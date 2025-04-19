@@ -12,7 +12,7 @@ export interface ActivityItem {
   action: string;
   target: string;
   timestamp: string;
-  targetType: "document" | "comment" | "workspace" | "summary" | "query";
+  targetType: "document" | "comment" | "workspace" | "summary" | "query" | "idea" | "share" | "version" | "bookmark" | "message" | "reference" | "search" | "invite";
   path?: string;
 }
 
