@@ -91,7 +91,7 @@ export function ActivityFeed() {
     switch (latestEvent.type) {
       case "paper_summarized":
         newActivity = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: eventUser.id,
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
@@ -103,7 +103,7 @@ export function ActivityFeed() {
         break
       case "idea_generated":
         newActivity = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: eventUser.id,
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
@@ -115,7 +115,7 @@ export function ActivityFeed() {
         break
       case "collaborator_joined":
         newActivity = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: eventUser.id,
           userName: latestEvent.payload.name || eventUser.name,
           userAvatar: latestEvent.payload.avatar || eventUser.avatar,
@@ -127,7 +127,7 @@ export function ActivityFeed() {
         break
       case "document_edited":
         newActivity = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: eventUser.id,
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
@@ -139,7 +139,7 @@ export function ActivityFeed() {
         break
       case "document_shared":
         newActivity = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: eventUser.id,
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,

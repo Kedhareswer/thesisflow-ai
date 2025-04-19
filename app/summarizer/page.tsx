@@ -16,6 +16,7 @@ import { useSocket } from "@/components/socket-provider"
 import { useUser } from "@/components/user-provider"
 import { useRouter } from "next/navigation"
 import { FileText, Loader2, Copy, Save, Upload, LinkIcon } from "lucide-react"
+import { processFile, validateFile } from "@/lib/file-upload"
 
 export default function PaperSummarizer() {
   const { user, isLoading: userLoading } = useUser()
@@ -77,122 +78,61 @@ export default function PaperSummarizer() {
     setSummary("")
 
     try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Compose a detailed prompt for the Gemini API
+      const prompt = `Summarize the following research paper.\n\nTitle: ${paperTitle}\n\nContent: ${paperText || `Content from URL: ${paperUrl}`}\n\nInstructions: Provide a structured summary with the following sections: Title, Authors (if available), Abstract, Key Findings, Methods, and Conclusions. Use clear markdown headings. ${includeKeywords ? 'Include a Keywords section.' : ''} ${includeCitations ? 'Include a Key Citations section if references are present.' : ''} ${includeMethodology ? 'Include a Methodology section.' : ''} The summary should be ${summaryLength === 1 ? 'very concise' : summaryLength === 2 ? 'concise' : summaryLength === 3 ? 'moderate in length' : summaryLength === 4 ? 'detailed' : 'very detailed'}.`;
 
-      // Generate a mock summary based on the input
-      const mockSummary = generateMockSummary(paperTitle, paperText || `Content from URL: ${paperUrl}`, summaryLength, {
-        includeKeywords,
-        includeCitations,
-        includeMethodology,
-      })
+      // Call Gemini API
+      const response = await fetch(`/api/summarize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          options: {
+            includeKeywords,
+            includeCitations,
+            includeMethodology,
+            summaryLength
+          }
+        })
+      });
 
-      setSummary(mockSummary)
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
 
-      // Track the summarization event
-      sendEvent("paper_summarized", {
-        title: paperTitle,
-        length: summaryLength,
-        options: {
-          includeKeywords,
-          includeCitations,
-          includeMethodology,
+      const data = await response.json();
+      setSummary(data.summary);
+
+      sendEvent({
+        type: "paper_summarized",
+        userId: user?.id || '',
+        timestamp: new Date().toISOString(),
+        payload: {
+          title: paperTitle,
+          length: summaryLength,
+          options: {
+            includeKeywords,
+            includeCitations,
+            includeMethodology,
+          },
         },
-      })
+      });
 
       toast({
         title: "Summary generated",
         description: "Your paper has been successfully summarized.",
-      })
+      });
     } catch (error) {
-      console.error("Error generating summary:", error)
-      setSummary("Error: Failed to summarize paper. Please try again.")
+      console.error("Error generating summary:", error);
+      setSummary("Error: Failed to summarize paper. Please try again.");
       toast({
         title: "Summarization failed",
         description: "There was an error generating the summary. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
-
-  // Function to generate a mock summary
-  const generateMockSummary = (
-    title: string,
-    text: string,
-    length: number,
-    options: {
-      includeKeywords: boolean
-      includeCitations: boolean
-      includeMethodology: boolean
-    },
-  ) => {
-    const lengthText = length <= 1 ? "very concise" : length <= 3 ? "concise" : "detailed"
-    const firstFewWords = text.split(" ").slice(0, 10).join(" ")
-
-    const summary = `# Summary of "${title}"
-
-## Main Findings
-This paper investigates ${firstFewWords}... and presents significant findings related to the field. The authors demonstrate that their approach offers improvements over existing methods, particularly in terms of efficiency and accuracy.
-
-${
-  length > 1
-    ? `
-## Background
-The research builds upon previous work in the field, addressing key limitations identified in earlier studies. The authors position their work within the broader context of ongoing research efforts.`
-    : ""
-}
-
-${
-  options.includeMethodology
-    ? `
-## Methodology
-The study employs a ${length > 3 ? "sophisticated" : "straightforward"} methodology involving data collection, preprocessing, and analysis. ${
-        length > 2
-          ? "The researchers utilize both quantitative and qualitative approaches to ensure comprehensive results. Their experimental design includes appropriate controls and validation techniques."
-          : ""
-      }`
-    : ""
-}
-
-${
-  length > 2
-    ? `
-## Results
-The findings indicate statistically significant improvements in performance metrics compared to baseline approaches. The authors report a ${
-        Math.floor(Math.random() * 30) + 15
-      }% increase in efficiency and enhanced accuracy across multiple test scenarios.`
-    : ""
-}
-
-${
-  length > 4
-    ? `
-## Discussion
-The paper thoroughly discusses the implications of these findings for both theory and practice. The authors acknowledge certain limitations of their approach and suggest potential avenues for future research.`
-    : ""
-}
-
-${
-  options.includeCitations
-    ? `
-## Key Citations
-- Smith et al. (2021) - Foundational work in the field
-- Johnson & Williams (2022) - Comparative methodology
-- Zhang et al. (2023) - Related findings in adjacent domain`
-    : ""
-}
-
-${
-  options.includeKeywords
-    ? `
-## Keywords
-#ResearchMethodology #DataAnalysis #MachineLearning #AcademicResearch`
-    : ""
-}`
-
-    return summary
   }
 
   const handleSaveSummary = () => {
@@ -213,32 +153,54 @@ ${
     })
 
     // Track the save event
-    sendEvent("summary_saved", {
-      title: paperTitle,
-      id: newSummary.id,
+    sendEvent({
+      type: "document_edited",
+      userId: user?.id || '',
+      timestamp: new Date().toISOString(),
+      payload: {
+        title: paperTitle,
+        id: newSummary.id,
+        action: 'save'
+      },
     })
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Set the paper title from the filename
-    setPaperTitle(file.name.replace(/\.[^/.]+$/, ""))
-
-    // Read the file content
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setPaperText(event.target.result.toString())
-      }
+    const validation = validateFile(file)
+    if (!validation.valid) {
+      toast({
+        title: "Invalid file",
+        description: validation.error,
+        variant: "destructive",
+      })
+      return
     }
-    reader.readAsText(file)
 
-    toast({
-      title: "File uploaded",
-      description: `${file.name} has been uploaded successfully.`,
-    })
+    setIsLoading(true)
+    try {
+      const result = await processFile(file)
+      if (result.error) {
+        throw new Error(result.error)
+      }
+      setPaperTitle(result.title)
+      setPaperText(result.text)
+      toast({
+        title: "File uploaded",
+        description: "Your document has been successfully processed.",
+      })
+    } catch (error) {
+      console.error("Error processing file:", error)
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to process file",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -297,7 +259,7 @@ ${
               <Tabs defaultValue="text" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="text">Paste Text</TabsTrigger>
-                  <TabsTrigger value="upload">Upload File</TabsTrigger>
+                  <TabsTrigger value="upload">Upload Word (.docx)</TabsTrigger>
                   <TabsTrigger value="url">Enter URL</TabsTrigger>
                 </TabsList>
 
@@ -306,7 +268,7 @@ ${
                     <Label htmlFor="paperText">Paper Content</Label>
                     <Textarea
                       id="paperText"
-                      placeholder="Paste the paper content here..."
+                      placeholder="Paste the paper content here...\nFor best results, include a clear title, author(s), abstract, and section headings. Optionally, add a prompt describing what you want summarized."
                       value={paperText}
                       onChange={(e) => setPaperText(e.target.value)}
                       className="min-h-[200px]"
@@ -316,7 +278,7 @@ ${
 
                 <TabsContent value="upload" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="paperFile">Upload Paper (PDF, DOCX)</Label>
+                    <Label htmlFor="paperFile">Upload Paper (.docx only)</Label>
                     <div className="flex items-center justify-center w-full">
                       <label
                         htmlFor="paperFile"
@@ -327,12 +289,12 @@ ${
                           <p className="mb-2 text-sm text-muted-foreground">
                             <span className="font-semibold">Click to upload</span> or drag and drop
                           </p>
-                          <p className="text-xs text-muted-foreground">PDF, DOCX (MAX. 20MB)</p>
+                          <p className="text-xs text-muted-foreground">DOCX only (MAX. 50MB)</p>
                         </div>
                         <input
                           id="paperFile"
                           type="file"
-                          accept=".pdf,.docx"
+                          accept=".docx"
                           className="hidden"
                           ref={fileInputRef}
                           onChange={handleFileUpload}
@@ -372,7 +334,7 @@ ${
                     max={5}
                     step={1}
                     value={[summaryLength]}
-                    onValueChange={(value) => setSummaryLength(value[0])}
+                    onValueChange={(value: number[]) => setSummaryLength(value[0])}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Concise</span>

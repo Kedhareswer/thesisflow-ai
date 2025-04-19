@@ -24,6 +24,10 @@ import {
   Edit2,
   Save,
   X,
+  BookOpen,
+  BarChart,
+  Loader2,
+  RefreshCw,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -34,6 +38,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface User {
   id: string
@@ -63,6 +75,32 @@ interface Document {
   lastModified: string
   collaborators: string[]
   isEditing?: boolean
+}
+
+interface SavedResponse {
+  id: string
+  prompt: string
+  response: string
+  timestamp: string
+  sharedWith: string[]
+}
+
+interface ResearchResource {
+  id: string
+  title: string
+  type: "paper" | "tool" | "dataset"
+  url: string
+  description: string
+  relevance: number
+}
+
+interface TimelineEvent {
+  id: string
+  title: string
+  description: string
+  date: string
+  status: "planned" | "in-progress" | "completed"
+  type: "milestone" | "task" | "meeting"
 }
 
 export default function CollaborativeWorkspace() {
@@ -187,6 +225,54 @@ export default function CollaborativeWorkspace() {
   const [editedContent, setEditedContent] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+
+  const [researchContext, setResearchContext] = useState({
+    field: "",
+    topic: "",
+    methodology: "",
+    stage: "planning", // planning, data_collection, analysis, writing
+  })
+
+  const [savedResponses, setSavedResponses] = useState<SavedResponse[]>([])
+  const [selectedResponse, setSelectedResponse] = useState<string | null>(null)
+
+  const [resources, setResources] = useState<ResearchResource[]>([
+    {
+      id: "1",
+      title: "Recent Advances in AI Research",
+      type: "paper",
+      url: "https://example.com/paper1",
+      description: "A comprehensive review of recent AI research methodologies",
+      relevance: 0.9,
+    },
+    {
+      id: "2",
+      title: "Research Data Analysis Tool",
+      type: "tool",
+      url: "https://example.com/tool1",
+      description: "Advanced data analysis tool for research projects",
+      relevance: 0.8,
+    },
+  ])
+
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([
+    {
+      id: "1",
+      title: "Literature Review",
+      description: "Complete initial literature review",
+      date: "2024-03-01",
+      status: "completed",
+      type: "milestone",
+    },
+    {
+      id: "2",
+      title: "Data Collection",
+      description: "Begin primary data collection",
+      date: "2024-04-15",
+      status: "in-progress",
+      type: "task",
+    },
+  ])
 
   // Simulate real-time collaboration
   useEffect(() => {
@@ -394,13 +480,95 @@ export default function CollaborativeWorkspace() {
 
   const generateMockAiResponse = (prompt: string): string => {
     if (prompt.toLowerCase().includes("research question")) {
-      return "**Potential Research Questions:**\n\n1. How does the implementation of AI tools affect research productivity in academic settings?\n2. What are the ethical implications of using AI for data analysis in sensitive research areas?\n3. To what extent can collaborative AI tools enhance interdisciplinary research outcomes?\n\nThese questions address current gaps in the literature while building on existing theoretical frameworks."
+      return `**Research Questions Analysis:**
+
+1. **Primary Research Question:**
+   How does the implementation of AI tools affect research productivity in academic settings?
+
+2. **Sub-questions:**
+   - What specific AI tools are most effective for different research tasks?
+   - How do researchers' experience levels impact AI tool adoption?
+   - What are the key barriers to successful AI integration in research workflows?
+
+3. **Methodological Considerations:**
+   - Consider using a mixed-methods approach
+   - Include both quantitative metrics (time saved, output quality) and qualitative insights
+   - Control for confounding variables like research field and institution type
+
+4. **Literature Gaps:**
+   - Limited studies on long-term impact
+   - Need for standardized evaluation metrics
+   - Lack of comparative studies across disciplines`
     } else if (prompt.toLowerCase().includes("methodology")) {
-      return "**Recommended Methodology:**\n\nBased on your research focus, a mixed methods approach would be most appropriate:\n\n- **Quantitative component**: Survey of 100+ researchers using standardized instruments to measure key variables\n- **Qualitative component**: In-depth interviews with 12-15 participants to explore contextual factors\n- **Analysis strategy**: Sequential explanatory design where qualitative data helps explain quantitative findings\n\nThis approach addresses the complexity of your research questions while providing both breadth and depth."
+      return `**Research Methodology Framework:**
+
+1. **Research Design:**
+   - Mixed-methods sequential explanatory design
+   - Phase 1: Quantitative survey (n=200+)
+   - Phase 2: Qualitative interviews (n=15-20)
+
+2. **Data Collection:**
+   - Survey: Standardized instruments for productivity metrics
+   - Interviews: Semi-structured format
+   - Document analysis: Research outputs and workflows
+
+3. **Analysis Strategy:**
+   - Quantitative: Statistical analysis (SPSS/R)
+   - Qualitative: Thematic analysis (NVivo)
+   - Integration: Joint display of findings
+
+4. **Validity & Reliability:**
+   - Pilot testing of instruments
+   - Inter-rater reliability checks
+   - Member checking for qualitative data`
     } else if (prompt.toLowerCase().includes("literature") || prompt.toLowerCase().includes("papers")) {
-      return "**Recent Literature Overview:**\n\nThe most cited papers in this field from the past 3 years include:\n\n1. Smith et al. (2022) - Comprehensive framework for understanding the phenomenon\n2. Johnson & Williams (2021) - Empirical study with large sample size (n=1,200)\n3. Zhang et al. (2023) - Meta-analysis of 45 studies showing consistent effect sizes\n\nKey themes across these works include methodological innovations, theoretical integration, and practical applications."
+      return `**Literature Review Highlights:**
+
+1. **Key Theoretical Papers:**
+   - Smith et al. (2022) - "AI in Research: A Theoretical Framework"
+   - Johnson & Williams (2021) - "Digital Transformation in Academia"
+   - Zhang et al. (2023) - "Machine Learning Applications in Research"
+
+2. **Methodological Studies:**
+   - Brown et al. (2023) - "Evaluating AI Tools in Research"
+   - Garcia & Lee (2022) - "Mixed Methods in AI Research"
+   - Patel et al. (2023) - "Longitudinal Study of AI Adoption"
+
+3. **Emerging Trends:**
+   - Increased focus on ethical considerations
+   - Integration of multiple AI tools
+   - Development of evaluation frameworks
+
+4. **Research Gaps:**
+   - Need for standardized metrics
+   - Long-term impact studies
+   - Cross-disciplinary comparisons`
     } else {
-      return "Based on your query, I've analyzed relevant research in this area. The current consensus suggests multiple approaches to this problem, with varying degrees of empirical support.\n\nRecent studies have highlighted the importance of considering contextual factors and methodological rigor when addressing these questions.\n\nI recommend focusing on the theoretical framework established by Smith et al. (2022) while incorporating the methodological innovations proposed by Johnson & Williams (2021)."
+      return `**Research Analysis:**
+
+Based on your query, I've analyzed the current research landscape and can provide the following insights:
+
+1. **Contextual Understanding:**
+   - The field is rapidly evolving with new methodologies
+   - Multiple theoretical frameworks exist
+   - Practical applications vary by discipline
+
+2. **Key Considerations:**
+   - Methodological rigor is crucial
+   - Contextual factors significantly impact outcomes
+   - Integration with existing workflows is essential
+
+3. **Recommendations:**
+   - Start with a comprehensive literature review
+   - Consider multiple theoretical frameworks
+   - Develop a clear research methodology
+   - Plan for practical implementation challenges
+
+4. **Next Steps:**
+   - Review recent systematic reviews
+   - Identify key theoretical frameworks
+   - Develop a research design
+   - Consider ethical implications`
     }
   }
 
@@ -432,6 +600,48 @@ export default function CollaborativeWorkspace() {
         role: "viewer",
       }
     )
+  }
+
+  const saveResponse = (prompt: string, response: string) => {
+    const newResponse: SavedResponse = {
+      id: Date.now().toString(),
+      prompt,
+      response,
+      timestamp: new Date().toLocaleString(),
+      sharedWith: [],
+    }
+    setSavedResponses([...savedResponses, newResponse])
+    toast({
+      title: "Response Saved",
+      description: "The AI response has been saved to your research notes.",
+    })
+  }
+
+  const shareResponse = (responseId: string) => {
+    const response = savedResponses.find((r) => r.id === responseId)
+    if (response) {
+      // Add system message about sharing
+      const systemMessage: Message = {
+        id: `system-${Date.now()}`,
+        userId: "system",
+        content: `You shared an AI response with the team: "${response.prompt}"`,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        type: "system",
+      }
+      setMessages([...messages, systemMessage])
+      toast({
+        title: "Response Shared",
+        description: "The AI response has been shared with your team.",
+      })
+    }
+  }
+
+  const addTimelineEvent = (event: Omit<TimelineEvent, "id">) => {
+    const newEvent: TimelineEvent = {
+      ...event,
+      id: Date.now().toString(),
+    }
+    setTimeline([...timeline, newEvent])
   }
 
   return (
@@ -510,7 +720,7 @@ export default function CollaborativeWorkspace() {
           </TabsList>
 
           <TabsContent value="chat" className="flex-1 flex flex-col mx-6 mt-0 space-y-4">
-            <ScrollArea className="flex-1 pr-4">
+            <div className="flex-1 overflow-auto">
               <div className="space-y-4 py-4">
                 {messages.map((message) => {
                   const user = getUserById(message.userId)
@@ -556,7 +766,7 @@ export default function CollaborativeWorkspace() {
                   )
                 })}
               </div>
-            </ScrollArea>
+            </div>
 
             <div className="flex gap-2 pb-4">
               <Input
@@ -579,24 +789,74 @@ export default function CollaborativeWorkspace() {
           <TabsContent value="ai" className="flex-1 flex flex-col mx-6 mt-0">
             <Card className="border-none shadow-none">
               <CardHeader>
-                <CardTitle className="text-lg">Research AI Assistant</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-blue-500" />
+                  Research AI Assistant
+                </CardTitle>
                 <CardDescription>
-                  Ask questions about research methods, literature, or get help with analysis
+                  Get help with research questions, methodology, literature review, and analysis
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg">
-                  <h4 className="font-medium text-sm mb-2">Suggested Prompts:</h4>
-                  <div className="space-y-2">
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg dark:bg-blue-950 dark:border-blue-900">
+                  <h4 className="font-medium text-sm mb-2">Research Context</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Research Field</Label>
+                      <Input
+                        id="research-field"
+                        placeholder="e.g., Computer Science, Education"
+                        value={researchContext.field}
+                        onChange={(e) => setResearchContext({ ...researchContext, field: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Research Topic</Label>
+                      <Input
+                        id="research-topic"
+                        placeholder="e.g., AI in Education"
+                        value={researchContext.topic}
+                        onChange={(e) => setResearchContext({ ...researchContext, topic: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Methodology</Label>
+                      <Input
+                        id="research-methodology"
+                        placeholder="e.g., Mixed Methods, Qualitative"
+                        value={researchContext.methodology}
+                        onChange={(e) => setResearchContext({ ...researchContext, methodology: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Research Stage</Label>
+                      <div className="relative">
+                        <select
+                          value={researchContext.stage}
+                          onChange={(e) => setResearchContext({ ...researchContext, stage: e.target.value })}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        >
+                          <option value="planning">Planning</option>
+                          <option value="data_collection">Data Collection</option>
+                          <option value="analysis">Analysis</option>
+                          <option value="writing">Writing</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg dark:bg-blue-950 dark:border-blue-900">
+                  <h4 className="font-medium text-sm mb-2">Research Support Categories:</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full justify-start text-left h-auto py-2"
-                      onClick={() =>
-                        setAiPrompt("Help me formulate research questions for my study on AI in education")
-                      }
+                      onClick={() => setAiPrompt("Help me formulate research questions for my study on AI in education")}
                     >
-                      Help me formulate research questions for my study on AI in education
+                      <Lightbulb className="mr-2 h-4 w-4" />
+                      Research Questions
                     </Button>
                     <Button
                       variant="outline"
@@ -604,7 +864,8 @@ export default function CollaborativeWorkspace() {
                       className="w-full justify-start text-left h-auto py-2"
                       onClick={() => setAiPrompt("Suggest a methodology for a mixed-methods research design")}
                     >
-                      Suggest a methodology for a mixed-methods research design
+                      <FileText className="mr-2 h-4 w-4" />
+                      Methodology
                     </Button>
                     <Button
                       variant="outline"
@@ -612,31 +873,168 @@ export default function CollaborativeWorkspace() {
                       className="w-full justify-start text-left h-auto py-2"
                       onClick={() => setAiPrompt("What are the most cited papers in this field from the last 3 years?")}
                     >
-                      What are the most cited papers in this field from the last 3 years?
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Literature Review
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start text-left h-auto py-2"
+                      onClick={() => setAiPrompt("Help me analyze my research data and findings")}
+                    >
+                      <BarChart className="mr-2 h-4 w-4" />
+                      Data Analysis
                     </Button>
                   </div>
                 </div>
 
-                <Textarea
-                  placeholder="Ask the AI assistant a research-related question..."
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  className="min-h-[120px]"
-                />
+                <div className="space-y-2">
+                  <Label>Your Research Question</Label>
+                  <Textarea
+                    id="ai-prompt"
+                    placeholder="Ask the AI assistant a research-related question..."
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="min-h-[120px]"
+                  />
+                </div>
 
                 <Button onClick={askAi} disabled={isAiLoading} className="w-full">
                   {isAiLoading ? (
                     <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analyzing Research Query...
                     </>
                   ) : (
                     <>
                       <Brain className="mr-2 h-4 w-4" />
-                      Ask AI Assistant
+                      Get Research Insights
                     </>
                   )}
                 </Button>
+
+                {messages.filter((m) => m.type === "ai-response").length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">Recent AI Responses</h4>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedResponse(null)}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {messages
+                        .filter((m) => m.type === "ai-response")
+                        .slice(-3)
+                        .map((message) => (
+                          <Card key={message.id} className="p-4">
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">{message.content}</p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => saveResponse(aiPrompt, message.content)}
+                                >
+                                  <Save className="mr-2 h-4 w-4" />
+                                  Save Response
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => shareResponse(message.id)}
+                                >
+                                  <Share2 className="mr-2 h-4 w-4" />
+                                  Share with Team
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Related Resources Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium">Related Resources</CardTitle>
+                      <CardDescription>Suggested papers, tools, and datasets</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {resources.map((resource) => (
+                        <div key={resource.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">{resource.title}</h4>
+                            <Badge variant="outline">{resource.type}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{resource.description}</p>
+                          <div className="flex items-center gap-2">
+                            <Button variant="link" size="sm" asChild>
+                              <a href={resource.url} target="_blank" rel="noopener noreferrer">
+                                View Resource
+                              </a>
+                            </Button>
+                            <Badge variant="secondary">
+                              Relevance: {Math.round(resource.relevance * 100)}%
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Research Timeline Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium">Research Timeline</CardTitle>
+                      <CardDescription>Track your research progress</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-4">
+                        {timeline.map((event) => (
+                          <div key={event.id} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium">{event.title}</h4>
+                              <Badge
+                                variant={
+                                  event.status === "completed"
+                                    ? "default"
+                                    : event.status === "in-progress"
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                              >
+                                {event.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{event.description}</p>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{event.type}</Badge>
+                              <span className="text-sm text-muted-foreground">{event.date}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          addTimelineEvent({
+                            title: "New Milestone",
+                            description: "Add description here",
+                            date: new Date().toISOString().split("T")[0],
+                            status: "planned",
+                            type: "milestone",
+                          })
+                        }
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Timeline Event
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -662,18 +1060,19 @@ export default function CollaborativeWorkspace() {
                             {getDocumentIcon(doc.type)}
                             <CardTitle className="text-base">{doc.title}</CardTitle>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                          <DropdownMenu
+                            trigger={
                               <Button variant="ghost" className="h-8 w-8 p-0 rounded-full">
                                 <span className="sr-only">Open menu</span>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
-                            </DropdownMenuTrigger>
+                            }
+                          >
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuItem
                                 onClick={() => startEditing(doc.id)}
-                                disabled={editingDocument !== null && editingDocument !== doc.id}
+                                className={editingDocument !== null && editingDocument !== doc.id ? "opacity-50 cursor-not-allowed" : ""}
                               >
                                 <Edit2 className="mr-2 h-4 w-4" />
                                 Edit

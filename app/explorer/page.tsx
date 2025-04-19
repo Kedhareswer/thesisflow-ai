@@ -1,50 +1,63 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import * as React from "react"
+import * as LabelPrimitive from "@radix-ui/react-label"
+import * as SliderPrimitive from "@radix-ui/react-slider"
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { useSocket } from "@/components/socket-provider"
 import { useUser } from "@/components/user-provider"
 import { useRouter } from "next/navigation"
 import { Brain, Loader2, Search, BookOpen, Lightbulb, ArrowRight, Copy, Save } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
 
-export default function ResearchExplorer() {
+// Define socket event types
+type SocketEvents = {
+  literature_searched: { query: string; type: string; resultCount: number };
+  idea_generated: { topic: string; count: number; context: string };
+};
+
+type Event = {
+  type: "paper_summarized" | "idea_generated" | "collaborator_joined" | "document_edited" | "document_shared"
+  userId: string
+  payload: any
+}
+
+const ResearchExplorer = () => {
   const { user, isLoading: userLoading } = useUser()
   const router = useRouter()
   const { toast } = useToast()
   const { sendEvent } = useSocket()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
 
   // Topic exploration state
-  const [researchTopic, setResearchTopic] = useState("")
-  const [explorationDepth, setExplorationDepth] = useState(3)
-  const [explorationResult, setExplorationResult] = useState("")
+  const [researchTopic, setResearchTopic] = React.useState("")
+  const [explorationDepth, setExplorationDepth] = React.useState<number>(3)
+  const [explorationResult, setExplorationResult] = React.useState("")
+  const [explorationType, setExplorationType] = React.useState("broad")
 
   // Literature search state
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchType, setSearchType] = useState("keyword")
-  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [searchType, setSearchType] = React.useState("keyword")
+  const [searchResults, setSearchResults] = React.useState<any[]>([])
 
   // Idea generation state
-  const [ideaTopic, setIdeaTopic] = useState("")
-  const [ideaContext, setIdeaContext] = useState("")
-  const [ideaCount, setIdeaCount] = useState(5)
-  const [generatedIdeas, setGeneratedIdeas] = useState("")
+  const [ideaTopic, setIdeaTopic] = React.useState("")
+  const [ideaContext, setIdeaContext] = React.useState("")
+  const [ideaCount, setIdeaCount] = React.useState(5)
+  const [generatedIdeas, setGeneratedIdeas] = React.useState("")
 
   // Redirect if not logged in
-  useEffect(() => {
+  React.useEffect(() => {
     if (!userLoading && !user) {
       router.push("/login")
     }
@@ -52,62 +65,63 @@ export default function ResearchExplorer() {
 
   const handleExplore = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!researchTopic.trim()) {
-      toast({
-        title: "Missing information",
-        description: "Please provide a research topic to explore.",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!researchTopic) return
 
     setIsLoading(true)
+    setError(null)
     setExplorationResult("")
 
+    const prompt = `Please explore the research topic: "${researchTopic}". Consider the following aspects:
+    1. Key concepts and theories
+    2. Current state of research
+    3. Major debates and controversies
+    4. Future research directions
+    5. Practical applications
+    Please provide a comprehensive analysis with a depth level of ${explorationDepth} (1-5 scale).
+    
+    Format the response in markdown with clear headings and bullet points.`
+
     try {
-      // Create the prompt for the AI
-      const prompt = `Provide a comprehensive exploration of the research topic: "${researchTopic}".
+      const response = await fetch("/api/explore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          options: {
+            temperature: 0.7,
+            maxTokens: 1000,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to explore research topic")
+      }
+
+      const data = await response.json()
       
-      Please include:
-      1. An overview of the field
-      2. Key concepts and terminology
-      3. Major research areas
-      4. Leading researchers and institutions
-      5. Recommended starting points for research
-      ${explorationDepth > 3 ? "6. Research gaps and opportunities" : ""}
-      7. Next steps for research
+      // Ensure we have a valid response
+      if (!data.result) {
+        throw new Error("No response received from the API")
+      }
       
-      The depth of exploration should be ${explorationDepth <= 2 ? "brief" : explorationDepth <= 4 ? "comprehensive" : "in-depth"}.
-      Format the response with clear markdown headings, bullet points, and sections for readability.`
-
-      // Use the AI SDK to generate the exploration
-      const result = await generateText({
-        model: openai("gpt-4o"),
-        prompt: prompt,
-        temperature: 0.7,
-        maxTokens: 1500,
+      setExplorationResult(data.result)
+      
+      // Track the search event
+      sendEvent({
+        type: "paper_summarized",
+        userId: user?.id || "anonymous",
+        payload: {
+          topic: researchTopic,
+          depth: explorationDepth
+        }
       })
-
-      setExplorationResult(result.text)
-
-      // Track the exploration event
-      sendEvent("topic_explored", {
-        topic: researchTopic,
-        depth: explorationDepth,
-      })
-
-      toast({
-        title: "Topic explored",
-        description: "Your research topic has been successfully explored.",
-      })
-    } catch (error) {
-      console.error("Error exploring topic:", error)
-      setExplorationResult("Error: Failed to explore topic. Please try again.")
-      toast({
-        title: "Exploration failed",
-        description: "There was an error exploring the topic. Please try again.",
-        variant: "destructive",
-      })
+    } catch (err) {
+      console.error("Error exploring topic:", err)
+      setError(err instanceof Error ? err.message : "An error occurred")
+      setExplorationResult("")
     } finally {
       setIsLoading(false)
     }
@@ -128,79 +142,114 @@ export default function ResearchExplorer() {
     setSearchResults([])
 
     try {
-      // In a real app, this would call an academic search API
-      // For now, we'll generate mock results using AI
-      const prompt = `Generate 4 realistic academic paper search results for the query: "${searchQuery}" (search type: ${searchType}).
-      
-      For each result, include:
-      1. Title
-      2. Authors
-      3. Journal
-      4. Year
-      5. A brief abstract
-      6. Number of citations
-      7. Keywords
-      
-      Format the response as a JSON array with these fields. Make the results diverse but relevant to the query.`
+      const prompt = `As an academic search engine, generate 4 realistic and detailed academic paper search results for the query: "${searchQuery}" (search type: ${searchType}).
 
-      const result = await generateText({
-        model: openai("gpt-4o"),
-        prompt: prompt,
-        temperature: 0.7,
-      })
+For each paper, provide a structured entry in JSON format with the following fields:
+{
+  "title": "Paper title",
+  "authors": "Author names with affiliations",
+  "journal": "Journal or conference name",
+  "year": "Publication year",
+  "abstract": "A comprehensive abstract",
+  "citations": "Number of citations",
+  "keywords": ["keyword1", "keyword2", ...],
+  "doi": "Digital Object Identifier",
+  "impact_factor": "Journal impact factor",
+  "methodology": "Brief description of research methodology",
+  "key_findings": ["finding1", "finding2", ...]
+}
 
-      // Parse the JSON response
+Requirements:
+1. Ensure papers are diverse but highly relevant to the query
+2. Include recent publications (within last 5 years) and seminal works
+3. Provide realistic citation counts based on publication year
+4. Include both journal articles and conference papers
+5. Ensure abstracts are detailed and technically accurate
+6. Include relevant methodology descriptions
+7. List impactful findings
+
+Format the response as a JSON array containing these detailed paper objects. Make the results academically rigorous and realistic.`
+
+      const response = await fetch('/api/explore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Improved JSON parsing with better error handling
       try {
-        const jsonStr = result.text.replace(/```json|```/g, "").trim()
-        const parsedResults = JSON.parse(jsonStr)
-        setSearchResults(parsedResults)
+        // First try to parse the raw result
+        const parsedResults = JSON.parse(data.result);
+        setSearchResults(parsedResults);
       } catch (parseError) {
-        console.error("Error parsing search results:", parseError)
-        // Fallback to mock data if parsing fails
-        setSearchResults([
-          {
-            title: `Recent Advances in ${searchQuery}: A Systematic Review`,
-            authors: "Johnson, A., Smith, B., & Williams, C.",
-            journal: "Journal of Advanced Research",
-            year: "2023",
-            abstract: `This paper provides a comprehensive review of recent developments in ${searchQuery}, highlighting key methodological advances and empirical findings from the past five years.`,
-            citations: 42,
-            keywords: ["systematic review", searchQuery.toLowerCase(), "research methods", "empirical findings"],
-          },
-          {
-            title: `Exploring the Impact of ${searchQuery} on Educational Outcomes`,
-            authors: "Chen, D. & Garcia, E.",
-            journal: "Educational Research Quarterly",
-            year: "2022",
-            abstract: `This study investigates how ${searchQuery} influences various educational outcomes across different age groups and learning contexts.`,
-            citations: 28,
-            keywords: ["education", searchQuery.toLowerCase(), "student engagement", "mixed-methods"],
-          },
-        ])
+        // If that fails, try to clean the string and parse again
+        try {
+          const cleanedStr = data.result
+            .replace(/```json|```/g, "")
+            .replace(/[\n\r]/g, "")
+            .trim();
+          const parsedResults = JSON.parse(cleanedStr);
+          setSearchResults(parsedResults);
+        } catch (secondParseError) {
+          console.error("Error parsing search results:", secondParseError);
+          // Fallback to mock data if parsing fails
+          setSearchResults([
+            {
+              title: `Recent Advances in ${searchQuery}: A Systematic Review`,
+              authors: "Johnson, A., Smith, B., & Williams, C.",
+              journal: "Journal of Advanced Research",
+              year: "2023",
+              abstract: `This paper provides a comprehensive review of recent developments in ${searchQuery}, highlighting key methodological advances and empirical findings from the past five years.`,
+              citations: 42,
+              keywords: ["systematic review", searchQuery.toLowerCase(), "research methods", "empirical findings"],
+            },
+            {
+              title: `Exploring the Impact of ${searchQuery} on Educational Outcomes`,
+              authors: "Chen, D. & Garcia, E.",
+              journal: "Educational Research Quarterly",
+              year: "2022",
+              abstract: `This study investigates how ${searchQuery} influences various educational outcomes across different age groups and learning contexts.`,
+              citations: 28,
+              keywords: ["education", searchQuery.toLowerCase(), "student engagement", "mixed-methods"],
+            },
+          ]);
+        }
       }
 
       // Track the search event
-      sendEvent("literature_searched", {
-        query: searchQuery,
-        type: searchType,
-        resultCount: searchResults.length,
-      })
+      sendEvent({
+        type: "paper_summarized",
+        userId: user?.id || "anonymous",
+        payload: {
+          query: searchQuery,
+          type: searchType,
+          resultCount: searchResults.length,
+        }
+      });
 
       toast({
         title: "Search completed",
         description: `Found ${searchResults.length} papers related to "${searchQuery}"`,
-      })
+      });
     } catch (error) {
-      console.error("Search failed:", error)
+      console.error("Search failed:", error);
       toast({
         title: "Search failed",
         description: "There was an error performing the search. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleGenerateIdeas = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -217,45 +266,102 @@ export default function ResearchExplorer() {
     setGeneratedIdeas("")
 
     try {
-      // Create the prompt for the AI
-      const prompt = `Generate ${ideaCount} innovative research ideas on the topic: "${ideaTopic}".
-      ${ideaContext ? `Additional context: ${ideaContext}` : ""}
-      
-      For each idea, include:
-      1. A clear research question
-      2. Suggested methodology
-      3. Potential impact of the research
-      
-      Format the response with markdown headings and bullet points for readability.
-      Make the ideas diverse, innovative, and academically rigorous.`
+      // Enhanced prompt for more innovative and structured research ideas
+      const prompt = `As an expert research advisor, generate ${ideaCount} innovative research ideas for: "${ideaTopic}"
+${ideaContext ? `\nContext: ${ideaContext}\n` : ''}
 
-      // Use the AI SDK to generate ideas
-      const result = await generateText({
-        model: openai("gpt-4o"),
-        prompt: prompt,
-        temperature: 0.8,
-        maxTokens: 1500,
-      })
+Format each idea as follows:
 
-      setGeneratedIdeas(result.text)
+# Research Ideas for ${ideaTopic}
+
+${Array.from({ length: ideaCount }, (_, i) => `
+## Research Idea ${i + 1}
+
+### Research Question
+- Main question
+- Key sub-questions
+
+### Background
+- Current knowledge gaps
+- Research significance
+
+### Methods
+- Research design
+- Data collection
+- Analysis approach
+
+### Impact & Innovation
+- Academic impact
+- Practical applications
+- Novel aspects
+
+### Timeline & Resources
+- Key phases
+- Required expertise
+- Essential resources
+`).join('\n')}
+
+Requirements:
+1. Be innovative but feasible
+2. Include interdisciplinary aspects
+3. Address real-world problems
+4. Suggest practical methods
+5. Consider resource constraints
+
+Use markdown formatting with clear headings and bullet points.`
+
+      const response = await fetch('/api/explore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          prompt,
+          options: {
+            temperature: 0.7,
+            maxOutputTokens: 8192, // Increased token limit for longer responses
+            topK: 40,
+            topP: 0.8,
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Set the generated ideas without validation
+      setGeneratedIdeas(data.result);
 
       // Track the idea generation event
-      sendEvent("idea_generated", {
-        topic: ideaTopic,
-        count: ideaCount,
-        context: ideaContext,
+      sendEvent({
+        type: "idea_generated",
+        userId: user?.id || "anonymous",
+        payload: {
+          topic: ideaTopic,
+          count: ideaCount,
+          context: ideaContext,
+        }
       })
 
       toast({
         title: "Ideas generated",
-        description: `Generated ${ideaCount} research ideas on "${ideaTopic}"`,
+        description: `Generated ${ideaCount} research ideas for "${ideaTopic}"`,
       })
     } catch (error) {
       console.error("Error generating ideas:", error)
-      setGeneratedIdeas("Error: Failed to generate ideas. Please try again.")
+      
+      // More specific error message
+      const errorMessage = error instanceof Error && error.message.includes("Incomplete response")
+        ? "Received incomplete results. Please try reducing the number of requested ideas or simplifying the topic."
+        : "Failed to generate ideas. Please try again.";
+
+      setGeneratedIdeas("")
       toast({
         title: "Idea generation failed",
-        description: "There was an error generating research ideas. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -320,42 +426,43 @@ export default function ResearchExplorer() {
                   <Label htmlFor="researchTopic">Research Topic</Label>
                   <Input
                     id="researchTopic"
-                    placeholder="Enter a research topic (e.g., 'Machine Learning in Healthcare')"
                     value={researchTopic}
                     onChange={(e) => setResearchTopic(e.target.value)}
-                    required
+                    placeholder="Enter your research topic"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="explorationDepth">Exploration Depth</Label>
-                    <span className="text-sm text-muted-foreground">
-                      {explorationDepth <= 2 ? "Brief" : explorationDepth <= 4 ? "Comprehensive" : "In-depth"}
-                    </span>
-                  </div>
+                <div className="grid gap-4">
+                  <Label>Exploration Depth</Label>
                   <Slider
-                    id="explorationDepth"
+                    value={[explorationDepth]}
                     min={1}
                     max={5}
                     step={1}
-                    value={[explorationDepth]}
                     onValueChange={(value) => setExplorationDepth(value[0])}
                   />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Shallow</span>
+                    <span>Deep</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Exploration Type</Label>
+                  <RadioGroup value={explorationType} onValueChange={setExplorationType}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="broad" id="broad" />
+                      <Label htmlFor="broad">Broad Overview</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="deep" id="deep" />
+                      <Label htmlFor="deep">Deep Dive</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
 
                 <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Exploring...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Explore Topic
-                    </>
-                  )}
+                  {isLoading ? "Exploring..." : "Explore"}
                 </Button>
               </form>
             </CardContent>
@@ -377,50 +484,70 @@ export default function ResearchExplorer() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="prose prose-sm max-w-none dark:prose-invert space-y-4">
                   {explorationResult.split("\n").map((line, index) => {
-                    // Handle headings
+                    // Main title
                     if (line.startsWith("# ")) {
                       return (
-                        <h1 key={index} className="text-xl font-bold mt-4">
+                        <h1 key={index} className="text-2xl font-bold text-primary border-b pb-2 mb-6">
                           {line.replace("# ", "")}
                         </h1>
                       )
-                    } else if (line.startsWith("## ")) {
+                    }
+                    // Section headers
+                    if (line.startsWith("## ")) {
                       return (
-                        <h2 key={index} className="text-lg font-bold mt-3">
+                        <h2 key={index} className="text-xl font-semibold text-primary/90 mt-8 mb-4">
                           {line.replace("## ", "")}
                         </h2>
                       )
-                    } else if (line.startsWith("### ")) {
+                    }
+                    // Subsection headers
+                    if (line.startsWith("### ")) {
                       return (
-                        <h3 key={index} className="text-md font-bold mt-2">
+                        <h3 key={index} className="text-lg font-medium text-primary/80 mt-6 mb-3">
                           {line.replace("### ", "")}
                         </h3>
                       )
                     }
-                    // Handle bullet points
-                    else if (line.startsWith("- ")) {
+                    // Clean bullet points
+                    if (line.trim().startsWith("-") || line.trim().startsWith("•")) {
                       return (
-                        <li key={index} className="ml-4">
-                          {line.replace("- ", "")}
-                        </li>
-                      )
-                    } else if (line.startsWith("1. ") || line.startsWith("2. ") || line.startsWith("3. ")) {
-                      return (
-                        <li key={index} className="ml-4">
-                          {line.replace(/^\d+\.\s/, "")}
-                        </li>
+                        <div key={index} className="flex gap-3 ml-4 my-1.5">
+                          <span className="text-primary/60 mt-1">•</span>
+                          <span className="text-sm flex-1">{line.replace(/^[-•]\s*/, "")}</span>
+                        </div>
                       )
                     }
-                    // Handle empty lines
-                    else if (line.trim() === "") {
-                      return <br key={index} />
+                    // Numbered lists
+                    if (/^\d+\.\s/.test(line)) {
+                      const number = line.match(/^\d+/)?.[0]
+                      return (
+                        <div key={index} className="flex gap-3 ml-4 my-1.5">
+                          <span className="text-primary/60 font-medium min-w-[1.5rem]">{number}.</span>
+                          <span className="text-sm flex-1">{line.replace(/^\d+\.\s/, "")}</span>
+                        </div>
+                      )
                     }
-                    // Regular text
-                    else {
-                      return <p key={index}>{line}</p>
+                    // Empty lines for spacing
+                    if (line.trim() === "") {
+                      return <div key={index} className="h-3" />
                     }
+                    // Regular paragraphs with improved formatting
+                    return (
+                      <p key={index} className="text-sm leading-relaxed my-2">
+                        {line.split(/(\*\*.*?\*\*|__.*?__)/g).map((part, i) => {
+                          if (part.startsWith("**") || part.startsWith("__")) {
+                            return (
+                              <strong key={i} className="font-semibold text-primary/90">
+                                {part.replace(/\*\*|__/g, "")}
+                              </strong>
+                            )
+                          }
+                          return part
+                        })}
+                      </p>
+                    )
                   })}
                 </div>
               </CardContent>
@@ -440,7 +567,7 @@ export default function ResearchExplorer() {
             <CardContent>
               <form onSubmit={handleSearch} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="searchQuery">Search Query</Label>
+                  <LabelPrimitive.Root htmlFor="searchQuery">Search Query</LabelPrimitive.Root>
                   <Input
                     id="searchQuery"
                     placeholder="Enter keywords or phrases (e.g., 'artificial intelligence ethics')"
@@ -451,21 +578,21 @@ export default function ResearchExplorer() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Search Type</Label>
-                  <RadioGroup value={searchType} onValueChange={setSearchType} className="flex space-x-4">
+                  <LabelPrimitive.Root>Search Type</LabelPrimitive.Root>
+                  <RadioGroupPrimitive.Root value={searchType} onValueChange={setSearchType} className="flex space-x-4">
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="keyword" id="keyword" />
-                      <Label htmlFor="keyword">Keyword</Label>
+                      <RadioGroupPrimitive.Item id="keyword" />
+                      <LabelPrimitive.Root htmlFor="keyword">Keyword</LabelPrimitive.Root>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="title" id="title" />
-                      <Label htmlFor="title">Title</Label>
+                      <RadioGroupPrimitive.Item id="title" />
+                      <LabelPrimitive.Root htmlFor="title">Title</LabelPrimitive.Root>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="author" id="author" />
-                      <Label htmlFor="author">Author</Label>
+                      <RadioGroupPrimitive.Item id="author" />
+                      <LabelPrimitive.Root htmlFor="author">Author</LabelPrimitive.Root>
                     </div>
-                  </RadioGroup>
+                  </RadioGroupPrimitive.Root>
                 </div>
 
                 <Button type="submit" disabled={isLoading} className="w-full">
@@ -501,10 +628,27 @@ export default function ResearchExplorer() {
                         <CardTitle className="text-base">{paper.title}</CardTitle>
                         <CardDescription>
                           {paper.authors} ({paper.year}) • {paper.journal}
+                          {paper.impact_factor && ` • Impact Factor: ${paper.impact_factor}`}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 pt-2">
                         <p className="text-sm mb-2">{paper.abstract}</p>
+                        {paper.methodology && (
+                          <div className="mt-2 mb-3">
+                            <span className="text-sm font-medium">Methodology: </span>
+                            <span className="text-sm">{paper.methodology}</span>
+                          </div>
+                        )}
+                        {paper.key_findings && paper.key_findings.length > 0 && (
+                          <div className="mt-2 mb-3">
+                            <span className="text-sm font-medium">Key Findings:</span>
+                            <ul className="list-disc list-inside">
+                              {paper.key_findings.map((finding: string, i: number) => (
+                                <li key={i} className="text-sm ml-2">{finding}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-1 mt-2">
                           {paper.keywords &&
                             paper.keywords.map((keyword: string, i: number) => (
@@ -515,8 +659,26 @@ export default function ResearchExplorer() {
                         </div>
                       </CardContent>
                       <CardFooter className="p-4 pt-0 flex justify-between items-center">
+                        <div className="flex items-center gap-4">
                         <span className="text-xs text-muted-foreground">Citations: {paper.citations}</span>
-                        <Button variant="ghost" size="sm" className="gap-1">
+                          {paper.doi && (
+                            <span className="text-xs text-muted-foreground">
+                              DOI: {paper.doi}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => {
+                            // Try to open using DOI first, then fall back to a Google Scholar search
+                            const url = paper.doi
+                              ? `https://doi.org/${paper.doi}`
+                              : `https://scholar.google.com/scholar?q=${encodeURIComponent(paper.title)}`;
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }}
+                        >
                           View Paper <ArrowRight className="h-3 w-3" />
                         </Button>
                       </CardFooter>
@@ -540,7 +702,7 @@ export default function ResearchExplorer() {
             <CardContent>
               <form onSubmit={handleGenerateIdeas} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="ideaTopic">Research Topic</Label>
+                  <LabelPrimitive.Root htmlFor="ideaTopic">Research Topic</LabelPrimitive.Root>
                   <Input
                     id="ideaTopic"
                     placeholder="Enter your research area (e.g., 'Climate Change Adaptation')"
@@ -551,7 +713,7 @@ export default function ResearchExplorer() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ideaContext">Research Context (Optional)</Label>
+                  <LabelPrimitive.Root htmlFor="ideaContext">Research Context (Optional)</LabelPrimitive.Root>
                   <Textarea
                     id="ideaContext"
                     placeholder="Provide additional context or specific aspects you're interested in..."
@@ -563,17 +725,21 @@ export default function ResearchExplorer() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <Label htmlFor="ideaCount">Number of Ideas</Label>
+                    <LabelPrimitive.Root htmlFor="ideaCount">Number of Ideas</LabelPrimitive.Root>
                     <span className="text-sm text-muted-foreground">{ideaCount} ideas</span>
                   </div>
-                  <Slider
-                    id="ideaCount"
+                  <SliderPrimitive.Root
+                    value={[ideaCount]}
                     min={3}
                     max={10}
                     step={1}
-                    value={[ideaCount]}
-                    onValueChange={(value) => setIdeaCount(value[0])}
-                  />
+                    onValueChange={(value: number[]) => setIdeaCount(value[0])}
+                  >
+                    <SliderPrimitive.Track>
+                      <SliderPrimitive.Range />
+                    </SliderPrimitive.Track>
+                    <SliderPrimitive.Thumb />
+                  </SliderPrimitive.Root>
                 </div>
 
                 <Button type="submit" disabled={isLoading} className="w-full">
@@ -609,59 +775,63 @@ export default function ResearchExplorer() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="prose prose-sm max-w-none dark:prose-invert space-y-4">
                   {generatedIdeas.split("\n").map((line, index) => {
-                    // Handle headings
                     if (line.startsWith("# ")) {
                       return (
-                        <h1 key={index} className="text-xl font-bold mt-4">
+                        <h1 key={index} className="text-2xl font-bold text-primary border-b pb-2">
                           {line.replace("# ", "")}
                         </h1>
                       )
-                    } else if (line.startsWith("## ")) {
+                    }
+                    if (line.startsWith("## ")) {
                       return (
-                        <h2 key={index} className="text-lg font-bold mt-3">
+                        <h2 key={index} className="text-xl font-semibold text-primary/90 mt-6">
                           {line.replace("## ", "")}
                         </h2>
                       )
-                    } else if (line.startsWith("### ")) {
+                    }
+                    if (line.startsWith("### ")) {
                       return (
-                        <h3 key={index} className="text-md font-bold mt-2">
+                        <h3 key={index} className="text-lg font-medium text-primary/80 mt-4">
                           {line.replace("### ", "")}
                         </h3>
                       )
                     }
-                    // Handle bullet points
-                    else if (line.startsWith("- ")) {
+                    if (line.startsWith("- ") || line.startsWith("* ")) {
                       return (
-                        <li key={index} className="ml-4">
-                          {line.replace("- ", "")}
-                        </li>
-                      )
-                    } else if (line.startsWith("1. ") || line.startsWith("2. ") || line.startsWith("3. ")) {
-                      return (
-                        <li key={index} className="ml-4">
-                          {line.replace(/^\d+\.\s/, "")}
-                        </li>
+                        <div key={index} className="flex gap-2 ml-4">
+                          <span className="text-primary/60">•</span>
+                          <span className="text-sm">{line.replace(/^[-*]\s/, "")}</span>
+                        </div>
                       )
                     }
-                    // Handle empty lines
-                    else if (line.trim() === "") {
-                      return <br key={index} />
-                    }
-                    // Handle bold text
-                    else if (line.includes("**")) {
+                    if (/^\d+\.\s/.test(line)) {
+                      const number = line.match(/^\d+/)?.[0]
                       return (
-                        <p
-                          key={index}
-                          dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }}
-                        />
+                        <div key={index} className="flex gap-2 ml-4">
+                          <span className="text-primary/60 font-medium min-w-[1.5rem]">{number}.</span>
+                          <span className="text-sm">{line.replace(/^\d+\.\s/, "")}</span>
+                        </div>
                       )
                     }
-                    // Regular text
-                    else {
-                      return <p key={index}>{line}</p>
+                    if (line.trim() === "") {
+                      return <div key={index} className="h-2" />
                     }
+                    return (
+                      <p key={index} className="text-sm leading-relaxed">
+                        {line.split(/(\*\*.*?\*\*|__.*?__)/g).map((part, i) => {
+                          if (part.startsWith("**") || part.startsWith("__")) {
+                            return (
+                              <strong key={i} className="font-semibold text-primary">
+                                {part.replace(/\*\*|__/g, "")}
+                              </strong>
+                            )
+                          }
+                          return part
+                        })}
+                      </p>
+                    )
                   })}
                 </div>
               </CardContent>
@@ -672,3 +842,5 @@ export default function ResearchExplorer() {
     </div>
   )
 }
+
+export default ResearchExplorer

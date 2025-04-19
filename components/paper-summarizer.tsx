@@ -89,6 +89,27 @@ export default function PaperSummarizer() {
     alert("Summary saved successfully!")
   }
 
+  const handleViewSummary = (summary: { title: string; summary: string }) => {
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${summary.title}</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-50 p-8">
+          <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-sm overflow-hidden">
+            ${summary.summary}
+          </div>
+        </body>
+      </html>
+    `
+    const blob = new Blob([htmlContent], { type: 'text/html' })
+    window.open(URL.createObjectURL(blob), '_blank')
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -126,66 +147,68 @@ export default function PaperSummarizer() {
     const title = paperTitle || "Research Paper"
     const lengthText = length <= 1 ? "very concise" : length <= 3 ? "concise" : "detailed"
 
-    const summary = `# Summary of "${title}"
+    const summary = `<article class="prose prose-slate max-w-none rounded-lg bg-white shadow-sm overflow-hidden">
+      <header class="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-4">${title}</h1>
+        ${options.includeKeywords ? `
+        <div class="flex flex-wrap gap-2">
+          <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">Research Methodology</span>
+          <span class="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">Data Analysis</span>
+          <span class="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">Machine Learning</span>
+          <span class="inline-flex items-center rounded-full bg-pink-50 px-3 py-1 text-sm font-medium text-pink-700 ring-1 ring-inset ring-pink-600/20">Academic Research</span>
+        </div>` : ''}
+      </header>
 
-## Main Findings
-This paper investigates ${text.split(" ").slice(0, 10).join(" ")}... and presents significant findings related to the field. The authors demonstrate that their approach offers improvements over existing methods, particularly in terms of efficiency and accuracy.
+      <div class="p-6 space-y-6">
+        <section>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-3">Main Findings</h2>
+          <p class="text-gray-700 leading-relaxed">This paper investigates ${text.split(" ").slice(0, 10).join(" ")}... and presents significant findings related to the field. The authors demonstrate that their approach offers improvements over existing methods, particularly in terms of efficiency and accuracy.</p>
+        </section>
 
-${
-  length > 1
-    ? `
-## Background
-The research builds upon previous work in the field, addressing key limitations identified in earlier studies. The authors position their work within the broader context of ongoing research efforts.`
-    : ""
-}
+        ${length > 1 ? `
+        <section>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-3">Background</h2>
+          <p class="text-gray-700 leading-relaxed">The research builds upon previous work in the field, addressing key limitations identified in earlier studies. The authors position their work within the broader context of ongoing research efforts.</p>
+        </section>` : ''}
 
-${
-  options.includeMethodology
-    ? `
-## Methodology
-The study employs a ${length > 3 ? "sophisticated" : "straightforward"} methodology involving data collection, preprocessing, and analysis. ${
-        length > 2
-          ? "The researchers utilize both quantitative and qualitative approaches to ensure comprehensive results. Their experimental design includes appropriate controls and validation techniques."
-          : ""
-      }`
-    : ""
-}
+        ${options.includeMethodology ? `
+        <section>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-3">Methodology</h2>
+          <p class="text-gray-700 leading-relaxed">The study employs a ${length > 3 ? "sophisticated" : "straightforward"} methodology involving data collection, preprocessing, and analysis. ${length > 2 ? "The researchers utilize both quantitative and qualitative approaches to ensure comprehensive results. Their experimental design includes appropriate controls and validation techniques." : ""}</p>
+        </section>` : ''}
 
-${
-  length > 2
-    ? `
-## Results
-The findings indicate statistically significant improvements in performance metrics compared to baseline approaches. The authors report a ${
-        Math.floor(Math.random() * 30) + 15
-      }% increase in efficiency and enhanced accuracy across multiple test scenarios.`
-    : ""
-}
+        ${length > 2 ? `
+        <section>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-3">Results</h2>
+          <p class="text-gray-700 leading-relaxed">The findings indicate statistically significant improvements in performance metrics compared to baseline approaches. The authors report a ${Math.floor(Math.random() * 30) + 15}% increase in efficiency and enhanced accuracy across multiple test scenarios.</p>
+        </section>` : ''}
 
-${
-  length > 4
-    ? `
-## Discussion
-The paper thoroughly discusses the implications of these findings for both theory and practice. The authors acknowledge certain limitations of their approach and suggest potential avenues for future research.`
-    : ""
-}
+        ${length > 4 ? `
+        <section>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-3">Discussion</h2>
+          <p class="text-gray-700 leading-relaxed">The paper thoroughly discusses the implications of these findings for both theory and practice. The authors acknowledge certain limitations of their approach and suggest potential avenues for future research.</p>
+        </section>` : ''}
 
-${
-  options.includeCitations
-    ? `
-## Key Citations
-- Smith et al. (2021) - Foundational work in the field
-- Johnson & Williams (2022) - Comparative methodology
-- Zhang et al. (2023) - Related findings in adjacent domain`
-    : ""
-}
-
-${
-  options.includeKeywords
-    ? `
-## Keywords
-#ResearchMethodology #DataAnalysis #MachineLearning #AcademicResearch`
-    : ""
-}`
+        ${options.includeCitations ? `
+        <section>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-3">Key Citations</h2>
+          <ul class="list-inside space-y-2 text-gray-700">
+            <li class="flex items-start">
+              <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-50 text-blue-600 text-sm font-medium mr-2">1</span>
+              <span>Smith et al. (2021) - Foundational work in the field</span>
+            </li>
+            <li class="flex items-start">
+              <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-50 text-blue-600 text-sm font-medium mr-2">2</span>
+              <span>Johnson & Williams (2022) - Comparative methodology</span>
+            </li>
+            <li class="flex items-start">
+              <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-50 text-blue-600 text-sm font-medium mr-2">3</span>
+              <span>Zhang et al. (2023) - Related findings in adjacent domain</span>
+            </li>
+          </ul>
+        </section>` : ''}
+      </div>
+    </article>`
 
     return summary
   }
@@ -303,7 +326,7 @@ ${
                     max={5}
                     step={1}
                     value={[summaryLength]}
-                    onValueChange={(value) => setSummaryLength(value[0])}
+                    onValueChange={(value: React.SetStateAction<number>[]) => setSummaryLength(value[0])}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Concise</span>
@@ -398,7 +421,7 @@ ${
                         <p className="text-sm line-clamp-3">{item.summary}</p>
                       </CardContent>
                       <CardFooter className="p-3 pt-0 flex justify-end">
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewSummary(item)}>
                           View
                         </Button>
                       </CardFooter>

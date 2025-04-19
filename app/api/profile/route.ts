@@ -1,10 +1,8 @@
-'use client';
-
-import { UserProfileComponent } from '@/components/user-profile';
+import { NextResponse } from 'next/server';
 import { UserProfile, UserSettings } from '@/lib/types';
 
-// Mock data - replace with actual data fetching
-const mockProfile: UserProfile = {
+// Mock database - replace with actual database
+let mockProfile: UserProfile = {
   id: '1',
   name: 'John Doe',
   email: 'john.doe@example.com',
@@ -31,7 +29,7 @@ const mockProfile: UserProfile = {
   updatedAt: new Date().toISOString(),
 };
 
-const mockSettings: UserSettings = {
+let mockSettings: UserSettings = {
   profile: mockProfile,
   displayName: 'John Doe',
   emailNotifications: true,
@@ -53,16 +51,35 @@ const mockSettings: UserSettings = {
   timezone: 'UTC',
 };
 
-export default function ProfilePage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto py-8">
-        <h1 className="text-3xl font-bold mb-8">Profile & Settings</h1>
-        <UserProfileComponent
-          initialProfile={mockProfile}
-          initialSettings={mockSettings}
-        />
-      </main>
-    </div>
-  );
+export async function GET() {
+  return NextResponse.json({ profile: mockProfile, settings: mockSettings });
 }
+
+export async function PUT(request: Request) {
+  try {
+    const { profile, settings } = await request.json();
+
+    if (profile) {
+      mockProfile = {
+        ...mockProfile,
+        ...profile,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (settings) {
+      mockSettings = {
+        ...mockSettings,
+        ...settings,
+        profile: mockProfile,
+      };
+    }
+
+    return NextResponse.json({ profile: mockProfile, settings: mockSettings });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to update profile' },
+      { status: 500 }
+    );
+  }
+} 
