@@ -1,10 +1,9 @@
-
 import { FileText, Users, BarChart3, TrendingUp, MessageSquare, Search } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatsCard from "@/components/dashboard/StatsCard";
 import ActivityCard from "@/components/dashboard/ActivityCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
+import AnalyticsSection from "@/components/dashboard/AnalyticsSection";
 import { useActivity } from "@/context/ActivityContext";
 import { useMemo } from "react";
 
@@ -139,72 +138,63 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Tabs defaultValue="all">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-medium">Research Projects</h2>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-                <TabsTrigger value="draft">Drafts</TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="all" className="mt-0 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects.map((project) => (
-                  <ProjectCard key={project.id} {...project} />
-                ))}
+          <AnalyticsSection />
+          <div className="mt-6">
+            <Tabs defaultValue="all">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-medium">Research Projects</h2>
+                <TabsList>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="completed">Completed</TabsTrigger>
+                  <TabsTrigger value="draft">Drafts</TabsTrigger>
+                </TabsList>
               </div>
-            </TabsContent>
 
-            <TabsContent value="active" className="mt-0 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects
-                  .filter((project) => project.status === "active")
-                  .map((project) => (
+              <TabsContent value="all" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects.map((project) => (
                     <ProjectCard key={project.id} {...project} />
                   ))}
-              </div>
-            </TabsContent>
+                </div>
+              </TabsContent>
 
-            <TabsContent value="completed" className="mt-0 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects
-                  .filter((project) => project.status === "completed")
-                  .map((project) => (
-                    <ProjectCard key={project.id} {...project} />
-                  ))}
-              </div>
-            </TabsContent>
+              <TabsContent value="active" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects
+                    .filter((project) => project.status === "active")
+                    .map((project) => (
+                      <ProjectCard key={project.id} {...project} />
+                    ))}
+                </div>
+              </TabsContent>
 
-            <TabsContent value="draft" className="mt-0 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects
-                  .filter((project) => project.status === "draft")
-                  .map((project) => (
-                    <ProjectCard key={project.id} {...project} />
-                  ))}
-              </div>
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="completed" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects
+                    .filter((project) => project.status === "completed")
+                    .map((project) => (
+                      <ProjectCard key={project.id} {...project} />
+                    ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="draft" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects
+                    .filter((project) => project.status === "draft")
+                    .map((project) => (
+                      <ProjectCard key={project.id} {...project} />
+                    ))}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
 
         <div>
           <h2 className="text-xl font-medium mb-4">Activity Feed</h2>
-          <Card className="bg-research-100/50 border-research-200 animate-fade-in">
-            <CardContent className="p-4">
-              <div className="text-sm">
-                <p className="font-medium text-research-600">Real-time Updates</p>
-                <p className="text-muted-foreground">
-                  Showing live activity from collaborators
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <div className="mt-4">
-            <ActivityCard activities={recentActivities} />
-          </div>
+          <ActivityCard activities={recentActivities} />
         </div>
       </div>
     </div>
