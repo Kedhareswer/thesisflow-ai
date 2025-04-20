@@ -16,11 +16,15 @@ export interface UsageMetrics {
   storage: number // in MB
 }
 
+interface AnalyticsProperties {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 // Mock analytics storage
 let analyticsEvents: AnalyticsEvent[] = []
 
 // Track an event
-export function trackEvent(eventName: string, userId: string, properties: Record<string, any> = {}): void {
+export function trackEvent(eventName: string, userId: string, properties: AnalyticsProperties = {}): void {
   const event: AnalyticsEvent = {
     eventName,
     userId,

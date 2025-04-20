@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -392,18 +391,22 @@ Format the response in markdown.`
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {searchResults.map((paper, index) => (
-                    <Card key={index} className="bg-muted/50">
+                  {searchResults.map((paper) => (
+                    <Card key={paper.id} className="bg-muted/50">
                       <CardHeader className="p-4 pb-2">
                         <CardTitle className="text-base">{paper.title}</CardTitle>
                         <CardDescription>
-                          {paper.authors.join(", ")} ({paper.year})
+                          {paper.authors.join(", ")} ({paper.year}) • {paper.journal}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 pt-2">
                         <p className="text-sm mb-2">{paper.abstract}</p>
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {/* Assuming keywords are not available in the mock data */}
+                          {paper.citations && (
+                            <Badge variant="outline" className="text-xs">
+                              Citations: {paper.citations}
+                            </Badge>
+                          )}
                         </div>
                       </CardContent>
                       <CardFooter className="p-4 pt-0 flex justify-between items-center">
@@ -509,4 +512,4 @@ Format the response in markdown.`
       </Tabs>
     </div>
   )
-}
+} 

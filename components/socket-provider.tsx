@@ -1,4 +1,3 @@
-
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
@@ -18,29 +17,28 @@ export interface Event {
   payload: Record<string, any>
 }
 
-interface SocketContextType {
-  socket: Socket | null
-  events: Event[]
-  activeUsers: User[]
-  isConnected: boolean
-  sendEvent: (eventType: string, payload: Record<string, any>) => void
+interface SocketEvent {
+  type: string;
+  payload: Record<string, unknown>;
 }
 
-const SocketContext = createContext<SocketContextType>({
-  socket: null,
-  events: [],
-  activeUsers: [],
-  isConnected: false,
-  sendEvent: () => {},
-})
+interface SocketContextType {
+  socket: Socket | null
+  events: SocketEvent[]
+  activeUsers: User[]
+  isConnected: boolean
+  sendEvent: (eventType: string, payload: Record<string, unknown>) => void
+}
+
+const SocketContext = createContext<SocketContextType | undefined>(undefined)
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null)
-  const [events, setEvents] = useState<Event[]>([])
+  const [events, setEvents] = useState<SocketEvent[]>([])
   const [activeUsers, setActiveUsers] = useState<User[]>([])
   const [isConnected, setIsConnected] = useState(false)
 
-  const sendEvent = (eventType: string, payload: Record<string, any>) => {
+  const sendEvent = (eventType: string, payload: Record<string, unknown>) => {
     if (!socket) return
     const eventWithTimestamp = {
       type: eventType,
@@ -49,7 +47,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       timestamp: new Date().toISOString()
     }
     socket.emit('event', eventWithTimestamp)
-    setEvents(prev => [...prev, eventWithTimestamp as Event])
+    setEvents(prev => [...prev, eventWithTimestamp as SocketEvent])
   }
 
   useEffect(() => {
@@ -73,7 +71,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     })
 
     socketInstance.on("event", (event: Event) => {
-      setEvents((prev) => [...prev, event])
+      setEvents((prev) => [...prev, event as SocketEvent])
     })
 
     setSocket(socketInstance)

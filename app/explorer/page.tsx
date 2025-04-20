@@ -175,7 +175,15 @@ Format the response as a JSON array containing these detailed paper objects. Mak
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt,
+          options: {
+            temperature: 0.7,
+            maxTokens: 4096,
+            topK: 40,
+            topP: 0.8,
+          }
+        }),
       });
 
       if (!response.ok) {
@@ -184,44 +192,37 @@ Format the response as a JSON array containing these detailed paper objects. Mak
 
       const data = await response.json();
       
-      // Improved JSON parsing with better error handling
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Parse the JSON result
       try {
-        // First try to parse the raw result
         const parsedResults = JSON.parse(data.result);
         setSearchResults(parsedResults);
       } catch (parseError) {
-        // If that fails, try to clean the string and parse again
-        try {
-          const cleanedStr = data.result
-            .replace(/```json|```/g, "")
-            .replace(/[\n\r]/g, "")
-            .trim();
-          const parsedResults = JSON.parse(cleanedStr);
-          setSearchResults(parsedResults);
-        } catch (secondParseError) {
-          console.error("Error parsing search results:", secondParseError);
-          // Fallback to mock data if parsing fails
-          setSearchResults([
-            {
-              title: `Recent Advances in ${searchQuery}: A Systematic Review`,
-              authors: "Johnson, A., Smith, B., & Williams, C.",
-              journal: "Journal of Advanced Research",
-              year: "2023",
-              abstract: `This paper provides a comprehensive review of recent developments in ${searchQuery}, highlighting key methodological advances and empirical findings from the past five years.`,
-              citations: 42,
-              keywords: ["systematic review", searchQuery.toLowerCase(), "research methods", "empirical findings"],
-            },
-            {
-              title: `Exploring the Impact of ${searchQuery} on Educational Outcomes`,
-              authors: "Chen, D. & Garcia, E.",
-              journal: "Educational Research Quarterly",
-              year: "2022",
-              abstract: `This study investigates how ${searchQuery} influences various educational outcomes across different age groups and learning contexts.`,
-              citations: 28,
-              keywords: ["education", searchQuery.toLowerCase(), "student engagement", "mixed-methods"],
-            },
-          ]);
-        }
+        console.error("Error parsing search results:", parseError);
+        // Fallback to mock data if parsing fails
+        setSearchResults([
+          {
+            title: `Recent Advances in ${searchQuery}: A Systematic Review`,
+            authors: "Johnson, A., Smith, B., & Williams, C.",
+            journal: "Journal of Advanced Research",
+            year: "2023",
+            abstract: `This paper provides a comprehensive review of recent developments in ${searchQuery}, highlighting key methodological advances and empirical findings from the past five years.`,
+            citations: 42,
+            keywords: ["systematic review", searchQuery.toLowerCase(), "research methods", "empirical findings"],
+          },
+          {
+            title: `Exploring the Impact of ${searchQuery} on Educational Outcomes`,
+            authors: "Chen, D. & Garcia, E.",
+            journal: "Educational Research Quarterly",
+            year: "2022",
+            abstract: `This study investigates how ${searchQuery} influences various educational outcomes across different age groups and learning contexts.`,
+            citations: 28,
+            keywords: ["education", searchQuery.toLowerCase(), "student engagement", "mixed-methods"],
+          },
+        ]);
       }
 
       // Track the search event
@@ -243,7 +244,7 @@ Format the response as a JSON array containing these detailed paper objects. Mak
       console.error("Search failed:", error);
       toast({
         title: "Search failed",
-        description: "There was an error performing the search. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error performing the search. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -266,7 +267,6 @@ Format the response as a JSON array containing these detailed paper objects. Mak
     setGeneratedIdeas("")
 
     try {
-      // Enhanced prompt for more innovative and structured research ideas
       const prompt = `As an expert research advisor, generate ${ideaCount} innovative research ideas for: "${ideaTopic}"
 ${ideaContext ? `\nContext: ${ideaContext}\n` : ''}
 
@@ -319,7 +319,7 @@ Use markdown formatting with clear headings and bullet points.`
           prompt,
           options: {
             temperature: 0.7,
-            maxOutputTokens: 8192, // Increased token limit for longer responses
+            maxTokens: 4096,
             topK: 40,
             topP: 0.8,
           }
@@ -332,7 +332,10 @@ Use markdown formatting with clear headings and bullet points.`
 
       const data = await response.json();
       
-      // Set the generated ideas without validation
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
       setGeneratedIdeas(data.result);
 
       // Track the idea generation event
@@ -344,30 +347,23 @@ Use markdown formatting with clear headings and bullet points.`
           count: ideaCount,
           context: ideaContext,
         }
-      })
+      });
 
       toast({
         title: "Ideas generated",
         description: `Generated ${ideaCount} research ideas for "${ideaTopic}"`,
-      })
+      });
     } catch (error) {
-      console.error("Error generating ideas:", error)
-      
-      // More specific error message
-      const errorMessage = error instanceof Error && error.message.includes("Incomplete response")
-        ? "Received incomplete results. Please try reducing the number of requested ideas or simplifying the topic."
-        : "Failed to generate ideas. Please try again.";
-
-      setGeneratedIdeas("")
+      console.error("Error generating ideas:", error);
       toast({
-        title: "Idea generation failed",
-        description: errorMessage,
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate research ideas. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard
