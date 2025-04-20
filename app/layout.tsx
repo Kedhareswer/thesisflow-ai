@@ -1,9 +1,10 @@
+
 import type React from "react"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { SocketProvider } from "@/components/socket-provider"
-import { UserProvider } from "@/components/user-provider"
+import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import MainNav from "@/components/main-nav"
 import "./globals.css"
 
@@ -12,7 +13,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata = {
   title: "Research Collaboration Platform",
   description: "A platform for collaborative research with AI-powered tools",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light">
-          <UserProvider>
+          <SupabaseAuthProvider>
             <SocketProvider>
               <div className="min-h-screen flex flex-col">
                 <MainNav />
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
               <Toaster />
             </SocketProvider>
-          </UserProvider>
+          </SupabaseAuthProvider>
         </ThemeProvider>
       </body>
     </html>

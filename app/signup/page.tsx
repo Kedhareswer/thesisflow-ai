@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -9,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
 
@@ -16,33 +18,18 @@ export default function SignupPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const { signUp, isLoading } = useSupabaseAuth()
   const { toast } = useToast()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
+    
     try {
-      // In a real app, this would call an API to create the account
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      toast({
-        title: "Account created",
-        description: "Your account has been created successfully. Please log in.",
-      })
-
+      await signUp(email, password, name)
       router.push("/login")
     } catch (error) {
       console.error("Signup failed:", error)
-      toast({
-        title: "Signup failed",
-        description: "There was an error creating your account. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
     }
   }
 

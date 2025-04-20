@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -8,20 +9,20 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useUser } from "@/components/user-provider"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const { login, isLoading } = useUser()
+  const { signIn, isLoading } = useSupabaseAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await login(email, password)
+      await signIn(email, password)
       router.push("/dashboard")
     } catch (error) {
       console.error("Login failed:", error)
