@@ -11,17 +11,8 @@ import ReactFlow, {
   addEdge,
   Connection,
   Position,
-  Panel,
-  NodeChange,
-  EdgeChange,
-  OnNodesChange,
-  OnEdgesChange,
-  OnConnect,
-  MarkerType
 } from "reactflow"
 import "reactflow/dist/style.css"
-import { Button } from "@/components/ui/button"
-import { Trash2 } from "lucide-react"
 
 interface MindMapNode {
   id: string
@@ -37,29 +28,14 @@ interface MindMapVisualizationProps {
   onNodeDelete: (nodeId: string) => void
 }
 
-const CustomNode = ({ data }: { data: { label: string; onDelete: () => void } }) => (
-  <div className="px-4 py-2 shadow-lg rounded-lg bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 group">
-    <div className="flex items-center gap-2">
+const nodeTypes = {
+  custom: ({ data }: { data: { label: string } }) => (
+    <div className="px-4 py-2 shadow-lg rounded-lg bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
       <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
         {data.label}
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(e) => {
-          e.stopPropagation()
-          data.onDelete()
-        }}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
     </div>
-  </div>
-)
-
-const nodeTypes = {
-  custom: CustomNode,
+  ),
 }
 
 export default function MindMapVisualization({
@@ -68,7 +44,7 @@ export default function MindMapVisualization({
   onNodeUpdate,
   onNodeDelete,
 }: MindMapVisualizationProps) {
-  // Convert mind map nodes to react-flow format
+  // Convert our mind map nodes to react-flow nodes and edges
   const { flowNodes, flowEdges } = useMemo(() => {
     const nodesMap = new Map<string, Node>()
     const edges: Edge[] = []
@@ -78,10 +54,7 @@ export default function MindMapVisualization({
         id: node.id,
         type: "custom",
         position: node.position,
-        data: { 
-          label: node.content,
-          onDelete: () => onNodeDelete(node.id)
-        },
+        data: { label: node.content },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       }
@@ -94,8 +67,6 @@ export default function MindMapVisualization({
           source: parentId,
           target: node.id,
           type: "smoothstep",
-          animated: true,
-          style: { stroke: "#94a3b8" },
         })
       }
 
@@ -108,7 +79,7 @@ export default function MindMapVisualization({
       flowNodes: Array.from(nodesMap.values()),
       flowEdges: edges,
     }
-  }, [nodes, onNodeDelete])
+  }, [nodes])
 
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(flowNodes)
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(flowEdges)
@@ -147,9 +118,6 @@ export default function MindMapVisualization({
         onNodeDoubleClick={onNodeDoubleClick}
         nodeTypes={nodeTypes}
         fitView
-        minZoom={0.5}
-        maxZoom={2}
-        attributionPosition="bottom-right"
       >
         <Background />
         <Controls />

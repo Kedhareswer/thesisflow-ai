@@ -1,145 +1,68 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(req: Request) {
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+
+export async function POST(request: NextRequest) {
   try {
-    const { prompt, options = {} } = await req.json()
-    
-    const systemPrompt = `You are an advanced Research Topic Explorer, specialized in providing comprehensive academic analysis. Your role is to:
+    const { prompt, options } = await request.json()
 
-1. DEPTH OF ANALYSIS
-- Provide multi-layered analysis of research topics
-- Identify core concepts, theoretical frameworks, and methodological approaches
-- Examine both established foundations and emerging trends
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error('Gemini API key is not configured')
+    }
 
-2. STRUCTURED EXPLORATION
-- Break down complex topics into manageable components
-- Highlight interconnections between different aspects
-- Present information in a clear hierarchical structure
+    if (!prompt) {
+      throw new Error('Prompt is required')
+    }
 
-3. RESEARCH CONTEXT
-- Consider historical development and evolution of ideas
-- Identify current state-of-the-art developments
-- Project future research directions and potential breakthroughs
+    console.log('Sending request to Gemini API with prompt:', prompt)
 
-4. CRITICAL EVALUATION
-- Analyze strengths and limitations of current approaches
-- Identify research gaps and opportunities
-- Suggest potential methodological improvements
-
-5. PRACTICAL IMPLICATIONS
-- Connect theoretical concepts to practical applications
-- Identify potential impact on different stakeholders
-- Suggest implementation strategies
-
-6. FORMAT GUIDELINES
-When responding, always structure your output as a valid JSON object with the following format:
-{
-  "analysis": {
-    "mainConcepts": [
-      { "concept": "string", "description": "string", "importance": "string" }
-    ],
-    "theoreticalFrameworks": [
-      { "name": "string", "description": "string", "applications": ["string"] }
-    ],
-    "methodologicalApproaches": [
-      { "method": "string", "strengths": ["string"], "limitations": ["string"] }
-    ],
-    "researchGaps": [
-      { "gap": "string", "impact": "string", "potentialSolutions": ["string"] }
-    ],
-    "futureDirections": [
-      { "direction": "string", "rationale": "string", "timeline": "string" }
-    ]
-  },
-  "visualization": {
-    "mindMap": {
-      "nodes": [
-        {
-          "id": "string",
-          "label": "string",
-          "type": "main|sub|leaf",
-          "connections": ["string"]
-        }
-      ]
-    },
-    "relationships": [
-      {
-        "from": "string",
-        "to": "string",
-        "type": "depends_on|influences|relates_to",
-        "strength": "weak|moderate|strong"
-      }
-    ]
-  },
-  "recommendations": {
-    "nextSteps": [
-      {
-        "step": "string",
-        "priority": "high|medium|low",
-        "resources": ["string"]
-      }
-    ],
-    "potentialCollaborations": [
-      {
-        "field": "string",
-        "rationale": "string",
-        "benefits": ["string"]
-      }
-    ],
-    "resources": [
-      {
-        "type": "paper|book|tool|dataset",
-        "title": "string",
-        "description": "string",
-        "url": "string"
-      }
-    ]
-  }
-}`
-
-    const response = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent", {
-      method: "POST",
+    const response = await fetch(`${GEMINI_API_URL}?key=${process.env.GOOGLE_API_KEY}`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GOOGLE_AI_KEY}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         contents: [{
-          role: "user",
-          parts: [{ text: `${systemPrompt}\n\nAnalyze the following research topic:\n${prompt}` }]
+          parts: [{ text: prompt }]
         }],
         generationConfig: {
-          temperature: options.temperature || 0.7,
-          maxOutputTokens: options.maxTokens || 2048,
-          topP: 0.8,
-          topK: 40
-        },
-      }),
+          temperature: options?.temperature || 0.7,
+          maxOutputTokens: options?.maxTokens || 2048,
+          topK: options?.topK || 40,
+          topP: options?.topP || 0.8,
+        }
+      })
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      const errorData = await response.json()
+      console.error('Gemini API Error:', errorData)
+      throw new Error(errorData.error?.message || 'Failed to generate content')
     }
 
     const data = await response.json()
-    let result = data.candidates[0].content.parts[0].text
-
-    // Validate JSON format
-    try {
-      const parsedResult = JSON.parse(result)
-      return new Response(JSON.stringify({ result: parsedResult }), {
-        headers: { "Content-Type": "application/json" },
-      })
-    } catch (error) {
-      throw new Error("Invalid JSON format in response")
+    console.log('Received response from Gemini API:', data)
+    
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Invalid response format from Gemini API')
     }
-  } catch (error: any) {
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to process request" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+
+    const result = data.candidates[0].content.parts[0].text
+
+    // Clean and format the response
+    const cleanedResponse = result
+      .trim()
+      .replace(/^```markdown|```$/g, '')
+      .trim()
+
+    console.log('Cleaned response:', cleanedResponse)
+
+    return NextResponse.json({ result: cleanedResponse })
+  } catch (error) {
+    console.error('Error in explore API:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to process exploration request' },
+      { status: 500 }
     )
   }
 } 

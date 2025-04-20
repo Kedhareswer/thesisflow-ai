@@ -63,12 +63,11 @@ const ResearchExplorer = () => {
   const [ideaCount, setIdeaCount] = React.useState(5)
   const [generatedIdeas, setGeneratedIdeas] = React.useState("")
 
-  const handleExplore = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!researchTopic) {
+  const handleExplore = async () => {
+    if (!researchTopic.trim()) {
       toast({
-        title: "Missing Topic",
-        description: "Please provide a research topic to explore.",
+        title: "Error",
+        description: "Please enter a research topic",
         variant: "destructive",
       })
       return
@@ -78,16 +77,6 @@ const ResearchExplorer = () => {
     setError(null)
     setExplorationResult("")
 
-    const prompt = `Please explore the research topic: "${researchTopic}". Consider the following aspects:
-    1. Key concepts and theories
-    2. Current state of research
-    3. Major debates and controversies
-    4. Future research directions
-    5. Practical applications
-    Please provide a comprehensive analysis with a depth level of ${explorationDepth} (1-5 scale).
-    
-    Format the response in markdown with clear headings and bullet points.`
-
     try {
       const response = await fetch("/api/explore", {
         method: "POST",
@@ -95,47 +84,47 @@ const ResearchExplorer = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt,
+          prompt: `Analyze the research topic: "${researchTopic}". Provide a comprehensive analysis including:
+          1. Key concepts and definitions
+          2. Current state of research
+          3. Major debates and controversies
+          4. Future research directions
+          5. Practical applications
+          
+          Format the response in markdown with clear headings and bullet points.`,
           options: {
             temperature: 0.7,
-            maxTokens: 1000,
+            maxTokens: 2048,
           },
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to explore research topic")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to explore research topic")
       }
 
       const data = await response.json()
       
-      // Ensure we have a valid response
       if (!data.result) {
-        throw new Error("No response received from the API")
+        throw new Error("No results found for the topic")
       }
-      
+
       setExplorationResult(data.result)
       
       toast({
-        title: "Research Topic Explored",
-        description: "Your research topic has been analyzed successfully.",
+        title: "Analysis Complete",
+        description: "Research topic has been analyzed successfully.",
       })
 
-      const eventPayload = {
-        topic: researchTopic,
-        depth: explorationDepth,
-        timestamp: new Date().toISOString()
-      };
-      sendEvent("paper_summarized", eventPayload);
     } catch (err) {
       console.error("Error exploring topic:", err)
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
       toast({
-        title: "Exploration Failed",
-        description: err instanceof Error ? err.message : "Failed to explore research topic. Please try again.",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to explore research topic",
         variant: "destructive",
       })
-      setError(err instanceof Error ? err.message : "An error occurred")
-      setExplorationResult("")
     } finally {
       setIsLoading(false)
     }
@@ -210,8 +199,13 @@ Format the response as a JSON array containing these detailed paper objects. Mak
         throw new Error(data.error);
       }
 
+      // Clean the response before parsing
+      const cleanedResult = data.result
+        .replace(/```json|```/g, '')
+        .trim();
+
       // Parse the JSON result
-      const parsedResults = JSON.parse(data.result);
+      const parsedResults = JSON.parse(cleanedResult);
       setSearchResults(parsedResults);
 
       toast({
@@ -349,28 +343,25 @@ Use markdown formatting with clear headings and bullet points.`
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        toast({
-          title: "Copied to Clipboard",
-          description: "Content has been copied successfully.",
-        })
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({
+        title: "Copied",
+        description: "Content copied to clipboard",
       })
-      .catch((err) => {
-        console.error("Failed to copy:", err)
-        toast({
-          title: "Copy Failed",
-          description: "Failed to copy content. Please try again.",
-          variant: "destructive",
-        })
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to copy content",
+        variant: "destructive",
       })
+    }
   }
 
   const formatMarkdown = (text: string) => {
-    // Remove markdown code block indicators
-    text = text.replace(/```markdown|```/g, '').trim();
+    // Remove markdown code block indicators and trim
+    text = text.trim();
 
     return text.split('\n').map((line, index) => {
       // Main title (# )
@@ -403,41 +394,7 @@ Use markdown formatting with clear headings and bullet points.`
         );
       }
 
-      // Keywords section
-      if (line.match(/^Keywords:/)) {
-        return (
-          <div key={index} className="flex flex-wrap gap-2 my-4">
-            {line.replace(/^Keywords:\s*/, '').split(',').map((keyword, i) => (
-              <Badge key={i} variant="secondary" className="text-sm">
-                {keyword.trim()}
-              </Badge>
-            ))}
-          </div>
-        );
-      }
-
-      // Bullet points (* or - )
-      if (line.match(/^[*-] /)) {
-        return (
-          <div key={index} className="flex gap-3 my-2 ml-4">
-            <span className="text-primary/60 mt-1.5">•</span>
-            <span className="flex-1">{line.replace(/^[*-] /, '')}</span>
-          </div>
-        );
-      }
-
-      // Numbered lists (1. 2. etc)
-      if (line.match(/^\d+\. /)) {
-        const number = line.match(/^\d+/)?.[0];
-        return (
-          <div key={index} className="flex gap-3 my-2 ml-4">
-            <span className="text-primary/60 font-medium min-w-[1.5rem]">{number}.</span>
-            <span className="flex-1">{line.replace(/^\d+\. /, '')}</span>
-          </div>
-        );
-      }
-
-      // Bold text
+      // Bold text (**text**)
       if (line.includes('**')) {
         return (
           <p key={index} className="my-2">
@@ -455,12 +412,27 @@ Use markdown formatting with clear headings and bullet points.`
         );
       }
 
+      // Bullet points (* or - )
+      if (line.match(/^\s*[*-] /)) {
+        const indentLevel = (line.match(/^\s*/) || [''])[0].length;
+        return (
+          <div 
+            key={index} 
+            className="flex gap-3 my-2" 
+            style={{ marginLeft: `${indentLevel + 16}px` }}
+          >
+            <span className="text-primary/60 mt-1.5">•</span>
+            <span className="flex-1">{line.replace(/^\s*[*-] /, '')}</span>
+          </div>
+        );
+      }
+
       // Empty lines for spacing
       if (line.trim() === '') {
         return <div key={index} className="h-4" />;
       }
 
-      // Regular paragraphs with improved readability
+      // Regular paragraphs
       return (
         <p key={index} className="my-3 leading-relaxed text-primary/90">
           {line}
@@ -498,7 +470,7 @@ Use markdown formatting with clear headings and bullet points.`
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleExplore} className="space-y-4">
+              <form className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="researchTopic">Research Topic</Label>
                   <Input
@@ -538,8 +510,20 @@ Use markdown formatting with clear headings and bullet points.`
                   </RadioGroup>
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? "Exploring..." : "Explore"}
+                <Button 
+                  type="button" 
+                  onClick={handleExplore} 
+                  disabled={isLoading} 
+                  className="w-full"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Exploring...
+                    </>
+                  ) : (
+                    "Explore"
+                  )}
                 </Button>
               </form>
             </CardContent>
@@ -549,7 +533,7 @@ Use markdown formatting with clear headings and bullet points.`
             <Card className="overflow-hidden">
               <CardHeader className="border-b bg-muted/40">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="text-2xl">Summary</CardTitle>
+                  <CardTitle className="text-2xl">Research Analysis</CardTitle>
                   <div className="flex gap-2">
                     <Button 
                       size="icon" 
@@ -562,9 +546,6 @@ Use markdown formatting with clear headings and bullet points.`
                     <Button 
                       size="icon" 
                       variant="ghost" 
-                      onClick={() => {
-                        // Implement save functionality
-                      }}
                       className="hover:bg-muted"
                     >
                       <Save className="h-4 w-4" />

@@ -278,62 +278,26 @@ Format the response as a JSON array of tasks, where each task has:
   const addMindMapNode = () => {
     if (!newNodeContent.trim()) return
 
-    const centerX = 400
-    const centerY = 300
-    const radius = 200
-    const currentNodes = mindMapNodes.length
-
-    // Calculate position based on golden angle for better distribution
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5)) // Golden angle in radians
-    const angle = currentNodes * goldenAngle
-
     const newNode: MindMapNode = {
       id: Date.now().toString(),
       content: newNodeContent,
       children: [],
-      position: {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
-      },
+      position: { x: 0, y: 0 },
     }
 
     if (selectedNode) {
-      // If a node is selected, add as a child with relative positioning
-      const parentNode = findNode(mindMapNodes, selectedNode)
-      if (parentNode) {
-        const childAngle = (parentNode.children.length * Math.PI * 2) / 8
-        const childRadius = 150
-        newNode.position = {
-          x: parentNode.position.x + childRadius * Math.cos(childAngle),
-          y: parentNode.position.y + childRadius * Math.sin(childAngle),
-        }
-        setMindMapNodes((prev) =>
-          prev.map((node) =>
-            node.id === selectedNode
-              ? { ...node, children: [...node.children, newNode] }
-              : node
-          )
+      setMindMapNodes((prev) =>
+        prev.map((node) =>
+          node.id === selectedNode
+            ? { ...node, children: [...node.children, newNode] }
+            : node
         )
-      }
+      )
     } else {
       setMindMapNodes((prev) => [...prev, newNode])
     }
 
     setNewNodeContent("")
-    toast({
-      title: "Node Added",
-      description: "New mind map node has been created.",
-    })
-  }
-
-  // Helper function to find a node by ID in the tree structure
-  const findNode = (nodes: MindMapNode[], id: string): MindMapNode | null => {
-    for (const node of nodes) {
-      if (node.id === id) return node
-      const found = findNode(node.children, id)
-      if (found) return found
-    }
-    return null
   }
 
   // Sticky Notes Functions
