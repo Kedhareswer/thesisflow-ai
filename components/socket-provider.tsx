@@ -1,3 +1,4 @@
+
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
@@ -11,7 +12,7 @@ export interface User {
 }
 
 export interface Event {
-  type: "paper_summarized" | "idea_generated" | "collaborator_joined" | "document_edited" | "document_shared"
+  type: "paper_summarized" | "idea_generated" | "collaborator_joined" | "document_edited" | "document_shared" | "chat_message" | "ai_prompt" | "collaboration_session"
   userId: string
   timestamp: string
   payload: Record<string, any>
@@ -22,7 +23,7 @@ interface SocketContextType {
   events: Event[]
   activeUsers: User[]
   isConnected: boolean
-  sendEvent: (event: Omit<Event, 'timestamp'>) => void
+  sendEvent: (eventType: string, payload: Record<string, any>) => void
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -39,13 +40,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [activeUsers, setActiveUsers] = useState<User[]>([])
   const [isConnected, setIsConnected] = useState(false)
 
-  const sendEvent = (event: Omit<Event, 'timestamp'>) => {
+  const sendEvent = (eventType: string, payload: Record<string, any>) => {
     if (!socket) return
     const eventWithTimestamp = {
-      ...event,
+      type: eventType,
+      userId: "user-1", // Default user ID, should be replaced with actual user ID
+      payload,
       timestamp: new Date().toISOString()
     }
     socket.emit('event', eventWithTimestamp)
+    setEvents(prev => [...prev, eventWithTimestamp as Event])
   }
 
   useEffect(() => {
