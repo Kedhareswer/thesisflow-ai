@@ -16,11 +16,16 @@ export async function POST(request: NextRequest) {
 
     console.log('Sending request to Gemini API with prompt:', prompt)
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${process.env.GOOGLE_API_KEY}`, {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+    try {
+      const response = await fetch(`${GEMINI_API_URL}?key=${process.env.GOOGLE_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [{
           parts: [{ text: prompt }]
@@ -40,7 +45,8 @@ export async function POST(request: NextRequest) {
       throw new Error(errorData.error?.message || 'Failed to generate content')
     }
 
-    const data = await response.json()
+      clearTimeout(timeoutId)
+      const data = await response.json()
     console.log('Received response from Gemini API:', data)
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -58,11 +64,29 @@ export async function POST(request: NextRequest) {
     console.log('Cleaned response:', cleanedResponse)
 
     return NextResponse.json({ result: cleanedResponse })
-  } catch (error) {
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out after 30 seconds')
+        }
+        throw error
+      }
+      throw new Error('An unexpected error occurred')
+    }
+  } catch (error: unknown) {
     console.error('Error in explore API:', error)
+    let errorMessage = 'Failed to process exploration request'
+    
+    if (error instanceof Error) {
+      errorMessage = error.message
+    } else if (typeof error === 'object' && error !== null && 'message' in error) {
+      errorMessage = String(error.message)
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to process exploration request' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
-} 
+}
