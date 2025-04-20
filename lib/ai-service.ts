@@ -104,7 +104,7 @@ For each suggestion, provide:
 - Key challenges to address
 - Next steps to take
 
-CRITICAL: You must respond with ONLY a valid JSON array containing exactly 3 objects. Do not include any markdown formatting, backticks, or additional text. The response must start with [ and end with ]. Each object must have these exact fields:
+IMPORTANT: Respond with ONLY a valid JSON array containing exactly 3 objects. Do not include any markdown formatting, backticks, or additional text. The response must be a valid JSON array starting with [ and ending with ]. Each object must have these exact fields:
 {
   "title": string,
   "description": string,
@@ -122,7 +122,9 @@ CRITICAL: You must respond with ONLY a valid JSON array containing exactly 3 obj
           .replace(/```json\n?|\n?```/g, '') // Remove markdown code blocks
           .replace(/^[\s\S]*?\[/, '[') // Remove everything before the first [
           .replace(/\][\s\S]*$/, ']') // Remove everything after the last ]
-          .trim();
+          .trim()
+          .replace(/\n/g, ' ') // Replace newlines with spaces
+          .replace(/\s+/g, ' '); // Replace multiple spaces with single space
         
         console.log('Cleaned response:', cleanedText); // Debug log
         

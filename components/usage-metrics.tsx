@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSocket } from "@/components/socket-provider"
-import { useUser } from "@/components/user-provider"
 import { FileText, Brain, Lightbulb, Users, Clock } from "lucide-react"
+import { Event } from "@/components/socket-provider"
 
 // Import recharts components
 import {
@@ -22,10 +22,21 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
+interface SocketPayload {
+  count?: number;
+  duration?: number;
+  title?: string;
+  topic?: string;
+}
+
 export function UsageMetrics() {
   const { events } = useSocket()
-  const { user } = useUser()
   const [activeTab, setActiveTab] = useState("overview")
+  const [currentUser] = useState({
+    id: `anonymous-${Math.random().toString(36).substr(2, 9)}`,
+    name: `Guest ${Math.floor(Math.random() * 1000)}`,
+    avatar: null
+  })
 
   // Usage data
   const [usageData, setUsageData] = useState({
@@ -62,7 +73,8 @@ export function UsageMetrics() {
   useEffect(() => {
     if (!events.length) return
 
-    const latestEvent = events[events.length - 1]
+    const latestEvent = events[events.length - 1] as Event
+    const payload = latestEvent.payload as SocketPayload
 
     // Update usage metrics based on event type
     switch (latestEvent.type) {
@@ -83,9 +95,11 @@ export function UsageMetrics() {
         break
 
       case "idea_generated":
+        const ideaCount = payload.count || 1;
+        
         setUsageData((prev) => ({
           ...prev,
-          ideasGenerated: prev.ideasGenerated + (latestEvent.payload.count || 1),
+          ideasGenerated: prev.ideasGenerated + ideaCount,
           aiPrompts: prev.aiPrompts + 1,
         }))
 
@@ -94,17 +108,19 @@ export function UsageMetrics() {
           const today = new Date().toLocaleDateString("en-US", { weekday: "short" }).slice(0, 3)
           return prev.map((day) =>
             day.name === today
-              ? { ...day, ideas: day.ideas + (latestEvent.payload.count || 1), prompts: day.prompts + 1 }
+              ? { ...day, ideas: day.ideas + ideaCount, prompts: day.prompts + 1 }
               : day,
           )
         })
         break
 
       case "collaboration_session":
+        const duration = payload.duration || 0.5;
+        
         setUsageData((prev) => ({
           ...prev,
           collaborationSessions: prev.collaborationSessions + 1,
-          totalTimeSpent: prev.totalTimeSpent + (latestEvent.payload.duration || 0.5),
+          totalTimeSpent: prev.totalTimeSpent + duration,
         }))
         break
 

@@ -14,25 +14,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { useSocket } from "@/components/socket-provider"
-import { useUser } from "@/components/user-provider"
 import { useRouter } from "next/navigation"
 import { Brain, Loader2, Search, BookOpen, Lightbulb, ArrowRight, Copy, Save } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
-// Define socket event types
-type SocketEvents = {
-  literature_searched: { query: string; type: string; resultCount: number };
-  idea_generated: { topic: string; count: number; context: string };
+// Update the socket event types
+type SocketPayload = {
+  topic?: string;
+  depth?: number;
+  query?: string;
+  type?: string;
+  resultCount?: number;
+  count?: number;
+  context?: string;
+  title?: string;
+  id?: string;
+  action?: string;
 };
 
-type Event = {
-  type: "paper_summarized" | "idea_generated" | "collaborator_joined" | "document_edited" | "document_shared"
-  userId: string
-  payload: any
-}
+type SocketEvent = {
+  type: string;
+  userId: string;
+  timestamp: string;
+  payload: SocketPayload;
+};
 
 const ResearchExplorer = () => {
-  const { user, isLoading: userLoading } = useUser()
   const router = useRouter()
   const { toast } = useToast()
   const { sendEvent } = useSocket()
@@ -56,16 +63,16 @@ const ResearchExplorer = () => {
   const [ideaCount, setIdeaCount] = React.useState(5)
   const [generatedIdeas, setGeneratedIdeas] = React.useState("")
 
-  // Redirect if not logged in
-  React.useEffect(() => {
-    if (!userLoading && !user) {
-      router.push("/login")
-    }
-  }, [user, userLoading, router])
-
   const handleExplore = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!researchTopic) return
+    if (!researchTopic) {
+      toast({
+        title: "Missing Topic",
+        description: "Please provide a research topic to explore.",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsLoading(true)
     setError(null)
@@ -109,17 +116,24 @@ const ResearchExplorer = () => {
       
       setExplorationResult(data.result)
       
-      // Track the search event
-      sendEvent({
-        type: "paper_summarized",
-        userId: user?.id || "anonymous",
-        payload: {
-          topic: researchTopic,
-          depth: explorationDepth
-        }
+      toast({
+        title: "Research Topic Explored",
+        description: "Your research topic has been analyzed successfully.",
       })
+
+      const eventPayload = {
+        topic: researchTopic,
+        depth: explorationDepth,
+        timestamp: new Date().toISOString()
+      };
+      sendEvent("paper_summarized", eventPayload);
     } catch (err) {
       console.error("Error exploring topic:", err)
+      toast({
+        title: "Exploration Failed",
+        description: err instanceof Error ? err.message : "Failed to explore research topic. Please try again.",
+        variant: "destructive",
+      })
       setError(err instanceof Error ? err.message : "An error occurred")
       setExplorationResult("")
     } finally {
@@ -131,8 +145,8 @@ const ResearchExplorer = () => {
     e.preventDefault()
     if (!searchQuery.trim()) {
       toast({
-        title: "Missing information",
-        description: "Please provide a search query.",
+        title: "Missing Query",
+        description: "Please provide a search query to find relevant papers.",
         variant: "destructive",
       })
       return
@@ -197,58 +211,30 @@ Format the response as a JSON array containing these detailed paper objects. Mak
       }
 
       // Parse the JSON result
-      try {
-        const parsedResults = JSON.parse(data.result);
-        setSearchResults(parsedResults);
-      } catch (parseError) {
-        console.error("Error parsing search results:", parseError);
-        // Fallback to mock data if parsing fails
-        setSearchResults([
-          {
-            title: `Recent Advances in ${searchQuery}: A Systematic Review`,
-            authors: "Johnson, A., Smith, B., & Williams, C.",
-            journal: "Journal of Advanced Research",
-            year: "2023",
-            abstract: `This paper provides a comprehensive review of recent developments in ${searchQuery}, highlighting key methodological advances and empirical findings from the past five years.`,
-            citations: 42,
-            keywords: ["systematic review", searchQuery.toLowerCase(), "research methods", "empirical findings"],
-          },
-          {
-            title: `Exploring the Impact of ${searchQuery} on Educational Outcomes`,
-            authors: "Chen, D. & Garcia, E.",
-            journal: "Educational Research Quarterly",
-            year: "2022",
-            abstract: `This study investigates how ${searchQuery} influences various educational outcomes across different age groups and learning contexts.`,
-            citations: 28,
-            keywords: ["education", searchQuery.toLowerCase(), "student engagement", "mixed-methods"],
-          },
-        ]);
-      }
-
-      // Track the search event
-      sendEvent({
-        type: "paper_summarized",
-        userId: user?.id || "anonymous",
-        payload: {
-          query: searchQuery,
-          type: searchType,
-          resultCount: searchResults.length,
-        }
-      });
+      const parsedResults = JSON.parse(data.result);
+      setSearchResults(parsedResults);
 
       toast({
-        title: "Search completed",
-        description: `Found ${searchResults.length} papers related to "${searchQuery}"`,
-      });
+        title: "Literature Search Complete",
+        description: `Found ${parsedResults.length} papers related to "${searchQuery}"`,
+      })
+
+      const eventPayload = {
+        query: searchQuery,
+        type: searchType,
+        resultCount: parsedResults.length,
+        timestamp: new Date().toISOString()
+      };
+      sendEvent("paper_summarized", eventPayload);
     } catch (error) {
-      console.error("Search failed:", error);
+      console.error("Search failed:", error)
       toast({
-        title: "Search failed",
-        description: error instanceof Error ? error.message : "There was an error performing the search. Please try again.",
+        title: "Search Failed",
+        description: error instanceof Error ? error.message : "Failed to search papers. Please try again.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   };
 
@@ -256,7 +242,7 @@ Format the response as a JSON array containing these detailed paper objects. Mak
     e.preventDefault()
     if (!ideaTopic.trim()) {
       toast({
-        title: "Missing information",
+        title: "Missing Topic",
         description: "Please provide a research topic for idea generation.",
         variant: "destructive",
       })
@@ -336,32 +322,30 @@ Use markdown formatting with clear headings and bullet points.`
         throw new Error(data.error);
       }
 
-      setGeneratedIdeas(data.result);
-
-      // Track the idea generation event
-      sendEvent({
-        type: "idea_generated",
-        userId: user?.id || "anonymous",
-        payload: {
-          topic: ideaTopic,
-          count: ideaCount,
-          context: ideaContext,
-        }
-      });
+      setGeneratedIdeas(data.result)
 
       toast({
-        title: "Ideas generated",
-        description: `Generated ${ideaCount} research ideas for "${ideaTopic}"`,
-      });
+        title: "Research Ideas Generated",
+        description: `Generated ${ideaCount} innovative research ideas for "${ideaTopic}"`,
+        duration: 5000, // Show for 5 seconds
+      })
+
+      const eventPayload = {
+        topic: ideaTopic,
+        count: ideaCount,
+        context: ideaContext,
+        timestamp: new Date().toISOString()
+      };
+      sendEvent("idea_generated", eventPayload);
     } catch (error) {
-      console.error("Error generating ideas:", error);
+      console.error("Error generating ideas:", error)
       toast({
-        title: "Error",
+        title: "Idea Generation Failed",
         description: error instanceof Error ? error.message : "Failed to generate research ideas. Please try again.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   };
 
@@ -370,23 +354,120 @@ Use markdown formatting with clear headings and bullet points.`
       .writeText(text)
       .then(() => {
         toast({
-          title: "Copied to clipboard",
-          description: "The content has been copied to your clipboard.",
+          title: "Copied to Clipboard",
+          description: "Content has been copied successfully.",
         })
       })
       .catch((err) => {
-        console.error("Failed to copy: ", err)
+        console.error("Failed to copy:", err)
         toast({
-          title: "Copy failed",
-          description: "Failed to copy to clipboard. Please try again.",
+          title: "Copy Failed",
+          description: "Failed to copy content. Please try again.",
           variant: "destructive",
         })
       })
   }
 
-  if (userLoading) {
-    return <div>Loading...</div>
-  }
+  const formatMarkdown = (text: string) => {
+    // Remove markdown code block indicators
+    text = text.replace(/```markdown|```/g, '').trim();
+
+    return text.split('\n').map((line, index) => {
+      // Main title (# )
+      if (line.match(/^# /)) {
+        return (
+          <h1 key={index} className="text-3xl font-bold text-primary border-b pb-3 mb-6">
+            {line.replace(/^# /, '')}
+          </h1>
+        );
+      }
+      
+      // Section headers (## )
+      if (line.match(/^## /)) {
+        return (
+          <div key={index} className="mt-8 mb-4">
+            <h2 className="text-2xl font-semibold text-primary/90 flex items-center gap-2">
+              {line.replace(/^## /, '')}
+            </h2>
+            <div className="h-px bg-border mt-2" />
+          </div>
+        );
+      }
+
+      // Subsection headers (### )
+      if (line.match(/^### /)) {
+        return (
+          <h3 key={index} className="text-xl font-medium text-primary/80 mt-6 mb-3">
+            {line.replace(/^### /, '')}
+          </h3>
+        );
+      }
+
+      // Keywords section
+      if (line.match(/^Keywords:/)) {
+        return (
+          <div key={index} className="flex flex-wrap gap-2 my-4">
+            {line.replace(/^Keywords:\s*/, '').split(',').map((keyword, i) => (
+              <Badge key={i} variant="secondary" className="text-sm">
+                {keyword.trim()}
+              </Badge>
+            ))}
+          </div>
+        );
+      }
+
+      // Bullet points (* or - )
+      if (line.match(/^[*-] /)) {
+        return (
+          <div key={index} className="flex gap-3 my-2 ml-4">
+            <span className="text-primary/60 mt-1.5">•</span>
+            <span className="flex-1">{line.replace(/^[*-] /, '')}</span>
+          </div>
+        );
+      }
+
+      // Numbered lists (1. 2. etc)
+      if (line.match(/^\d+\. /)) {
+        const number = line.match(/^\d+/)?.[0];
+        return (
+          <div key={index} className="flex gap-3 my-2 ml-4">
+            <span className="text-primary/60 font-medium min-w-[1.5rem]">{number}.</span>
+            <span className="flex-1">{line.replace(/^\d+\. /, '')}</span>
+          </div>
+        );
+      }
+
+      // Bold text
+      if (line.includes('**')) {
+        return (
+          <p key={index} className="my-2">
+            {line.split(/(\*\*.*?\*\*)/).map((part, i) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                return (
+                  <strong key={i} className="font-semibold text-primary">
+                    {part.replace(/\*\*/g, '')}
+                  </strong>
+                );
+              }
+              return part;
+            })}
+          </p>
+        );
+      }
+
+      // Empty lines for spacing
+      if (line.trim() === '') {
+        return <div key={index} className="h-4" />;
+      }
+
+      // Regular paragraphs with improved readability
+      return (
+        <p key={index} className="my-3 leading-relaxed text-primary/90">
+          {line}
+        </p>
+      );
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -465,86 +546,35 @@ Use markdown formatting with clear headings and bullet points.`
           </Card>
 
           {explorationResult && (
-            <Card>
-              <CardHeader className="pb-3">
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b bg-muted/40">
                 <div className="flex justify-between items-center">
-                  <CardTitle>Topic Exploration Results</CardTitle>
+                  <CardTitle className="text-2xl">Summary</CardTitle>
                   <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(explorationResult)}>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => copyToClipboard(explorationResult)}
+                      className="hover:bg-muted"
+                    >
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => {
+                        // Implement save functionality
+                      }}
+                      className="hover:bg-muted"
+                    >
                       <Save className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none dark:prose-invert space-y-4">
-                  {explorationResult.split("\n").map((line, index) => {
-                    // Main title
-                    if (line.startsWith("# ")) {
-                      return (
-                        <h1 key={index} className="text-2xl font-bold text-primary border-b pb-2 mb-6">
-                          {line.replace("# ", "")}
-                        </h1>
-                      )
-                    }
-                    // Section headers
-                    if (line.startsWith("## ")) {
-                      return (
-                        <h2 key={index} className="text-xl font-semibold text-primary/90 mt-8 mb-4">
-                          {line.replace("## ", "")}
-                        </h2>
-                      )
-                    }
-                    // Subsection headers
-                    if (line.startsWith("### ")) {
-                      return (
-                        <h3 key={index} className="text-lg font-medium text-primary/80 mt-6 mb-3">
-                          {line.replace("### ", "")}
-                        </h3>
-                      )
-                    }
-                    // Clean bullet points
-                    if (line.trim().startsWith("-") || line.trim().startsWith("•")) {
-                      return (
-                        <div key={index} className="flex gap-3 ml-4 my-1.5">
-                          <span className="text-primary/60 mt-1">•</span>
-                          <span className="text-sm flex-1">{line.replace(/^[-•]\s*/, "")}</span>
-                        </div>
-                      )
-                    }
-                    // Numbered lists
-                    if (/^\d+\.\s/.test(line)) {
-                      const number = line.match(/^\d+/)?.[0]
-                      return (
-                        <div key={index} className="flex gap-3 ml-4 my-1.5">
-                          <span className="text-primary/60 font-medium min-w-[1.5rem]">{number}.</span>
-                          <span className="text-sm flex-1">{line.replace(/^\d+\.\s/, "")}</span>
-                        </div>
-                      )
-                    }
-                    // Empty lines for spacing
-                    if (line.trim() === "") {
-                      return <div key={index} className="h-3" />
-                    }
-                    // Regular paragraphs with improved formatting
-                    return (
-                      <p key={index} className="text-sm leading-relaxed my-2">
-                        {line.split(/(\*\*.*?\*\*|__.*?__)/g).map((part, i) => {
-                          if (part.startsWith("**") || part.startsWith("__")) {
-                            return (
-                              <strong key={i} className="font-semibold text-primary/90">
-                                {part.replace(/\*\*|__/g, "")}
-                              </strong>
-                            )
-                          }
-                          return part
-                        })}
-                      </p>
-                    )
-                  })}
+              <CardContent className="p-6">
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  {formatMarkdown(explorationResult)}
                 </div>
               </CardContent>
             </Card>
@@ -574,21 +604,21 @@ Use markdown formatting with clear headings and bullet points.`
                 </div>
 
                 <div className="space-y-2">
-                  <LabelPrimitive.Root>Search Type</LabelPrimitive.Root>
-                  <RadioGroupPrimitive.Root value={searchType} onValueChange={setSearchType} className="flex space-x-4">
+                  <Label>Search Type</Label>
+                  <RadioGroup value={searchType} onValueChange={setSearchType} className="flex space-x-4">
                     <div className="flex items-center space-x-2">
-                      <RadioGroupPrimitive.Item id="keyword" />
-                      <LabelPrimitive.Root htmlFor="keyword">Keyword</LabelPrimitive.Root>
+                      <RadioGroupItem value="keyword" id="keyword" />
+                      <Label htmlFor="keyword">Keyword</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupPrimitive.Item id="title" />
-                      <LabelPrimitive.Root htmlFor="title">Title</LabelPrimitive.Root>
+                      <RadioGroupItem value="title" id="title" />
+                      <Label htmlFor="title">Title</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupPrimitive.Item id="author" />
-                      <LabelPrimitive.Root htmlFor="author">Author</LabelPrimitive.Root>
+                      <RadioGroupItem value="author" id="author" />
+                      <Label htmlFor="author">Author</Label>
                     </div>
-                  </RadioGroupPrimitive.Root>
+                  </RadioGroup>
                 </div>
 
                 <Button type="submit" disabled={isLoading} className="w-full">
@@ -668,10 +698,36 @@ Use markdown formatting with clear headings and bullet points.`
                           size="sm"
                           className="gap-1"
                           onClick={() => {
-                            // Try to open using DOI first, then fall back to a Google Scholar search
-                            const url = paper.doi
-                              ? `https://doi.org/${paper.doi}`
-                              : `https://scholar.google.com/scholar?q=${encodeURIComponent(paper.title)}`;
+                            let url;
+                            // Try DOI first
+                            if (paper.doi) {
+                              url = `https://doi.org/${paper.doi}`;
+                            }
+                            // Then try direct URL if available
+                            else if (paper.url && paper.url.startsWith('http')) {
+                              url = paper.url;
+                            }
+                            // Finally fallback to Google Scholar search using multiple parameters
+                            else {
+                              const searchParams = new URLSearchParams();
+                              if (paper.title) {
+                                searchParams.append('q', paper.title);
+                              }
+                              if (paper.authors) {
+                                // Add first author to search query
+                                const firstAuthor = Array.isArray(paper.authors) 
+                                  ? paper.authors[0]
+                                  : paper.authors.split(',')[0];
+                                if (firstAuthor) {
+                                  searchParams.append('author', firstAuthor.trim());
+                                }
+                              }
+                              if (paper.year) {
+                                searchParams.append('as_ylo', paper.year.toString());
+                                searchParams.append('as_yhi', paper.year.toString());
+                              }
+                              url = `https://scholar.google.com/scholar?${searchParams.toString()}`;
+                            }
                             window.open(url, '_blank', 'noopener,noreferrer');
                           }}
                         >

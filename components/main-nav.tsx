@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -19,7 +18,6 @@ import { useSupabaseAuth } from "./supabase-auth-provider"
 
 export default function MainNav() {
   const pathname = usePathname()
-  const { user, signOut } = useSupabaseAuth()
 
   return (
     <header className="bg-background border-b">
@@ -27,7 +25,7 @@ export default function MainNav() {
         <Link href="/" className="font-bold text-xl">
           ResearchBolt
         </Link>
-        <nav className="ml-8 flex items-center space-x-4 lg:space-x-6">
+        <nav className="ml-8 flex items-center space-x-6">
           <Link
             href="/dashboard"
             className={cn(
@@ -36,15 +34,6 @@ export default function MainNav() {
             )}
           >
             Dashboard
-          </Link>
-          <Link
-            href="/workspace"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname === "/workspace" ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            Workspace
           </Link>
           <Link
             href="/explorer"
@@ -56,39 +45,35 @@ export default function MainNav() {
             Research Explorer
           </Link>
           <Link
+            href="/collaborate"
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/collaborate" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            Collaborate
+          </Link>
+          <Link
             href="/summarizer"
             className={cn(
               "text-sm font-medium transition-colors hover:text-primary",
               pathname === "/summarizer" ? "text-primary" : "text-muted-foreground"
             )}
           >
-            Summarizer
+            Summarization
+          </Link>
+          <Link
+            href="/ideas"
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/ideas" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            Ideas
           </Link>
         </nav>
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Avatar className="cursor-pointer">
-                  <AvatarImage src="" />
-                  <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile">Profile</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => signOut()}>Log out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button variant="outline" asChild>
-              <Link href="/login">Login</Link>
-            </Button>
-          )}
         </div>
       </div>
     </header>

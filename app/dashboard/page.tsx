@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useUser } from "@/components/user-provider"
 import { useRouter } from "next/navigation"
 import { ActivityFeed } from "@/components/activity-feed"
 import { UsageMetrics } from "@/components/usage-metrics"
@@ -14,10 +13,15 @@ import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
 
 export default function Dashboard() {
-  const { user, isLoading } = useUser()
   const router = useRouter()
   const { events } = useSocket()
   const { toast } = useToast()
+  const [currentUser] = useState({
+    id: `anonymous-${Math.random().toString(36).substr(2, 9)}`,
+    name: `Guest ${Math.floor(Math.random() * 1000)}`,
+    avatar: null
+  })
+  
   const [stats, setStats] = useState([
     {
       title: "Papers Summarized",
@@ -68,13 +72,6 @@ export default function Dashboard() {
     },
   ])
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login")
-    }
-  }, [user, isLoading, router])
-
   // Update dashboard in real-time based on socket events
   useEffect(() => {
     if (!events.length) return
@@ -92,7 +89,7 @@ export default function Dashboard() {
       // Add to recent activity
       const newActivity = {
         icon: <FileText className="h-5 w-5 text-blue-500" />,
-        title: `Summarized '${latestEvent.payload.title}'`,
+        title: `Summarized '${latestEvent.payload?.title || "Untitled Paper"}'`,
         time: "Just now",
       }
 
@@ -105,17 +102,19 @@ export default function Dashboard() {
     }
 
     if (latestEvent.type === "idea_generated") {
+      const ideaCount = typeof latestEvent.payload?.count === 'number' ? latestEvent.payload.count : 1;
+      
       setStats((prev) =>
         prev.map((stat) =>
           stat.title === "Research Ideas"
-            ? { ...stat, value: String(Number.parseInt(stat.value) + latestEvent.payload.count || 1) }
+            ? { ...stat, value: String(Number.parseInt(stat.value) + ideaCount) }
             : stat,
         ),
       )
 
       const newActivity = {
         icon: <Lightbulb className="h-5 w-5 text-yellow-500" />,
-        title: `Generated ${latestEvent.payload.count || 1} research ideas on '${latestEvent.payload.topic}'`,
+        title: `Generated ${ideaCount} research ideas on '${latestEvent.payload?.topic || "Research Topic"}'`,
         time: "Just now",
       }
 
@@ -131,17 +130,13 @@ export default function Dashboard() {
 
       const newActivity = {
         icon: <Users className="h-5 w-5 text-green-500" />,
-        title: `${latestEvent.payload.name} joined your research group`,
+        title: `${latestEvent.payload?.name || "Someone"} joined your research group`,
         time: "Just now",
       }
 
       setRecentActivity((prev) => [newActivity, ...prev.slice(0, 3)])
     }
   }, [events, toast])
-
-  if (isLoading || !user) {
-    return <div>Loading...</div>
-  }
 
   return (
     <div className="space-y-6">

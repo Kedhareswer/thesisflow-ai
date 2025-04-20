@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { useSocket } from "@/components/socket-provider"
-import { useUser } from "@/components/user-provider"
 import { useRouter } from "next/navigation"
 import {
   Users,
@@ -37,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Event } from "@/components/socket-provider"
 
 interface Message {
   id: string
@@ -60,7 +60,6 @@ interface Document {
 }
 
 export default function CollaborativeWorkspace() {
-  const { user, isLoading: userLoading } = useUser()
   const router = useRouter()
   const { toast } = useToast()
   const { isConnected, sendEvent, activeUsers, events } = useSocket()
@@ -72,6 +71,11 @@ export default function CollaborativeWorkspace() {
   const [editedContent, setEditedContent] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [currentUser] = useState({
+    id: `anonymous-${Math.random().toString(36).substr(2, 9)}`,
+    name: `Guest ${Math.floor(Math.random() * 1000)}`,
+    avatar: null
+  })
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -176,13 +180,6 @@ export default function CollaborativeWorkspace() {
     },
   ])
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!userLoading && !user) {
-      router.push("/login")
-    }
-  }, [user, userLoading, router])
-
   // Scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -192,114 +189,63 @@ export default function CollaborativeWorkspace() {
   useEffect(() => {
     if (!events.length) return
 
-    const latestEvent = events[events.length - 1]
+    const latestEvent = events[events.length - 1] as Event
 
-    // Handle different event types
-    if (latestEvent.type === "chat_message" && latestEvent.userId !== user?.id) {
+    if (latestEvent.type === "chat_message" && latestEvent.userId !== currentUser.id) {
       const newMessage: Message = {
         id: Date.now().toString(),
         userId: latestEvent.userId,
-        content: latestEvent.payload.content,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        type: "text",
+        content: latestEvent.payload.content as string,
+        timestamp: latestEvent.timestamp,
+        type: "text"
       }
-
-      setMessages((prev) => [...prev, newMessage])
-
-      toast({
-        title: "New message",
-        description: `${getUserById(latestEvent.userId).name} sent a message`,
-      })
+      setMessages(prev => [...prev, newMessage])
     }
 
     if (latestEvent.type === "document_edited") {
-      // Update document
-      setDocuments((docs) =>
-        docs.map((doc) =>
-          doc.id === latestEvent.payload.documentId
-            ? {
-                ...doc,
-                content: latestEvent.payload.content,
-                lastModified: new Date().toISOString().split("T")[0],
-              }
-            : doc,
-        ),
-      )
-
-      // Add system message
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        userId: "system",
-        content: `${getUserById(latestEvent.userId).name} has updated "${latestEvent.payload.title}"`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        type: "system",
-      }
-
-      setMessages((prev) => [...prev, systemMessage])
+      setDocuments(prev => prev.map(doc => {
+        if (doc.id === latestEvent.payload.documentId) {
+          return { 
+            ...doc, 
+            content: latestEvent.payload.content as string, 
+            lastModified: latestEvent.timestamp 
+          }
+        }
+        return doc
+      }))
     }
-
-    if (latestEvent.type === "document_shared") {
-      // Add system message
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        userId: "system",
-        content: `${getUserById(latestEvent.userId).name} has shared "${latestEvent.payload.title}" with the team`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        type: "system",
-      }
-
-      setMessages((prev) => [...prev, systemMessage])
-    }
-
-    if (latestEvent.type === "collaborator_joined") {
-      // Add system message
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        userId: "system",
-        content: `${latestEvent.payload.name} has joined the workspace`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        type: "system",
-      }
-
-      setMessages((prev) => [...prev, systemMessage])
-
-      toast({
-        title: "New collaborator",
-        description: `${latestEvent.payload.name} has joined the workspace`,
-      })
-    }
-  }, [events, user, toast])
+  }, [events, currentUser])
 
   const sendMessage = () => {
-    if (!newMessage.trim() || !user) return
+    if (!newMessage.trim()) return;
 
-    const newMsg: Message = {
+    const message: Message = {
       id: Date.now().toString(),
-      userId: user.id,
+      userId: currentUser.id,
       content: newMessage,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      type: "text",
+      timestamp: new Date().toLocaleTimeString(),
+      type: "text"
+    };
+
+    setMessages(prev => [...prev, message]);
+    setNewMessage("");
+    
+    if (sendEvent) {
+      sendEvent("chat_message", {
+        content: newMessage
+      });
     }
-
-    setMessages([...messages, newMsg])
-
-    // Send event to other users
-    sendEvent("chat_message", {
-      content: newMessage,
-    })
-
-    setNewMessage("")
-  }
+  };
 
   const askAi = async () => {
-    if (!aiPrompt.trim() || !user) return
+    if (!aiPrompt.trim()) return
 
     setIsAiLoading(true)
 
     // Add user's question to messages
     const userMsg: Message = {
       id: Date.now().toString(),
-      userId: user.id,
+      userId: currentUser.id,
       content: aiPrompt,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       type: "text",
@@ -350,7 +296,7 @@ export default function CollaborativeWorkspace() {
   }
 
   const saveDocument = () => {
-    if (!editingDocument || !user) return
+    if (!editingDocument || !currentUser) return
 
     const doc = documents.find((d) => d.id === editingDocument)
     if (!doc) return
@@ -400,7 +346,7 @@ export default function CollaborativeWorkspace() {
   }
 
   const inviteCollaborator = () => {
-    if (!inviteEmail.trim() || !user) return
+    if (!inviteEmail.trim()) return
 
     // Send event to other users
     sendEvent("collaborator_joined", {
@@ -428,7 +374,7 @@ export default function CollaborativeWorkspace() {
   }
 
   const shareDocument = (docId: string) => {
-    if (!user) return
+    if (!currentUser) return
 
     const doc = documents.find((d) => d.id === docId)
     if (!doc) return
@@ -486,31 +432,16 @@ export default function CollaborativeWorkspace() {
   }
 
   const getUserById = (id: string) => {
-    if (id === "0") return { id: "0", name: "AI Assistant", avatar: "", status: "online" as const }
-    if (id === "system") return { id: "system", name: "System", avatar: "", status: "online" as const }
-    if (id === user?.id) return { id: user.id, name: "You", avatar: user.avatar, status: "online" as const }
-
-    const activeUser = activeUsers.find((u) => u.id === id)
-    if (activeUser) return { ...activeUser, status: "online" as const }
-
+    if (id === currentUser.id) {
+      return currentUser;
+    }
+    // Return a default user object for other IDs
     return {
       id,
-      name:
-        id === "user-2"
-          ? "Alex Johnson"
-          : id === "user-3"
-            ? "Sam Taylor"
-            : id === "user-4"
-              ? "Jordan Lee"
-              : "Unknown User",
-      avatar: "",
-      status: "offline" as const,
-    }
-  }
-
-  if (userLoading) {
-    return <div>Loading...</div>
-  }
+      name: `User ${id.split('-')[1]}`,
+      avatar: null
+    };
+  };
 
   return (
     <div className="space-y-6">
@@ -534,7 +465,7 @@ export default function CollaborativeWorkspace() {
           <CardContent>
             <div className="space-y-4">
               {activeUsers.map((activeUser) => {
-                const isCurrentUser = activeUser.id === user?.id
+                const isCurrentUser = activeUser.id === currentUser.id
                 return (
                   <div key={activeUser.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -787,30 +718,17 @@ export default function CollaborativeWorkspace() {
                               {getDocumentIcon(doc.type)}
                               <CardTitle className="text-base">{doc.title}</CardTitle>
                             </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0 rounded-full">
-                                  <span className="sr-only">Open menu</span>
+                            <DropdownMenu
+                              trigger={
+                                <Button variant="ghost" size="icon">
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
-                              </DropdownMenuTrigger>
+                              }
+                            >
                               <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem
-                                  onClick={() => startEditing(doc.id)}
-                                  disabled={editingDocument !== null && editingDocument !== doc.id}
-                                >
-                                  <Edit2 className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => shareDocument(doc.id)}>
                                   <Share2 className="mr-2 h-4 w-4" />
                                   Share
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                  <Users className="mr-2 h-4 w-4" />
-                                  View Collaborators
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
