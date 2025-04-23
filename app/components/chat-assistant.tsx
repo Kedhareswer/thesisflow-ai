@@ -123,13 +123,9 @@ export function ChatAssistant({ topic = "general", placeholder = "Ask me anythin
               <div className="flex items-center space-x-2">
                 {message.role === "user" ? (
                   <div className="h-8 w-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    {/* User icon */}
-/*
                   </div>
                 ) : (
                   <div className="h-8 w-8 bg-gray-500 rounded-full flex items-center justify-center">
-                    {/* AI icon */}
-/*
                   </div>
                 )}
                 <div className="text-sm text-gray-500">
