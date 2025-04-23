@@ -21,7 +21,6 @@ import { FileText, Loader2, Copy, Save, Upload, LinkIcon, Brain, Search, Lightbu
 import { processFile, validateFile } from "@/lib/file-upload"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { CSSProperties } from "react"
-import React from 'react';
 
 interface MainConcept {
   concept: string;
