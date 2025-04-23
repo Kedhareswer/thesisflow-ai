@@ -21,6 +21,7 @@ import { FileText, Loader2, Copy, Save, Upload, LinkIcon, Brain, Search, Lightbu
 import { processFile, validateFile } from "@/lib/file-upload"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { CSSProperties } from "react"
+import React from 'react';
 
 interface MainConcept {
   concept: string;
@@ -261,11 +262,11 @@ export default function TopicExplorer() {
   const [context, setContext] = useState("")
   const [result, setResult] = useState<ResearchAnalysis | null>(null)
 
-  const codeBlockStyle: { [key: string]: CSSProperties } = {
+  const codeBlockStyle: React.CSSProperties = {
     margin: '0',
     borderRadius: '0.5rem',
     padding: '1rem',
-  }
+};
 
   const handleSummarize = async (e: React.FormEvent) => {
     e.preventDefault()
