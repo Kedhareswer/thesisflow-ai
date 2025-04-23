@@ -1,4 +1,5 @@
-"Use Client"
+"use client"
+
 import { useState} from "react"
 
 interface Message {
