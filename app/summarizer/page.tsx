@@ -262,7 +262,7 @@ export default function TopicExplorer() {
   const [result, setResult] = useState<ResearchAnalysis | null>(null)
 
   const codeBlockStyle: { [key: string]: CSSProperties } = {
-    margin: 0,
+    margin: '0',
     borderRadius: '0.5rem',
     padding: '1rem',
   }
