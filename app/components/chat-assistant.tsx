@@ -1,3 +1,4 @@
+/*
 "use client"
 
 import { useState, useRef, useEffect } from "react"
@@ -6,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useChatMemory, ChatMessage } from "../../lib/chat-memory"
-import { generateAIResponse } from "../../lib/ai-service"
 import { Loader2, Send, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -124,10 +124,12 @@ export function ChatAssistant({ topic = "general", placeholder = "Ask me anythin
                 {message.role === "user" ? (
                   <div className="h-8 w-8 bg-blue-500 rounded-full flex items-center justify-center">
                     {/* User icon */}
+/*
                   </div>
                 ) : (
                   <div className="h-8 w-8 bg-gray-500 rounded-full flex items-center justify-center">
                     {/* AI icon */}
+/*
                   </div>
                 )}
                 <div className="text-sm text-gray-500">
