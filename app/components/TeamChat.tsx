@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { use client } from 'react'
 
 interface Message {
   id: string
