@@ -262,11 +262,11 @@ export default function TopicExplorer() {
   const [context, setContext] = useState("")
   const [result, setResult] = useState<ResearchAnalysis | null>(null)
 
-  const codeBlockStyle: CSSProperties = {
+  const codeBlockStyle: React.CSSProperties = {
     margin: 0,
     borderRadius: '0.5rem',
     padding: '1rem',
-  }
+  };
 
   const handleSummarize = async (e: React.FormEvent) => {
     e.preventDefault()
