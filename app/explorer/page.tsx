@@ -15,8 +15,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { useSocket } from "@/components/socket-provider"
 import { useRouter } from "next/navigation"
-import { Brain, Loader2, Search, BookOpen, Lightbulb, ArrowRight, Copy, Save } from "lucide-react"
+import { Brain, Loader2, Search, BookOpen, Lightbulb, ArrowRight, Copy, Save, Bookmark, BookmarkCheck } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { detectAI, humanizeText } from "./ai-utils"
+import { getLiteratureReviewPapers } from "./literature-ai"
+import type { OpenAlexWork } from "./openalex"
 
 // Update the socket event types
 type SocketPayload = {
@@ -40,6 +43,85 @@ type SocketEvent = {
 };
 
 const ResearchExplorer = () => {
+  // --- Recently Saved State ---
+  const [recentlySaved, setRecentlySaved] = React.useState<{
+    id: string;
+    type: "topic" | "literature" | "idea";
+    label: string;
+    content: string;
+  }[]>([]);
+
+  const handleSaveItem = (item: { id: string; type: "topic" | "literature" | "idea"; label: string; content: string }) => {
+    setRecentlySaved((prev) => {
+      if (prev.some((i) => i.id === item.id)) {
+        toast({ title: "Already Bookmarked", description: "This item is already saved.", variant: "default" });
+        return prev;
+      }
+      toast({ title: "Bookmarked!", description: "Item added to your saved list.", variant: "default" });
+      return [item, ...prev];
+    });
+  };
+
+  const isBookmarked = (id: string) => recentlySaved.some((i) => i.id === id);
+
+  // ...existing hooks...
+  // --- AI Detector & Humanizer UI ---
+  const [aiInput, setAiInput] = React.useState("");
+  const [aiLoading, setAiLoading] = React.useState(false);
+  const [aiResult, setAiResult] = React.useState<{ aiScore: number; verdict: string } | null>(null);
+  const [humanized, setHumanized] = React.useState("");
+  const [humanizeLoading, setHumanizeLoading] = React.useState(false);
+
+  // Humanizer options state
+  const [humanizeEnglishVariant, setHumanizeEnglishVariant] = React.useState("");
+  const [humanizeTone, setHumanizeTone] = React.useState("");
+  const [humanizePOV, setHumanizePOV] = React.useState("");
+  const [humanizeTense, setHumanizeTense] = React.useState("");
+  const [humanizeSentenceType, setHumanizeSentenceType] = React.useState("");
+
+  // Handler for AI detection
+  const handleDetectAI = async () => {
+    if (!aiInput.trim()) {
+      toast({ title: "Missing Text", description: "Paste some text to analyze.", variant: "destructive" });
+      return;
+    }
+    setAiLoading(true);
+    setAiResult(null);
+    try {
+      const result = await detectAI(aiInput);
+      setAiResult(result);
+    } catch (err) {
+      toast({ title: "Detection Failed", description: err instanceof Error ? err.message : "Failed to detect AI.", variant: "destructive" });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Handler for Humanizer
+  const handleHumanize = async () => {
+    if (!aiInput.trim()) {
+      toast({ title: "Missing Text", description: "Paste some text to humanize.", variant: "destructive" });
+      return;
+    }
+    setHumanizeLoading(true);
+    setHumanized("");
+    try {
+      // Only send options that are set
+      const options: any = {};
+      if (humanizeEnglishVariant) options.englishVariant = humanizeEnglishVariant;
+      if (humanizeTone) options.tone = humanizeTone;
+      if (humanizePOV) options.pointOfView = humanizePOV;
+      if (humanizeTense) options.tense = humanizeTense;
+      if (humanizeSentenceType) options.sentenceType = humanizeSentenceType;
+      const result = await humanizeText(aiInput, options);
+      setHumanized(result.humanized);
+    } catch (err) {
+      toast({ title: "Humanizer Failed", description: err instanceof Error ? err.message : "Failed to humanize text.", variant: "destructive" });
+    } finally {
+      setHumanizeLoading(false);
+    }
+  };
+
   const router = useRouter()
   const { toast } = useToast()
   const { sendEvent } = useSocket()
@@ -52,10 +134,10 @@ const ResearchExplorer = () => {
   const [explorationResult, setExplorationResult] = React.useState("")
   const [explorationType, setExplorationType] = React.useState("broad")
 
-  // Literature search state
+  // Literature review state
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [searchType, setSearchType] = React.useState("keyword")
-  const [searchResults, setSearchResults] = React.useState<any[]>([])
+  const [literaturePapers, setLiteraturePapers] = React.useState<OpenAlexWork[]>([]);
+  const [literatureError, setLiteratureError] = React.useState<string>("");
 
   // Idea generation state
   const [ideaTopic, setIdeaTopic] = React.useState("")
@@ -130,103 +212,43 @@ const ResearchExplorer = () => {
     }
   }
 
+  // Literature Review Handler using OpenAlex + AI
   const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!searchQuery.trim()) {
       toast({
         title: "Missing Query",
         description: "Please provide a search query to find relevant papers.",
         variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
-    setSearchResults([])
-
-    try {
-      const prompt = `As an academic search engine, generate 4 realistic and detailed academic paper search results for the query: "${searchQuery}" (search type: ${searchType}).
-
-For each paper, provide a structured entry in JSON format with the following fields:
-{
-  "title": "Paper title",
-  "authors": "Author names with affiliations",
-  "journal": "Journal or conference name",
-  "year": "Publication year",
-  "abstract": "A comprehensive abstract",
-  "citations": "Number of citations",
-  "keywords": ["keyword1", "keyword2", ...],
-  "doi": "Digital Object Identifier",
-  "impact_factor": "Journal impact factor",
-  "methodology": "Brief description of research methodology",
-  "key_findings": ["finding1", "finding2", ...]
-}
-
-Requirements:
-1. Ensure papers are diverse but highly relevant to the query
-2. Include recent publications (within last 5 years) and seminal works
-3. Provide realistic citation counts based on publication year
-4. Include both journal articles and conference papers
-5. Ensure abstracts are detailed and technically accurate
-6. Include relevant methodology descriptions
-7. List impactful findings
-
-Format the response as a JSON array containing these detailed paper objects. Make the results academically rigorous and realistic.`
-
-      const response = await fetch('/api/explore', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          prompt,
-          options: {
-            temperature: 0.7,
-            maxTokens: 4096,
-            topK: 40,
-            topP: 0.8,
-          }
-        }),
       });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+      return;
+    }
+    setIsLoading(true);
+    setLiteraturePapers([]);
+    setLiteratureError("");
+    try {
+      const papers = await getLiteratureReviewPapers(searchQuery, 6);
+      setLiteraturePapers(papers);
+      if (!papers.length) {
+        setLiteratureError("No papers found.");
+      } else {
+        toast({
+          title: "Search Complete",
+          description: `${papers.length} papers found for \"${searchQuery}\".`,
+        });
       }
-
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      // Clean the response before parsing
-      const cleanedResult = data.result
-        .replace(/```json|```/g, '')
-        .trim();
-
-      // Parse the JSON result
-      const parsedResults = JSON.parse(cleanedResult);
-      setSearchResults(parsedResults);
-
-      toast({
-        title: "Literature Search Complete",
-        description: `Found ${parsedResults.length} papers related to "${searchQuery}"`,
-      })
-
-      const eventPayload = {
+      sendEvent("literature_review", {
         query: searchQuery,
-        type: searchType,
-        resultCount: parsedResults.length,
-        timestamp: new Date().toISOString()
-      };
-      sendEvent("paper_summarized", eventPayload);
+        timestamp: new Date().toISOString(),
+      });
     } catch (error) {
-      console.error("Search failed:", error)
+      console.error("Literature search failed:", error);
+      setLiteratureError(error instanceof Error ? error.message : "Failed to fetch papers.");
       toast({
-        title: "Search Failed",
-        description: error instanceof Error ? error.message : "Failed to search papers. Please try again.",
+        title: "Literature Search Failed",
+        description: error instanceof Error ? error.message : "Failed to fetch papers.",
         variant: "destructive",
-      })
+      });
     } finally {
       setIsLoading(false)
     }
@@ -443,18 +465,22 @@ Use markdown formatting with clear headings and bullet points.`
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">Research Explorer</h1>
-        <p className="text-muted-foreground">
-          Explore research topics, search literature, and generate research ideas with AI assistance.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">Research Explorer</h1>
+          <p className="text-muted-foreground">
+            Explore research topics, search literature, and generate research ideas with AI assistance.
+          </p>
+        </div>
+
       </div>
 
       <Tabs defaultValue="explore" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="explore">Topic Explorer</TabsTrigger>
           <TabsTrigger value="search">Literature Search</TabsTrigger>
           <TabsTrigger value="ideas">Idea Generator</TabsTrigger>
+          <TabsTrigger value="ai-tools">AI Detector & Humanizer</TabsTrigger>
         </TabsList>
 
         <TabsContent value="explore" className="space-y-4">
@@ -546,9 +572,14 @@ Use markdown formatting with clear headings and bullet points.`
                     <Button 
                       size="icon" 
                       variant="ghost" 
+                      onClick={() => handleSaveItem({ id: researchTopic, type: "topic", label: researchTopic, content: explorationResult })}
                       className="hover:bg-muted"
+                      title={isBookmarked(researchTopic) ? "Bookmarked" : "Bookmark Topic"}
+                      disabled={isBookmarked(researchTopic)}
                     >
-                      <Save className="h-4 w-4" />
+                      {isBookmarked(researchTopic)
+                        ? <BookmarkCheck className="h-4 w-4 text-green-600" />
+                        : <Bookmark className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -585,24 +616,7 @@ Use markdown formatting with clear headings and bullet points.`
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Search Type</Label>
-                  <RadioGroup value={searchType} onValueChange={setSearchType} className="flex space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="keyword" id="keyword" />
-                      <Label htmlFor="keyword">Keyword</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="title" id="title" />
-                      <Label htmlFor="title">Title</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="author" id="author" />
-                      <Label htmlFor="author">Author</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <Button type="submit" disabled={isLoading} className="w-full">
+                  <Button type="submit" disabled={isLoading} className="w-full">
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -615,112 +629,52 @@ Use markdown formatting with clear headings and bullet points.`
                     </>
                   )}
                 </Button>
+                {/* Literature Papers Output */}
+                <div className="mt-6">
+                  {isLoading ? (
+                    <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin" /> Loading...</div>
+                  ) : literatureError ? (
+                    <div className="text-muted-foreground">{literatureError}</div>
+                   ) : literaturePapers.length > 0 ? (
+                    <div>
+                      <div className="mb-4 font-medium">{literaturePapers.length} papers found for "{searchQuery}"</div>
+                      <div className="space-y-6">
+                        {literaturePapers.map((paper, idx) => (
+                          <div key={paper.id} className="border rounded-lg p-4 bg-card">
+                            <div className="font-semibold text-lg mb-1">{paper.title}</div>
+                            <div className="text-sm text-muted-foreground mb-2">
+                              {paper.authors && paper.authors.length > 0 ? paper.authors.join(", ") : "Unknown authors"} {paper.publication_year ? `(${paper.publication_year})` : ""}
+                            </div>
+                            <div className="text-sm mb-2">{paper.abstract || "No abstract available."}</div>
+                            <div className="text-xs text-muted-foreground mb-2">
+                              {paper.host_venue && <span>Venue: {paper.host_venue} | </span>}
+                              {paper.doi && <span>DOI: <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noopener noreferrer" className="underline">{paper.doi}</a></span>}
+                            </div>
+                            <div className="flex justify-between">
+                              <a href={paper.url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm font-medium">View Paper →</a>
+                              <div className="flex gap-2">
+                                <Button size="icon" variant="ghost" onClick={() => copyToClipboard(paper.title)} title="Copy Title">
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => handleSaveItem({ id: paper.id, type: "literature", label: paper.title, content: paper.title })} title={isBookmarked(paper.id) ? "Bookmarked" : "Bookmark Paper"} disabled={isBookmarked(paper.id)}>
+                                  {isBookmarked(paper.id)
+                                    ? <BookmarkCheck className="h-4 w-4 text-green-600" />
+                                    : <Bookmark className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                   ) : (
+                    <div className="text-muted-foreground">No papers found.</div>
+                  )}
+                </div>
+              </div>
               </form>
             </CardContent>
           </Card>
-
-          {searchResults.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Search Results</CardTitle>
-                <CardDescription>
-                  {searchResults.length} papers found for "{searchQuery}"
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {searchResults.map((paper, index) => (
-                    <Card key={index} className="bg-muted/50">
-                      <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-base">{paper.title}</CardTitle>
-                        <CardDescription>
-                          {paper.authors} ({paper.year}) • {paper.journal}
-                          {paper.impact_factor && ` • Impact Factor: ${paper.impact_factor}`}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-2">
-                        <p className="text-sm mb-2">{paper.abstract}</p>
-                        {paper.methodology && (
-                          <div className="mt-2 mb-3">
-                            <span className="text-sm font-medium">Methodology: </span>
-                            <span className="text-sm">{paper.methodology}</span>
-                          </div>
-                        )}
-                        {paper.key_findings && paper.key_findings.length > 0 && (
-                          <div className="mt-2 mb-3">
-                            <span className="text-sm font-medium">Key Findings:</span>
-                            <ul className="list-disc list-inside">
-                              {paper.key_findings.map((finding: string, i: number) => (
-                                <li key={i} className="text-sm ml-2">{finding}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {paper.keywords &&
-                            paper.keywords.map((keyword: string, i: number) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {keyword}
-                              </Badge>
-                            ))}
-                        </div>
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0 flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                        <span className="text-xs text-muted-foreground">Citations: {paper.citations}</span>
-                          {paper.doi && (
-                            <span className="text-xs text-muted-foreground">
-                              DOI: {paper.doi}
-                            </span>
-                          )}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => {
-                            let url;
-                            // Try DOI first
-                            if (paper.doi) {
-                              url = `https://doi.org/${paper.doi}`;
-                            }
-                            // Then try direct URL if available
-                            else if (paper.url && paper.url.startsWith('http')) {
-                              url = paper.url;
-                            }
-                            // Finally fallback to Google Scholar search using multiple parameters
-                            else {
-                              const searchParams = new URLSearchParams();
-                              if (paper.title) {
-                                searchParams.append('q', paper.title);
-                              }
-                              if (paper.authors) {
-                                // Add first author to search query
-                                const firstAuthor = Array.isArray(paper.authors) 
-                                  ? paper.authors[0]
-                                  : paper.authors.split(',')[0];
-                                if (firstAuthor) {
-                                  searchParams.append('author', firstAuthor.trim());
-                                }
-                              }
-                              if (paper.year) {
-                                searchParams.append('as_ylo', paper.year.toString());
-                                searchParams.append('as_yhi', paper.year.toString());
-                              }
-                              url = `https://scholar.google.com/scholar?${searchParams.toString()}`;
-                            }
-                            window.open(url, '_blank', 'noopener,noreferrer');
-                          }}
-                        >
-                          View Paper <ArrowRight className="h-3 w-3" />
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="ideas" className="space-y-4">
@@ -797,12 +751,12 @@ Use markdown formatting with clear headings and bullet points.`
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <CardTitle>Generated Research Ideas</CardTitle>
-                  <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(generatedIdeas)}>
+                  <div className="flex gap-2 mb-2">
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(generatedIdeas)} title="Copy Ideas">
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost">
-                      <Save className="h-4 w-4" />
+                    <Button size="icon" variant="ghost" onClick={() => handleSaveItem({ id: ideaTopic, type: "idea", label: ideaTopic, content: generatedIdeas })} title="Save Ideas">
+                      <Bookmark className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -871,9 +825,145 @@ Use markdown formatting with clear headings and bullet points.`
             </Card>
           )}
         </TabsContent>
+        <TabsContent value="ai-tools" className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* AI Detector Card */}
+            <Card className="flex-1">
+              <CardHeader>
+                <CardTitle>AI Detector</CardTitle>
+                <CardDescription>
+                  Paste text to check if it is AI-generated.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="Paste text here..."
+                  value={aiInput}
+                  onChange={e => setAiInput(e.target.value)}
+                  rows={8}
+                />
+                <Button onClick={handleDetectAI} disabled={aiLoading || !aiInput.trim()}>
+                  {aiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Detect AI
+                </Button>
+                {aiResult ? (
+                  <div className="space-y-2">
+                    <Badge variant={aiResult.aiScore >= 70 ? "destructive" : aiResult.aiScore >= 40 ? "secondary" : "default"}>
+                      AI Score: {aiResult.aiScore}
+                    </Badge>
+                    <div className="font-medium">{aiResult.verdict}</div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+            {/* Humanizer Card */}
+            <Card className="flex-1">
+              <CardHeader>
+                <CardTitle>Text Humanizer</CardTitle>
+                <CardDescription>
+                  Paste AI-generated text to make it more human-like.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="Paste text here..."
+                  value={aiInput}
+                  onChange={e => setAiInput(e.target.value)}
+                  rows={8}
+                />
+                {/* Humanizer Options */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>English Variant</Label>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={humanizeEnglishVariant}
+                      onChange={e => setHumanizeEnglishVariant(e.target.value)}
+                    >
+                      <option value="">Default</option>
+                      <option value="American">American English</option>
+                      <option value="British">British English</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Tone</Label>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={humanizeTone}
+                      onChange={e => setHumanizeTone(e.target.value)}
+                    >
+                      <option value="">Default</option>
+                      <option value="formal">Formal</option>
+                      <option value="informal">Informal</option>
+                      <option value="friendly">Friendly</option>
+                      <option value="academic">Academic</option>
+                      <option value="conversational">Conversational</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Point of View</Label>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={humanizePOV}
+                      onChange={e => setHumanizePOV(e.target.value)}
+                    >
+                      <option value="">Default</option>
+                      <option value="first">First Person</option>
+                      <option value="second">Second Person</option>
+                      <option value="third">Third Person</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Tense</Label>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={humanizeTense}
+                      onChange={e => setHumanizeTense(e.target.value)}
+                    >
+                      <option value="">Default</option>
+                      <option value="past">Past</option>
+                      <option value="present">Present</option>
+                      <option value="future">Future</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Sentence Type</Label>
+                    <select
+                      className="w-full border rounded px-2 py-1"
+                      value={humanizeSentenceType}
+                      onChange={e => setHumanizeSentenceType(e.target.value)}
+                    >
+                      <option value="">Default</option>
+                      <option value="direct">Direct</option>
+                      <option value="indirect">Indirect</option>
+                      <option value="statement">Statement</option>
+                      <option value="exclamation">Exclamation</option>
+                      <option value="question">Questioning</option>
+                    </select>
+                  </div>
+                </div>
+                <Button onClick={handleHumanize} disabled={humanizeLoading || !aiInput.trim()} variant="secondary">
+                  {humanizeLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Humanize Text
+                </Button>
+                {humanized && (
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label>Humanized Output</Label>
+                      <Button size="icon" variant="ghost" onClick={() => copyToClipboard(humanized)} title="Copy Humanized Text">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Textarea value={humanized} readOnly className="mt-1 bg-muted" rows={8} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
 
 export default ResearchExplorer

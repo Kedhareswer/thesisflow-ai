@@ -8,8 +8,37 @@ import { Input } from "@/components/ui/input"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, UserPlus } from "lucide-react"
+import { PermissionRole, Collaborator, PendingInvite } from "@/app/writing-assistant/permissions"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-export default function CollaboratorsList() {
+type CollaboratorsListProps = {
+  collaborators?: Collaborator[];
+  pendingInvites?: PendingInvite[];
+  onRoleChange?: (collabId: string, newRole: PermissionRole) => void;
+  onResendInvite?: (inviteId: string) => void;
+  onRevokeInvite?: (inviteId: string) => void;
+};
+
+const roleLabels: Record<PermissionRole, string> = {
+  owner: "Owner",
+  editor: "Editor",
+  commenter: "Commenter",
+  viewer: "Viewer"
+};
+
+const statusColor: Record<string, string> = {
+  online: "bg-green-500",
+  away: "bg-yellow-400",
+  offline: "bg-gray-400"
+};
+
+export default function CollaboratorsList({
+  collaborators,
+  pendingInvites,
+  onRoleChange,
+  onResendInvite,
+  onRevokeInvite
+}: CollaboratorsListProps = {}) {
   const { socket, activeUsers } = useSocket()
   const { toast } = useToast()
   const [inviteEmail, setInviteEmail] = useState("")
@@ -33,6 +62,43 @@ export default function CollaboratorsList() {
       })
     }
   }
+
+  // Use props if provided, else fallback to activeUsers (convert User to Collaborator)
+  let collabs: Collaborator[] = [];
+  if (collaborators) {
+    collabs = collaborators;
+  } else if (activeUsers) {
+    collabs = activeUsers.map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email || "",
+      avatar: u.avatar,
+      status: u.status,
+      role: u.role || "viewer",
+      isTyping: u.isTyping
+    }));
+  }
+  const invites: PendingInvite[] = pendingInvites || [];
+
+  const handleRoleChange = (id: string, newRole: PermissionRole) => {
+    if (onRoleChange) onRoleChange(id, newRole);
+    // Optionally emit socket event here
+    if (socket) socket.emit("change_collaborator_role", { id, role: newRole });
+  };
+
+  const handleResend = (id: string) => {
+    if (onResendInvite) onResendInvite(id);
+    // Optionally emit socket event here
+    if (socket) socket.emit("resend_invite", { id });
+    toast({ title: "Invite resent" });
+  };
+
+  const handleRevoke = (id: string) => {
+    if (onRevokeInvite) onRevokeInvite(id);
+    // Optionally emit socket event here
+    if (socket) socket.emit("revoke_invite", { id });
+    toast({ title: "Invite revoked" });
+  };
 
   const getInitials = (name: string) => {
     return name

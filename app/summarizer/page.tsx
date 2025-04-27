@@ -7,6 +7,7 @@ import { Light as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -261,7 +262,7 @@ export default function TopicExplorer() {
   const [context, setContext] = useState("")
   const [result, setResult] = useState<ResearchAnalysis | null>(null)
 
-  const codeBlockStyle: { [key: string]: CSSProperties } = {
+  const codeBlockStyle: CSSProperties = {
     margin: 0,
     borderRadius: '0.5rem',
     padding: '1rem',
@@ -457,16 +458,17 @@ export default function TopicExplorer() {
               {children}
             </li>
           ),
-          code: ({ node, inline, className, children, ...props }) => {
+          code: ({ node, inline, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || "");
             return !inline && match ? (
               <SyntaxHighlighter
-                style={oneDark}
-                language={match[1]}
-                PreTag="div"
-                className="rounded-md my-2"
-                {...props}
-              >
+  style={oneDark}
+  language={match[1]}
+  PreTag="div"
+  className="rounded-md my-2"
+  customStyle={codeBlockStyle}
+  {...props}
+>
                 {String(children).replace(/\n$/, "")}
               </SyntaxHighlighter>
             ) : (
@@ -679,13 +681,13 @@ export default function TopicExplorer() {
                     </span>
                   </div>
                   <Slider
-                    id="summaryLength"
-                    min={1}
-                    max={5}
-                    step={1}
-                    value={[summaryLength]}
-                    onValueChange={(value: number[]) => setSummaryLength(value[0])}
-                  />
+  id="summaryLength"
+  min={1}
+  max={5}
+  step={1}
+  value={[summaryLength] as number[]}
+  onValueChange={(value: number[]) => setSummaryLength(value[0])}
+/>
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Concise</span>
                     <span>Detailed</span>
@@ -740,6 +742,30 @@ export default function TopicExplorer() {
         </Card>
 
         <div className="space-y-6">
+          {isLoading && !summary && (
+            <Card aria-label="Summary Loading">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-6 w-32 mb-2" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-4 w-1/3" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {summary && (
             <Card>
               <CardHeader className="pb-3">
@@ -857,47 +883,7 @@ export default function TopicExplorer() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Research Topic Analysis</CardTitle>
-          <CardDescription>
-            Enter your research topic and any relevant context for a comprehensive analysis
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Research Topic</label>
-            <Input
-              placeholder="Enter your research topic (e.g., 'Deep Learning in Healthcare')"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Additional Context (Optional)</label>
-            <Textarea
-              placeholder="Provide any additional context or specific aspects you'd like to explore"
-              value={context}
-              onChange={(e) => setContext(e.target.value)}
-              rows={4}
-            />
-          </div>
-          <Button 
-            onClick={exploreResearchTopic} 
-            disabled={isLoading}
-            className="w-full sm:w-auto"
-          >
-            {isLoading ? (
-              <>Analyzing...</>
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Explore Topic
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+
 
       {result && (
         <Card>

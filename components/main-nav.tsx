@@ -36,6 +36,24 @@ export default function MainNav() {
             Dashboard
           </Link>
           <Link
+            href="/planner"
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/planner" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            Planner
+          </Link>
+          <Link
+            href="/writing-assistant"
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/writing-assistant" ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            Writing Assistant
+          </Link>
+          <Link
             href="/explorer"
             className={cn(
               "text-sm font-medium transition-colors hover:text-primary",
@@ -43,15 +61,6 @@ export default function MainNav() {
             )}
           >
             Research Explorer
-          </Link>
-          <Link
-            href="/collaborate"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname === "/collaborate" ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            Collaborate
           </Link>
           <Link
             href="/summarizer"
@@ -63,14 +72,15 @@ export default function MainNav() {
             Summarization
           </Link>
           <Link
-            href="/ideas"
+            href="/collaborate"
             className={cn(
               "text-sm font-medium transition-colors hover:text-primary",
-              pathname === "/ideas" ? "text-primary" : "text-muted-foreground"
+              pathname === "/collaborate" ? "text-primary" : "text-muted-foreground"
             )}
           >
-            Ideas
+            Collaborate
           </Link>
+
         </nav>
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />

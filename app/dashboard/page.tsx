@@ -11,6 +11,7 @@ import { RecentDocuments } from "@/components/recent-documents"
 import { FileText, Users, Lightbulb, Calendar, BookOpen } from "lucide-react"
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
+import { formatRelativeTime } from "@/lib/utils/date"
 
 export default function Dashboard() {
   const router = useRouter()
@@ -21,6 +22,9 @@ export default function Dashboard() {
     name: `Guest ${Math.floor(Math.random() * 1000)}`,
     avatar: null
   })
+
+  // Import activity tracker
+  const { activityTracker } = require('@/lib/services/activity-tracker');
   
   const [stats, setStats] = useState([
     {
@@ -78,65 +82,110 @@ export default function Dashboard() {
 
     const latestEvent = events[events.length - 1]
 
-    // Update stats based on event type
+    // Track activity using ActivityTracker service
     if (latestEvent.type === "paper_summarized") {
-      setStats((prev) =>
-        prev.map((stat) =>
-          stat.title === "Papers Summarized" ? { ...stat, value: String(Number.parseInt(stat.value) + 1) } : stat,
-        ),
-      )
-
-      // Add to recent activity
-      const newActivity = {
-        icon: <FileText className="h-5 w-5 text-blue-500" />,
-        title: `Summarized '${latestEvent.payload?.title || "Untitled Paper"}'`,
-        time: "Just now",
-      }
-
-      setRecentActivity((prev) => [newActivity, ...prev.slice(0, 3)])
-
-      toast({
-        title: "Dashboard Updated",
-        description: "Your paper summary has been added to your stats.",
-      })
+      activityTracker.trackActivity(
+        "paper_summarized",
+        `Summarized '${latestEvent.payload?.title || "Untitled Paper"}'`,
+        latestEvent.payload
+      );
     }
 
     if (latestEvent.type === "idea_generated") {
-      const ideaCount = typeof latestEvent.payload?.count === 'number' ? latestEvent.payload.count : 1;
-      
-      setStats((prev) =>
-        prev.map((stat) =>
-          stat.title === "Research Ideas"
-            ? { ...stat, value: String(Number.parseInt(stat.value) + ideaCount) }
-            : stat,
-        ),
-      )
-
-      const newActivity = {
-        icon: <Lightbulb className="h-5 w-5 text-yellow-500" />,
-        title: `Generated ${ideaCount} research ideas on '${latestEvent.payload?.topic || "Research Topic"}'`,
-        time: "Just now",
-      }
-
-      setRecentActivity((prev) => [newActivity, ...prev.slice(0, 3)])
+      activityTracker.trackActivity(
+        "idea_generated",
+        `Generated research ideas on '${latestEvent.payload?.topic || "Research Topic"}'`,
+        {
+          count: typeof latestEvent.payload?.count === 'number' ? latestEvent.payload.count : 1,
+          topic: latestEvent.payload?.topic
+        }
+      );
     }
 
     if (latestEvent.type === "collaborator_joined") {
-      setStats((prev) =>
-        prev.map((stat) =>
-          stat.title === "Collaborators" ? { ...stat, value: String(Number.parseInt(stat.value) + 1) } : stat,
-        ),
-      )
-
-      const newActivity = {
-        icon: <Users className="h-5 w-5 text-green-500" />,
-        title: `${latestEvent.payload?.name || "Someone"} joined your research group`,
-        time: "Just now",
-      }
-
-      setRecentActivity((prev) => [newActivity, ...prev.slice(0, 3)])
+      activityTracker.trackActivity(
+        "collaborator_joined",
+        `${latestEvent.payload?.name || "Someone"} joined your research group`,
+        latestEvent.payload
+      );
     }
-  }, [events, toast])
+
+    // Update UI with latest stats
+    const currentStats = activityTracker.getStats();
+    setStats(prev => prev.map(stat => {
+      switch(stat.title) {
+        case "Papers Summarized":
+          return { ...stat, value: currentStats.papersSummarized.toString() };
+        case "Collaborators":
+          return { ...stat, value: currentStats.collaborators.toString() };
+        case "Research Ideas":
+          return { ...stat, value: currentStats.researchIdeas.toString() };
+        case "Upcoming Deadlines":
+          return { ...stat, value: currentStats.upcomingDeadlines.toString() };
+        default:
+          return stat;
+      }
+    }));
+
+    // Update recent activity
+    const activities = activityTracker.getRecentActivities();
+    setRecentActivity(activities.map((activity: Activity) => ({
+      icon: getActivityIcon(activity.type),
+      title: activity.title,
+      time: formatRelativeTime(new Date(activity.timestamp))
+    })));
+
+  }, [events]);
+
+  interface Activity {
+    type: string;
+    title: string;
+    timestamp: Date;
+  }
+
+  // Helper function to get activity icon
+  const getActivityIcon = (type: string) => {
+    switch(type) {
+      case 'paper_summarized':
+        return <FileText className="h-5 w-5 text-blue-500" />;
+      case 'collaborator_joined':
+        return <Users className="h-5 w-5 text-green-500" />;
+      case 'idea_generated':
+        return <Lightbulb className="h-5 w-5 text-yellow-500" />;
+      default:
+        return <BookOpen className="h-5 w-5 text-purple-500" />;
+    }
+  };
+
+  interface UserData {
+    stats: Array<{ title: string; value: string; description: string; icon: JSX.Element }>;
+    recentActivity: Array<{ icon: JSX.Element; title: string; time: string }>;
+  }
+  
+  const [userData, setUserData] = useState<UserData | null>(null);
+
+  useEffect(() => {
+    // Fetch user-specific data from the backend
+    async function fetchUserData() {
+      try {
+        const response = await fetch('/api/user-data');
+        const data = await response.json();
+        setUserData(data);
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+      }
+    }
+
+    fetchUserData();
+  }, []);
+
+  // Update stats and recent activity based on userData
+  useEffect(() => {
+    if (userData) {
+      setStats(userData.stats);
+      setRecentActivity(userData.recentActivity);
+    }
+  }, [userData]);
 
   return (
     <div className="space-y-6">

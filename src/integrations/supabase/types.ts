@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      user_activities: {
+        Row: {
+          id: string
+          type: string
+          title: string
+          timestamp: string
+          details: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          type: string
+          title: string
+          timestamp?: string
+          details?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          type?: string
+          title?: string
+          timestamp?: string
+          details?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       chat_messages: {
         Row: {
           id: string
