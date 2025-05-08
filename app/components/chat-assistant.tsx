@@ -1,4 +1,3 @@
-/*
 "use client"
 
 import { useState, useRef, useEffect } from "react"
@@ -9,6 +8,31 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useChatMemory, ChatMessage } from "../../lib/chat-memory"
 import { Loader2, Send, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+
+async function generateAIResponse(message: string, context: string) {
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        context,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to generate AI response')
+    }
+
+    const data = await response.json()
+    return { content: data.response }
+  } catch (error) {
+    console.error('Error generating AI response:', error)
+    return { error: 'Failed to generate response' }
+  }
+}
 
 interface ChatAssistantProps {
   topic?: string;
@@ -158,5 +182,4 @@ export function ChatAssistant({ topic = "general", placeholder = "Ask me anythin
       </div>
     </div>
   )
-} 
-*/
+}
