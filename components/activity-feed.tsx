@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, ReactElement } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSocket } from "@/components/socket-provider"
 import { Event } from "@/components/socket-provider"
 import { FileText, Users, Lightbulb, BookOpen, MessageSquare, Edit, Share2 } from "lucide-react"
-import { ReactElement } from "react"
 
 type Activity = {
   id: string
