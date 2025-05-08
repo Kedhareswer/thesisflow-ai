@@ -21,28 +21,98 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // No auth state listener or session check needed
+  const { toast } = useToast()
+
   useEffect(() => {
-    // Set default state
-    setUser(null)
-    setSession(null)
-    setIsLoading(false)
+    // Check active sessions and set the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+    })
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  // Simplified auth functions that don't require actual authentication
-  const signIn = async () => {
-    setUser({ id: 'guest', email: 'guest@example.com' } as User)
-    return
+  const signIn = async (email: string, password: string) => {
+    try {
+      setIsLoading(true)
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+
+      toast({
+        title: "Logged in successfully",
+        description: "Welcome back!",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sign in",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const signUp = async () => {
-    setUser({ id: 'guest', email: 'guest@example.com' } as User)
-    return
+  const signUp = async (email: string, password: string, name: string) => {
+    try {
+      setIsLoading(true)
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+        },
+      })
+
+      if (error) throw error
+
+      toast({
+        title: "Account created",
+        description: "Please check your email for verification link",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sign up",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const signOut = async () => {
-    setUser(null)
-    return
+    try {
+      setIsLoading(true)
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sign out",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

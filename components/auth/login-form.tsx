@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -8,10 +7,9 @@ import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/hooks/use-toast"
-import { loginUser } from "@/lib/auth"
 import { Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -20,9 +18,8 @@ const loginSchema = z.object({
 })
 
 export function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
+  const { signIn, isLoading } = useSupabaseAuth()
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -34,31 +31,11 @@ export function LoginForm() {
   })
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
-    setIsLoading(true)
-
     try {
-      // In a real app, this would call an API endpoint
-      const user = await loginUser({
-        email: values.email,
-        password: values.password,
-        rememberMe: values.rememberMe,
-      })
-
-      toast({
-        title: "Login successful",
-        description: `Welcome back, ${user.name}!`,
-      })
-
+      await signIn(values.email, values.password)
       router.push("/")
     } catch (error) {
       console.error("Error logging in:", error)
-      toast({
-        title: "Login failed",
-        description: "Invalid email or password. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
     }
   }
 

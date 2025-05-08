@@ -18,7 +18,9 @@ class ActivityTracker {
     papersSummarized: 0,
     collaborators: 0,
     researchIdeas: 0,
-    upcomingDeadlines: 0
+    upcomingDeadlines: 0,
+    writingStreak: 0,
+    lastSession: null as { title: string; link: string } | null
   };
 
   private constructor() {
@@ -55,6 +57,7 @@ class ActivityTracker {
   }
 
   private calculateStats() {
+    const now = new Date();
     this.stats = {
       papersSummarized: this.activities.filter((a: Activity) => a.type === 'paper_summarized').length,
       collaborators: this.activities.filter((a: Activity) => a.type === 'collaborator_joined').length,
@@ -63,7 +66,9 @@ class ActivityTracker {
       upcomingDeadlines: this.activities.filter((a: Activity) => 
         a.type === 'deadline_added' && !this.activities.some((b: Activity) => 
           b.type === 'deadline_completed' && b.details?.deadline_id === a.details?.deadline_id
-        )).length
+        )).length,
+      writingStreak: this.calculateWritingStreak(),
+      lastSession: this.findLastSession()
     };
   }
 
@@ -127,6 +132,96 @@ class ActivityTracker {
 
   public async refreshActivities() {
     await this.loadInitialData();
+  }
+  public getLastSession() {
+    return this.stats.lastSession;
+  }
+
+  public getWritingStreak() {
+    return this.stats.writingStreak;
+  }
+
+  public getPapersSummarizedThisMonth() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return this.activities.filter(a => 
+      a.type === 'paper_summarized' && 
+      a.timestamp >= startOfMonth
+    ).length;
+  }
+
+  public getCollaborationSessions() {
+    return this.activities.filter(a => 
+      a.type === 'collaboration_session'
+    ).length;
+  }
+
+  public getHighlights() {
+    return this.activities
+      .filter(a => a.type === 'highlight_created')
+      .map(a => a.title);
+  }
+
+  public getAISuggestion() {
+    const suggestions = [
+      'Consider reviewing recent papers in your field',
+      'Time to collaborate with peers on your research',
+      'Update your research notes and highlights',
+      'Plan your next writing session'
+    ];
+    return suggestions[Math.floor(Math.random() * suggestions.length)];
+  }
+
+  private calculateWritingStreak() {
+    let streak = 0;
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const hasWritingToday = this.activities.some(a => 
+      a.type === 'writing_session' && 
+      a.timestamp.toDateString() === now.toDateString()
+    );
+
+    const hasWritingYesterday = this.activities.some(a => 
+      a.type === 'writing_session' && 
+      a.timestamp.toDateString() === yesterday.toDateString()
+    );
+
+    if (hasWritingToday || hasWritingYesterday) {
+      streak = 1;
+      let checkDate = new Date(yesterday);
+
+      
+      while (this.activities.some(a => 
+        a.type === 'writing_session' && 
+        a.timestamp.toDateString() === checkDate.toDateString()
+      )) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+    }
+
+    return streak;
+  }
+
+  private findLastSession() {
+    const lastSession = this.activities.find(a => 
+      a.type === 'session_start' && 
+      !this.activities.some(b => 
+        b.type === 'session_end' && 
+        b.details?.session_id === a.details?.session_id
+      )
+    );
+
+    if (lastSession) {
+      return {
+        title: lastSession.title,
+        link: lastSession.details?.link || '/'
+      };
+    }
+
+    return null;
   }
 }
 
