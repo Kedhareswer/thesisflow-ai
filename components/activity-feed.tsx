@@ -4,8 +4,9 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSocket } from "@/components/socket-provider"
+import { Event } from "@/components/socket-provider"
 import { FileText, Users, Lightbulb, BookOpen, MessageSquare, Edit, Share2 } from "lucide-react"
-import type { JSX } from "react"
+import { ReactElement } from "react"
 
 type Activity = {
   id: string
@@ -15,7 +16,7 @@ type Activity = {
   action: string
   target: string
   timestamp: string
-  icon: JSX.Element
+  icon: ReactElement
 }
 
 export function ActivityFeed() {
@@ -77,12 +78,13 @@ export function ActivityFeed() {
   useEffect(() => {
     if (!events.length) return
 
-    const latestEvent = events[events.length - 1]
+    const latestEvent = events[events.length - 1] as Event
 
     // Find the user or use a default if not found
     const eventUser = activeUsers.find((u) => u.id === latestEvent.userId) || {
       id: latestEvent.userId || "unknown",
       name: "Unknown User",
+      avatar: undefined
     }
 
     let newActivity: Activity
@@ -96,7 +98,7 @@ export function ActivityFeed() {
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
           action: "summarized",
-          target: latestEvent.payload.title || "a research paper",
+          target: (latestEvent.payload.title as string) || "a research paper",
           timestamp: "Just now",
           icon: <FileText className="h-5 w-5 text-blue-500" />,
         }
@@ -108,7 +110,7 @@ export function ActivityFeed() {
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
           action: "generated",
-          target: `${latestEvent.payload.count || 1} research ideas on ${latestEvent.payload.topic || "a topic"}`,
+          target: `${(latestEvent.payload.count as number) || 1} research ideas on ${(latestEvent.payload.topic as string) || "a topic"}`,
           timestamp: "Just now",
           icon: <Lightbulb className="h-5 w-5 text-yellow-500" />,
         }
@@ -117,8 +119,8 @@ export function ActivityFeed() {
         newActivity = {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: eventUser.id,
-          userName: latestEvent.payload.name || eventUser.name,
-          userAvatar: latestEvent.payload.avatar || eventUser.avatar,
+          userName: (latestEvent.payload.name as string) || eventUser.name,
+          userAvatar: (latestEvent.payload.avatar as string) || eventUser.avatar,
           action: "joined",
           target: "your research group",
           timestamp: "Just now",
@@ -132,7 +134,7 @@ export function ActivityFeed() {
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
           action: "edited",
-          target: latestEvent.payload.title || "a document",
+          target: (latestEvent.payload.title as string) || "a document",
           timestamp: "Just now",
           icon: <Edit className="h-5 w-5 text-orange-500" />,
         }
@@ -144,7 +146,7 @@ export function ActivityFeed() {
           userName: eventUser.id === "user-1" ? "You" : eventUser.name,
           userAvatar: eventUser.avatar,
           action: "shared",
-          target: `${latestEvent.payload.title || "a document"} with ${latestEvent.payload.recipient || "someone"}`,
+          target: `${(latestEvent.payload.title as string) || "a document"} with ${(latestEvent.payload.recipient as string) || "someone"}`,
           timestamp: "Just now",
           icon: <Share2 className="h-5 w-5 text-teal-500" />,
         }
