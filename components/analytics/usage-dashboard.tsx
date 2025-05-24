@@ -8,9 +8,10 @@ import { FeatureUsageTable } from "./feature-usage-table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePickerWithRange } from "../ui/date-range-picker"
 import { addDays } from "date-fns"
+import type { DateRange } from "react-day-picker"
 
 export function UsageDashboard() {
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: addDays(new Date(), -30),
     to: new Date(),
   })
