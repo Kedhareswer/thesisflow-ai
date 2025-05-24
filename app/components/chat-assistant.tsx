@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useChatMemory, ChatMessage } from "../../lib/chat-memory"
+import { useChatMemory, ChatMessage } from "@/app/lib/chat-memory"
 import { Loader2, Send, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 

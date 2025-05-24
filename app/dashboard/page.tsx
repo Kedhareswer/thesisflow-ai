@@ -13,7 +13,7 @@ import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
 import { formatRelativeTime } from "@/lib/utils/date"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import { supabase } from "@/src/integrations/supabase/client"
+import { supabase } from "@/integrations/supabase/client"
 
 export default function Dashboard() {
   const router = useRouter()
