@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { FileText, Upload, Link, Copy, Download, Clock, BookOpen, ArrowRight } from "lucide-react"
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
+import { SummarizerService } from "@/lib/services/summarizer.service"
 
 interface Summary {
   id: string
@@ -37,24 +38,18 @@ export default function PaperSummarizer() {
 
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
+      // Call the AI service to summarize the text
+      const result = await SummarizerService.summarizeText(inputText)
+      
       const summary: Summary = {
         id: Date.now().toString(),
         title: "Text Summary",
         originalText: inputText,
-        summary:
-          "This comprehensive analysis explores the fundamental concepts presented in the provided text. The content demonstrates significant insights into the research domain, highlighting key methodologies and findings that contribute to our understanding of the subject matter. The analysis reveals important patterns and relationships that have implications for future research directions.",
-        keyPoints: [
-          "Primary research findings and their significance",
-          "Methodological approaches and their effectiveness",
-          "Key insights and theoretical contributions",
-          "Implications for future research and applications",
-          "Limitations and areas for further investigation",
-        ],
+        summary: result.summary,
+        keyPoints: result.keyPoints,
         timestamp: new Date(),
         source: "text",
-        readingTime: Math.ceil(inputText.length / 1000),
+        readingTime: result.readingTime || Math.ceil(inputText.length / 1000),
       }
 
       setSummaries((prev) => [summary, ...prev])
@@ -88,24 +83,27 @@ export default function PaperSummarizer() {
 
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
+      // First fetch the URL content and then summarize it
+      const result = await SummarizerService.summarizeUrl(fileUrl)
+      
+      // Get the title from the URL
+      let title = "Research Paper Analysis"
+      try {
+        const url = new URL(fileUrl)
+        title = url.hostname.replace(/^www\./, '') + url.pathname
+      } catch (e) {
+        // Use default title if URL parsing fails
+      }
+      
       const summary: Summary = {
         id: Date.now().toString(),
-        title: "Research Paper Analysis",
-        originalText: "Content extracted from the provided URL...",
-        summary:
-          "This research paper presents a novel approach to addressing key challenges in the field. The authors introduce innovative methodologies and provide comprehensive experimental validation. The findings demonstrate significant improvements over existing approaches and offer valuable insights for practitioners and researchers alike.",
-        keyPoints: [
-          "Novel algorithmic approach with theoretical foundations",
-          "Comprehensive experimental evaluation on benchmark datasets",
-          "Significant performance improvements over state-of-the-art methods",
-          "Practical applications and real-world implementation considerations",
-          "Future research directions and potential extensions",
-        ],
+        title: title,
+        originalText: `Content extracted from ${fileUrl}`,
+        summary: result.summary,
+        keyPoints: result.keyPoints,
         timestamp: new Date(),
         source: "url",
-        readingTime: 8,
+        readingTime: result.readingTime || 5,
       }
 
       setSummaries((prev) => [summary, ...prev])
@@ -140,24 +138,18 @@ export default function PaperSummarizer() {
 
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2500))
-
+      // Use the AI service to summarize the file content
+      const result = await SummarizerService.summarizeFile(file)
+      
       const summary: Summary = {
         id: Date.now().toString(),
         title: file.name,
-        originalText: "Content extracted from the uploaded file...",
-        summary:
-          "This document provides a comprehensive overview of the research topic, presenting detailed analysis and findings. The content demonstrates thorough investigation of the subject matter with well-structured arguments and evidence-based conclusions. The document contributes valuable insights to the field and offers practical implications for future work.",
-        keyPoints: [
-          "Comprehensive literature review and background analysis",
-          "Detailed methodology and research design",
-          "Significant findings and data analysis results",
-          "Practical implications and real-world applications",
-          "Recommendations for future research and development",
-        ],
+        originalText: `Content extracted from ${file.name}`,
+        summary: result.summary,
+        keyPoints: result.keyPoints,
         timestamp: new Date(),
         source: "file",
-        readingTime: 12,
+        readingTime: result.readingTime || Math.ceil(file.size / 5000),
       }
 
       setSummaries((prev) => [summary, ...prev])
