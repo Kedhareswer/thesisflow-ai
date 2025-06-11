@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server"
+import { exec } from "child_process"
+import { promisify } from "util"
+import path from "path"
+
+const execAsync = promisify(exec)
 
 export async function GET(request: Request) {
   try {
@@ -10,33 +15,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_SEMANTIC_SCHOLAR_API_KEY || ""
-
-    const response = await fetch(
-      `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,authors,abstract,year,url,citationCount,journal`,
-      {
-        headers: {
-          "x-api-key": apiKey,
-        },
-      },
-    )
-
-    if (!response.ok) {
-      throw new Error(`Semantic Scholar API error: ${response.status}`)
+    // Get the path to the Python script relative to the project root
+    const pythonScriptPath = path.join(process.cwd(), "python", "search_papers.py")
+    
+    // Execute the Python script directly with the query parameter
+    const { stdout, stderr } = await execAsync(`python "${pythonScriptPath}" "${query}"`)
+    
+    if (stderr) {
+      console.error("Python script error:", stderr)
+      throw new Error(`pygetpapers error: ${stderr}`)
     }
-
-    const data = await response.json()
-    const results = data.data.map((paper: any) => ({
-      id: paper.paperId,
-      title: paper.title,
-      authors: paper.authors.map((author: any) => author.name),
-      abstract: paper.abstract,
-      year: paper.year,
-      url: paper.url,
-      citations: paper.citationCount,
-      journal: paper.journal?.name,
-    }))
-
+    
+    // Parse the JSON output from the Python script
+    const results = JSON.parse(stdout)
+    
+    // Check if there was an error in the Python script
+    if (results.error) {
+      throw new Error(results.error)
+    }
+    
     return NextResponse.json(results)
   } catch (error) {
     console.error("Error in search papers API:", error)

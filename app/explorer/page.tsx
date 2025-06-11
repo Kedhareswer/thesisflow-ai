@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Brain, Search, Lightbulb, BookOpen } from "lucide-react"
+import { BookOpen, Brain, Lightbulb, MessageCircle, Search } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { EmptyState } from "@/components/common/EmptyState"
 import { SkeletonCard, SkeletonList } from "@/components/common/SkeletonCard"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
+import { ResearchChatbot } from "@/components/research-chatbot"
 
 export default function ResearchExplorer() {
   const { toast } = useToast()
@@ -110,7 +111,7 @@ export default function ResearchExplorer() {
         </div>
 
         <Tabs defaultValue="explore" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-50">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-50">
             <TabsTrigger value="explore" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
               Topic Explorer
@@ -122,6 +123,10 @@ export default function ResearchExplorer() {
             <TabsTrigger value="ideas" className="flex items-center gap-2">
               <Lightbulb className="h-4 w-4" />
               Idea Generator
+            </TabsTrigger>
+            <TabsTrigger value="assistant" className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Research Assistant
             </TabsTrigger>
           </TabsList>
 
@@ -184,7 +189,67 @@ export default function ResearchExplorer() {
                 </CardHeader>
                 <CardContent>
                   <div className="prose max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm">{topicExploration.data.data}</pre>
+                    {(() => {
+                      // Extract content from response
+                      let content = '';
+                      
+                      if (typeof topicExploration.data === 'string') {
+                        content = topicExploration.data;
+                      } else if (topicExploration.data && typeof topicExploration.data === 'object') {
+                        // Check if it's the new API response format with content field
+                        if ('content' in topicExploration.data) {
+                          content = topicExploration.data.content as string;
+                        } else if ('data' in topicExploration.data) {
+                          content = topicExploration.data.data as string;
+                        } else {
+                          content = JSON.stringify(topicExploration.data, null, 2);
+                        }
+                      }
+                      
+                      // Try to extract content from JSON if it's a JSON string
+                      try {
+                        const parsedContent = JSON.parse(content);
+                        if (typeof parsedContent === 'object' && parsedContent !== null && 'content' in parsedContent) {
+                          content = parsedContent.content;
+                        }
+                      } catch (e) {
+                        // Not JSON, use as is
+                      }
+                      
+                      return (
+                        <div className="markdown-content bg-white p-6 rounded-lg shadow-sm">
+                          {content.split('\n').map((line, i) => {
+                            // Check if line is a numbered heading (e.g., "1. Key Concepts")
+                            if (/^\d+\.\s+[A-Z]/.test(line)) {
+                              return <h2 key={i} className="font-bold text-xl mt-6 mb-3 text-blue-800 border-b pb-1 border-gray-200">{line}</h2>;
+                            }
+                            // Check if line is a heading
+                            else if (line.startsWith('**') && line.endsWith('**')) {
+                              return <h3 key={i} className="font-bold text-lg mt-5 mb-3 text-gray-800">{line.replace(/\*\*/g, '')}</h3>;
+                            }
+                            // Check if line is a subheading
+                            else if (line.startsWith('*') && line.endsWith('*')) {
+                              return <h4 key={i} className="font-semibold text-md mt-4 mb-2 text-gray-700">{line.replace(/\*/g, '')}</h4>;
+                            }
+                            // Check if line starts with an asterisk (bullet point)
+                            else if (line.trim().startsWith('*')) {
+                              return (
+                                <div key={i} className="flex mb-2 ml-4">
+                                  <span className="text-blue-600 mr-2">•</span>
+                                  <span className="text-gray-700">{line.trim().substring(1).trim()}</span>
+                                </div>
+                              );
+                            }
+                            // Regular paragraph
+                            else if (line.trim()) {
+                              return <p key={i} className="mb-3 text-gray-700 leading-relaxed">{line}</p>;
+                            }
+                            // Empty line - use smaller spacing
+                            return <div key={i} className="h-1"></div>;
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
@@ -219,7 +284,7 @@ export default function ResearchExplorer() {
 
             {paperSearch.loading && <SkeletonList count={3} />}
 
-            {paperSearch.data && paperSearch.data.data?.length > 0 ? (
+            {paperSearch.data && paperSearch.data.data && paperSearch.data.data.length > 0 ? (
               <div className="space-y-4">
                 {paperSearch.data.data.map((paper: any, index: number) => (
                   <Card key={index}>
@@ -315,11 +380,144 @@ export default function ResearchExplorer() {
                 </CardHeader>
                 <CardContent>
                   <div className="prose max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm">{ideaGeneration.data.data}</pre>
+                    {(() => {
+                      // Get the raw data
+                      const ideaRaw = ideaGeneration.data;
+                      let content = '';
+                      
+                      // Deep recursive function to extract content from complex objects
+                      const extractContent = (data: any): string => {
+                        // If it's a string, return it directly
+                        if (typeof data === 'string') {
+                          return data;
+                        }
+                        
+                        // If it has a content property, extract that
+                        if (data && typeof data === 'object' && 'content' in data && typeof data.content === 'string') {
+                          return data.content;
+                        }
+                        
+                        // If it's an array, stringify it properly
+                        if (Array.isArray(data)) {
+                          return data.map(item => {
+                            if (typeof item === 'object') {
+                              // For research ideas, try to format them nicely
+                              if (item.question || item.methodology || item.impact || item.challenges) {
+                                return `**Research Question:** ${item.question || ''}\n` +
+                                  `**Methodology:** ${item.methodology || ''}\n` +
+                                  `**Impact:** ${item.impact || ''}\n` +
+                                  `**Challenges:** ${item.challenges || ''}\n---`;
+                              }
+                              return JSON.stringify(item, null, 2);
+                            }
+                            return String(item);
+                          }).join('\n\n');
+                        }
+                        
+                        // If it's a plain object but not an array
+                        if (data && typeof data === 'object') {
+                          // Check for data.data pattern
+                          if ('data' in data) {
+                            return extractContent(data.data);
+                          }
+                          
+                          // As a last resort, stringify the object
+                          try {
+                            return JSON.stringify(data, null, 2);
+                          } catch (e) {
+                            return String(data);
+                          }
+                        }
+                        
+                        // Fallback
+                        return String(data);
+                      };
+                      
+                      // Extract content using our recursive function
+                      content = extractContent(ideaRaw);
+                      
+                      // One more attempt to parse JSON if it's a string that looks like JSON
+                      if (typeof content === 'string' && 
+                          (content.trim().startsWith('{') || content.trim().startsWith('[')) &&
+                          (content.trim().endsWith('}') || content.trim().endsWith(']'))) {
+                        try {
+                          const parsed = JSON.parse(content);
+                          content = extractContent(parsed);
+                        } catch (_) {
+                          // Not valid JSON, keep as-is
+                        }
+                      }
+                      
+                      return (
+                        <div className="markdown-content bg-white p-6 rounded-lg shadow-sm">
+                          {content.split('\n').map((line, i) => {
+                            // Check if line is a numbered heading (e.g., "1. Key Concepts")
+                            if (/^\d+\.\s+[A-Z]/.test(line)) {
+                              return <h2 key={i} className="font-bold text-xl mt-6 mb-3 text-blue-800 border-b pb-1 border-gray-200">{line}</h2>;
+                            }
+                            // Check if line is a heading
+                            else if (line.startsWith('**') && line.endsWith('**')) {
+                              return <h3 key={i} className="font-bold text-lg mt-5 mb-3 text-gray-800">{line.replace(/\*\*/g, '')}</h3>;
+                            }
+                            // Check if line is a subheading
+                            else if (line.startsWith('*') && line.endsWith('*')) {
+                              return <h4 key={i} className="font-semibold text-md mt-4 mb-2 text-gray-700">{line.replace(/\*/g, '')}</h4>;
+                            }
+                            // Check if line is a numbered list item
+                            else if (/^\d+\.\s/.test(line)) {
+                              const [number, ...rest] = line.split('. ');
+                              return (
+                                <div key={i} className="flex mb-2 ml-2">
+                                  <span className="font-bold text-blue-700 mr-2 min-w-[20px]">{number}.</span>
+                                  <span className="text-gray-700">{rest.join('. ')}</span>
+                                </div>
+                              );
+                            }
+                            // Check if line starts with an asterisk (bullet point)
+                            else if (line.trim().startsWith('*')) {
+                              return (
+                                <div key={i} className="flex mb-2 ml-4">
+                                  <span className="text-blue-600 mr-2">•</span>
+                                  <span className="text-gray-700">{line.trim().substring(1).trim()}</span>
+                                </div>
+                              );
+                            }
+                            // Regular paragraph
+                            else if (line.trim()) {
+                              return <p key={i} className="mb-3 text-gray-700 leading-relaxed">{line}</p>;
+                            }
+                            // Empty line - use smaller spacing
+                            return <div key={i} className="h-1"></div>;
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="assistant" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  Research Assistant
+                </CardTitle>
+                <CardDescription>
+                  Chat with an AI research assistant to ask questions about your topic, generated ideas, or found papers.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResearchChatbot 
+                  topic={topic || ideaTopic} 
+                  papers={paperSearch.data?.data || []} 
+                  ideas={ideaGeneration.data ? String(ideaGeneration.data) : undefined}
+                  context={topicExploration.data ? String(topicExploration.data) : undefined}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

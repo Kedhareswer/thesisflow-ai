@@ -1,10 +1,21 @@
 import { api } from "@/lib/utils/api"
 import type { ResearchPaper, ResearchIdea, Summary } from "@/lib/types/common"
 
+interface AIGenerationResponse {
+  content: string;
+  model: string;
+  provider: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
 export class ResearchService {
   static async exploreTopics(topic: string, depth = 3) {
     try {
-      return await api.post("/api/ai/generate", {
+      const response = await api.post<AIGenerationResponse>("/api/ai/generate", {
         prompt: `Provide a comprehensive research overview of "${topic}". Include:
 1. Key concepts and definitions
 2. Major research areas and subfields
@@ -15,6 +26,18 @@ export class ResearchService {
 
 Depth level: ${depth}/5`,
       })
+      
+      // Extract content from the response
+      // If response.data has a content property (new format), use that
+      // Otherwise fall back to the entire response.data (old format)
+      const content = response.data && typeof response.data === 'object' && 'content' in response.data
+        ? response.data.content
+        : response.data
+
+      return {
+        ...response,
+        data: content
+      }
     } catch (error) {
       console.error("Error exploring topics:", error)
       throw error
@@ -32,14 +55,26 @@ Depth level: ${depth}/5`,
 
   static async generateIdeas(topic: string, context?: string, count = 5) {
     try {
-      return await api.post<ResearchIdea[]>("/api/ai/generate", {
-        prompt: `Generate ${count} research ideas about "${topic}". ${context ? `Context: ${context}` : ""}
-For each idea, include:
-1. Research question
-2. Methodology
-3. Potential impact
-4. Key challenges`,
+      const response = await api.post<AIGenerationResponse>("/api/ai/generate", {
+        prompt: `You are a research assistant. Generate ${count} innovative research ideas on the topic "${topic}".${context ? ` Context: ${context}` : ""}
+For each idea, provide:
+1. A concise research question (max 20 words)
+2. A brief suggested methodology (1–2 sentences)
+3. The potential impact or contribution (1 sentence)
+4. Key challenges or limitations (1 sentence)
+
+Return the ideas as a Markdown numbered list, where each idea is formatted as:\n**Research Question:** ...\n**Methodology:** ...\n**Impact:** ...\n**Challenges:** ...\n---`,
       })
+
+      // Extract usable content from new/old formats
+      const content = response.data && typeof response.data === "object" && "content" in response.data
+        ? (response.data as AIGenerationResponse).content
+        : (response.data as unknown as string)
+
+      return {
+        ...response,
+        data: content,
+      }
     } catch (error) {
       console.error("Error generating ideas:", error)
       throw error
