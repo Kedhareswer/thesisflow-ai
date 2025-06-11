@@ -14,7 +14,7 @@ export default function MainNav() {
   return (
     <nav className="flex items-center justify-between py-4 px-6 bg-white border-b">
       <div className="flex items-center gap-8">
-        <Link href="/dashboard" className="text-xl font-bold text-blue-700">AI Project Planner</Link>
+        <Link href="/dashboard" className="text-xl font-bold text-blue-700">Bolt</Link>
         <Link href="/dashboard" className="hover:underline">Dashboard</Link>
         <Link href="/projects" className="hover:underline">Projects</Link>
         <Link href="/summarizer" className="hover:underline">Summarizer</Link>
