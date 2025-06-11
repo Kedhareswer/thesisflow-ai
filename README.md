@@ -27,8 +27,7 @@
 
 ## 📋 Overview
 
-AI Project Planner is a comprehensive research platform designed to streamline the academic research workflow. It combines AI-powered tools for literature review, summarization, project planning, coll[...]
-
+AI Project Planner is a comprehensive research platform designed to streamline the academic research workflow. It combines AI-powered tools for literature review, summarization, project planning, collaboration, and more into a unified interface.
 <div align="center">
   <table>
     <tr>
