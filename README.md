@@ -1,97 +1,170 @@
-# Collaborative Research Hub
+# 🚀 AI Project Planner
 
-A real-time collaborative workspace for research teams. Chat with team members, share documents, and leverage AI assistance for your research projects.
+[![Next.js](https://img.shields.io/badge/Built%20with-Next.js-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
+[![Supabase](https://img.shields.io/badge/Database-Supabase-green?style=flat-square&logo=supabase)](https://supabase.com)
+[![OpenAI](https://img.shields.io/badge/AI-OpenAI-lightgrey?style=flat-square&logo=openai)](https://openai.com)
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Features
+A modern, collaborative research workspace powered by AI that helps teams plan, organize, and execute research projects efficiently. Real-time collaboration meets intelligent assistance to streamline your research workflow.
 
-- Real-time team chat with AI assistance
-- Document sharing and collaboration
-- Team member management
-- Modern, responsive UI
-- OpenAI integration for intelligent responses
-- Supabase backend for data storage and real-time updates
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/yourusername/ai-project-planner/assets/project-dashboard.png" alt="AI Project Planner Dashboard" width="800">
+</p>
 
-## Prerequisites
+## 🌟 Features
+
+### Core Functionality
+- 📊 **Project Management**
+  - Kanban-style task boards
+  - Progress tracking
+  - Deadline management
+  - Priority-based task organization
+
+- 🤖 **AI Integration**
+  - Automated research planning
+  - Literature review assistance
+  - Methodology framework generation
+  - Mind map creation
+  - Note-taking suggestions
+
+- 👥 **Team Collaboration**
+  - Real-time document sharing
+  - Team chat with AI assistance
+  - Multi-user editing
+  - Research team management
+
+### Research Tools
+- 📝 **Writing Assistant**
+  - Research paper structuring
+  - Citation management
+  - Content suggestions
+  - Style improvements
+
+- 📚 **Research Planning**
+  - Literature review organization
+  - Methodology framework
+  - Timeline generation
+  - Resource allocation
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js, TypeScript, Tailwind CSS
+- **Backend**: Supabase
+- **AI Integration**: OpenAI API
+- **Real-time**: WebSocket
+- **Authentication**: Supabase Auth
+
+## 📋 Prerequisites
 
 - Node.js 18.x or later
 - npm or yarn
 - Supabase account
 - OpenAI API key
 
-## Environment Setup
+## ⚙️ Installation
 
-Create a `.env.local` file in the root directory with the following variables:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Kedhareswer/ai-project-planner.git
+   cd ai-project-planner
+   ```
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-OPENAI_API_KEY=your_openai_api_key
-```
-
-## Database Setup
-
-Create the following tables in your Supabase database:
-
-### Team Members Table
-```sql
-create table team_members (
-  id uuid default uuid_generate_v4() primary key,
-  email text not null unique,
-  name text,
-  role text not null check (role in ('owner', 'editor')),
-  avatar_url text,
-  status text not null check (status in ('active', 'invited')),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-```
-
-### Documents Table
-```sql
-create table documents (
-  id uuid default uuid_generate_v4() primary key,
-  title text not null,
-  content text not null,
-  author text not null,
-  type text not null check (type in ('literature_review', 'methodology', 'research_questions', 'summary', 'framework')),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-```
-
-## Installation
-
-1. Clone the repository
-2. Install dependencies:
+2. **Install dependencies**
    ```bash
    npm install
    # or
    yarn install
    ```
 
-3. Run the development server:
+3. **Set up environment variables**
+   Create a `.env.local` file:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   OPENAI_API_KEY=your_openai_api_key
+   ```
+
+4. **Start the development server**
    ```bash
    npm run dev
    # or
    yarn dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. **Open [http://localhost:3000](http://localhost:3000) in your browser**
 
-## Usage
+## 🔍 Project Structure
 
-1. Set up your research team by inviting members via email
-2. Create and share documents with your team
-3. Use the AI assistant to help with research tasks
-4. Collaborate in real-time through the team chat
+```
+ai-project-planner/
+├── app/
+│   ├── components/
+│   │   ├── main-nav.tsx
+│   │   └── ...
+├── components/
+│   ├── ai-integration.tsx
+│   ├── collaborative-workspace.tsx
+│   ├── project-planner.tsx
+│   └── projects-overview.tsx
+├── public/
+├── styles/
+├── types/
+└── ...
+```
 
-## Contributing
+## 🎯 Core Features Breakdown
+
+### Project Management
+```mermaid
+graph TD
+    A[Project Creation] --> B[Task Management]
+    B --> C[Progress Tracking]
+    B --> D[Priority Setting]
+    C --> E[Timeline View]
+    D --> F[Task Board]
+```
+
+### AI Integration
+```mermaid
+graph LR
+    A[User Input] --> B[AI Processing]
+    B --> C[Research Planning]
+    B --> D[Literature Analysis]
+    B --> E[Writing Assistance]
+    B --> F[Methodology Generation]
+```
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. Commit your changes
+   ```bash
+   git commit -m 'Add some amazing feature'
+   ```
+4. Push to the branch
+   ```bash
+   git push origin feature/amazing-feature
+   ```
 5. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Next.js](https://nextjs.org) for the amazing React framework
+- [Supabase](https://supabase.com) for the backend infrastructure
+- [OpenAI](https://openai.com) for AI capabilities
+- [Tailwind CSS](https://tailwindcss.com) for styling
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/Kedhareswer">Kedhareswer</a>
+</p>
