@@ -1,4 +1,4 @@
-# AI Project Planner
+# Bolt Research Hub
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Latest-green?style=flat-square&logo=supabase)](https://supabase.io/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Kedhareswer/ai-project-planner/blob/main/LICENSE)
 
 **Advanced Machine Learning Research Platform**
 
@@ -27,7 +27,7 @@
 
 ## 📋 Overview
 
-AI Project Planner is a comprehensive research platform designed to streamline the academic research workflow. It combines AI-powered tools for literature review, summarization, project planning, collaboration, and more into a unified interface.
+AI Project Planner is a comprehensive research platform designed to streamline the academic research workflow. It combines AI-powered tools for literature review, summarization, project planning, coll[...]
 
 <div align="center">
   <table>
@@ -104,7 +104,7 @@ Get expert guidance on methodology, analysis, and research best practices.
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/ai-project-planner.git
+git clone https://github.com/Kedhareswer/ai-project-planner.git
 cd ai-project-planner
 ```
 
@@ -244,15 +244,15 @@ ai-project-planner/
 ├── app/                  # Next.js app directory
 │   ├── ai-assistant/     # AI assistant feature
 │   ├── explorer/         # Research explorer feature
-│   ├── planner/          # Project planning feature
-│   ├── summarizer/       # Document summarization feature
+│   ├── planner/         # Project planning feature
+│   ├── summarizer/      # Document summarization feature
 │   └── ...
-├── components/           # Reusable UI components
-├── lib/                  # Core services and utilities
-│   ├── services/         # Business logic services
-│   └── utils/            # Utility functions
-├── python/               # Python backend for literature review
-└── public/               # Static assets
+├── components/          # Reusable UI components
+├── lib/                 # Core services and utilities
+│   ├── services/        # Business logic services
+│   └── utils/          # Utility functions
+├── python/             # Python backend for literature review
+└── public/             # Static assets
 ```
 
 ### Architecture Diagram
@@ -302,7 +302,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/Kedhareswer/ai-project-planner/blob/main/LICENSE) file for details.
 
 ## 🙏 Acknowledgements
 
@@ -317,7 +317,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
   <p>Built with ❤️ by the AI Project Planner Team</p>
   <p>
-    <a href="https://github.com/yourusername/ai-project-planner/issues">Report Bug</a> · 
-    <a href="https://github.com/yourusername/ai-project-planner/issues">Request Feature</a>
+    <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Report Bug</a> · 
+    <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a>
   </p>
 </div>
