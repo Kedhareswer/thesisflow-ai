@@ -70,4 +70,4 @@ Please provide a helpful, relevant, and well-structured response.`
       { status: 500 }
     )
   }
-} 
+}

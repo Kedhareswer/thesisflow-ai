@@ -15,18 +15,17 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 
 interface SearchResult {
-  id: string;
-  title: string;
-  authors: string[];
-  abstract: string;
-  year: number;
-  url: string;
-  citations?: number;
-  journal?: string;
+  id: string
+  title: string
+  authors: string[]
+  abstract: string
+  year: number
+  url: string
+  citations?: number
+  journal?: string
 }
 
 export default function ResearchExplorer() {
-  const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
 
@@ -48,10 +47,10 @@ export default function ResearchExplorer() {
 
   const handleExplore = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!researchTopic.trim() || !apiKey.trim()) {
+    if (!researchTopic.trim()) {
       toast({
         title: "Missing required fields",
-        description: "Please enter a research topic and API key",
+        description: "Please enter a research topic",
         variant: "destructive",
       })
       return
@@ -61,16 +60,14 @@ export default function ResearchExplorer() {
     setExplorationResult("")
 
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent", {
+      // Use server API route instead of direct API call
+      const response = await fetch("/api/ai/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Provide a comprehensive research overview of "${researchTopic}". Include:
+          prompt: `Provide a comprehensive research overview of "${researchTopic}". Include:
 1. Key concepts and definitions
 2. Major research areas and subfields
 3. Current challenges and limitations
@@ -78,10 +75,8 @@ export default function ResearchExplorer() {
 5. Leading researchers and institutions
 6. Future research directions
 
-Format the response in markdown.`
-            }]
-          }]
-        })
+Format the response in markdown.`,
+        }),
       })
 
       if (!response.ok) {
@@ -89,12 +84,11 @@ Format the response in markdown.`
       }
 
       const data = await response.json()
-      const result = data.candidates[0].content.parts[0].text
-      setExplorationResult(result)
+      setExplorationResult(data.content)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to explore topic. Please check your API key and try again.",
+        description: "Failed to explore topic. Please try again later.",
         variant: "destructive",
       })
     } finally {
@@ -117,28 +111,18 @@ Format the response in markdown.`
     setSearchResults([])
 
     try {
-      const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(searchQuery)}&limit=10&fields=title,authors,abstract,year,url,citationCount,journal`, {
+      // Use server API route for semantic scholar search
+      const response = await fetch(`/api/search/papers?query=${encodeURIComponent(searchQuery)}&type=${searchType}`, {
         headers: {
-          "x-api-key": process.env.NEXT_PUBLIC_SEMANTIC_SCHOLAR_API_KEY || "",
-        }
+          "Content-Type": "application/json",
+        },
       })
 
       if (!response.ok) {
         throw new Error("Failed to search papers")
       }
 
-      const data = await response.json()
-      const results: SearchResult[] = data.data.map((paper: any) => ({
-        id: paper.paperId,
-        title: paper.title,
-        authors: paper.authors.map((author: any) => author.name),
-        abstract: paper.abstract,
-        year: paper.year,
-        url: paper.url,
-        citations: paper.citationCount,
-        journal: paper.journal?.name
-      }))
-
+      const results = await response.json()
       setSearchResults(results)
     } catch (error) {
       toast({
@@ -153,10 +137,10 @@ Format the response in markdown.`
 
   const handleGenerateIdeas = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!ideaTopic.trim() || !apiKey.trim()) {
+    if (!ideaTopic.trim()) {
       toast({
         title: "Missing required fields",
-        description: "Please enter a topic and API key",
+        description: "Please enter a topic",
         variant: "destructive",
       })
       return
@@ -166,26 +150,22 @@ Format the response in markdown.`
     setGeneratedIdeas("")
 
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent", {
+      // Use server API route instead of direct API call
+      const response = await fetch("/api/ai/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Generate ${ideaCount} research ideas about "${ideaTopic}". ${ideaContext ? `Context: ${ideaContext}` : ''}
+          prompt: `Generate ${ideaCount} research ideas about "${ideaTopic}". ${ideaContext ? `Context: ${ideaContext}` : ""}
 For each idea, include:
 1. Research question
 2. Methodology
 3. Potential impact
 4. Key challenges
 
-Format the response in markdown.`
-            }]
-          }]
-        })
+Format the response in markdown.`,
+        }),
       })
 
       if (!response.ok) {
@@ -193,12 +173,11 @@ Format the response in markdown.`
       }
 
       const data = await response.json()
-      const result = data.candidates[0].content.parts[0].text
-      setGeneratedIdeas(result)
+      setGeneratedIdeas(data.content)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to generate ideas. Please check your API key and try again.",
+        description: "Failed to generate ideas. Please try again later.",
         variant: "destructive",
       })
     } finally {
@@ -224,18 +203,6 @@ Format the response in markdown.`
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="apiKey">Gemini API Key</Label>
-        <Input
-          id="apiKey"
-          placeholder="Enter your Gemini API key"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          required
-        />
-        <p className="text-xs text-muted-foreground">Your API key is required to use the Gemini AI model</p>
-      </div>
-
       <Tabs defaultValue="explore" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="explore">Topic Explorer</TabsTrigger>
@@ -512,4 +479,4 @@ Format the response in markdown.`
       </Tabs>
     </div>
   )
-} 
+}

@@ -115,4 +115,4 @@ export function TeamMembers() {
       )}
     </div>
   )
-} 
+}

@@ -1,4 +1,3 @@
-
 -- Enable Row Level Security on all tables
 ALTER TABLE public.research_papers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.paper_edits ENABLE ROW LEVEL SECURITY;

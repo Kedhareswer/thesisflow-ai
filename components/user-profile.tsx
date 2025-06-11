@@ -302,4 +302,4 @@ export function UserProfileComponent({ initialProfile, initialSettings }: UserPr
       </Tabs>
     </div>
   );
-} 
+}

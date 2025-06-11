@@ -1,4 +1,3 @@
-
 -- Create a trigger to create a user profile when a new user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$

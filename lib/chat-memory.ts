@@ -34,4 +34,4 @@ export const useChatMemory = create<ChatMemoryState>((set, get) => ({
     const state = get()
     return state.messages.filter((msg) => msg.topic === topic)
   },
-})) 
+}))

@@ -195,4 +195,4 @@ export function ResearchExplorer() {
       </Card>
     </div>
   );
-} 
+}

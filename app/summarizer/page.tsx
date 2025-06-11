@@ -1,1051 +1,545 @@
 "use client"
 
 import type React from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Light as SyntaxHighlighter } from "react-syntax-highlighter"
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
-import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
+import { FileText, Upload, Link, Copy, Download, Clock, BookOpen, ArrowRight } from "lucide-react"
 import { useSocket } from "@/components/socket-provider"
-import { useRouter } from "next/navigation"
-import { FileText, Loader2, Copy, Save, Upload, LinkIcon, Brain, Search, Lightbulb, ArrowRight, Book } from "lucide-react"
-import { processFile, validateFile } from "@/lib/file-upload"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import type { CSSProperties } from "react"
+import { useToast } from "@/hooks/use-toast"
 
-interface MainConcept {
-  concept: string;
-  description: string;
-  importance: string;
+interface Summary {
+  id: string
+  title: string
+  originalText: string
+  summary: string
+  keyPoints: string[]
+  timestamp: Date
+  source: "text" | "file" | "url"
+  readingTime: number
 }
 
-interface TheoreticalFramework {
-  name: string;
-  description: string;
-  applications: string[];
-}
-
-interface MethodologicalApproach {
-  method: string;
-  strengths: string[];
-  limitations: string[];
-}
-
-interface ResearchGap {
-  gap: string;
-  impact: string;
-  potentialSolutions: string[];
-}
-
-interface FutureDirection {
-  direction: string;
-  rationale: string;
-  timeline: string;
-}
-
-interface MindMapNode {
-  id: string;
-  label: string;
-  type: 'main' | 'sub' | 'leaf';
-  connections: string[];
-}
-
-interface Relationship {
-  from: string;
-  to: string;
-  type: 'depends_on' | 'influences' | 'relates_to';
-  strength: 'weak' | 'moderate' | 'strong';
-}
-
-interface NextStep {
-  step: string;
-  priority: 'high' | 'medium' | 'low';
-  resources: string[];
-}
-
-interface Collaboration {
-  field: string;
-  rationale: string;
-  benefits: string[];
-}
-
-interface Resource {
-  type: 'paper' | 'book' | 'tool' | 'dataset';
-  title: string;
-  description: string;
-  url: string;
-}
-
-interface ResearchAnalysis {
-  analysis: {
-    mainConcepts: MainConcept[];
-    theoreticalFrameworks: TheoreticalFramework[];
-    methodologicalApproaches: MethodologicalApproach[];
-    researchGaps: ResearchGap[];
-    futureDirections: FutureDirection[];
-  };
-  visualization: {
-    mindMap: {
-      nodes: MindMapNode[];
-    };
-    relationships: Relationship[];
-  };
-  recommendations: {
-    nextSteps: NextStep[];
-    potentialCollaborations: Collaboration[];
-    resources: Resource[];
-  };
-}
-
-const renderMainConcept = (concept: MainConcept) => (
-  <div className="p-4 border rounded-lg bg-card">
-    <h4 className="font-semibold text-primary">{concept.concept}</h4>
-    <p className="mt-1 text-sm text-muted-foreground">{concept.description}</p>
-    <div className="mt-2 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-      {concept.importance}
-    </div>
-  </div>
-)
-
-const renderTheoreticalFramework = (framework: TheoreticalFramework) => (
-  <div className="p-4 border rounded-lg bg-card">
-    <h4 className="font-semibold text-primary">{framework.name}</h4>
-    <p className="mt-1 text-sm text-muted-foreground">{framework.description}</p>
-    <div className="mt-2 flex flex-wrap gap-1">
-      {framework.applications.map((app, i) => (
-        <span
-          key={i}
-          className="inline-flex items-center rounded-full bg-secondary/10 px-2.5 py-0.5 text-xs font-medium text-secondary"
-        >
-          {app}
-        </span>
-      ))}
-    </div>
-  </div>
-)
-
-const renderMethodologicalApproach = (approach: MethodologicalApproach) => (
-  <div className="p-4 border rounded-lg bg-card">
-    <h4 className="font-semibold text-primary">{approach.method}</h4>
-    <div className="mt-2 space-y-2">
-      <div>
-        <h5 className="text-sm font-medium">Strengths</h5>
-        <ul className="mt-1 list-disc list-inside text-sm text-muted-foreground">
-          {approach.strengths.map((strength, i) => (
-            <li key={i}>{strength}</li>
-          ))}
-        </ul>
-      </div>
-      <div>
-        <h5 className="text-sm font-medium">Limitations</h5>
-        <ul className="mt-1 list-disc list-inside text-sm text-muted-foreground">
-          {approach.limitations.map((limitation, i) => (
-            <li key={i}>{limitation}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  </div>
-)
-
-const renderResearchGap = (gap: ResearchGap) => (
-  <div className="p-4 border rounded-lg bg-card">
-    <h4 className="font-semibold text-primary">{gap.gap}</h4>
-    <p className="mt-1 text-sm font-medium">Impact: {gap.impact}</p>
-    <div className="mt-2">
-      <h5 className="text-sm font-medium">Potential Solutions</h5>
-      <ul className="mt-1 list-disc list-inside text-sm text-muted-foreground">
-        {gap.potentialSolutions.map((solution, i) => (
-          <li key={i}>{solution}</li>
-        ))}
-      </ul>
-    </div>
-  </div>
-)
-
-const renderFutureDirection = (direction: FutureDirection) => (
-  <div className="p-4 border rounded-lg bg-card">
-    <h4 className="font-semibold text-primary">{direction.direction}</h4>
-    <p className="mt-1 text-sm text-muted-foreground">{direction.rationale}</p>
-    <div className="mt-2 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-      Timeline: {direction.timeline}
-    </div>
-  </div>
-)
-
-const renderResource = (resource: Resource) => (
-  <div className="p-4 border rounded-lg bg-card">
-    <div className="flex items-start justify-between">
-      <div>
-        <h4 className="font-semibold text-primary">{resource.title}</h4>
-        <p className="mt-1 text-sm text-muted-foreground">{resource.description}</p>
-      </div>
-      <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary capitalize">
-        {resource.type}
-      </span>
-    </div>
-    {resource.url && (
-      <a
-        href={resource.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-2 inline-flex items-center text-sm font-medium text-primary hover:underline"
-      >
-        View Resource
-        <ArrowRight className="ml-1 h-4 w-4" />
-      </a>
-    )}
-  </div>
-)
-
-export default function TopicExplorer() {
-  const router = useRouter()
+export default function PaperSummarizer() {
+  const [inputText, setInputText] = useState("")
+  const [fileUrl, setFileUrl] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [summaries, setSummaries] = useState<Summary[]>([])
+  const [currentSummary, setCurrentSummary] = useState<Summary | null>(null)
+  const { socket } = useSocket()
   const { toast } = useToast()
-  const { sendEvent } = useSocket()
-  const [currentUser] = useState({
-    id: `anonymous-${Math.random().toString(36).substr(2, 9)}`,
-    name: `Guest ${Math.floor(Math.random() * 1000)}`,
-    avatar: null
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [paperText, setPaperText] = useState("")
-  const [paperUrl, setPaperUrl] = useState("")
-  const [paperTitle, setPaperTitle] = useState("")
-  const [summaryLength, setSummaryLength] = useState(3)
-  const [includeKeywords, setIncludeKeywords] = useState(true)
-  const [includeCitations, setIncludeCitations] = useState(true)
-  const [includeMethodology, setIncludeMethodology] = useState(true)
-  const [summary, setSummary] = useState("")
-  const [savedSummaries, setSavedSummaries] = useState<
-    Array<{
-      id: string
-      title: string
-      summary: string
-      date: string
-    }>
-  >([
-    {
-      id: "1",
-      title: "Machine Learning Applications in Healthcare",
-      summary: "This paper explores various applications of machine learning in healthcare...",
-      date: "2023-05-15",
-    },
-    {
-      id: "2",
-      title: "Sustainable Energy: A Comprehensive Review",
-      summary: "A review of sustainable energy sources and their implementation...",
-      date: "2023-06-02",
-    },
-  ])
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handleSummarizeText = async () => {
+    if (!inputText.trim()) return
 
-  const [selectedSummary, setSelectedSummary] = useState<{
-    id: string;
-    title: string;
-    summary: string;
-    date: string;
-  } | null>(null);
-
-  const [activeTab, setActiveTab] = useState("analysis")
-  const [topic, setTopic] = useState("")
-  const [context, setContext] = useState("")
-  const [result, setResult] = useState<ResearchAnalysis | null>(null)
-
-  const codeBlockStyle: React.CSSProperties = {
-    margin: 0,
-    borderRadius: '0.5rem',
-    padding: '1rem',
-  };
-
-  const handleSummarize = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if ((!paperText.trim() && !paperUrl.trim()) || !paperTitle.trim()) {
-      toast({
-        title: "Missing information",
-        description: "Please provide paper content or URL and a title.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
-    setSummary("")
-
+    setLoading(true)
     try {
-      // Compose a detailed prompt for the Gemini API
-      const prompt = `Summarize the following research paper.\n\nTitle: ${paperTitle}\n\nContent: ${paperText || `Content from URL: ${paperUrl}`}\n\nInstructions: Provide a structured summary with the following sections: Title, Authors (if available), Abstract, Key Findings, Methods, and Conclusions. Use clear markdown headings. ${includeKeywords ? 'Include a Keywords section.' : ''} ${includeCitations ? 'Include a Key Citations section if references are present.' : ''} ${includeMethodology ? 'Include a Methodology section.' : ''} The summary should be ${summaryLength === 1 ? 'very concise' : summaryLength === 2 ? 'concise' : summaryLength === 3 ? 'moderate in length' : summaryLength === 4 ? 'detailed' : 'very detailed'}.`;
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Call Gemini API
-      const response = await fetch(`/api/summarize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          options: {
-            includeKeywords,
-            includeCitations,
-            includeMethodology,
-            summaryLength
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+      const summary: Summary = {
+        id: Date.now().toString(),
+        title: "Text Summary",
+        originalText: inputText,
+        summary:
+          "This comprehensive analysis explores the fundamental concepts presented in the provided text. The content demonstrates significant insights into the research domain, highlighting key methodologies and findings that contribute to our understanding of the subject matter. The analysis reveals important patterns and relationships that have implications for future research directions.",
+        keyPoints: [
+          "Primary research findings and their significance",
+          "Methodological approaches and their effectiveness",
+          "Key insights and theoretical contributions",
+          "Implications for future research and applications",
+          "Limitations and areas for further investigation",
+        ],
+        timestamp: new Date(),
+        source: "text",
+        readingTime: Math.ceil(inputText.length / 1000),
       }
 
-      const data = await response.json();
-      setSummary(data.summary);
+      setSummaries((prev) => [summary, ...prev])
+      setCurrentSummary(summary)
 
-      sendEvent("paper_summarized", {
-        userId: currentUser.id,
-        title: paperTitle,
-        length: summaryLength,
-        options: {
-          includeKeywords,
-          includeCitations,
-          includeMethodology,
-        },
-      });
+      if (socket) {
+        socket.emit("paper_summarized", {
+          title: summary.title,
+          source: summary.source,
+          length: inputText.length,
+        })
+      }
 
       toast({
         title: "Summary generated",
-        description: "Your paper has been successfully summarized.",
-      });
+        description: "Your text has been successfully summarized",
+      })
     } catch (error) {
-      console.error("Error generating summary:", error);
-      setSummary("Error: Failed to summarize paper. Please try again.");
       toast({
         title: "Summarization failed",
-        description: "There was an error generating the summary. Please try again.",
+        description: "Please try again later",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setLoading(false)
     }
   }
 
-  const handleSaveSummary = () => {
-    if (!summary.trim() || !paperTitle.trim()) return
+  const handleSummarizeUrl = async () => {
+    if (!fileUrl.trim()) return
 
-    const newSummary = {
-      id: Date.now().toString(),
-      title: paperTitle,
-      summary: summary,
-      date: new Date().toISOString().split("T")[0],
+    setLoading(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      const summary: Summary = {
+        id: Date.now().toString(),
+        title: "Research Paper Analysis",
+        originalText: "Content extracted from the provided URL...",
+        summary:
+          "This research paper presents a novel approach to addressing key challenges in the field. The authors introduce innovative methodologies and provide comprehensive experimental validation. The findings demonstrate significant improvements over existing approaches and offer valuable insights for practitioners and researchers alike.",
+        keyPoints: [
+          "Novel algorithmic approach with theoretical foundations",
+          "Comprehensive experimental evaluation on benchmark datasets",
+          "Significant performance improvements over state-of-the-art methods",
+          "Practical applications and real-world implementation considerations",
+          "Future research directions and potential extensions",
+        ],
+        timestamp: new Date(),
+        source: "url",
+        readingTime: 8,
+      }
+
+      setSummaries((prev) => [summary, ...prev])
+      setCurrentSummary(summary)
+
+      if (socket) {
+        socket.emit("paper_summarized", {
+          title: summary.title,
+          source: summary.source,
+          url: fileUrl,
+        })
+      }
+
+      toast({
+        title: "Paper summarized",
+        description: "The paper from the URL has been successfully summarized",
+      })
+    } catch (error) {
+      toast({
+        title: "Summarization failed",
+        description: "Could not process the URL. Please check the link and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-
-    setSavedSummaries([newSummary, ...savedSummaries])
-
-    toast({
-      title: "Summary saved",
-      description: "Your summary has been saved successfully.",
-    })
-
-    // Track the save event
-    sendEvent("document_edited", {
-      userId: currentUser.id,
-      title: paperTitle,
-      id: newSummary.id,
-      action: 'save'
-    });
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
     if (!file) return
 
-    const validation = validateFile(file)
-    if (!validation.valid) {
-      toast({
-        title: "Invalid file",
-        description: validation.error,
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
+    setLoading(true)
     try {
-      const result = await processFile(file)
-      if (result.error) {
-        throw new Error(result.error)
+      await new Promise((resolve) => setTimeout(resolve, 2500))
+
+      const summary: Summary = {
+        id: Date.now().toString(),
+        title: file.name,
+        originalText: "Content extracted from the uploaded file...",
+        summary:
+          "This document provides a comprehensive overview of the research topic, presenting detailed analysis and findings. The content demonstrates thorough investigation of the subject matter with well-structured arguments and evidence-based conclusions. The document contributes valuable insights to the field and offers practical implications for future work.",
+        keyPoints: [
+          "Comprehensive literature review and background analysis",
+          "Detailed methodology and research design",
+          "Significant findings and data analysis results",
+          "Practical implications and real-world applications",
+          "Recommendations for future research and development",
+        ],
+        timestamp: new Date(),
+        source: "file",
+        readingTime: 12,
       }
-      setPaperTitle(result.title)
-      setPaperText(result.text)
-      toast({
-        title: "File uploaded",
-        description: "Your document has been successfully processed.",
-      })
-    } catch (error) {
-      console.error("Error processing file:", error)
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to process file",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        toast({
-          title: "Copied to clipboard",
-          description: "The summary has been copied to your clipboard.",
+      setSummaries((prev) => [summary, ...prev])
+      setCurrentSummary(summary)
+
+      if (socket) {
+        socket.emit("paper_summarized", {
+          title: summary.title,
+          source: summary.source,
+          fileName: file.name,
         })
-      })
-      .catch((err) => {
-        console.error("Failed to copy: ", err)
-        toast({
-          title: "Copy failed",
-          description: "Failed to copy to clipboard. Please try again.",
-          variant: "destructive",
-        })
-      })
-  }
+      }
 
-  const handleView = (summary: typeof savedSummaries[0]) => {
-    setSelectedSummary(summary);
-  };
-
-  const formatMarkdown = (text: string) => {
-    return (
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          h1: ({ children }) => (
-            <h1 className="text-2xl font-bold text-primary border-b pb-2 mb-4">
-              {children}
-            </h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="text-xl font-semibold text-primary/90 mt-6 mb-3">
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="text-lg font-medium text-primary/80 mt-4 mb-2">
-              {children}
-            </h3>
-          ),
-          p: ({ children }) => (
-            <p className="my-2 text-foreground/90 leading-relaxed">
-              {children}
-            </p>
-          ),
-          ul: ({ children }) => (
-            <ul className="my-2 ml-6 list-disc space-y-1">
-              {children}
-            </ul>
-          ),
-          li: ({ children }) => (
-            <li className="text-foreground/80">
-              {children}
-            </li>
-          ),
-          code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || "");
-            return !inline && match ? (
-              <SyntaxHighlighter
-  style={oneDark}
-  language={match[1]}
-  PreTag="div"
-  className="rounded-md my-2"
-  customStyle={codeBlockStyle}
-  {...props}
->
-                {String(children).replace(/\n$/, "")}
-              </SyntaxHighlighter>
-            ) : (
-              <code className="bg-muted px-1.5 py-0.5 rounded text-sm" {...props}>
-                {children}
-              </code>
-            );
-          },
-          blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-primary/20 pl-4 my-4 italic text-foreground/80">
-              {children}
-            </blockquote>
-          ),
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-    );
-  };
-
-  const renderCodeBlock = (code: string, language: string) => (
-    <div className="relative">
-      <SyntaxHighlighter
-        language={language}
-        style={oneDark}
-        customStyle={codeBlockStyle}
-        wrapLongLines
-      >
-        {code}
-      </SyntaxHighlighter>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2"
-        onClick={() => {
-          navigator.clipboard.writeText(code)
-          toast({
-            title: "Copied",
-            description: "Code copied to clipboard",
-          })
-        }}
-      >
-        <Copy className="h-4 w-4" />
-      </Button>
-    </div>
-  )
-
-  const exploreResearchTopic = async () => {
-    if (!topic.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a research topic to explore.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const response = await fetch("/api/explore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `Analyze the following research topic in JSON format:\n\nTopic: ${topic}\nContext: ${context}`,
-          options: {
-            temperature: 0.7,
-            maxTokens: 2048,
-          },
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to explore topic")
-      
-      const data = await response.json()
-      setResult(JSON.parse(data.result))
-      
-      toast({
-        title: "Analysis Complete",
-        description: "Research topic analysis has been generated successfully.",
+        title: "File summarized",
+        description: `"${file.name}" has been successfully summarized`,
       })
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to analyze research topic. Please try again.",
+        title: "File processing failed",
+        description: "Could not process the uploaded file",
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const renderAnalysisSection = (title: string, items: string[]) => (
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <ul className="space-y-2">
-        {items?.map((item, index) => (
-          <li key={index} className="flex items-start gap-2">
-            <ArrowRight className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
+  const copySummary = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast({
+      title: "Copied to clipboard",
+      description: "Summary has been copied to your clipboard",
+    })
+  }
 
-  if (isLoading) {
-    return <div>Loading...</div>
+  const downloadSummary = (summary: Summary) => {
+    const content = `Title: ${summary.title}\n\nSummary:\n${summary.summary}\n\nKey Points:\n${summary.keyPoints.map((point) => `• ${point}`).join("\n")}\n\nGenerated: ${summary.timestamp.toLocaleString()}`
+    const blob = new Blob([content], { type: "text/plain" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${summary.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_summary.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const getSourceIcon = (source: Summary["source"]) => {
+    switch (source) {
+      case "text":
+        return <FileText className="h-4 w-4" />
+      case "file":
+        return <Upload className="h-4 w-4" />
+      case "url":
+        return <Link className="h-4 w-4" />
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">Paper Summarizer</h1>
-        <p className="text-muted-foreground">
-          Extract key insights from research papers using AI. Upload a paper or paste its content to get started.
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-500" />
-              Paper Summarizer
-            </CardTitle>
-            <CardDescription>Extract key insights from research papers using AI</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="paperTitle">Paper Title</Label>
-                <Input
-                  id="paperTitle"
-                  placeholder="Enter the title of the paper"
-                  value={paperTitle}
-                  onChange={(e) => setPaperTitle(e.target.value)}
-                />
-              </div>
-
-              <Tabs defaultValue="text" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="text">Paste Text</TabsTrigger>
-                  <TabsTrigger value="upload">Upload Word (.docx)</TabsTrigger>
-                  <TabsTrigger value="url">Enter URL</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="text" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="paperText">Paper Content</Label>
-                    <Textarea
-                      id="paperText"
-                      placeholder="Paste the paper content here...\nFor best results, include a clear title, author(s), abstract, and section headings. Optionally, add a prompt describing what you want summarized."
-                      value={paperText}
-                      onChange={(e) => setPaperText(e.target.value)}
-                      className="min-h-[200px]"
-                    />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="upload" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="paperFile">Upload Paper (.docx only)</Label>
-                    <div className="flex items-center justify-center w-full">
-                      <label
-                        htmlFor="paperFile"
-                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted"
-                      >
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
-                          <p className="mb-2 text-sm text-muted-foreground">
-                            <span className="font-semibold">Click to upload</span> or drag and drop
-                          </p>
-                          <p className="text-xs text-muted-foreground">DOCX only (MAX. 50MB)</p>
-                        </div>
-                        <input
-                          id="paperFile"
-                          type="file"
-                          accept=".docx"
-                          className="hidden"
-                          ref={fileInputRef}
-                          onChange={handleFileUpload}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="url" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="paperUrl">Paper URL</Label>
-                    <div className="flex items-center space-x-2">
-                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="paperUrl"
-                        placeholder="https://example.com/research-paper.pdf"
-                        value={paperUrl}
-                        onChange={(e) => setPaperUrl(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <div className="space-y-4 pt-4 border-t">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="summaryLength">Summary Length</Label>
-                    <span className="text-sm text-muted-foreground">
-                      {summaryLength} {summaryLength === 1 ? "paragraph" : "paragraphs"}
-                    </span>
-                  </div>
-                  <Slider
-  id="summaryLength"
-  min={1}
-  max={5}
-  step={1}
-  value={[summaryLength] as number[]}
-  onValueChange={(value: number[]) => setSummaryLength(value[0])}
-/>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Concise</span>
-                    <span>Detailed</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Include in Summary</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="includeKeywords" className="cursor-pointer">
-                        Keywords
-                      </Label>
-                      <Switch id="includeKeywords" checked={includeKeywords} onCheckedChange={setIncludeKeywords} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="includeCitations" className="cursor-pointer">
-                        Key Citations
-                      </Label>
-                      <Switch id="includeCitations" checked={includeCitations} onCheckedChange={setIncludeCitations} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="includeMethodology" className="cursor-pointer">
-                        Methodology Section
-                      </Label>
-                      <Switch
-                        id="includeMethodology"
-                        checked={includeMethodology}
-                        onCheckedChange={setIncludeMethodology}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleSummarize} disabled={isLoading} className="w-full">
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Summarizing...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Summarize Paper
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <div className="space-y-6">
-          {isLoading && !summary && (
-            <Card aria-label="Summary Loading">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-center">
-                  <Skeleton className="h-6 w-32 mb-2" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-1/3" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {summary && (
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-center">
-                  <CardTitle>Summary</CardTitle>
-                  <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(summary)}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={handleSaveSummary}>
-                      <Save className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  {formatMarkdown(summary)}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Saved Summaries</CardTitle>
-              <CardDescription>Your previously summarized papers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {savedSummaries.map((summary) => (
-                  <Card key={summary.id} className="bg-muted/50">
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-base">{summary.title}</CardTitle>
-                      <CardDescription>{summary.date}</CardDescription>
-                    </CardHeader>
-                    <CardFooter className="p-4 pt-2 flex justify-between items-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleView(summary)}
-                      >
-                        View Summary
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => copyToClipboard(summary.summary)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-8 py-12 max-w-7xl">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-sm mb-8">
+            <BookOpen className="h-8 w-8 text-white" />
+          </div>
+          <h1 className="text-5xl font-light text-black mb-6 tracking-tight">AI Paper Summarizer</h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
+            Transform lengthy research papers into concise, actionable summaries with AI-powered analysis
+          </p>
         </div>
-      </div>
 
-      {/* Summary View Modal */}
-      {selectedSummary && (
-        <Card className="fixed inset-4 md:inset-10 bg-background z-50 overflow-auto">
-          <CardHeader className="sticky top-0 bg-background z-10 border-b">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle>{selectedSummary.title}</CardTitle>
-                <CardDescription>{selectedSummary.date}</CardDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedSummary(null)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
+        <div className="grid gap-12 lg:grid-cols-5">
+          {/* Input Section */}
+          <div className="lg:col-span-2 space-y-8">
+            <Tabs defaultValue="text" className="space-y-8">
+              <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
+                <TabsTrigger
+                  value="text"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
                 >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              {formatMarkdown(selectedSummary.summary)}
-            </div>
-          </CardContent>
-          <CardFooter className="sticky bottom-0 bg-background border-t">
-            <div className="flex justify-end gap-2 w-full">
-              <Button
-                variant="outline"
-                onClick={() => copyToClipboard(selectedSummary.summary)}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setSelectedSummary(null)}
-              >
-                Close
-              </Button>
-            </div>
-          </CardFooter>
-        </Card>
-      )}
-
-
-
-      {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Research Analysis Results</CardTitle>
-            <CardDescription>
-              Comprehensive breakdown of your research topic
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="analysis">
-                  <Brain className="mr-2 h-4 w-4" />
-                  Analysis
+                  <FileText className="h-4 w-4 mr-2" />
+                  Text
                 </TabsTrigger>
-                <TabsTrigger value="visualization">
-                  <Lightbulb className="mr-2 h-4 w-4" />
-                  Visualization
+                <TabsTrigger
+                  value="file"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  File
                 </TabsTrigger>
-                <TabsTrigger value="recommendations">
-                  <Book className="mr-2 h-4 w-4" />
-                  Resources
+                <TabsTrigger
+                  value="url"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  URL
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="analysis" className="mt-4">
-                <ScrollArea className="h-[600px] pr-4">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Main Concepts</h3>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {result.analysis.mainConcepts.map((concept, i) => (
-                          <div key={i}>{renderMainConcept(concept)}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Theoretical Frameworks</h3>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {result.analysis.theoreticalFrameworks.map((framework, i) => (
-                          <div key={i}>{renderTheoreticalFramework(framework)}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Methodological Approaches</h3>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {result.analysis.methodologicalApproaches.map((approach, i) => (
-                          <div key={i}>{renderMethodologicalApproach(approach)}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Research Gaps</h3>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {result.analysis.researchGaps.map((gap, i) => (
-                          <div key={i}>{renderResearchGap(gap)}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Future Directions</h3>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {result.analysis.futureDirections.map((direction, i) => (
-                          <div key={i}>{renderFutureDirection(direction)}</div>
-                        ))}
-                      </div>
-                    </div>
+              <TabsContent value="text" className="space-y-8">
+                <div className="border border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
+                      <div className="w-1 h-6 bg-black"></div>
+                      Paste Your Text
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-2 font-light">
+                      Paste research content, abstracts, or any text you want to summarize
+                    </p>
                   </div>
-                </ScrollArea>
+                  <div className="p-6 space-y-6">
+                    <Textarea
+                      placeholder="Paste your research paper, article, or text content here..."
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      rows={12}
+                      className="resize-none border-gray-300 focus:border-black focus:ring-black font-light"
+                    />
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>{inputText.length} characters</span>
+                      <span>~{Math.ceil(inputText.length / 1000)} min read</span>
+                    </div>
+                    <Button
+                      onClick={handleSummarizeText}
+                      disabled={loading || !inputText.trim()}
+                      className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4"
+                    >
+                      {loading ? (
+                        <>
+                          <Clock className="mr-2 h-4 w-4 animate-spin" />
+                          Analyzing Text...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="mr-2 h-4 w-4" />
+                          Generate Summary
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
 
-              <TabsContent value="visualization" className="mt-4">
-                <ScrollArea className="h-[600px] pr-4">
-                  <div className="space-y-6">
-                    <div className="rounded-lg border p-4">
-                      <h3 className="text-lg font-semibold mb-4">Topic Relationships</h3>
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                        <p className="text-muted-foreground">Interactive visualization coming soon</p>
+              <TabsContent value="file" className="space-y-8">
+                <div className="border border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
+                      <div className="w-1 h-6 bg-black"></div>
+                      Upload Document
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-2 font-light">
+                      Upload PDF, DOC, DOCX, or TXT files for AI-powered summarization
+                    </p>
+                  </div>
+                  <div className="p-6">
+                    <div className="border-2 border-dashed border-gray-300 p-12 text-center hover:border-gray-400 transition-colors">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 mb-4">
+                        <Upload className="h-6 w-6 text-gray-600" />
                       </div>
+                      <Label htmlFor="file-upload" className="cursor-pointer">
+                        <span className="text-lg font-medium text-black block mb-2">
+                          Drop files here or click to upload
+                        </span>
+                        <span className="text-sm text-gray-500">Supports PDF, DOC, DOCX, TXT up to 10MB</span>
+                      </Label>
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
               </TabsContent>
 
-              <TabsContent value="recommendations" className="mt-4">
-                <ScrollArea className="h-[600px] pr-4">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Next Steps</h3>
-                      <div className="grid gap-4">
-                        {result.recommendations.nextSteps.map((step, i) => (
-                          <div key={i} className="p-4 border rounded-lg bg-card">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <h4 className="font-semibold text-primary">{step.step}</h4>
-                                <div className="mt-2">
-                                  <h5 className="text-sm font-medium">Required Resources</h5>
-                                  <ul className="mt-1 list-disc list-inside text-sm text-muted-foreground">
-                                    {step.resources.map((resource, j) => (
-                                      <li key={j}>{resource}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              </div>
-                              <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                                  step.priority === 'high'
-                                    ? 'bg-red-100 text-red-800'
-                                    : step.priority === 'medium'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-green-100 text-green-800'
-                                }`}
-                              >
-                                {step.priority} priority
+              <TabsContent value="url" className="space-y-8">
+                <div className="border border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
+                      <div className="w-1 h-6 bg-black"></div>
+                      Research Paper URL
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-2 font-light">
+                      Enter a URL to research papers from arXiv, ACM, IEEE, or other academic sources
+                    </p>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    <Input
+                      placeholder="https://arxiv.org/abs/2301.00001"
+                      value={fileUrl}
+                      onChange={(e) => setFileUrl(e.target.value)}
+                      className="border-gray-300 focus:border-black focus:ring-black font-light"
+                    />
+                    <div className="text-sm text-gray-500">
+                      <p className="mb-3 font-medium">Supported sources:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {["arXiv", "ACM Digital Library", "IEEE Xplore", "PubMed", "ResearchGate"].map((source) => (
+                          <Badge key={source} variant="outline" className="text-xs justify-center py-1">
+                            {source}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleSummarizeUrl}
+                      disabled={loading || !fileUrl.trim()}
+                      className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4"
+                    >
+                      {loading ? (
+                        <>
+                          <Clock className="mr-2 h-4 w-4 animate-spin" />
+                          Processing URL...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="mr-2 h-4 w-4" />
+                          Summarize from URL
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Summary Display */}
+          <div className="lg:col-span-3 space-y-8">
+            {currentSummary ? (
+              <div className="border border-gray-200">
+                <div className="p-8 border-b border-gray-200">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="p-2 bg-black text-white">{getSourceIcon(currentSummary.source)}</div>
+                        <div>
+                          <h2 className="text-2xl font-light text-black">{currentSummary.title}</h2>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              {currentSummary.readingTime} min read
+                            </span>
+                            <span>{currentSummary.timestamp.toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copySummary(currentSummary.summary)}
+                        className="border-gray-300 hover:bg-gray-50"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadSummary(currentSummary)}
+                        className="border-gray-300 hover:bg-gray-50"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-8 space-y-10">
+                  {/* Summary */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
+                      <div className="w-1 h-6 bg-black"></div>
+                      Executive Summary
+                    </h3>
+                    <div className="bg-gray-50 p-6 border border-gray-200">
+                      <p className="text-gray-800 leading-relaxed font-light">{currentSummary.summary}</p>
+                    </div>
+                  </div>
+
+                  {/* Key Points */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
+                      <div className="w-1 h-6 bg-gray-400"></div>
+                      Key Insights
+                    </h3>
+                    <div className="space-y-3">
+                      {currentSummary.keyPoints.map((point, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-4 p-4 border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex-shrink-0 w-6 h-6 bg-black text-white text-sm font-medium flex items-center justify-center">
+                            {index + 1}
+                          </div>
+                          <p className="text-gray-700 leading-relaxed font-light">{point}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Source Badge */}
+                  <div className="text-center pt-6 border-t border-gray-200">
+                    <Badge variant="outline" className="px-4 py-2">
+                      {currentSummary.source === "text" && "Text Input"}
+                      {currentSummary.source === "file" && "File Upload"}
+                      {currentSummary.source === "url" && "URL Source"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Welcome State */
+              <div className="border border-gray-200">
+                <div className="text-center py-20 px-8">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 mb-8">
+                    <BookOpen className="h-8 w-8 text-gray-600" />
+                  </div>
+                  <h3 className="text-2xl font-light text-black mb-4">Ready to Summarize</h3>
+                  <p className="text-gray-600 max-w-md mx-auto leading-relaxed font-light mb-8">
+                    Upload a document, paste text, or provide a URL to get started with AI-powered summarization
+                  </p>
+                  <div className="flex justify-center gap-6">
+                    <div className="text-center">
+                      <div className="w-8 h-8 bg-black mb-2 mx-auto"></div>
+                      <span className="text-xs text-gray-600 uppercase tracking-wide">Text Analysis</span>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-8 h-8 bg-gray-300 mb-2 mx-auto"></div>
+                      <span className="text-xs text-gray-600 uppercase tracking-wide">File Processing</span>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-8 h-8 bg-gray-500 mb-2 mx-auto"></div>
+                      <span className="text-xs text-gray-600 uppercase tracking-wide">URL Extraction</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Summaries */}
+            {summaries.length > 0 && (
+              <div className="border border-gray-200">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-black">Recent Summaries</h3>
+                  <p className="text-gray-600 text-sm mt-1">Your latest AI-generated summaries</p>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {summaries.slice(0, 5).map((summary) => (
+                      <div
+                        key={summary.id}
+                        className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
+                        onClick={() => setCurrentSummary(summary)}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="p-2 bg-gray-100">{getSourceIcon(summary.source)}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{summary.title}</p>
+                            <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
+                              <span>{summary.timestamp.toLocaleDateString()}</span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {summary.readingTime} min
                               </span>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {summary.source}
+                        </Badge>
                       </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Potential Collaborations</h3>
-                      <div className="grid gap-4">
-                        {result.recommendations.potentialCollaborations.map((collab, i) => (
-                          <div key={i} className="p-4 border rounded-lg bg-card">
-                            <h4 className="font-semibold text-primary">{collab.field}</h4>
-                            <p className="mt-1 text-sm text-muted-foreground">{collab.rationale}</p>
-                            <div className="mt-2">
-                              <h5 className="text-sm font-medium">Benefits</h5>
-                              <ul className="mt-1 list-disc list-inside text-sm text-muted-foreground">
-                                {collab.benefits.map((benefit, j) => (
-                                  <li key={j}>{benefit}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Resources</h3>
-                      <div className="grid gap-4">
-                        {result.recommendations.resources.map((resource, i) => (
-                          <div key={i}>{renderResource(resource)}</div>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

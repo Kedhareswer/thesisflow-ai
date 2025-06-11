@@ -1,791 +1,774 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useToast } from "@/hooks/use-toast"
-import { useSocket } from "@/components/socket-provider"
-import { useRouter } from "next/navigation"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Users,
   MessageSquare,
-  Send,
-  Plus,
-  FileText,
-  Brain,
-  Lightbulb,
-  Share2,
+  Share,
   UserPlus,
-  MoreHorizontal,
-  Edit2,
-  Save,
-  X,
-  Loader2,
+  Globe,
+  Search,
+  Settings,
+  Crown,
+  Shield,
+  Eye,
+  Send,
+  Video,
+  ArrowRight,
 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Event } from "@/components/socket-provider"
+import { useSocket } from "@/components/socket-provider"
+import { useToast } from "@/hooks/use-toast"
+
+interface Collaborator {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  status: "online" | "offline" | "away"
+  role: "owner" | "editor" | "viewer"
+  joinedAt: Date
+  lastActive: Date
+}
+
+interface Team {
+  id: string
+  name: string
+  description: string
+  members: Collaborator[]
+  createdAt: Date
+  isPublic: boolean
+  category: string
+}
 
 interface Message {
   id: string
-  userId: string
+  senderId: string
+  senderName: string
   content: string
-  timestamp: string
-  type: "text" | "ai-response" | "document" | "idea" | "system"
-  reactions?: { emoji: string; count: number }[]
+  timestamp: Date
+  teamId: string
+  type: "text" | "system"
 }
 
-interface Document {
-  id: string
-  title: string
-  type: "note" | "summary" | "paper" | "idea" | "mindmap"
-  content: string
-  createdBy: string
-  createdAt: string
-  lastModified: string
-  collaborators: string[]
-  isEditing?: boolean
-}
-
-export default function CollaborativeWorkspace() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const { isConnected, sendEvent, activeUsers, events } = useSocket()
-  const [isLoading, setIsLoading] = useState(false)
-  const [newMessage, setNewMessage] = useState("")
-  const [aiPrompt, setAiPrompt] = useState("")
-  const [isAiLoading, setIsAiLoading] = useState(false)
-  const [editingDocument, setEditingDocument] = useState<string | null>(null)
-  const [editedContent, setEditedContent] = useState("")
-  const [inviteEmail, setInviteEmail] = useState("")
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [currentUser] = useState({
-    id: `anonymous-${Math.random().toString(36).substr(2, 9)}`,
-    name: `Guest ${Math.floor(Math.random() * 1000)}`,
-    avatar: null
+export default function CollaborationPage() {
+  const [teams, setTeams] = useState<Team[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newTeam, setNewTeam] = useState({
+    name: "",
+    description: "",
+    category: "Research",
+    isPublic: false,
   })
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null)
+  const [newMessage, setNewMessage] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const { socket, activeUsers } = useSocket()
+  const { toast } = useToast()
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      userId: "user-2",
-      content: "I found some interesting papers on our research topic. Should we review them together?",
-      timestamp: "10:30 AM",
-      type: "text",
-    },
-    {
-      id: "2",
-      userId: "user-1",
-      content: "Yes, that would be great! I've been working on the methodology section.",
-      timestamp: "10:32 AM",
-      type: "text",
-    },
-    {
-      id: "3",
-      userId: "user-3",
-      content: "I asked the AI assistant to summarize the key findings from the latest papers in our field.",
-      timestamp: "10:35 AM",
-      type: "text",
-    },
-    {
-      id: "4",
-      userId: "0",
-      content:
-        "**Summary of Recent Research**\n\nBased on the latest papers in this field, the key findings include:\n\n1. Novel methodological approaches combining qualitative and quantitative data\n2. Emerging trends in theoretical frameworks\n3. Gaps in current research regarding application in diverse contexts\n\nRecommended next steps: Focus on addressing the identified research gaps with your proposed methodology.",
-      timestamp: "10:36 AM",
-      type: "ai-response",
-      reactions: [
-        { emoji: "👍", count: 2 },
-        { emoji: "🔍", count: 1 },
-      ],
-    },
-    {
-      id: "5",
-      userId: "user-2",
-      content: "That's really helpful! Let's incorporate these insights into our literature review.",
-      timestamp: "10:38 AM",
-      type: "text",
-    },
-    {
-      id: "system-1",
-      userId: "system",
-      content: "Sam Taylor has shared a document: 'Literature Review Draft'",
-      timestamp: "10:45 AM",
-      type: "system",
-    },
-  ])
-
-  const [documents, setDocuments] = useState<Document[]>([
-    {
-      id: "1",
-      title: "Literature Review Draft",
-      type: "note",
-      content: "Initial draft of literature review covering key theories and recent studies...",
-      createdBy: "user-2",
-      createdAt: "2023-06-10",
-      lastModified: "2023-06-12",
-      collaborators: ["user-1", "user-2", "user-3"],
-    },
-    {
-      id: "2",
-      title: "Research Methodology",
-      type: "note",
-      content: "Proposed mixed methods approach with survey and interviews...",
-      createdBy: "user-1",
-      createdAt: "2023-06-11",
-      lastModified: "2023-06-11",
-      collaborators: ["user-1", "user-2"],
-    },
-    {
-      id: "3",
-      title: "AI-Generated Research Questions",
-      type: "idea",
-      content: "1. How does X affect Y in context Z?\n2. What is the relationship between A and B?...",
-      createdBy: "user-3",
-      createdAt: "2023-06-12",
-      lastModified: "2023-06-12",
-      collaborators: ["user-1", "user-3"],
-    },
-    {
-      id: "4",
-      title: "Summary: Recent Advances in the Field",
-      type: "summary",
-      content: "This paper reviews the latest developments in...",
-      createdBy: "user-2",
-      createdAt: "2023-06-09",
-      lastModified: "2023-06-09",
-      collaborators: ["user-1", "user-2", "user-3", "user-4"],
-    },
-    {
-      id: "5",
-      title: "Research Framework Mind Map",
-      type: "mindmap",
-      content: "Visual representation of our research framework...",
-      createdBy: "user-1",
-      createdAt: "2023-06-13",
-      lastModified: "2023-06-13",
-      collaborators: ["user-1", "user-2", "user-3"],
-    },
-  ])
-
-  // Scroll to bottom of messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
-
-  // Handle socket events
-  useEffect(() => {
-    if (!events.length) return
-
-    const latestEvent = events[events.length - 1] as Event
-
-    if (latestEvent.type === "chat_message" && latestEvent.userId !== currentUser.id) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        userId: latestEvent.userId,
-        content: latestEvent.payload.content as string,
-        timestamp: latestEvent.timestamp,
-        type: "text"
-      }
-      setMessages(prev => [...prev, newMessage])
-    }
-
-    if (latestEvent.type === "document_edited") {
-      setDocuments(prev => prev.map(doc => {
-        if (doc.id === latestEvent.payload.documentId) {
-          return { 
-            ...doc, 
-            content: latestEvent.payload.content as string, 
-            lastModified: latestEvent.timestamp 
-          }
-        }
-        return doc
-      }))
-    }
-  }, [events, currentUser])
-
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-
-    const message: Message = {
-      id: Date.now().toString(),
-      userId: currentUser.id,
-      content: newMessage,
-      timestamp: new Date().toLocaleTimeString(),
-      type: "text"
-    };
-
-    setMessages(prev => [...prev, message]);
-    setNewMessage("");
-    
-    if (sendEvent) {
-      sendEvent("chat_message", {
-        content: newMessage
-      });
-    }
-  };
-
-  const askAi = async () => {
-    if (!aiPrompt.trim()) return
-
-    setIsAiLoading(true)
-
-    // Add user's question to messages
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      userId: currentUser.id,
-      content: aiPrompt,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      type: "text",
-    }
-
-    setMessages([...messages, userMsg])
-
-    try {
-      // In a real app, this would call an AI API
-      // For now, we'll simulate a response
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      const aiResponse = generateAiResponse(aiPrompt)
-
-      const responseMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        userId: "0", // AI
-        content: aiResponse,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        type: "ai-response",
-      }
-
-      setMessages((prev) => [...prev, responseMsg])
-
-      // Track AI usage
-      sendEvent("ai_prompt", {
-        prompt: aiPrompt,
-        responseLength: aiResponse.length,
-      })
-    } catch (error) {
-      toast({
-        title: "AI response failed",
-        description: "There was an error generating the AI response. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setAiPrompt("")
-      setIsAiLoading(false)
-    }
+  // Mock current user
+  const currentUser: Collaborator = {
+    id: "current-user",
+    name: "You",
+    email: "you@example.com",
+    status: "online",
+    role: "owner",
+    joinedAt: new Date(),
+    lastActive: new Date(),
   }
 
-  const startEditing = (docId: string) => {
-    const doc = documents.find((d) => d.id === docId)
-    if (doc) {
-      setEditingDocument(docId)
-      setEditedContent(doc.content)
+  useEffect(() => {
+    // Initialize with sample data
+    const sampleTeams: Team[] = [
+      {
+        id: "team-1",
+        name: "ML Research Group",
+        description: "Collaborative research on machine learning algorithms and applications",
+        members: [
+          currentUser,
+          {
+            id: "user-2",
+            name: "Dr. Sarah Chen",
+            email: "sarah@university.edu",
+            status: "online",
+            role: "editor",
+            joinedAt: new Date(Date.now() - 86400000),
+            lastActive: new Date(Date.now() - 300000),
+          },
+          {
+            id: "user-3",
+            name: "Alex Rodriguez",
+            email: "alex@research.org",
+            status: "away",
+            role: "viewer",
+            joinedAt: new Date(Date.now() - 172800000),
+            lastActive: new Date(Date.now() - 3600000),
+          },
+        ],
+        createdAt: new Date(Date.now() - 604800000),
+        isPublic: false,
+        category: "Research",
+      },
+      {
+        id: "team-2",
+        name: "NLP Study Group",
+        description: "Natural Language Processing research and paper discussions",
+        members: [
+          currentUser,
+          {
+            id: "user-4",
+            name: "Prof. Michael Kim",
+            email: "mkim@tech.edu",
+            status: "offline",
+            role: "editor",
+            joinedAt: new Date(Date.now() - 259200000),
+            lastActive: new Date(Date.now() - 7200000),
+          },
+        ],
+        createdAt: new Date(Date.now() - 432000000),
+        isPublic: true,
+        category: "Study Group",
+      },
+    ]
+
+    setTeams(sampleTeams)
+    setSelectedTeam(sampleTeams[0].id)
+
+    // Sample messages
+    const sampleMessages: Message[] = [
+      {
+        id: "msg-1",
+        senderId: "user-2",
+        senderName: "Dr. Sarah Chen",
+        content: "I've uploaded the latest dataset for our transformer experiments. The results look promising!",
+        timestamp: new Date(Date.now() - 3600000),
+        teamId: sampleTeams[0].id,
+        type: "text",
+      },
+      {
+        id: "msg-2",
+        senderId: "current-user",
+        senderName: "You",
+        content:
+          "Great! I'll start running the baseline models this afternoon. Should we schedule a meeting to discuss the preliminary results?",
+        timestamp: new Date(Date.now() - 1800000),
+        teamId: sampleTeams[0].id,
+        type: "text",
+      },
+      {
+        id: "msg-3",
+        senderId: "user-3",
+        senderName: "Alex Rodriguez",
+        content:
+          "I can join the meeting. Also, I found some interesting related work that might be relevant to our approach.",
+        timestamp: new Date(Date.now() - 900000),
+        teamId: sampleTeams[0].id,
+        type: "text",
+      },
+    ]
+
+    setMessages(sampleMessages)
+  }, [])
+
+  const createTeam = () => {
+    if (!newTeam.name.trim()) return
+
+    const team: Team = {
+      id: `team-${Date.now()}`,
+      name: newTeam.name,
+      description: newTeam.description,
+      members: [currentUser],
+      createdAt: new Date(),
+      isPublic: newTeam.isPublic,
+      category: newTeam.category,
     }
-  }
 
-  const saveDocument = () => {
-    if (!editingDocument || !currentUser) return
+    setTeams((prev) => [team, ...prev])
+    setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
 
-    const doc = documents.find((d) => d.id === editingDocument)
-    if (!doc) return
-
-    setDocuments((docs) =>
-      docs.map((doc) =>
-        doc.id === editingDocument
-          ? {
-              ...doc,
-              content: editedContent,
-              lastModified: new Date().toISOString().split("T")[0],
-            }
-          : doc,
-      ),
-    )
-
-    // Send event to other users
-    sendEvent("document_edited", {
-      documentId: editingDocument,
-      title: doc.title,
-      content: editedContent,
-    })
-
-    setEditingDocument(null)
-    setEditedContent("")
+    if (socket) {
+      socket.emit("team_created", {
+        teamName: team.name,
+        description: team.description,
+      })
+    }
 
     toast({
-      title: "Document Saved",
-      description: "Your changes have been saved and shared with collaborators.",
+      title: "Team created",
+      description: `"${team.name}" has been created successfully`,
     })
-
-    // Add system message
-    const systemMessage: Message = {
-      id: `system-${Date.now()}`,
-      userId: "system",
-      content: `You updated "${doc.title}"`,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      type: "system",
-    }
-
-    setMessages([...messages, systemMessage])
   }
 
-  const cancelEditing = () => {
-    setEditingDocument(null)
-    setEditedContent("")
-  }
-
-  const inviteCollaborator = () => {
+  const inviteCollaborator = (teamId: string) => {
     if (!inviteEmail.trim()) return
 
-    // Send event to other users
-    sendEvent("collaborator_joined", {
-      name: inviteEmail.split("@")[0],
+    const team = teams.find((t) => t.id === teamId)
+    if (!team) return
+
+    // Check if user already exists
+    if (team.members.some((m) => m.email === inviteEmail)) {
+      toast({
+        title: "User already in team",
+        description: "This user is already a member of the team",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Simulate adding collaborator
+    const newCollaborator: Collaborator = {
+      id: `user-${Date.now()}`,
+      name: inviteEmail.split("@")[0].charAt(0).toUpperCase() + inviteEmail.split("@")[0].slice(1),
       email: inviteEmail,
-    })
+      status: "offline",
+      role: "viewer",
+      joinedAt: new Date(),
+      lastActive: new Date(),
+    }
 
-    toast({
-      title: "Invitation Sent",
-      description: `An invitation has been sent to ${inviteEmail}`,
-    })
+    setTeams((prev) => prev.map((t) => (t.id === teamId ? { ...t, members: [...t.members, newCollaborator] } : t)))
 
+    // Add system message
+    const systemMessage: Message = {
+      id: `msg-${Date.now()}`,
+      senderId: "system",
+      senderName: "System",
+      content: `${newCollaborator.name} joined the team`,
+      timestamp: new Date(),
+      teamId: teamId,
+      type: "system",
+    }
+
+    setMessages((prev) => [...prev, systemMessage])
     setInviteEmail("")
 
-    // Add system message
-    const systemMessage: Message = {
-      id: `system-${Date.now()}`,
-      userId: "system",
-      content: `You invited ${inviteEmail} to collaborate`,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      type: "system",
+    if (socket) {
+      socket.emit("collaborator_joined", {
+        name: newCollaborator.name,
+        email: newCollaborator.email,
+        teamId: teamId,
+      })
     }
-
-    setMessages([...messages, systemMessage])
-  }
-
-  const shareDocument = (docId: string) => {
-    if (!currentUser) return
-
-    const doc = documents.find((d) => d.id === docId)
-    if (!doc) return
-
-    // Send event to other users
-    sendEvent("document_shared", {
-      documentId: docId,
-      title: doc.title,
-    })
 
     toast({
-      title: "Document Shared",
-      description: `"${doc.title}" has been shared with the team`,
+      title: "Invitation sent",
+      description: `Invitation sent to ${inviteEmail}`,
     })
-
-    // Add system message
-    const systemMessage: Message = {
-      id: `system-${Date.now()}`,
-      userId: "system",
-      content: `You shared "${doc.title}" with the team`,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      type: "system",
-    }
-
-    setMessages([...messages, systemMessage])
   }
 
-  const generateAiResponse = (prompt: string): string => {
-    if (prompt.toLowerCase().includes("research question")) {
-      return "**Potential Research Questions:**\n\n1. How does the implementation of AI tools affect research productivity in academic settings?\n2. What are the ethical implications of using AI for data analysis in sensitive research areas?\n3. To what extent can collaborative AI tools enhance interdisciplinary research outcomes?\n\nThese questions address current gaps in the literature while building on existing theoretical frameworks."
-    } else if (prompt.toLowerCase().includes("methodology")) {
-      return "**Recommended Methodology:**\n\nBased on your research focus, a mixed methods approach would be most appropriate:\n\n- **Quantitative component**: Survey of 100+ researchers using standardized instruments to measure key variables\n- **Qualitative component**: In-depth interviews with 12-15 participants to explore contextual factors\n- **Analysis strategy**: Sequential explanatory design where qualitative data helps explain quantitative findings\n\nThis approach addresses the complexity of your research questions while providing both breadth and depth."
-    } else if (prompt.toLowerCase().includes("literature") || prompt.toLowerCase().includes("papers")) {
-      return "**Recent Literature Overview:**\n\nThe most cited papers in this field from the past 3 years include:\n\n1. Smith et al. (2022) - Comprehensive framework for understanding the phenomenon\n2. Johnson & Williams (2021) - Empirical study with large sample size (n=1,200)\n3. Zhang et al. (2023) - Meta-analysis of 45 studies showing consistent effect sizes\n\nKey themes across these works include methodological innovations, theoretical integration, and practical applications."
-    } else {
-      return "Based on your query, I've analyzed relevant research in this area. The current consensus suggests multiple approaches to this problem, with varying degrees of empirical support.\n\nRecent studies have highlighted the importance of considering contextual factors and methodological rigor when addressing these questions.\n\nI recommend focusing on the theoretical framework established by Smith et al. (2022) while incorporating the methodological innovations proposed by Johnson & Williams (2021)."
-    }
-  }
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedTeam) return
 
-  const getDocumentIcon = (type: Document["type"]) => {
-    switch (type) {
-      case "note":
-        return <FileText className="h-4 w-4" />
-      case "summary":
-        return <FileText className="h-4 w-4" />
-      case "paper":
-        return <FileText className="h-4 w-4" />
-      case "idea":
-        return <Lightbulb className="h-4 w-4" />
-      case "mindmap":
-        return <Brain className="h-4 w-4" />
-      default:
-        return <FileText className="h-4 w-4" />
+    const message: Message = {
+      id: `msg-${Date.now()}`,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      content: newMessage,
+      timestamp: new Date(),
+      teamId: selectedTeam,
+      type: "text",
+    }
+
+    setMessages((prev) => [...prev, message])
+    setNewMessage("")
+
+    if (socket) {
+      socket.emit("chat_message", {
+        content: message.content,
+        teamId: selectedTeam,
+      })
     }
   }
 
-  const getUserById = (id: string) => {
-    if (id === currentUser.id) {
-      return currentUser;
+  const getStatusColor = (status: Collaborator["status"]) => {
+    switch (status) {
+      case "online":
+        return "bg-black"
+      case "away":
+        return "bg-gray-500"
+      case "offline":
+        return "bg-gray-300"
     }
-    // Return a default user object for other IDs
-    return {
-      id,
-      name: `User ${id.split('-')[1]}`,
-      avatar: null
-    };
-  };
+  }
+
+  const getRoleIcon = (role: Collaborator["role"]) => {
+    switch (role) {
+      case "owner":
+        return <Crown className="h-3 w-3 text-black" />
+      case "editor":
+        return <Shield className="h-3 w-3 text-gray-600" />
+      case "viewer":
+        return <Eye className="h-3 w-3 text-gray-400" />
+    }
+  }
+
+  const selectedTeamData = teams.find((t) => t.id === selectedTeam)
+  const teamMessages = messages.filter((m) => m.teamId === selectedTeam)
+  const filteredTeams = teams.filter(
+    (team) =>
+      team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.description.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  const categories = Array.from(new Set(teams.map((t) => t.category)))
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">Collaborative Workspace</h1>
-        <p className="text-muted-foreground">
-          Work together with your team in real-time. Chat, share documents, and use AI assistance.
-        </p>
-      </div>
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-8 py-12 max-w-7xl">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-sm mb-8">
+            <Users className="h-8 w-8 text-white" />
+          </div>
+          <h1 className="text-5xl font-light text-black mb-6 tracking-tight">Research Collaboration</h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
+            Connect with researchers worldwide, share ideas, and collaborate on groundbreaking projects
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
-        {/* Left sidebar - Team members */}
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-500" />
-              Research Team
-            </CardTitle>
-            <CardDescription>Collaborate with your team members</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {activeUsers.map((activeUser) => {
-                const isCurrentUser = activeUser.id === currentUser.id
-                return (
-                  <div key={activeUser.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={activeUser.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{activeUser.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{isCurrentUser ? "You" : activeUser.name}</p>
-                        <p className="text-xs text-muted-foreground">{isCurrentUser ? "Owner" : "Editor"}</p>
-                      </div>
-                    </div>
-                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                  </div>
-                )
-              })}
-
-              <div className="flex items-center gap-2">
+        <div className="grid gap-12 lg:grid-cols-4">
+          {/* Teams Sidebar */}
+          <div className="lg:col-span-1 space-y-8">
+            {/* Create Team */}
+            <div className="border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-black flex items-center gap-3">
+                  <div className="w-1 h-6 bg-black"></div>
+                  Create Team
+                </h3>
+              </div>
+              <div className="p-6 space-y-4">
                 <Input
-                  type="email"
-                  placeholder="Invite by email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="flex-1"
+                  placeholder="Team name"
+                  value={newTeam.name}
+                  onChange={(e) => setNewTeam((prev) => ({ ...prev, name: e.target.value }))}
+                  className="border-gray-300 focus:border-black focus:ring-black font-light"
                 />
-                <Button variant="outline" onClick={inviteCollaborator}>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Invite
+                <Input
+                  placeholder="Description"
+                  value={newTeam.description}
+                  onChange={(e) => setNewTeam((prev) => ({ ...prev, description: e.target.value }))}
+                  className="border-gray-300 focus:border-black focus:ring-black font-light"
+                />
+                <select
+                  value={newTeam.category}
+                  onChange={(e) => setNewTeam((prev) => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 focus:border-black focus:ring-black font-light"
+                >
+                  <option value="Research">Research</option>
+                  <option value="Study Group">Study Group</option>
+                  <option value="Project">Project</option>
+                  <option value="Discussion">Discussion</option>
+                </select>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="public-team"
+                    checked={newTeam.isPublic}
+                    onChange={(e) => setNewTeam((prev) => ({ ...prev, isPublic: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="public-team" className="text-sm text-gray-700 font-light">
+                    Public team
+                  </label>
+                </div>
+                <Button
+                  onClick={createTeam}
+                  disabled={!newTeam.name.trim()}
+                  className="w-full bg-black hover:bg-gray-800 text-white font-medium"
+                >
+                  Create Team
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Main content - Chat and AI Assistant */}
-        <Card className="md:col-span-2 flex flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle>Collaborative Workspace</CardTitle>
-            <CardDescription>Chat with your team and use AI assistance</CardDescription>
-          </CardHeader>
-          <Tabs defaultValue="chat" className="flex-1 flex flex-col">
-            <TabsList className="mx-6">
-              <TabsTrigger value="chat" className="flex gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Team Chat
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="flex gap-2">
-                <Brain className="h-4 w-4" />
-                AI Assistant
-              </TabsTrigger>
-              <TabsTrigger value="docs" className="flex gap-2">
-                <FileText className="h-4 w-4" />
-                Shared Documents
-              </TabsTrigger>
-            </TabsList>
+            {/* Search Teams */}
+            <div className="border border-gray-200 p-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search teams..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 border-gray-300 focus:border-black focus:ring-black font-light"
+                />
+              </div>
+            </div>
 
-            <TabsContent value="chat" className="flex-1 flex flex-col mx-6 mt-0 space-y-4">
-              <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-4 py-4">
-                  {messages.map((message) => {
-                    const messageUser = getUserById(message.userId)
-                    return (
-                      <div key={message.id} className="flex gap-3 w-full">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={messageUser.avatar || "/placeholder.svg"} />
-                          <AvatarFallback>{message.userId === "0" ? "AI" : messageUser.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="space-y-1 w-full">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium">
-                              {message.userId === "0" ? "AI Assistant" : messageUser.name}
-                            </p>
-                            <span className="text-xs text-muted-foreground">{message.timestamp}</span>
-                          </div>
-                          <div
-                            className={`p-3 rounded-lg ${
-                              message.type === "ai-response"
-                                ? "bg-blue-50 border border-blue-100 dark:bg-blue-950 dark:border-blue-900"
-                                : message.type === "system"
-                                  ? "bg-green-50 border border-green-100 text-green-600 italic dark:bg-green-950 dark:border-green-900 dark:text-green-400"
-                                  : "bg-muted"
-                            }`}
-                          >
-                            {message.type === "ai-response" ? (
-                              <div className="prose prose-sm max-w-none dark:prose-invert">
-                                {message.content.split("\n").map((line, index) => {
-                                  // Handle bold text
-                                  if (line.includes("**")) {
-                                    return (
-                                      <p
-                                        key={index}
-                                        dangerouslySetInnerHTML={{
-                                          __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>"),
-                                        }}
-                                      />
-                                    )
-                                  }
-                                  // Handle bullet points
-                                  else if (line.startsWith("- ")) {
-                                    return (
-                                      <li key={index} className="ml-4">
-                                        {line.replace("- ", "")}
-                                      </li>
-                                    )
-                                  } else if (
-                                    line.startsWith("1. ") ||
-                                    line.startsWith("2. ") ||
-                                    line.startsWith("3. ")
-                                  ) {
-                                    return (
-                                      <li key={index} className="ml-4">
-                                        {line.replace(/^\d+\.\s/, "")}
-                                      </li>
-                                    )
-                                  }
-                                  // Handle empty lines
-                                  else if (line.trim() === "") {
-                                    return <br key={index} />
-                                  }
-                                  // Regular text
-                                  else {
-                                    return <p key={index}>{line}</p>
-                                  }
-                                })}
+            {/* Teams List */}
+            <div className="border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-black">Your Teams ({teams.length})</h3>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {filteredTeams.map((team) => (
+                    <div
+                      key={team.id}
+                      className={`p-4 cursor-pointer transition-all duration-200 border ${
+                        selectedTeam === team.id
+                          ? "bg-black text-white border-black"
+                          : "hover:bg-gray-50 border-gray-100"
+                      }`}
+                      onClick={() => setSelectedTeam(team.id)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">{team.name}</h4>
+                          {team.isPublic && <Globe className="h-4 w-4" />}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${selectedTeam === team.id ? "border-white text-white" : ""}`}
+                        >
+                          {team.category}
+                        </Badge>
+                      </div>
+                      <p
+                        className={`text-sm mb-3 line-clamp-2 ${selectedTeam === team.id ? "text-gray-300" : "text-gray-600"} font-light`}
+                      >
+                        {team.description}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          <span className="text-sm">{team.members.length} members</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="flex -space-x-1">
+                            {team.members.slice(0, 3).map((member) => (
+                              <div key={member.id} className="relative">
+                                <Avatar className="h-6 w-6 border-2 border-white">
+                                  <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                                  <AvatarFallback className="text-xs">{member.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div
+                                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
+                                />
                               </div>
-                            ) : (
-                              <p className="text-sm">{message.content}</p>
-                            )}
+                            ))}
                           </div>
-                          {message.reactions && message.reactions.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              {message.reactions.map((reaction, index) => (
-                                <Badge key={index} variant="secondary">
-                                  {reaction.emoji} {reaction.count}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       </div>
-                    )
-                  })}
-                  <div ref={messagesEndRef} />
+                    </div>
+                  ))}
+                  {filteredTeams.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-sm font-light">{searchTerm ? "No teams found" : "No teams yet"}</p>
+                    </div>
+                  )}
                 </div>
-              </ScrollArea>
-
-              <div className="flex gap-2 pb-4">
-                <Input
-                  placeholder="Type your message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      sendMessage()
-                    }
-                  }}
-                />
-                <Button onClick={sendMessage}>
-                  <Send className="h-4 w-4" />
-                </Button>
               </div>
-            </TabsContent>
+            </div>
+          </div>
 
-            <TabsContent value="ai" className="flex-1 flex flex-col mx-6 mt-0">
-              <Card className="border-none shadow-none">
-                <CardHeader>
-                  <CardTitle className="text-lg">Research AI Assistant</CardTitle>
-                  <CardDescription>
-                    Ask questions about research methods, literature, or get help with analysis
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg dark:bg-blue-950 dark:border-blue-900">
-                    <h4 className="font-medium text-sm mb-2">Suggested Prompts:</h4>
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start text-left h-auto py-2"
-                        onClick={() =>
-                          setAiPrompt("Help me formulate research questions for my study on AI in education")
-                        }
-                      >
-                        Help me formulate research questions for my study on AI in education
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start text-left h-auto py-2"
-                        onClick={() => setAiPrompt("Suggest a methodology for a mixed-methods research design")}
-                      >
-                        Suggest a methodology for a mixed-methods research design
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start text-left h-auto py-2"
-                        onClick={() =>
-                          setAiPrompt("What are the most cited papers in this field from the last 3 years?")
-                        }
-                      >
-                        What are the most cited papers in this field from the last 3 years?
-                      </Button>
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-8">
+            {selectedTeamData ? (
+              <>
+                {/* Team Header */}
+                <div className="border border-gray-200">
+                  <div className="p-8 border-b border-gray-200">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="p-3 bg-black text-white">
+                            <Users className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3 mb-2">
+                              <h2 className="text-2xl font-light text-black">{selectedTeamData.name}</h2>
+                              {selectedTeamData.isPublic && <Globe className="h-5 w-5 text-gray-600" />}
+                              <Badge variant="outline" className="text-xs">
+                                {selectedTeamData.category}
+                              </Badge>
+                            </div>
+                            <p className="text-gray-600 font-light">{selectedTeamData.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-50">
+                          <Video className="h-4 w-4 mr-2" />
+                          Video Call
+                        </Button>
+                        <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-50">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
+                  <div className="p-8">
+                    <Tabs defaultValue="chat" className="space-y-6">
+                      <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
+                        <TabsTrigger
+                          value="chat"
+                          className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Chat
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="members"
+                          className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Members ({selectedTeamData.members.length})
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="files"
+                          className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
+                        >
+                          <Share className="h-4 w-4 mr-2" />
+                          Files
+                        </TabsTrigger>
+                      </TabsList>
 
-                  <Textarea
-                    placeholder="Ask the AI assistant a research-related question..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    className="min-h-[120px]"
-                  />
-
-                  <Button onClick={askAi} disabled={isAiLoading} className="w-full">
-                    {isAiLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Brain className="mr-2 h-4 w-4" />
-                        Ask AI Assistant
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="docs" className="flex-1 mx-6 mt-0">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium">Shared Documents</h3>
-                  <Button size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Document
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {documents.map((doc) => {
-                    const creator = getUserById(doc.createdBy)
-                    return (
-                      <Card key={doc.id} className="bg-muted/50">
-                        <CardHeader className="p-4 pb-2">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2">
-                              {getDocumentIcon(doc.type)}
-                              <CardTitle className="text-base">{doc.title}</CardTitle>
-                            </div>
-                            <DropdownMenu
-                              trigger={
-                                <Button variant="ghost" size="icon">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              }
-                            >
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => shareDocument(doc.id)}>
-                                  <Share2 className="mr-2 h-4 w-4" />
-                                  Share
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          <CardDescription className="flex items-center gap-1">
-                            <Avatar className="h-4 w-4">
-                              <AvatarFallback>{creator.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <span>
-                              {creator.name} • {doc.lastModified}
-                            </span>
-                            {doc.isEditing && (
-                              <Badge variant="secondary" className="ml-2">
-                                Being Edited
-                              </Badge>
+                      <TabsContent value="chat" className="space-y-6">
+                        {/* Chat Messages */}
+                        <div className="border border-gray-200 h-96 flex flex-col">
+                          <div className="flex-1 p-6 overflow-y-auto space-y-4">
+                            {teamMessages.map((message) => (
+                              <div
+                                key={message.id}
+                                className={`flex gap-3 ${message.type === "system" ? "justify-center" : ""}`}
+                              >
+                                {message.type === "system" ? (
+                                  <div className="text-center">
+                                    <Badge variant="outline" className="text-xs">
+                                      {message.content}
+                                    </Badge>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback className="text-xs">
+                                        {message.senderName.charAt(0)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-medium text-black text-sm">{message.senderName}</span>
+                                        <span className="text-xs text-gray-500">
+                                          {message.timestamp.toLocaleTimeString()}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-gray-700 leading-relaxed font-light">
+                                        {message.content}
+                                      </p>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                            {teamMessages.length === 0 && (
+                              <div className="text-center py-12 text-gray-500">
+                                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                <p className="text-lg font-medium mb-2">No messages yet</p>
+                                <p className="text-sm font-light">Start the conversation with your team</p>
+                              </div>
                             )}
-                          </CardDescription>
-                        </CardHeader>
-                        {editingDocument === doc.id ? (
-                          <CardContent className="p-4 pt-2">
-                            <Textarea
-                              value={editedContent}
-                              onChange={(e) => setEditedContent(e.target.value)}
-                              className="min-h-[100px]"
-                            />
-                          </CardContent>
-                        ) : (
-                          <CardContent className="p-4 pt-2">
-                            <p className="text-sm line-clamp-2">{doc.content}</p>
-                          </CardContent>
-                        )}
-                        <CardFooter className="p-4 pt-0">
-                          {editingDocument === doc.id ? (
-                            <div className="ml-auto flex gap-2">
-                              <Button variant="ghost" size="sm" onClick={cancelEditing}>
-                                <X className="mr-2 h-4 w-4" />
-                                Cancel
-                              </Button>
-                              <Button size="sm" onClick={saveDocument}>
-                                <Save className="mr-2 h-4 w-4" />
-                                Save
+                          </div>
+                          <div className="border-t border-gray-200 p-4">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Type your message..."
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                                className="flex-1 border-gray-300 focus:border-black focus:ring-black font-light"
+                              />
+                              <Button
+                                onClick={sendMessage}
+                                disabled={!newMessage.trim()}
+                                className="bg-black hover:bg-gray-800 text-white"
+                              >
+                                <Send className="h-4 w-4" />
                               </Button>
                             </div>
-                          ) : (
-                            <Button variant="ghost" size="sm" className="ml-auto">
-                              Open
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="members" className="space-y-6">
+                        {/* Invite Member */}
+                        <div className="border border-gray-200 p-6">
+                          <h4 className="font-medium text-black mb-4 flex items-center gap-2">
+                            <UserPlus className="h-4 w-4" />
+                            Invite New Member
+                          </h4>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter email address"
+                              value={inviteEmail}
+                              onChange={(e) => setInviteEmail(e.target.value)}
+                              className="flex-1 border-gray-300 focus:border-black focus:ring-black font-light"
+                            />
+                            <Button
+                              onClick={() => inviteCollaborator(selectedTeam!)}
+                              disabled={!inviteEmail.trim()}
+                              className="bg-black hover:bg-gray-800 text-white"
+                            >
+                              <ArrowRight className="h-4 w-4" />
                             </Button>
-                          )}
-                        </CardFooter>
-                      </Card>
-                    )
-                  })}
+                          </div>
+                        </div>
+
+                        {/* Members List */}
+                        <div className="border border-gray-200">
+                          <div className="p-6 border-b border-gray-200">
+                            <h4 className="font-medium text-black">Team Members</h4>
+                          </div>
+                          <div className="p-6">
+                            <div className="space-y-4">
+                              {selectedTeamData.members.map((member) => (
+                                <div
+                                  key={member.id}
+                                  className="flex items-center justify-between p-4 border border-gray-200 hover:bg-gray-50 transition-colors"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                      <Avatar className="h-10 w-10">
+                                        <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                                        <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                      <div
+                                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium text-black">{member.name}</p>
+                                        {getRoleIcon(member.role)}
+                                      </div>
+                                      <p className="text-sm text-gray-600 font-light">{member.email}</p>
+                                      <p className="text-xs text-gray-500">
+                                        Last active: {member.lastActive.toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {member.role}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs ${
+                                        member.status === "online"
+                                          ? "border-black text-black"
+                                          : "border-gray-300 text-gray-600"
+                                      }`}
+                                    >
+                                      {member.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="files" className="space-y-6">
+                        <div className="border border-gray-200">
+                          <div className="text-center py-20 px-8">
+                            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 mb-8">
+                              <Share className="h-8 w-8 text-gray-600" />
+                            </div>
+                            <h3 className="text-xl font-medium text-black mb-4">Shared Files</h3>
+                            <p className="text-gray-600 max-w-md mx-auto leading-relaxed font-light mb-8">
+                              File sharing and collaborative document editing coming soon
+                            </p>
+                            <div className="flex justify-center gap-6">
+                              <div className="text-center">
+                                <div className="w-8 h-8 bg-black mb-2 mx-auto"></div>
+                                <span className="text-xs text-gray-600 uppercase tracking-wide">Document Sync</span>
+                              </div>
+                              <div className="text-center">
+                                <div className="w-8 h-8 bg-gray-300 mb-2 mx-auto"></div>
+                                <span className="text-xs text-gray-600 uppercase tracking-wide">Version Control</span>
+                              </div>
+                              <div className="text-center">
+                                <div className="w-8 h-8 bg-gray-500 mb-2 mx-auto"></div>
+                                <span className="text-xs text-gray-600 uppercase tracking-wide">Real-time Edit</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Welcome State */
+              <div className="border border-gray-200">
+                <div className="text-center py-20 px-8">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 mb-8">
+                    <Users className="h-8 w-8 text-gray-600" />
+                  </div>
+                  <h3 className="text-2xl font-light text-black mb-4">Select a Team</h3>
+                  <p className="text-gray-600 max-w-md mx-auto leading-relaxed font-light mb-8">
+                    Choose a team from the sidebar to start collaborating, or create a new team to get started
+                  </p>
+                  <div className="flex justify-center gap-6">
+                    <div className="text-center">
+                      <div className="w-8 h-8 bg-black mb-2 mx-auto"></div>
+                      <span className="text-xs text-gray-600 uppercase tracking-wide">Team Chat</span>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-8 h-8 bg-gray-300 mb-2 mx-auto"></div>
+                      <span className="text-xs text-gray-600 uppercase tracking-wide">File Sharing</span>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-8 h-8 bg-gray-500 mb-2 mx-auto"></div>
+                      <span className="text-xs text-gray-600 uppercase tracking-wide">Video Calls</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
-        </Card>
+            )}
+
+            {/* Active Users */}
+            {activeUsers && activeUsers.length > 0 && (
+              <div className="border border-gray-200">
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-black">Currently Online</h3>
+                  <p className="text-gray-600 text-sm mt-1">Users active on the platform</p>
+                </div>
+                <div className="p-6">
+                  <div className="flex gap-4">
+                    {activeUsers.slice(0, 8).map((user, index) => (
+                      <div key={index} className="text-center">
+                        <div className="relative">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="text-sm">{user.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-black rounded-full border-2 border-white" />
+                        </div>
+                        <p className="text-xs text-gray-600 mt-2 font-light">{user}</p>
+                      </div>
+                    ))}
+                    {activeUsers.length > 8 && (
+                      <div className="text-center">
+                        <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm text-gray-600">+{activeUsers.length - 8}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-2 font-light">more</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -150,4 +150,4 @@ export default function CollaboratorsList({
       </div>
     </div>
   )
-} 
+}

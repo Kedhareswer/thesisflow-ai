@@ -63,4 +63,4 @@ if __name__ == "__main__":
     print(json.dumps(papers, indent=2))
     
     author = ScholarlyService.get_author_info("Geoffrey Hinton")
-    print(json.dumps(author, indent=2)) 
+    print(json.dumps(author, indent=2))

@@ -440,4 +440,4 @@ export default function IdeaList() {
       ))}
     </div>
   )
-} 
+}

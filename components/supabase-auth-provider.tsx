@@ -1,7 +1,9 @@
 "use client"
 
+import type React from "react"
+
 import { createContext, useContext, useEffect, useState } from "react"
-import { Session, User } from "@supabase/supabase-js"
+import type { Session, User } from "@supabase/supabase-js"
 import { supabase } from "@/src/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
@@ -19,7 +21,7 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(u
 export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const { toast } = useToast()
 
@@ -37,6 +39,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      setIsLoading(false)
     })
 
     return () => subscription.unsubscribe()

@@ -47,4 +47,4 @@ export interface UserSettings {
   theme: 'light' | 'dark' | 'system';
   language: string;
   timezone: string;
-} 
+}

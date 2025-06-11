@@ -1,113 +1,197 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { ArrowRight, FileText, Users, Brain, BarChart3 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe } from "lucide-react"
 
-export default function Home() {
+export default function HomePage() {
+  const features = [
+    {
+      icon: Search,
+      title: "Research Explorer",
+      description: "Discover and analyze research papers with AI-powered insights and recommendations.",
+      href: "/explorer",
+    },
+    {
+      icon: FileText,
+      title: "Smart Summarizer",
+      description: "Generate comprehensive summaries from papers, documents, and web content.",
+      href: "/summarizer",
+    },
+    {
+      icon: Calendar,
+      title: "Project Planner",
+      description: "Organize research projects with intelligent task management and timelines.",
+      href: "/planner",
+    },
+    {
+      icon: Lightbulb,
+      title: "Idea Workspace",
+      description: "Generate and develop research ideas with AI-powered brainstorming tools.",
+      href: "/workspace",
+    },
+    {
+      icon: Users,
+      title: "Collaboration Hub",
+      description: "Work together with real-time chat, shared workspaces, and team management.",
+      href: "/collaborate",
+    },
+    {
+      icon: Bot,
+      title: "AI Research Assistant",
+      description: "Get expert guidance on methodology, analysis, and research best practices.",
+      href: "/research-assistant",
+    },
+  ]
+
+  const benefits = [
+    {
+      icon: Zap,
+      title: "Accelerated Research",
+      description: "Reduce research time by 60% with AI-powered tools and automation.",
+    },
+    {
+      icon: Shield,
+      title: "Enterprise Security",
+      description: "Bank-grade security with encrypted data and secure API handling.",
+    },
+    {
+      icon: Globe,
+      title: "Global Collaboration",
+      description: "Connect with researchers worldwide through real-time collaboration tools.",
+    },
+  ]
+
   return (
-    <div className="space-y-8 py-10">
-      <div className="text-center space-y-4 mb-12">
-        <h1 className="text-4xl font-bold tracking-tight">Research Collaboration Platform</h1>
-        <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-          Collaborate on research projects in real-time, summarize papers with AI, and track your progress with
-          interactive dashboards.
-        </p>
-        <div className="flex justify-center gap-4 pt-4">
-          <Button asChild size="lg">
-            <Link href="/dashboard">
-              Get Started <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/about">Learn More</Link>
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="section-spacing">
+        <div className="container">
+          <div className="max-w-4xl mx-auto text-center content-spacing">
+            <Badge variant="outline" className="mb-6">
+              Powered by Multiple AI Providers
+            </Badge>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-xl">Real-time Collaboration</h3>
-              <p className="text-muted-foreground">
-                Work together with your team in real-time. See changes as they happen and communicate instantly.
-              </p>
-              <Button asChild variant="link" className="mt-2">
-                <Link href="/collaborate">
-                  Try Collaboration <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            <h1 className="text-display text-balance mb-6">
+              Advanced Machine Learning
+              <span className="block">Research Platform</span>
+            </h1>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <FileText className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-xl">Paper Summarizer</h3>
-              <p className="text-muted-foreground">
-                Extract key insights from research papers automatically. Save time and focus on what matters.
-              </p>
-              <Button asChild variant="link" className="mt-2">
-                <Link href="/summarizer">
-                  Summarize Papers <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            <p className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto leading-relaxed">
+              Accelerate your research with AI-powered tools for discovery, analysis, and collaboration. Built for
+              researchers, by researchers.
+            </p>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <Brain className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-xl">Research Explorer</h3>
-              <p className="text-muted-foreground">
-                Discover new research directions and generate ideas with AI assistance.
-              </p>
-              <Button asChild variant="link" className="mt-2">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" asChild className="focus-ring">
                 <Link href="/explorer">
-                  Explore Research <ArrowRight className="ml-1 h-4 w-4" />
+                  Start Exploring
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
+              <Button variant="outline" size="lg" asChild className="focus-ring">
+                <Link href="/signup">Create Account</Link>
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      </section>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <BarChart3 className="h-8 w-8 text-primary" />
+      {/* Features Grid */}
+      <section className="section-spacing bg-muted/30">
+        <div className="container">
+          <div className="max-w-2xl mx-auto text-center mb-16">
+            <h2 className="text-headline mb-4">Everything you need for research</h2>
+            <p className="text-body text-muted-foreground">
+              Comprehensive tools designed to streamline every aspect of your research workflow.
+            </p>
+          </div>
+
+          <div className="grid grid-auto-fit gap-8">
+            {features.map((feature, index) => (
+              <Card
+                key={feature.title}
+                className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-accent rounded-lg group-hover:bg-foreground group-hover:text-background transition-colors">
+                      <feature.icon className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-title">{feature.title}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <CardDescription className="text-body mb-4">{feature.description}</CardDescription>
+                  <Button variant="ghost" size="sm" asChild className="p-0 h-auto font-normal">
+                    <Link href={feature.href} className="inline-flex items-center text-sm">
+                      Learn more
+                      <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="section-spacing">
+        <div className="container">
+          <div className="max-w-2xl mx-auto text-center mb-16">
+            <h2 className="text-headline mb-4">Why choose our platform</h2>
+            <p className="text-body text-muted-foreground">
+              Built with modern technology and research best practices in mind.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {benefits.map((benefit, index) => (
+              <div
+                key={benefit.title}
+                className="text-center space-y-4 animate-fade-in"
+                style={{ animationDelay: `${index * 150}ms` }}
+              >
+                <div className="mx-auto w-12 h-12 bg-accent rounded-xl flex items-center justify-center">
+                  <benefit.icon className="h-6 w-6" />
+                </div>
+                <h3 className="text-title">{benefit.title}</h3>
+                <p className="text-body text-muted-foreground">{benefit.description}</p>
               </div>
-              <h3 className="font-semibold text-xl">Interactive Dashboard</h3>
-              <p className="text-muted-foreground">
-                Track your research progress with real-time analytics and visualizations.
-              </p>
-              <Button asChild variant="link" className="mt-2">
-                <Link href="/dashboard">
-                  View Dashboard <ArrowRight className="ml-1 h-4 w-4" />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="section-spacing bg-foreground text-background">
+        <div className="container">
+          <div className="max-w-2xl mx-auto text-center content-spacing">
+            <h2 className="text-headline mb-4">Ready to accelerate your research?</h2>
+            <p className="text-body opacity-90 mb-8">
+              Join thousands of researchers already using our platform to advance their work.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" variant="secondary" asChild className="focus-ring">
+                <Link href="/signup">
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                asChild
+                className="border-background/20 text-background hover:bg-background/10 focus-ring"
+              >
+                <Link href="/explorer">View Demo</Link>
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-16 text-center">
-        <h2 className="text-2xl font-bold mb-4">Ready to transform your research workflow?</h2>
-        <Button asChild size="lg">
-          <Link href="/dashboard">Get Started Today</Link>
-        </Button>
-      </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
