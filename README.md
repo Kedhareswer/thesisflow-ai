@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![AI Project Planner](https://img.shields.io/badge/AI-Project_Planner-blue?style=for-the-badge&logo=artificial-intelligence)
+![Bolt Research Hub](https://img.shields.io/badge/AI-Project_Planner-blue?style=for-the-badge&logo=artificial-intelligence)
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)](https://reactjs.org/)
