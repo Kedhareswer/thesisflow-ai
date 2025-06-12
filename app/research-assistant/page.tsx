@@ -170,239 +170,258 @@ export default function ResearchAssistant() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">AI Research Assistant</h1>
-        <p className="text-muted-foreground">
-          Get AI-powered assistance for your research questions, methodology, and analysis
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header Section */}
+        <div className="mb-8 space-y-4">
+          <h1 className="text-4xl font-bold tracking-tight">AI Research Assistant</h1>
+          <p className="text-xl text-muted-foreground max-w-3xl">
+            Get AI-powered assistance for your research questions, methodology, and analysis
+          </p>
+        </div>
 
-      <Tabs defaultValue="chat" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="chat">Chat Assistant</TabsTrigger>
-          <TabsTrigger value="research">Research Queries</TabsTrigger>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
-        </TabsList>
+        {/* Main Content */}
+        <Tabs defaultValue="chat" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-md">
+            <TabsTrigger value="chat">Chat Assistant</TabsTrigger>
+            <TabsTrigger value="research">Research Queries</TabsTrigger>
+            <TabsTrigger value="resources">Resources</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="chat" className="space-y-4">
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Chat Interface */}
-            <div className="lg:col-span-2">
+          <TabsContent value="chat" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Chat Interface */}
+              <div className="lg:col-span-2">
+                <Card className="h-full">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" />
+                      Chat with AI Assistant
+                    </CardTitle>
+                    <CardDescription>
+                      Ask questions about research methodology, data analysis, or get general research advice
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Messages Container */}
+                    <div className="space-y-4 h-96 overflow-y-auto border rounded-lg p-4 bg-muted/20">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[85%] p-3 rounded-lg ${
+                              message.role === "user"
+                                ? "bg-primary text-primary-foreground ml-4"
+                                : "bg-background border shadow-sm mr-4"
+                            }`}
+                          >
+                            <p className="text-sm leading-relaxed">{message.content}</p>
+                            <p className="text-xs opacity-70 mt-2">{message.timestamp.toLocaleTimeString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {loading && (
+                        <div className="flex justify-start">
+                          <div className="bg-background border shadow-sm p-3 rounded-lg mr-4">
+                            <p className="text-sm">AI is thinking...</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Message Input */}
+                    <div className="flex gap-3">
+                      <Input
+                        placeholder="Ask me anything about research..."
+                        value={currentMessage}
+                        onChange={(e) => setCurrentMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                        className="flex-1"
+                      />
+                      <Button onClick={sendMessage} disabled={loading || !currentMessage.trim()} size="icon">
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Quick Questions */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg">Quick Questions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      "How do I choose the right methodology?",
+                      "What's the best way to analyze qualitative data?",
+                      "How to write a literature review?",
+                      "Statistical significance vs practical significance?",
+                      "How to handle missing data?",
+                    ].map((question, index) => (
+                      <Button
+                        key={index}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-left justify-start h-auto p-3 text-wrap"
+                        onClick={() => setCurrentMessage(question)}
+                      >
+                        <span className="text-sm leading-relaxed">{question}</span>
+                      </Button>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Research Areas */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg">Research Areas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        "Machine Learning",
+                        "Data Science",
+                        "Statistics",
+                        "Methodology",
+                        "Literature Review",
+                        "Ethics",
+                      ].map((area) => (
+                        <Badge key={area} variant="secondary" className="text-xs">
+                          {area}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="research" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Research Query Assistant
+                </CardTitle>
+                <CardDescription>Get detailed answers to specific research questions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Research Question</label>
+                  <Textarea
+                    placeholder="Enter your detailed research question here..."
+                    value={researchQuestion}
+                    onChange={(e) => setResearchQuestion(e.target.value)}
+                    rows={4}
+                    className="resize-none"
+                  />
+                </div>
+                <Button
+                  onClick={askResearchQuestion}
+                  disabled={loading || !researchQuestion.trim()}
+                  className="w-full"
+                  size="lg"
+                >
+                  {loading ? (
+                    <>
+                      <Brain className="mr-2 h-4 w-4 animate-pulse" />
+                      Analyzing Question...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Get Research Insights
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Previous Queries */}
+            {queries.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Previous Research Queries</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {queries.map((query) => (
+                      <div key={query.id} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-start gap-4">
+                          <h4 className="font-medium leading-relaxed">{query.question}</h4>
+                          <Badge variant="outline" className="shrink-0">
+                            {query.category}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{query.answer}</p>
+                        <p className="text-xs text-muted-foreground">{query.timestamp.toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="resources" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Chat with AI Assistant
+                    <BookOpen className="h-5 w-5" />
+                    Research Guides
                   </CardTitle>
-                  <CardDescription>
-                    Ask questions about research methodology, data analysis, or get general research advice
-                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Messages */}
-                  <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[80%] p-3 rounded-lg ${
-                            message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                          }`}
-                        >
-                          <p className="text-sm">{message.content}</p>
-                          <p className="text-xs opacity-70 mt-1">{message.timestamp.toLocaleTimeString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {loading && (
-                      <div className="flex justify-start">
-                        <div className="bg-muted p-3 rounded-lg">
-                          <p className="text-sm">AI is thinking...</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Message Input */}
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Ask me anything about research..."
-                      value={currentMessage}
-                      onChange={(e) => setCurrentMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                      className="flex-1"
-                    />
-                    <Button onClick={sendMessage} disabled={loading || !currentMessage.trim()}>
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Questions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-3">
                   {[
-                    "How do I choose the right methodology?",
-                    "What's the best way to analyze qualitative data?",
-                    "How to write a literature review?",
-                    "Statistical significance vs practical significance?",
-                    "How to handle missing data?",
-                  ].map((question, index) => (
-                    <Button
+                    "How to Write a Research Proposal",
+                    "Statistical Analysis Best Practices",
+                    "Literature Review Guidelines",
+                    "Data Collection Methods",
+                    "Research Ethics Framework",
+                  ].map((guide, index) => (
+                    <div
                       key={index}
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-left justify-start h-auto p-2"
-                      onClick={() => setCurrentMessage(question)}
+                      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                     >
-                      <span className="text-xs">{question}</span>
-                    </Button>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Research Areas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      "Machine Learning",
-                      "Data Science",
-                      "Statistics",
-                      "Methodology",
-                      "Literature Review",
-                      "Ethics",
-                    ].map((area) => (
-                      <Badge key={area} variant="secondary" className="text-xs">
-                        {area}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="research" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Research Query Assistant
-              </CardTitle>
-              <CardDescription>Get detailed answers to specific research questions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Research Question</label>
-                <Textarea
-                  placeholder="Enter your detailed research question here..."
-                  value={researchQuestion}
-                  onChange={(e) => setResearchQuestion(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <Button onClick={askResearchQuestion} disabled={loading || !researchQuestion.trim()} className="w-full">
-                {loading ? (
-                  <>
-                    <Brain className="mr-2 h-4 w-4 animate-pulse" />
-                    Analyzing Question...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Get Research Insights
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Previous Queries */}
-          {queries.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Previous Research Queries</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {queries.map((query) => (
-                    <div key={query.id} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-medium">{query.question}</h4>
-                        <Badge variant="outline">{query.category}</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{query.answer}</p>
-                      <p className="text-xs text-muted-foreground">{query.timestamp.toLocaleString()}</p>
+                      <p className="text-sm font-medium">{guide}</p>
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="resources" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Research Guides
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  "How to Write a Research Proposal",
-                  "Statistical Analysis Best Practices",
-                  "Literature Review Guidelines",
-                  "Data Collection Methods",
-                  "Research Ethics Framework",
-                ].map((guide, index) => (
-                  <div key={index} className="p-2 border rounded hover:bg-muted cursor-pointer">
-                    <p className="text-sm font-medium">{guide}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5" />
-                  Research Tips
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  "Start with a clear research question",
-                  "Use systematic literature search strategies",
-                  "Document your methodology thoroughly",
-                  "Consider ethical implications early",
-                  "Plan for data management and storage",
-                ].map((tip, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <p className="text-sm">{tip}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5" />
+                    Research Tips
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    "Start with a clear research question",
+                    "Use systematic literature search strategies",
+                    "Document your methodology thoroughly",
+                    "Consider ethical implications early",
+                    "Plan for data management and storage",
+                  ].map((tip, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-primary rounded-full mt-2 shrink-0" />
+                      <p className="text-sm leading-relaxed">{tip}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
