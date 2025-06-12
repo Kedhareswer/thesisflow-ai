@@ -102,55 +102,55 @@ Get expert guidance on methodology, analysis, and research best practices.
 ### Installation
 
 1. Clone the repository
-\`\`\`bash
+```bash
 git clone https://github.com/Kedhareswer/ai-project-planner.git
 cd ai-project-planner
-\`\`\`
+```
 
 2. Install dependencies
-\`\`\`bash
+```bash
 pnpm install
-\`\`\`
+```
 
 3. Set up environment variables
-\`\`\`bash
+```bash
 cp .env.example .env.local
-\`\`\`
+```
 Edit `.env.local` with your API keys and configuration.
 
 4. Set up the Python backend (for literature review functionality)
-\`\`\`bash
+```bash
 cd python
 ./setup.bat
-\`\`\`
+```
 
 ## 🔧 Usage
 
 ### Development Server
 
-\`\`\`bash
+```bash
 pnpm dev
-\`\`\`
+```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Production Build
 
-\`\`\`bash
+```bash
 pnpm build
 pnpm start
-\`\`\`
+```
 
 ### Python Backend (for Literature Review)
 
-\`\`\`bash
+```bash
 cd python
 python app.py
-\`\`\`
+```
 This will start the Flask server on port 5000.
 
 ### Workflow Diagram
 
-\`\`\`mermaid
+```mermaid
 sequenceDiagram
     actor User
     participant Frontend
@@ -172,7 +172,7 @@ sequenceDiagram
     APIRoutes->>Database: Store summary
     APIRoutes-->>Frontend: Display summary
     Frontend-->>User: View research summary
-\`\`\`
+```
 
 ## 📊 Performance Metrics
 
@@ -203,7 +203,7 @@ sequenceDiagram
 
 ### Performance Comparison
 
-\`\`\`mermaid
+```mermaid
 pie title Feature Usage Distribution
     "Research Explorer" : 35
     "Smart Summarizer" : 25
@@ -211,7 +211,7 @@ pie title Feature Usage Distribution
     "Idea Workspace" : 10
     "Collaboration Hub" : 5
     "AI Research Assistant" : 5
-\`\`\`
+```
 
 ## 🛠️ Technologies
 
@@ -238,7 +238,7 @@ pie title Feature Usage Distribution
 
 ## 📂 Project Structure
 
-\`\`\`
+```
 ai-project-planner/
 ├── app/                  # Next.js app directory
 │   ├── ai-assistant/     # AI assistant feature
@@ -252,11 +252,11 @@ ai-project-planner/
 │   └── utils/          # Utility functions
 ├── python/             # Python backend for literature review
 └── public/             # Static assets
-\`\`\`
+```
 
 ### Architecture Diagram
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     Client[Client Browser] --> NextJS[Next.js Frontend]
     NextJS --> APIRoutes[Next.js API Routes]
@@ -287,7 +287,7 @@ flowchart TD
         PythonBackend
         PyGetPapers
     end
-\`\`\`
+```
 
 ## 🤝 Contributing
 
