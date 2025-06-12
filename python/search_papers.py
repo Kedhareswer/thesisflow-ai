@@ -7,38 +7,86 @@ import socket
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import concurrent.futures
+from collections import OrderedDict
 
 class TimeoutError(Exception):
     pass
 
-def search_papers(query):
-    """Search for academic papers using multiple APIs with fallbacks.
+def search_papers(query, max_results=10):
+    """Search for academic papers using multiple APIs in parallel.
     
     Args:
         query (str): Search query string
+        max_results (int): Maximum number of results to return
         
     Returns:
         str: JSON string containing papers or error message
     """
     try:
-        # First try Crossref API which is very reliable
-        papers = search_crossref(query)
-        if papers:  # If we got results, return them
-            return json.dumps(papers)
+        # Define search functions to run in parallel
+        search_functions = [
+            (search_arxiv, query, max_results),
+            (search_crossref, query, max_results)
+        ]
+        
+        papers = []
+        
+        # Use ThreadPoolExecutor to run searches in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(search_functions)) as executor:
+            # Start the search operations and mark each future with its search function
+            future_to_search = {
+                executor.submit(func, query, max_results): func.__name__ 
+                for func, query, max_results in search_functions
+            }
             
-        # If Crossref returned no results, try searching arXiv
-        papers = search_arxiv(query)
-        if papers:  # If we got results, return them
-            return json.dumps(papers)
+            for future in concurrent.futures.as_completed(future_to_search):
+                search_name = future_to_search[future]
+                try:
+                    result = future.result()
+                    if result:
+                        papers.extend(result)
+                        print(f"Successfully retrieved {len(result)} papers from {search_name}", file=sys.stderr)
+                except Exception as e:
+                    print(f"Error in {search_name}: {str(e)}", file=sys.stderr)
+        
+        # Deduplicate papers based on title and first author
+        unique_papers = OrderedDict()
+        for paper in papers:
+            # Create a unique key using title and first author (if available)
+            title = paper.get('title', '').lower().strip()
+            first_author = paper.get('authors', [''])[0].lower() if paper.get('authors') else ''
+            key = f"{title}:{first_author}"
             
-        # If no results from any source, return empty list
-        return json.dumps([])
+            # Only keep the first occurrence of each paper
+            if key not in unique_papers:
+                unique_papers[key] = paper
+        
+        # Convert back to list and limit to max_results
+        unique_papers_list = list(unique_papers.values())[:max_results]
+        
+        # Sort by date (newest first)
+        # For papers without a date, put them at the end
+        unique_papers_list.sort(
+            key=lambda x: (
+                x.get('published_date', '') or x.get('year', ''),  # Try to use published_date first, then fall back to year
+                x.get('title', '')  # For papers with same date, sort by title
+            ),
+            reverse=True
+        )
+        
+        # Ensure we don't exceed max_results after sorting
+        unique_papers_list = unique_papers_list[:max_results]
+        
+        print(f"Total unique papers found: {len(unique_papers_list)}", file=sys.stderr)
+        return json.dumps(unique_papers_list)
 
     except Exception as e:
         # Catch any unexpected errors
-        print(f"ERROR: Unexpected error: {str(e)}", file=sys.stderr)
+        error_msg = f"ERROR in search_papers: {str(e)}"
+        print(error_msg, file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        return json.dumps({"error": str(e)})
+        return json.dumps({"error": error_msg})
 
 def create_http_session(retries=3, backoff_factor=0.3):
     """Create a requests session with retry logic."""
@@ -161,23 +209,49 @@ def search_crossref(query, max_results=10, timeout_seconds=15):
         return []
 
 def search_arxiv(query, max_results=10, timeout_seconds=15):
-    """Search academic papers using a direct API call to arXiv API with timeout and retries."""
+    """Search academic papers using arXiv API with improved query handling and error recovery.
+    
+    Args:
+        query (str): Search query string
+        max_results (int): Maximum number of results to return
+        timeout_seconds (int): Request timeout in seconds
+        
+    Returns:
+        list: List of paper dictionaries or empty list on error
+    """
     try:
         print(f"Searching arXiv for '{query}'...", file=sys.stderr)
         
+        # Clean and prepare the query
+        query = query.strip()
+        if not query:
+            print("Empty query provided", file=sys.stderr)
+            return []
+            
         # Try multiple arXiv domains in case of DNS issues
         arxiv_domains = [
             'export.arxiv.org',
             'arxiv.org',
-            'export.arxiv.org',  # Try again in case of temporary issues
+            'export.arxiv.org'  # Try again in case of temporary issues
         ]
         
         last_error = None
         
         for domain in arxiv_domains:
             try:
-                # Construct the API URL with the current domain
-                url = f"https://{domain}/api/query?search_query=all:{requests.utils.quote(query)}&start=0&max_results={max_results}&sortBy=relevance&sortOrder=descending"
+                # Construct the API URL with the current domain and better query handling
+                query_terms = [f"all:{term}" for term in query.split() if term.strip() and term != 'sort:date']
+                search_query = '+AND+'.join(query_terms)
+                
+                # Always sort by last updated date in descending order
+                url = (
+                    f"https://{domain}/api/query?"
+                    f"search_query={search_query}&"
+                    f"start=0&"
+                    f"max_results={max_results}&"
+                    "sortBy=lastUpdatedDate&"
+                    "sortOrder=descending"
+                )
                 print(f"Trying arXiv API at: {url}", file=sys.stderr)
                 
                 # Create a session with retry logic
@@ -241,10 +315,13 @@ def search_arxiv(query, max_results=10, timeout_seconds=15):
                     if author_name:
                         authors.append(author_name)
                 
-                # Extract year from published date
+                # Extract and store full published date and year
+                published_date = ""
                 year = ""
-                if published and len(published) >= 4:
-                    year = published[:4]  # Extract first 4 characters (the year)
+                if published:
+                    published_date = published  # Full ISO format date
+                    if len(published) >= 4:
+                        year = published[:4]  # Extract first 4 characters (the year)
                 
                 # Extract PDF link if available
                 pdf_url = ""

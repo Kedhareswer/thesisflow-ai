@@ -1,4 +1,4 @@
-# Bolt Research Hub
+# AI Project Planner
 
 <div align="center">
 
@@ -27,7 +27,7 @@
 
 ## 📋 Overview
 
-AI Project Planner is a comprehensive research platform designed to streamline the academic research workflow. It combines AI-powered tools for literature review, summarization, project planning, collaboration, and more into a unified interface.
+AI Project Planner is a comprehensive research platform designed to streamline the academic research workflow. It combines AI-powered tools for literature review, paper search, summarization, and project planning into a unified interface. The platform consists of a Next.js frontend and a Python backend that leverages multiple academic search APIs to provide comprehensive research capabilities.
 <div align="center">
   <table>
     <tr>
@@ -98,6 +98,7 @@ Get expert guidance on methodology, analysis, and research best practices.
 - Node.js 18.0 or higher
 - Python 3.7+ (for literature review functionality)
 - npm or pnpm package manager
+- Java Runtime Environment (JRE) for pygetpapers
 
 ### Installation
 
@@ -107,7 +108,7 @@ git clone https://github.com/Kedhareswer/ai-project-planner.git
 cd ai-project-planner
 ```
 
-2. Install dependencies
+2. Install frontend dependencies
 ```bash
 pnpm install
 ```
@@ -118,7 +119,7 @@ cp .env.example .env.local
 ```
 Edit `.env.local` with your API keys and configuration.
 
-4. Set up the Python backend (for literature review functionality)
+4. Set up the Python backend (for literature search functionality)
 ```bash
 cd python
 ./setup.bat
@@ -128,10 +129,19 @@ cd python
 
 ### Development Server
 
+1. Start the Next.js frontend:
 ```bash
 pnpm dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+2. In a separate terminal, start the Python backend:
+```bash
+cd python
+python app.py
+```
+
+The Python backend will run on port 5000 and handle paper search functionality.
 
 ### Production Build
 
@@ -140,38 +150,81 @@ pnpm build
 pnpm start
 ```
 
-### Python Backend (for Literature Review)
+## 📚 API Endpoints
 
-```bash
-cd python
-python app.py
-```
-This will start the Flask server on port 5000.
+The Python backend provides the following API endpoints:
 
-### Workflow Diagram
+- `GET /api/search/papers?query=your_search_term` - Search for academic papers
+  - Returns JSON array of paper objects with title, authors, abstract, etc.
+  - Supports query parameters: `query` (required), `limit` (optional, default 10)
+
+## 🔍 Search Features
+
+The platform supports searching across multiple academic sources:
+- Crossref API
+- arXiv API
+- Europe PMC (via pygetpapers)
+
+Search results include:
+- Paper titles and abstracts
+- Author information
+- Publication years
+- Citation counts
+- Direct links to papers
+
+## 🛠️ Dependencies
+
+### Frontend
+- Next.js 13+
+- React 18+
+- TypeScript
+- Tailwind CSS
+
+### Backend (Python)
+- Flask 2.3.3
+- Flask-CORS 4.0.0
+- pygetpapers 1.2.5
+- requests
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **pygetpapers not working**
+   - Ensure Java Runtime Environment (JRE) is installed
+   - Check that the Python virtual environment is activated
+   - Verify internet connection and API rate limits
+
+2. **CORS errors**
+   - Ensure the backend is running on port 5000
+   - Check that the frontend is making requests to the correct backend URL
+
+3. **Missing dependencies**
+   - Run `pnpm install` in the project root
+   - Run `pip install -r requirements.txt` in the python directory
+
+### System Architecture
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant Frontend
-    participant APIRoutes
-    participant AIService
-    participant Database
-    participant PythonBackend
+    participant Frontend as Frontend (Next.js)
+    participant API as Next.js API Routes
+    participant Python as Python Backend (Flask)
+    participant External as External APIs
     
-    User->>Frontend: Access Research Explorer
-    Frontend->>APIRoutes: Request paper search
-    APIRoutes->>PythonBackend: Forward search query
-    PythonBackend->>PythonBackend: Execute pygetpapers
-    PythonBackend-->>APIRoutes: Return search results
-    APIRoutes-->>Frontend: Display results
-    User->>Frontend: Select paper for summarization
-    Frontend->>APIRoutes: Request summary
-    APIRoutes->>AIService: Process summarization
-    AIService-->>APIRoutes: Return summary
-    APIRoutes->>Database: Store summary
-    APIRoutes-->>Frontend: Display summary
-    Frontend-->>User: View research summary
+    User->>Frontend: Enters search query
+    Frontend->>API: GET /api/search/papers?query=...
+    API->>Python: Forward search request
+    Python->>External: Query Crossref API
+    External-->>Python: Return results
+    alt No results from Crossref
+        Python->>External: Query arXiv API
+        External-->>Python: Return results
+    end
+    Python-->>API: Return formatted results
+    API-->>Frontend: Display papers
+    Frontend-->>User: Show search results
 ```
 
 ## 📊 Performance Metrics

@@ -6,17 +6,17 @@ This directory contains the Python backend service that integrates pygetpapers f
 
 1. Make sure you have Python 3.7+ installed on your system
 2. Run the setup script:
-   \`\`\`
+   ```
    setup.bat
-   \`\`\`
+   ```
    This will install all required dependencies.
 
 ## Running the Service
 
 1. Start the Python backend service:
-   \`\`\`
+   ```
    python app.py
-   \`\`\`
+   ```
    This will start the Flask server on port 5000.
 
 2. Keep this service running while using the Literature Review functionality in the AI Project Planner.
