@@ -211,16 +211,7 @@ export default function PaperSummarizer() {
   return (
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-8 py-12 max-w-7xl">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-sm mb-8">
-            <BookOpen className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-5xl font-light text-black mb-6 tracking-tight">AI Paper Summarizer</h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
-            Transform lengthy research papers into concise, actionable summaries with AI-powered analysis
-          </p>
-        </div>
+
 
         <div className="grid gap-12 lg:grid-cols-5">
           {/* Input Section */}

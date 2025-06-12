@@ -103,12 +103,7 @@ export default function ResearchExplorer() {
   return (
     <ErrorBoundary>
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-light mb-4">Research Explorer</h1>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Discover research topics, find relevant papers, and generate innovative ideas with AI assistance.
-          </p>
-        </div>
+  
 
         <Tabs defaultValue="explore" className="space-y-8">
           <TabsList className="grid w-full grid-cols-4 bg-gray-50">
@@ -278,6 +273,8 @@ export default function ResearchExplorer() {
                   placeholder="Search for papers, authors, or keywords..."
                   onSearch={handlePaperSearch}
                   className="w-full"
+                  showButton={true}
+                  buttonText="Search Literature"
                 />
               </CardContent>
             </Card>

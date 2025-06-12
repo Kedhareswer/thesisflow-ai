@@ -189,16 +189,7 @@ export default function ProjectPlanner() {
   return (
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-8 py-12 max-w-7xl">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-sm mb-8">
-            <Target className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-5xl font-light text-black mb-6 tracking-tight">Research Project Planner</h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
-            Organize and manage your research projects with intelligent planning tools and collaborative features
-          </p>
-        </div>
+
 
         <Tabs defaultValue="projects" className="space-y-10">
           <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 max-w-lg mx-auto">

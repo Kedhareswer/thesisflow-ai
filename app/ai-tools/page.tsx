@@ -182,16 +182,7 @@ export default function AIToolsPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-8 py-12 max-w-7xl">
-        {/* Header Section */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-sm mb-8">
-            <Wand2 className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-5xl font-light text-black mb-6 tracking-tight">AI Research Tools</h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
-            Powerful AI-driven tools to accelerate your research workflow and enhance productivity
-          </p>
-        </div>
+
 
         <div className="grid lg:grid-cols-3 gap-12">
           {/* Tools Sidebar */}
