@@ -1,15 +1,15 @@
 import { api } from "@/lib/utils/api"
-import type { ResearchPaper, ResearchIdea, Summary } from "@/lib/types/common"
+import type { Summary } from "@/lib/types/common"
 
 interface AIGenerationResponse {
-  content: string;
-  model: string;
-  provider: string;
+  content: string
+  model: string
+  provider: string
   usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
 }
 
 export class ResearchService {
@@ -26,17 +26,18 @@ export class ResearchService {
 
 Depth level: ${depth}/5`,
       })
-      
+
       // Extract content from the response
       // If response.data has a content property (new format), use that
       // Otherwise fall back to the entire response.data (old format)
-      const content = response.data && typeof response.data === 'object' && 'content' in response.data
-        ? response.data.content
-        : response.data
+      const content =
+        response.data && typeof response.data === "object" && "content" in response.data
+          ? response.data.content
+          : response.data
 
       return {
         ...response,
-        data: content
+        data: content,
       }
     } catch (error) {
       console.error("Error exploring topics:", error)
@@ -46,10 +47,69 @@ Depth level: ${depth}/5`,
 
   static async searchPapers(query: string, type = "keyword") {
     try {
-      return await api.get<ResearchPaper[]>(`/api/search/papers?query=${encodeURIComponent(query)}&type=${type}`)
+      console.log("[ResearchService] Searching papers for query:", query)
+      
+      if (!query || query.trim().length < 3) {
+        throw new Error("Please enter a more specific search term (at least 3 characters)")
+      }
+
+      // Use the existing OpenAlex integration
+      try {
+        const { fetchOpenAlexWorks } = await import("@/app/explorer/openalex")
+        console.log("[ResearchService] OpenAlex module imported successfully")
+        
+        const papers = await fetchOpenAlexWorks(query, 15) // Get 15 papers to ensure we have at least 5 good ones
+        console.log("[ResearchService] Raw papers from OpenAlex:", papers.length)
+
+        if (!papers || !Array.isArray(papers)) {
+          console.error("[ResearchService] Invalid response format from OpenAlex - not an array:", papers)
+          throw new Error("Invalid response from research API")
+        }
+        
+        // Transform OpenAlex format to match expected UI format
+        const transformedPapers = papers
+          .filter((paper) => paper.title && paper.title.trim() !== "") // Filter out papers without titles
+          .map((paper) => ({
+            id: paper.id || `paper-${Math.random().toString(36).substring(2, 9)}`,
+            title: paper.title || "Untitled Paper",
+            authors: paper.authors || [],
+            year: paper.publication_year || new Date().getFullYear(),
+            journal: paper.host_venue || "Unknown Source",
+            abstract: paper.abstract || "No abstract available",
+            url: paper.url || (paper.doi ? `https://doi.org/${paper.doi}` : ""),
+            doi: paper.doi || "",
+            citations: 0, // OpenAlex doesn't provide citation count in basic API
+            pdf_url: paper.doi ? `https://doi.org/${paper.doi}` : paper.url || "",
+          }))
+          .slice(0, 10) // Limit to top 10 results
+
+        console.log("[ResearchService] Transformed papers:", transformedPapers.length)
+        console.log("[ResearchService] First paper sample:", 
+          transformedPapers.length > 0 ? JSON.stringify(transformedPapers[0]).substring(0, 200) + '...' : 'None')
+
+        if (transformedPapers.length === 0) {
+          throw new Error("No relevant papers found. Try different search terms.")
+        }
+        
+        return {
+          data: {
+            success: true,
+            count: transformedPapers.length,
+            source: "openalex",
+            data: transformedPapers,
+          },
+        }
+      } catch (openAlexError) {
+        console.error("[ResearchService] OpenAlex API error:", openAlexError)
+        throw new Error(openAlexError instanceof Error ? openAlexError.message : "Failed to search papers.")
+      }
     } catch (error) {
       console.error("Error searching papers:", error)
-      throw error
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to search papers. Please try again with different search terms.",
+      )
     }
   }
 
@@ -67,9 +127,10 @@ Return the ideas as a Markdown numbered list, where each idea is formatted as:\n
       })
 
       // Extract usable content from new/old formats
-      const content = response.data && typeof response.data === "object" && "content" in response.data
-        ? (response.data as AIGenerationResponse).content
-        : (response.data as unknown as string)
+      const content =
+        response.data && typeof response.data === "object" && "content" in response.data
+          ? (response.data as AIGenerationResponse).content
+          : (response.data as unknown as string)
 
       return {
         ...response,

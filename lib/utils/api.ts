@@ -12,12 +12,18 @@ export class APIError extends Error {
 }
 
 export async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<APIResponse<T>> {
-  const defaultOptions: RequestInit = {
-    headers: {
+  // Initialize default options
+  const defaultOptions: RequestInit = {}
+  
+  // Only set Content-Type header if we're not sending FormData
+  // This allows the browser to set the correct multipart boundary for form data
+  if (!(options.body instanceof FormData)) {
+    defaultOptions.headers = {
       "Content-Type": "application/json",
-    },
+    }
   }
 
+  // Merge options with defaults (user options take precedence)
   const config = { ...defaultOptions, ...options }
 
   try {
@@ -51,7 +57,8 @@ export const api = {
   post: <T>(url: string, data?: any) =>
     apiRequest<T>(url, {
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      // Don't stringify FormData objects, let the browser handle them properly
+      body: data instanceof FormData ? data : data ? JSON.stringify(data) : undefined,
     }),
 
   put: <T>(url: string, data?: any) =>

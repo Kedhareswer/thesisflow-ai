@@ -33,7 +33,8 @@ const providers: Provider[] = [
   {
     name: "gemini",
     envKey: "GEMINI_API_KEY",
-    apiUrl: (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    apiUrl: (model) =>
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
     headers: () => ({
       "Content-Type": "application/json",
     }),
@@ -80,34 +81,34 @@ export async function POST(request: Request) {
     console.log("GEMINI_API_KEY present:", !!process.env.GEMINI_API_KEY)
     console.log("GROQ_API_KEY present:", !!process.env.GROQ_API_KEY)
 
-    // Hardcoded GROQ API key from .env file
-    const groqApiKey = "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"
-    console.log("Using hardcoded GROQ API key")
-    
+    // Use GROQ API key from environment variables
+    const groqApiKey = process.env.GROQ_API_KEY
+    if (!groqApiKey) {
+      return NextResponse.json({ error: "GROQ API key not configured" }, { status: 500 })
+    }
+    console.log("Using GROQ API key from environment variables")
+
     // Use GROQ provider directly
-    const selectedProvider = providers.find(p => p.name === 'groq')
+    const selectedProvider = providers.find((p) => p.name === "groq")
     if (!selectedProvider) {
       return NextResponse.json({ error: "GROQ provider not found in configuration" }, { status: 500 })
     }
-    
+
     const model = requestedModel || selectedProvider.defaultModel
     console.log(`Using AI provider: groq with model: ${model}`)
-    
+
     // Override the apiUrl and headers functions to use our hardcoded key
     const apiUrl = selectedProvider.apiUrl(model)
     const headers = {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${groqApiKey}`
+      Authorization: `Bearer ${groqApiKey}`,
     }
 
-    const response = await fetch(
-      apiUrl,
-      {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(selectedProvider.body(prompt, model)),
-      },
-    )
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(selectedProvider.body(prompt, model)),
+    })
 
     if (!response.ok) {
       const errorData = await response.json()

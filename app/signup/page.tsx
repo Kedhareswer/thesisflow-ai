@@ -32,10 +32,22 @@ export default function SignUpPage() {
       return
     }
 
+    if (password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
 
     try {
-      await signUp(email, password, { name })
+      await signUp(email, password, {
+        full_name: name,
+        email: email,
+      })
       toast({
         title: "Account created!",
         description: "Please check your email to verify your account.",
@@ -87,11 +99,15 @@ export default function SignUpPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Create a password"
+                placeholder="Create a password (min 6 characters)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
               />
+              {password && password.length < 6 && (
+                <p className="text-xs text-red-500">Password must be at least 6 characters</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>

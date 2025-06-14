@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,7 +53,7 @@ export default function ProjectPlanner() {
   const { socket } = useSocket()
   const { toast } = useToast()
 
-  const createProject = () => {
+  const createProject = async () => {
     if (!newProject.title.trim()) return
 
     const project: Project = {
@@ -69,6 +69,16 @@ export default function ProjectPlanner() {
     }
 
     setProjects((prev) => [project, ...prev])
+
+    // Store in localStorage for persistence
+    try {
+      const existingProjects = JSON.parse(localStorage.getItem("research_projects") || "[]")
+      const updatedProjects = [project, ...existingProjects]
+      localStorage.setItem("research_projects", JSON.stringify(updatedProjects))
+    } catch (error) {
+      console.error("Error saving project:", error)
+    }
+
     setNewProject({ title: "", description: "", startDate: "", endDate: "" })
 
     if (socket) {
@@ -84,6 +94,19 @@ export default function ProjectPlanner() {
     })
   }
 
+  useEffect(() => {
+    // Load projects from localStorage on component mount
+    try {
+      const savedProjects = localStorage.getItem("research_projects")
+      if (savedProjects) {
+        const parsedProjects = JSON.parse(savedProjects)
+        setProjects(parsedProjects)
+      }
+    } catch (error) {
+      console.error("Error loading projects:", error)
+    }
+  }, [])
+
   const addTask = (projectId: string) => {
     if (!newTask.title.trim()) return
 
@@ -97,22 +120,29 @@ export default function ProjectPlanner() {
       estimatedHours: newTask.estimatedHours || undefined,
     }
 
-    setProjects((prev) =>
-      prev.map((project) => {
-        if (project.id === projectId) {
-          const updatedTasks = [...project.tasks, task]
-          const completedTasks = updatedTasks.filter((t) => t.status === "completed").length
-          const progress = updatedTasks.length > 0 ? (completedTasks / updatedTasks.length) * 100 : 0
+    const updatedProjects = projects.map((project) => {
+      if (project.id === projectId) {
+        const updatedTasks = [...project.tasks, task]
+        const completedTasks = updatedTasks.filter((t) => t.status === "completed").length
+        const progress = updatedTasks.length > 0 ? (completedTasks / updatedTasks.length) * 100 : 0
 
-          return {
-            ...project,
-            tasks: updatedTasks,
-            progress: Math.round(progress),
-          }
+        return {
+          ...project,
+          tasks: updatedTasks,
+          progress: Math.round(progress),
         }
-        return project
-      }),
-    )
+      }
+      return project
+    })
+
+    setProjects(updatedProjects)
+
+    // Persist to localStorage
+    try {
+      localStorage.setItem("research_projects", JSON.stringify(updatedProjects))
+    } catch (error) {
+      console.error("Error saving task:", error)
+    }
 
     setNewTask({ title: "", description: "", dueDate: "", priority: "medium", estimatedHours: 0 })
 
@@ -189,8 +219,6 @@ export default function ProjectPlanner() {
   return (
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-8 py-12 max-w-7xl">
-
-
         <Tabs defaultValue="projects" className="space-y-10">
           <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 max-w-lg mx-auto">
             <TabsTrigger

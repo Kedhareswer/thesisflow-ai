@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { useEffect, useState } from "react"
 
 const navigation = [
   { name: "Explorer", href: "/explorer", icon: Search },
@@ -26,7 +27,37 @@ const navigation = [
 
 export function MainNav() {
   const pathname = usePathname()
-  const { user, signOut } = useSupabaseAuth()
+  const { user, isLoading, signOut } = useSupabaseAuth()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between">
+            <Link href="/" className="flex items-center space-x-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-black text-white text-sm font-bold">
+                Bolt
+              </div>
+              <span className="text-lg font-semibold text-black">Research Hub</span>
+            </Link>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/login">Sign In</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+    )
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -67,8 +98,8 @@ export function MainNav() {
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
-            {user ? (
-              <DropdownMenu trigger="click">
+            {user && !isLoading ? (
+              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">

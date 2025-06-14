@@ -2,15 +2,15 @@ import { api } from "@/lib/utils/api"
 
 // Define response types for API calls
 interface GenerateResponse {
-  content: string;
+  content: string
 }
 
 interface FetchUrlResponse {
-  content: string;
+  content: string
 }
 
 interface ExtractFileResponse {
-  text: string;
+  text: string
 }
 
 export interface SummaryResult {
@@ -22,8 +22,6 @@ export interface SummaryResult {
 export class SummarizerService {
   /**
    * Summarize text content using AI
-   * @param text The text content to summarize
-   * @returns Summary result with summary text and key points
    */
   static async summarizeText(text: string): Promise<SummaryResult> {
     try {
@@ -31,7 +29,7 @@ export class SummarizerService {
         prompt: `You are an expert research paper summarizer. Summarize the following text in a clear, concise manner. 
         Focus on the main findings, methodology, and implications. 
         
-        After the summary, provide a list of 5 key points from the text.
+        After the summary, provide exactly 5 key points from the text.
         
         Format your response as:
         
@@ -47,91 +45,103 @@ export class SummarizerService {
         
         Here is the text to summarize:
         
-        ${text}`,
+        ${text.substring(0, 8000)}`, // Limit input to prevent token overflow
       })
 
-      // Extract content from response
-      let content = ""
-      if (response.data && typeof response.data === "object" && "content" in response.data) {
-        content = String(response.data.content)
-      } else {
-        content = String(response.data)
-      }
-
-      // Parse the response to extract summary and key points
-      const summaryMatch = content.match(/SUMMARY:([\s\S]*?)KEY_POINTS:/i)
-      const keyPointsMatch = content.match(/KEY_POINTS:([\s\S]*)/i)
-
-      const summary = summaryMatch ? summaryMatch[1].trim() : content
-      
-      // Extract key points as array
-      const keyPointsText = keyPointsMatch ? keyPointsMatch[1].trim() : ""
-      const keyPoints = keyPointsText
-        .split("\n")
-        .map(point => point.replace(/^-\s*/, "").trim())
-        .filter(point => point.length > 0)
-
-      // Calculate approximate reading time (1 minute per 1000 characters)
-      const readingTime = Math.ceil(text.length / 1000)
-
-      return {
-        summary,
-        keyPoints: keyPoints.length > 0 ? keyPoints : [],
-        readingTime
-      }
+      return this.parseSummaryResponse(response.data, text.length)
     } catch (error) {
       console.error("Error summarizing text:", error)
-      throw error
+      throw new Error("Failed to summarize text. Please try again.")
     }
   }
 
   /**
    * Summarize content from a URL using AI
-   * @param url The URL to fetch and summarize
-   * @returns Summary result with summary text and key points
    */
   static async summarizeUrl(url: string): Promise<SummaryResult> {
     try {
-      // First, we need to fetch the content from the URL
+      console.log("Fetching URL content:", url)
+
+      // First, fetch the content from the URL
       const fetchResponse = await api.post<FetchUrlResponse>("/api/fetch-url", { url })
       const content = fetchResponse.data?.content || ""
-      
+
       if (!content) {
         throw new Error("Could not extract content from URL")
       }
-      
+
+      console.log("Extracted content length:", content.length)
+
       // Then summarize the extracted content
       return this.summarizeText(content)
     } catch (error) {
       console.error("Error summarizing URL:", error)
-      throw error
+      throw new Error("Failed to process URL. Please check the link and try again.")
     }
   }
 
   /**
    * Summarize content from an uploaded file using AI
-   * @param file The file to summarize
-   * @returns Summary result with summary text and key points
    */
   static async summarizeFile(file: File): Promise<SummaryResult> {
     try {
+      console.log("Processing file:", file.name, file.type, file.size)
+
       // Create form data to upload the file
       const formData = new FormData()
       formData.append("file", file)
-      
+
       // Upload and extract text from the file
       const uploadResponse = await api.post<ExtractFileResponse>("/api/extract-file", formData)
       const extractedText = uploadResponse.data?.text || ""
-      
+
       if (!extractedText) {
         throw new Error("Could not extract text from file")
       }
-      
+
+      console.log("Extracted text length:", extractedText.length)
+
       // Then summarize the extracted text
       return this.summarizeText(extractedText)
     } catch (error) {
       console.error("Error summarizing file:", error)
-      throw error
+      throw new Error("Failed to process file. Please try a different file format.")
+    }
+  }
+
+  /**
+   * Parse the AI response to extract summary and key points
+   */
+  private static parseSummaryResponse(responseData: any, originalLength: number): SummaryResult {
+    // Extract content from response
+    let content = ""
+    if (responseData && typeof responseData === "object" && "content" in responseData) {
+      content = String(responseData.content)
+    } else {
+      content = String(responseData)
+    }
+
+    // Parse the response to extract summary and key points
+    const summaryMatch = content.match(/SUMMARY:([\s\S]*?)KEY_POINTS:/i)
+    const keyPointsMatch = content.match(/KEY_POINTS:([\s\S]*)/i)
+
+    const summary = summaryMatch ? summaryMatch[1].trim() : content
+
+    // Extract key points as array
+    const keyPointsText = keyPointsMatch ? keyPointsMatch[1].trim() : ""
+    const keyPoints = keyPointsText
+      .split("\n")
+      .map((point) => point.replace(/^-\s*/, "").trim())
+      .filter((point) => point.length > 0)
+      .slice(0, 5) // Ensure exactly 5 key points
+
+    // Calculate approximate reading time (1 minute per 1000 characters)
+    const readingTime = Math.ceil(originalLength / 1000)
+
+    return {
+      summary: summary || "Summary could not be generated.",
+      keyPoints: keyPoints.length > 0 ? keyPoints : ["Key points could not be extracted."],
+      readingTime,
     }
   }
 }

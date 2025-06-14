@@ -1,44 +1,4 @@
 import { NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
-import path from "path"
-
-const execAsync = promisify(exec)
-const TIMEOUT_MS = 30000 // 30 second timeout
-
-type SearchResult = {
-  results?: any[]
-  error?: string
-  details?: string
-  suggestion?: string
-  source?: string
-}
-
-async function executePythonScript(scriptPath: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const command = `python "${scriptPath}" ${args.map((arg) => `"${arg}"`).join(" ")}`
-
-    const childProcess = exec(command, { timeout: TIMEOUT_MS }, (error, stdout, stderr) => {
-      if (error) {
-        // If the error is a timeout, provide a more specific message
-        if (error.killed && error.signal === "SIGTERM") {
-          reject(new Error(`Script execution timed out after ${TIMEOUT_MS / 1000} seconds`))
-          return
-        }
-        reject(error)
-        return
-      }
-      resolve({ stdout, stderr })
-    })
-
-    // Handle process exit before completion
-    childProcess.on("exit", (code) => {
-      if (code !== 0) {
-        reject(new Error(`Python script exited with code ${code}`))
-      }
-    })
-  })
-}
 
 export async function GET(request: Request) {
   try {
@@ -46,7 +6,9 @@ export async function GET(request: Request) {
     const query = searchParams.get("query")
     const type = searchParams.get("type") || "keyword"
 
-    if (!query) {
+    console.log("API: Received search request for:", query)
+
+    if (!query || query.trim().length === 0) {
       return NextResponse.json(
         {
           error: "Query parameter is required",
@@ -56,109 +18,54 @@ export async function GET(request: Request) {
       )
     }
 
-    // Get the path to the Python script relative to the project root
-    const pythonScriptPath = path.join(process.cwd(), "python", "search_papers.py")
-
     try {
-      // Execute the Python script with the query parameter and handle timeouts
-      const { stdout, stderr } = await Promise.race([
-        executePythonScript(pythonScriptPath, [query]),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Script execution timed out")), TIMEOUT_MS),
-        ),
-      ])
+      // Use OpenAlex to search for papers
+      const { fetchOpenAlexWorks } = await import("@/app/explorer/openalex")
+      const papers = await fetchOpenAlexWorks(query.trim(), 15)
 
-      // Log any stderr output for debugging (but don't fail the request for warnings)
-      if (stderr) {
-        console.warn("Python script warnings:", stderr)
-      }
+      console.log("API: Found papers from OpenAlex:", papers.length)
 
-      // Parse the JSON output from the Python script
-      let results: any
-      try {
-        results = JSON.parse(stdout)
-      } catch (parseError) {
-        console.error("Failed to parse Python script output:", stdout)
-        throw new Error("Failed to process search results. The response format was invalid.")
-      }
+      // Transform to expected format and ensure quality
+      const transformedPapers = papers
+        .filter((paper) => paper.title && paper.title.trim() !== "")
+        .map((paper) => ({
+          id: paper.id,
+          title: paper.title,
+          authors: paper.authors || [],
+          year: paper.publication_year,
+          journal: paper.host_venue || "Unknown Journal",
+          abstract: paper.abstract || "No abstract available",
+          url: paper.url,
+          doi: paper.doi,
+          citations: 0,
+          pdf_url: paper.doi ? `https://doi.org/${paper.doi}` : paper.url,
+        }))
+        .slice(0, 10)
 
-      // Handle different response formats from Python script
-      let papers: any[] = []
-
-      if (Array.isArray(results)) {
-        // Direct array of papers
-        papers = results
-      } else if (results && typeof results === "object") {
-        if (results.error) {
-          return NextResponse.json(
-            {
-              error: results.error,
-              details: results.details,
-              suggestion: results.suggestion || "Please try again later or with different search terms",
-            },
-            { status: 400 },
-          )
-        }
-
-        // Check for results property
-        if (results.results && Array.isArray(results.results)) {
-          papers = results.results
-        } else if (results.data && Array.isArray(results.data)) {
-          papers = results.data
-        } else {
-          papers = []
-        }
-      }
-
-      // Return successful results in the format expected by the frontend
       const responseData = {
         success: true,
-        count: papers.length,
-        source: "academic_search",
-        data: papers, // Frontend expects results in data property
+        count: transformedPapers.length,
+        source: "openalex",
+        data: transformedPapers,
       }
 
-      console.log(`Returning ${papers.length} search results`)
+      console.log(`API: Returning ${transformedPapers.length} search results`)
       return NextResponse.json(responseData)
     } catch (error) {
-      console.error("Error executing Python script:", error)
+      console.error("API: Error searching OpenAlex:", error)
 
-      // Handle specific error cases
-      if (error instanceof Error) {
-        if (error.message.includes("timed out")) {
-          return NextResponse.json(
-            {
-              error: "Search request timed out",
-              suggestion: "The search is taking longer than expected. Please try again with a more specific query.",
-            },
-            { status: 504 }, // Gateway Timeout
-          )
-        }
-
-        if (error.message.includes("ENOENT")) {
-          return NextResponse.json(
-            {
-              error: "Search service is not available",
-              details: "The search script could not be found",
-              suggestion: "Please contact support if the problem persists",
-            },
-            { status: 503 }, // Service Unavailable
-          )
-        }
-      }
-
-      // Generic error response
       return NextResponse.json(
         {
-          error: "Failed to execute search",
+          error: "Failed to search papers",
           details: error instanceof Error ? error.message : String(error),
-          suggestion: "Please try again later or contact support if the problem persists",
+          suggestion:
+            "Please try again with different search terms. Make sure your search terms are specific and relevant.",
         },
         { status: 500 },
       )
     }
   } catch (error) {
-    console.error("Unexpected error in search papers API:", error)
+    console.error("API: Unexpected error:", error)
     return NextResponse.json(
       {
         error: "An unexpected error occurred",

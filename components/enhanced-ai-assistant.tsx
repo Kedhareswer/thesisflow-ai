@@ -52,7 +52,7 @@ export default function EnhancedAIAssistant() {
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([])
 
   // Comparison Results
-  const [comparisonResults, setComparisonResults] = useState<Record<AIProvider, AIResponse>>({})
+  const [comparisonResults, setComparisonResults] = useState<Partial<Record<AIProvider, AIResponse>>>({})
 
   const generateResearchSuggestions = async () => {
     if (!researchContext.topic || !researchContext.description) {

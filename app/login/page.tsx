@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -17,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const { signIn } = useSupabaseAuth()
   const { toast } = useToast()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,6 +27,11 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password)
+
+      // Handle redirect after login
+      const redirectTo = searchParams.get("redirectTo") || "/workspace"
+      router.push(redirectTo)
+
       toast({
         title: "Welcome back!",
         description: "You have been successfully signed in.",
@@ -74,11 +82,16 @@ export default function LoginPage() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
-              Sign up
+          <div className="mt-4 text-center text-sm space-y-2">
+            <Link href="/forgot-password" className="text-primary hover:underline">
+              Forgot your password?
             </Link>
+            <div>
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-primary hover:underline">
+                Sign up
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>

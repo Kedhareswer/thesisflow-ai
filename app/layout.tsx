@@ -1,22 +1,17 @@
-import { cn } from "@/lib/utils"
 import type React from "react"
+import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
-import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import { MainNav } from "@/components/main-nav"
+import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
+import { Toaster } from "@/components/ui/toaster"
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600", "700"],
-  variable: "--font-inter",
-})
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "ML Research Platform",
-  description: "AI-powered research platform for machine learning and data science",
+  title: "Research Hub - AI-Powered Research Platform",
+  description: "Generate, organize, and develop your research ideas with AI assistance and collaborative tools.",
     generator: 'v0.dev'
 }
 
@@ -27,12 +22,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(inter.variable, "font-sans antialiased")}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <SupabaseAuthProvider>
-            <div className="min-h-screen bg-white">
+            <div className="min-h-screen bg-gray-50">
               <MainNav />
-              <main>{children}</main>
+              <main className="flex-1">{children}</main>
             </div>
             <Toaster />
           </SupabaseAuthProvider>
