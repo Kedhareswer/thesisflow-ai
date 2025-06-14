@@ -52,7 +52,7 @@ type SupabaseAuthContextType = {
   session: Session | null
   isLoading: boolean
   authError: Error | null
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<any>
   signUp: (email: string, password: string, metadata?: any) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
@@ -92,10 +92,18 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true)
-      const { error } = await supabase.auth.signInWithPassword({
+      
+      // Log the Supabase URL being used (for debugging)
+      console.log("Signing in with Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+      
+      // Attempt to sign in with enhanced error logging
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+
+      // Log the response for debugging
+      console.log("Auth response:", { data: data ? "[DATA EXISTS]" : "[NO DATA]", error });
 
       if (error) throw error
 
@@ -103,10 +111,16 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         title: "Logged in successfully",
         description: "Welcome back!",
       })
+      return data;
     } catch (error) {
+      // Enhanced error logging
+      console.error("Sign-in error details:", error);
+      
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to sign in",
+        title: "Sign-In Failed",
+        description: error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "Failed to sign in. Please check your credentials and try again.",
         variant: "destructive",
       })
       throw error

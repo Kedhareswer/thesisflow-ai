@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Analytics } from "@vercel/analytics/react"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -30,6 +31,7 @@ export default function RootLayout({
               <main className="flex-1">{children}</main>
             </div>
             <Toaster />
+            <Analytics />
           </SupabaseAuthProvider>
         </ThemeProvider>
       </body>

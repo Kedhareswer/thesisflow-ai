@@ -546,7 +546,7 @@ export default function ResearchExplorer() {
                     paperSearch.data && 
                     paperSearch.data.data && 
                     paperSearch.data.data.data ? 
-                    paperSearch.data.data.data.data || [] : []
+                    (paperSearch.data.data.data as any)?.data || [] : []
                   }
                   ideas={ideaGeneration.data ? String(ideaGeneration.data) : undefined}
                   context={topicExploration.data ? String(topicExploration.data) : undefined}
