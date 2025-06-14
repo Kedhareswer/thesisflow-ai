@@ -121,26 +121,91 @@ export class SummarizerService {
       content = String(responseData)
     }
 
-    // Parse the response to extract summary and key points
-    const summaryMatch = content.match(/SUMMARY:([\s\S]*?)KEY_POINTS:/i)
-    const keyPointsMatch = content.match(/KEY_POINTS:([\s\S]*)/i)
+    console.log("AI Response content:", content.substring(0, 200) + "...");
 
-    const summary = summaryMatch ? summaryMatch[1].trim() : content
+    // More flexible parsing to handle different response formats
+    let summary = "";
+    let keyPointsArray: string[] = [];
 
-    // Extract key points as array
-    const keyPointsText = keyPointsMatch ? keyPointsMatch[1].trim() : ""
-    const keyPoints = keyPointsText
-      .split("\n")
-      .map((point) => point.replace(/^-\s*/, "").trim())
-      .filter((point) => point.length > 0)
-      .slice(0, 5) // Ensure exactly 5 key points
+    // Try to extract summary using various patterns
+    const summaryPatterns = [
+      /SUMMARY:([\s\S]*?)(?:KEY_POINTS:|KEY POINTS:|KEY INSIGHTS:|$)/i,
+      /Executive Summary[\s\S]*?([\s\S]*?)(?:Key Insights|Key Points|$)/i,
+      /^([\s\S]*?)(?:Key Insights|Key Points|\d+\.)/i
+    ];
+
+    for (const pattern of summaryPatterns) {
+      const match = content.match(pattern);
+      if (match && match[1] && match[1].trim().length > 20) {
+        summary = match[1].trim();
+        break;
+      }
+    }
+
+    // If no summary was found, use the first part of the content
+    if (!summary) {
+      summary = content.split('\n').slice(0, 5).join('\n').trim();
+      if (summary.length > 1000) {
+        summary = summary.substring(0, 1000) + "...";
+      }
+    }
+
+    // Try to extract key points using various patterns
+    const keyPointsPatterns = [
+      /KEY_POINTS:|KEY POINTS:|KEY INSIGHTS:([\s\S]*)/i,
+      /Key Insights[\s\S]*?([\s\S]*)/i,
+      /Key Points[\s\S]*?([\s\S]*)/i,
+      /\d+\.([\s\S]*)/i
+    ];
+
+    for (const pattern of keyPointsPatterns) {
+      const match = content.match(pattern);
+      if (match && match[1]) {
+        const keyPointsText = match[1].trim();
+        
+        // Try to extract numbered or bulleted points
+        const pointsArray = keyPointsText
+          .split(/\n+|\d+\.\s+|•\s+|\*\s+|\-\s+/)
+          .map(point => point.trim())
+          .filter(point => point.length > 10);
+        
+        if (pointsArray.length > 0) {
+          keyPointsArray = pointsArray.slice(0, 5);
+          break;
+        }
+      }
+    }
+
+    // If no key points were found, try to generate some from the summary
+    if (keyPointsArray.length === 0) {
+      // Try to extract sentences that might be key points
+      const sentences = summary
+        .split(/\.\s+|\n+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 20 && s.length < 200);
+      
+      if (sentences.length >= 3) {
+        keyPointsArray = sentences.slice(0, 5);
+      } else {
+        keyPointsArray = ["Key points could not be extracted."];
+      }
+    }
+
+    // Ensure we have exactly 5 key points or fewer if that's all we could extract
+    while (keyPointsArray.length < 5 && keyPointsArray.length > 0 && keyPointsArray[0] !== "Key points could not be extracted.") {
+      // Duplicate some existing points if we need to fill in
+      keyPointsArray.push(keyPointsArray[keyPointsArray.length % keyPointsArray.length]);
+    }
+
+    // Limit to 5 key points
+    keyPointsArray = keyPointsArray.slice(0, 5);
 
     // Calculate approximate reading time (1 minute per 1000 characters)
-    const readingTime = Math.ceil(originalLength / 1000)
+    const readingTime = Math.ceil(originalLength / 1000);
 
     return {
       summary: summary || "Summary could not be generated.",
-      keyPoints: keyPoints.length > 0 ? keyPoints : ["Key points could not be extracted."],
+      keyPoints: keyPointsArray,
       readingTime,
     }
   }
