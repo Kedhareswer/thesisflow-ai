@@ -103,52 +103,52 @@ Get expert guidance on methodology, analysis, and research best practices.
 ### Installation
 
 1. Clone the repository
-\`\`\`bash
+```bash
 git clone https://github.com/Kedhareswer/ai-project-planner.git
 cd ai-project-planner
-\`\`\`
+```
 
 2. Install frontend dependencies
-\`\`\`bash
+```bash
 pnpm install
-\`\`\`
+```
 
 3. Set up environment variables
-\`\`\`bash
+```bash
 cp .env.example .env.local
-\`\`\`
+```
 Edit `.env.local` with your API keys and configuration.
 
 4. Set up the Python backend (for literature search functionality)
-\`\`\`bash
+```bash
 cd python
 ./setup.bat
-\`\`\`
+```
 
 ## 🔧 Usage
 
 ### Development Server
 
 1. Start the Next.js frontend:
-\`\`\`bash
+```bash
 pnpm dev
-\`\`\`
+```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 2. In a separate terminal, start the Python backend:
-\`\`\`bash
+```bash
 cd python
 python app.py
-\`\`\`
+```
 
 The Python backend will run on port 5000 and handle paper search functionality.
 
 ### Production Build
 
-\`\`\`bash
+```bash
 pnpm build
 pnpm start
-\`\`\`
+```
 
 ## 📚 API Endpoints
 
@@ -205,7 +205,7 @@ Search results include:
 
 ### System Architecture
 
-\`\`\`mermaid
+```mermaid
 sequenceDiagram
     actor User
     participant Frontend as Frontend (Next.js)
@@ -225,7 +225,7 @@ sequenceDiagram
     Python-->>API: Return formatted results
     API-->>Frontend: Display papers
     Frontend-->>User: Show search results
-\`\`\`
+```
 
 ## 📊 Performance Metrics
 
@@ -256,7 +256,7 @@ sequenceDiagram
 
 ### Performance Comparison
 
-\`\`\`mermaid
+```mermaid
 pie title Feature Usage Distribution
     "Research Explorer" : 35
     "Smart Summarizer" : 25
@@ -264,7 +264,7 @@ pie title Feature Usage Distribution
     "Idea Workspace" : 10
     "Collaboration Hub" : 5
     "AI Research Assistant" : 5
-\`\`\`
+```
 
 ## 🛠️ Technologies
 
@@ -291,7 +291,7 @@ pie title Feature Usage Distribution
 
 ## 📂 Project Structure
 
-\`\`\`
+```
 ai-project-planner/
 ├── app/                  # Next.js app directory
 │   ├── ai-assistant/     # AI assistant feature
@@ -305,11 +305,11 @@ ai-project-planner/
 │   └── utils/          # Utility functions
 ├── python/             # Python backend for literature review
 └── public/             # Static assets
-\`\`\`
+```
 
 ### Architecture Diagram
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     Client[Client Browser] --> NextJS[Next.js Frontend]
     NextJS --> APIRoutes[Next.js API Routes]
@@ -340,7 +340,7 @@ flowchart TD
         PythonBackend
         PyGetPapers
     end
-\`\`\`
+```
 
 ## 🤝 Contributing
 
