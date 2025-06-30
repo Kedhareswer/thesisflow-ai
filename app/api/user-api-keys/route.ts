@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
+import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
 // Simple encryption/decryption for API keys (in production, use a proper key management service)
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
@@ -39,33 +40,7 @@ function validateApiKey(provider: string, apiKey: string): boolean {
   return pattern ? pattern.test(apiKey) : apiKey.length > 10
 }
 
-// Test API key validity by making a simple request
-async function testApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; error?: string }> {
-  try {
-    switch (provider) {
-      case 'openai':
-        const openaiResponse = await fetch('https://api.openai.com/v1/models', {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
-        })
-        return { valid: openaiResponse.status === 200 }
-        
-      case 'groq':
-        const groqResponse = await fetch('https://api.groq.com/openai/v1/models', {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
-        })
-        return { valid: groqResponse.status === 200 }
-        
-      case 'gemini':
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`)
-        return { valid: geminiResponse.status === 200 }
-        
-      default:
-        return { valid: true } // Skip validation for unknown providers
-    }
-  } catch (error) {
-    return { valid: false, error: 'Network error during validation' }
-  }
-}
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -104,11 +79,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { provider, apiKey, testKey = false } = body
+    const { provider, apiKey, testKey } = await request.json()
 
     if (!provider || !apiKey) {
-      return NextResponse.json({ error: 'Provider and API key are required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Provider and API key are required' },
+        { status: 400 }
+      )
+    }
+
+    // Test the API key if requested
+    if (testKey) {
+      try {
+        const testResult = await enhancedAIService.testApiKey(provider, apiKey)
+        
+        if (!testResult.valid) {
+          return NextResponse.json(
+            { error: testResult.error || 'API key validation failed' },
+            { status: 400 }
+          )
+        }
+
+        // If testing only, return success without saving
+        return NextResponse.json({
+          message: `${provider} API key is valid`,
+          model: testResult.model,
+          provider
+        })
+      } catch (error) {
+        return NextResponse.json(
+          { error: `API key test failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
+          { status: 400 }
+        )
+      }
     }
 
     // Validate API key format
@@ -116,17 +119,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: `Invalid API key format for ${provider}. Please check your key and try again.` 
       }, { status: 400 })
-    }
-
-    // Test API key if requested
-    let testResult: { valid: boolean; error?: string } = { valid: true }
-    if (testKey) {
-      testResult = await testApiKey(provider, apiKey)
-      if (!testResult.valid) {
-        return NextResponse.json({ 
-          error: `API key validation failed: ${testResult.error || 'Invalid key'}` 
-        }, { status: 400 })
-      }
     }
 
     // Encrypt the API key
@@ -140,8 +132,8 @@ export async function POST(request: NextRequest) {
         provider,
         api_key_encrypted: encryptedKey,
         is_active: true,
-        last_tested_at: testKey ? new Date().toISOString() : null,
-        test_status: testKey ? (testResult.valid ? 'valid' : 'invalid') : 'untested',
+        last_tested_at: null,
+        test_status: 'untested',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,provider'
@@ -154,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: `${provider} API key saved successfully${testKey ? ' and validated' : ''}` 
+      message: `${provider} API key saved successfully` 
     })
   } catch (error) {
     console.error('API keys POST error:', error)

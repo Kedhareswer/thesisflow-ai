@@ -7,176 +7,247 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Plus, Clock, CheckCircle, AlertCircle, Target } from "lucide-react"
+import { Calendar, Plus, Clock, CheckCircle, AlertCircle, Target, Loader2 } from "lucide-react"
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
-
-interface Task {
-  id: string
-  title: string
-  description: string
-  dueDate: string
-  priority: "low" | "medium" | "high"
-  status: "todo" | "in-progress" | "completed"
-  assignee?: string
-  estimatedHours?: number
-}
-
-interface Project {
-  id: string
-  title: string
-  description: string
-  startDate: string
-  endDate: string
-  status: "planning" | "active" | "completed" | "on-hold"
-  tasks: Task[]
-  collaborators: string[]
-  progress: number
-}
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { projectService, type Project, type Task } from "@/lib/services/project.service"
 
 export default function ProjectPlanner() {
   const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [tasks, setTasks] = useState<Record<string, Task[]>>({})
   const [newProject, setNewProject] = useState({
     title: "",
     description: "",
-    startDate: "",
-    endDate: "",
+    start_date: "",
+    end_date: "",
   })
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
-    dueDate: "",
-    priority: "medium" as const,
-    estimatedHours: 0,
+    due_date: "",
+    priority: "medium" as Task["priority"],
+    estimated_hours: 0,
   })
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const { socket } = useSocket()
   const { toast } = useToast()
+  const { user } = useSupabaseAuth()
+
+  // Load projects from database
+  useEffect(() => {
+    if (user) {
+      loadProjects()
+    }
+  }, [user])
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!selectedProject) return
+
+    const unsubscribe = projectService.subscribeToProject(selectedProject, (payload) => {
+      console.log('Real-time update:', payload)
+      // Refresh data when changes occur
+      loadProjects()
+      loadProjectTasks(selectedProject)
+    })
+
+    return unsubscribe
+  }, [selectedProject])
+
+  const loadProjects = async () => {
+    setLoading(true)
+    try {
+      const { projects: userProjects, error } = await projectService.getProjects()
+      
+      if (error) {
+        toast({
+          title: "Error loading projects",
+          description: error,
+          variant: "destructive",
+        })
+        return
+      }
+
+      setProjects(userProjects)
+      
+      // Load tasks for each project
+      const tasksData: Record<string, Task[]> = {}
+      for (const project of userProjects) {
+        const { tasks: projectTasks } = await projectService.getProjectTasks(project.id)
+        tasksData[project.id] = projectTasks
+      }
+      setTasks(tasksData)
+      
+    } catch (error) {
+      console.error('Error loading projects:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load projects",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadProjectTasks = async (projectId: string) => {
+    const { tasks: projectTasks } = await projectService.getProjectTasks(projectId)
+    setTasks(prev => ({ ...prev, [projectId]: projectTasks }))
+  }
 
   const createProject = async () => {
     if (!newProject.title.trim()) return
 
-    const project: Project = {
-      id: Date.now().toString(),
-      title: newProject.title,
-      description: newProject.description,
-      startDate: newProject.startDate,
-      endDate: newProject.endDate,
-      status: "planning",
-      tasks: [],
-      collaborators: [],
-      progress: 0,
-    }
-
-    setProjects((prev) => [project, ...prev])
-
-    // Store in localStorage for persistence
+    setCreating(true)
     try {
-      const existingProjects = JSON.parse(localStorage.getItem("research_projects") || "[]")
-      const updatedProjects = [project, ...existingProjects]
-      localStorage.setItem("research_projects", JSON.stringify(updatedProjects))
-    } catch (error) {
-      console.error("Error saving project:", error)
-    }
-
-    setNewProject({ title: "", description: "", startDate: "", endDate: "" })
-
-    if (socket) {
-      socket.emit("project_created", {
-        title: project.title,
-        startDate: project.startDate,
+      const { project, error } = await projectService.createProject({
+        title: newProject.title,
+        description: newProject.description,
+        start_date: newProject.start_date,
+        end_date: newProject.end_date,
+        status: "planning",
+        progress: 0,
       })
-    }
 
-    toast({
-      title: "Project created",
-      description: `"${project.title}" has been added to your projects`,
-    })
-  }
+      if (error) {
+        toast({
+          title: "Error creating project",
+          description: error,
+          variant: "destructive",
+        })
+        return
+      }
 
-  useEffect(() => {
-    // Load projects from localStorage on component mount
-    try {
-      const savedProjects = localStorage.getItem("research_projects")
-      if (savedProjects) {
-        const parsedProjects = JSON.parse(savedProjects)
-        setProjects(parsedProjects)
+      if (project) {
+        setProjects(prev => [project, ...prev])
+        setTasks(prev => ({ ...prev, [project.id]: [] }))
+        setNewProject({ title: "", description: "", start_date: "", end_date: "" })
+
+        if (socket) {
+          socket.emit("project_created", {
+            title: project.title,
+            start_date: project.start_date,
+          })
+        }
+
+        toast({
+          title: "Project created",
+          description: `"${project.title}" has been added to your projects`,
+        })
       }
     } catch (error) {
-      console.error("Error loading projects:", error)
+      console.error('Error creating project:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create project",
+        variant: "destructive",
+      })
+    } finally {
+      setCreating(false)
     }
-  }, [])
+  }
 
-  const addTask = (projectId: string) => {
+  const addTask = async (projectId: string) => {
     if (!newTask.title.trim()) return
 
-    const task: Task = {
-      id: Date.now().toString(),
-      title: newTask.title,
-      description: newTask.description,
-      dueDate: newTask.dueDate,
-      priority: newTask.priority,
-      status: "todo",
-      estimatedHours: newTask.estimatedHours || undefined,
-    }
-
-    const updatedProjects = projects.map((project) => {
-      if (project.id === projectId) {
-        const updatedTasks = [...project.tasks, task]
-        const completedTasks = updatedTasks.filter((t) => t.status === "completed").length
-        const progress = updatedTasks.length > 0 ? (completedTasks / updatedTasks.length) * 100 : 0
-
-        return {
-          ...project,
-          tasks: updatedTasks,
-          progress: Math.round(progress),
-        }
-      }
-      return project
-    })
-
-    setProjects(updatedProjects)
-
-    // Persist to localStorage
     try {
-      localStorage.setItem("research_projects", JSON.stringify(updatedProjects))
+      const { task, error } = await projectService.createTask({
+        project_id: projectId,
+        title: newTask.title,
+        description: newTask.description,
+        due_date: newTask.due_date,
+        priority: newTask.priority,
+        status: "todo",
+        estimated_hours: newTask.estimated_hours || undefined,
+      })
+
+      if (error) {
+        toast({
+          title: "Error creating task",
+          description: error,
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (task) {
+        // Update local state
+        setTasks(prev => ({
+          ...prev,
+          [projectId]: [...(prev[projectId] || []), task]
+        }))
+
+        // Update project progress in local state
+        const projectTasks = [...(tasks[projectId] || []), task]
+        const completedTasks = projectTasks.filter(t => t.status === "completed").length
+        const progress = Math.round((completedTasks / projectTasks.length) * 100)
+        
+        setProjects(prev => prev.map(p => 
+          p.id === projectId ? { ...p, progress } : p
+        ))
+
+        setNewTask({ title: "", description: "", due_date: "", priority: "medium", estimated_hours: 0 })
+
+        toast({
+          title: "Task added",
+          description: `"${task.title}" has been added to the project`,
+        })
+      }
     } catch (error) {
-      console.error("Error saving task:", error)
+      console.error('Error creating task:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create task",
+        variant: "destructive",
+      })
     }
-
-    setNewTask({ title: "", description: "", dueDate: "", priority: "medium", estimatedHours: 0 })
-
-    toast({
-      title: "Task added",
-      description: `"${task.title}" has been added to the project`,
-    })
   }
 
-  const updateTaskStatus = (projectId: string, taskId: string, status: Task["status"]) => {
-    setProjects((prev) =>
-      prev.map((project) => {
-        if (project.id === projectId) {
-          const updatedTasks = project.tasks.map((task) => (task.id === taskId ? { ...task, status } : task))
-          const completedTasks = updatedTasks.filter((t) => t.status === "completed").length
-          const progress = updatedTasks.length > 0 ? (completedTasks / updatedTasks.length) * 100 : 0
+  const updateTaskStatus = async (projectId: string, taskId: string, status: Task["status"]) => {
+    try {
+      const { task, error } = await projectService.updateTask(taskId, { status })
 
-          return {
-            ...project,
-            tasks: updatedTasks,
-            progress: Math.round(progress),
-          }
-        }
-        return project
-      }),
-    )
+      if (error) {
+        toast({
+          title: "Error updating task",
+          description: error,
+          variant: "destructive",
+        })
+        return
+      }
 
-    const project = projects.find((p) => p.id === projectId)
-    const task = project?.tasks.find((t) => t.id === taskId)
+      if (task) {
+        // Update local state
+        setTasks(prev => ({
+          ...prev,
+          [projectId]: prev[projectId]?.map(t => t.id === taskId ? task : t) || []
+        }))
 
-    toast({
-      title: "Task updated",
-      description: `"${task?.title}" marked as ${status.replace("-", " ")}`,
-    })
+        // Update project progress
+        const projectTasks = tasks[projectId]?.map(t => t.id === taskId ? { ...t, status } : t) || []
+        const completedTasks = projectTasks.filter(t => t.status === "completed").length
+        const progress = Math.round((completedTasks / projectTasks.length) * 100)
+        
+        setProjects(prev => prev.map(p => 
+          p.id === projectId ? { ...p, progress } : p
+        ))
+
+        toast({
+          title: "Task updated",
+          description: `"${task.title}" marked as ${status.replace("-", " ")}`,
+        })
+      }
+    } catch (error) {
+      console.error('Error updating task:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update task",
+        variant: "destructive",
+      })
+    }
   }
 
   const getPriorityColor = (priority: Task["priority"]) => {
@@ -215,6 +286,32 @@ export default function ProjectPlanner() {
   }
 
   const selectedProjectData = projects.find((p) => p.id === selectedProject)
+  const selectedProjectTasks = selectedProject ? tasks[selectedProject] || [] : []
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-600" />
+          <p className="text-gray-600">Loading your projects...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show auth required state
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+          <h2 className="text-xl font-medium mb-2">Authentication Required</h2>
+          <p className="text-gray-600">Please sign in to access your projects.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -265,6 +362,7 @@ export default function ProjectPlanner() {
                       value={newProject.title}
                       onChange={(e) => setNewProject((prev) => ({ ...prev, title: e.target.value }))}
                       className="border-gray-300 focus:border-black focus:ring-black font-light"
+                      disabled={creating}
                     />
                   </div>
                   <div className="space-y-2">
@@ -274,9 +372,10 @@ export default function ProjectPlanner() {
                     <Input
                       id="project-start"
                       type="date"
-                      value={newProject.startDate}
-                      onChange={(e) => setNewProject((prev) => ({ ...prev, startDate: e.target.value }))}
+                      value={newProject.start_date}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, start_date: e.target.value }))}
                       className="border-gray-300 focus:border-black focus:ring-black font-light"
+                      disabled={creating}
                     />
                   </div>
                 </div>
@@ -295,6 +394,7 @@ export default function ProjectPlanner() {
                       onChange={(e) => setNewProject((prev) => ({ ...prev, description: e.target.value }))}
                       rows={4}
                       className="resize-none border-gray-300 focus:border-black focus:ring-black font-light"
+                      disabled={creating}
                     />
                   </div>
                   <div className="space-y-4">
@@ -305,20 +405,25 @@ export default function ProjectPlanner() {
                       <Input
                         id="project-end"
                         type="date"
-                        value={newProject.endDate}
-                        onChange={(e) => setNewProject((prev) => ({ ...prev, endDate: e.target.value }))}
+                        value={newProject.end_date}
+                        onChange={(e) => setNewProject((prev) => ({ ...prev, end_date: e.target.value }))}
                         className="border-gray-300 focus:border-black focus:ring-black font-light"
+                        disabled={creating}
                       />
                     </div>
                   </div>
                 </div>
                 <Button
                   onClick={createProject}
-                  disabled={!newProject.title.trim()}
+                  disabled={!newProject.title.trim() || creating}
                   className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Project
+                  {creating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  {creating ? "Creating..." : "Create Project"}
                 </Button>
               </div>
             </div>
@@ -369,13 +474,14 @@ export default function ProjectPlanner() {
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Total Tasks</span>
                       <span className="font-medium text-black">
-                        {projects.reduce((acc, p) => acc + p.tasks.length, 0)}
+                        {Object.values(tasks).reduce((acc, projectTasks) => acc + projectTasks.length, 0)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Completed Tasks</span>
                       <span className="font-medium text-black">
-                        {projects.reduce((acc, p) => acc + p.tasks.filter((t) => t.status === "completed").length, 0)}
+                        {Object.values(tasks).reduce((acc, projectTasks) => 
+                          acc + projectTasks.filter(t => t.status === "completed").length, 0)}
                       </span>
                     </div>
                   </div>
@@ -384,25 +490,32 @@ export default function ProjectPlanner() {
                 <div className="border border-gray-200 p-6">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-1 h-6 bg-gray-600"></div>
-                    <h3 className="font-medium text-black">Collaboration</h3>
+                    <h3 className="font-medium text-black">Activity</h3>
                   </div>
                   <div className="space-y-4">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Team Projects</span>
+                      <span className="text-sm text-gray-600">Recent Projects</span>
                       <span className="font-medium text-black">
-                        {projects.filter((p) => p.collaborators.length > 0).length}
+                        {projects.filter(p => {
+                          const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                          return new Date(p.created_at) > weekAgo
+                        }).length}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Solo Projects</span>
+                      <span className="text-sm text-gray-600">In Progress</span>
                       <span className="font-medium text-black">
-                        {projects.filter((p) => p.collaborators.length === 0).length}
+                        {Object.values(tasks).reduce((acc, projectTasks) => 
+                          acc + projectTasks.filter(t => t.status === "in-progress").length, 0)}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Collaborators</span>
+                      <span className="text-sm text-gray-600">Overdue Tasks</span>
                       <span className="font-medium text-black">
-                        {new Set(projects.flatMap((p) => p.collaborators)).size}
+                        {Object.values(tasks).reduce((acc, projectTasks) => 
+                          acc + projectTasks.filter(t => 
+                            t.due_date && new Date(t.due_date) < new Date() && t.status !== "completed"
+                          ).length, 0)}
                       </span>
                     </div>
                   </div>
@@ -412,62 +525,67 @@ export default function ProjectPlanner() {
 
             {/* Projects List */}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  className="border border-gray-200 hover:shadow-lg transition-all duration-300 group"
-                >
-                  <div className="p-6 border-b border-gray-200">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <h4 className="text-lg font-medium text-black group-hover:text-gray-600 transition-colors mb-2">
-                          {project.title}
-                        </h4>
-                        <p className="text-gray-600 text-sm line-clamp-2 font-light">{project.description}</p>
+              {projects.map((project) => {
+                const projectTasks = tasks[project.id] || []
+                return (
+                  <div
+                    key={project.id}
+                    className="border border-gray-200 hover:shadow-lg transition-all duration-300 group"
+                  >
+                    <div className="p-6 border-b border-gray-200">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <h4 className="text-lg font-medium text-black group-hover:text-gray-600 transition-colors mb-2">
+                            {project.title}
+                          </h4>
+                          <p className="text-gray-600 text-sm line-clamp-2 font-light">{project.description}</p>
+                        </div>
+                        <Badge variant="outline" className={`text-xs ${getProjectStatusColor(project.status)} ml-2`}>
+                          {project.status}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className={`text-xs ${getProjectStatusColor(project.status)} ml-2`}>
-                        {project.status}
-                      </Badge>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      {(project.start_date || project.end_date) && (
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Calendar className="h-4 w-4" />
+                          <span>
+                            {project.start_date || "No start"} → {project.end_date || "No end"}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Progress</span>
+                          <span className="font-medium text-black">
+                            {projectTasks.filter((t) => t.status === "completed").length}/{projectTasks.length} tasks
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 h-2">
+                          <div
+                            className="bg-black h-2 transition-all duration-300"
+                            style={{
+                              width: `${project.progress}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-medium text-black">{project.progress}%</span>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        className="w-full group-hover:bg-gray-50 transition-colors border-gray-300"
+                        onClick={() => setSelectedProject(selectedProject === project.id ? null : project.id)}
+                      >
+                        {selectedProject === project.id ? "Hide Tasks" : "Manage Tasks"}
+                      </Button>
                     </div>
                   </div>
-                  <div className="p-6 space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        {project.startDate} → {project.endDate}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Progress</span>
-                        <span className="font-medium text-black">
-                          {project.tasks.filter((t) => t.status === "completed").length}/{project.tasks.length} tasks
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 h-2">
-                        <div
-                          className="bg-black h-2 transition-all duration-300"
-                          style={{
-                            width: `${project.progress}%`,
-                          }}
-                        />
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-medium text-black">{project.progress}%</span>
-                      </div>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      className="w-full group-hover:bg-gray-50 transition-colors border-gray-300"
-                      onClick={() => setSelectedProject(selectedProject === project.id ? null : project.id)}
-                    >
-                      {selectedProject === project.id ? "Hide Tasks" : "Manage Tasks"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {projects.length === 0 && (
@@ -516,8 +634,8 @@ export default function ProjectPlanner() {
                       />
                       <Input
                         type="date"
-                        value={newTask.dueDate}
-                        onChange={(e) => setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))}
+                        value={newTask.due_date}
+                        onChange={(e) => setNewTask((prev) => ({ ...prev, due_date: e.target.value }))}
                         className="border-gray-300 focus:border-black focus:ring-black font-light"
                       />
                     </div>
@@ -543,9 +661,9 @@ export default function ProjectPlanner() {
                       <Input
                         type="number"
                         placeholder="Est. hours"
-                        value={newTask.estimatedHours || ""}
+                        value={newTask.estimated_hours || ""}
                         onChange={(e) =>
-                          setNewTask((prev) => ({ ...prev, estimatedHours: Number.parseInt(e.target.value) || 0 }))
+                          setNewTask((prev) => ({ ...prev, estimated_hours: Number.parseInt(e.target.value) || 0 }))
                         }
                         className="w-32 border-gray-300 focus:border-black focus:ring-black font-light"
                       />
@@ -561,7 +679,7 @@ export default function ProjectPlanner() {
 
                   {/* Tasks List */}
                   <div className="space-y-3">
-                    {selectedProjectData.tasks.map((task) => (
+                    {selectedProjectTasks.map((task) => (
                       <div
                         key={task.id}
                         className="flex items-center justify-between p-4 border border-gray-200 hover:bg-gray-50 transition-colors"
@@ -572,16 +690,16 @@ export default function ProjectPlanner() {
                             <p className="font-medium text-black">{task.title}</p>
                             <p className="text-sm text-gray-600 mt-1 font-light">{task.description}</p>
                             <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                              {task.dueDate && (
+                              {task.due_date && (
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
-                                  Due: {task.dueDate}
+                                  Due: {task.due_date}
                                 </span>
                               )}
-                              {task.estimatedHours && (
+                              {task.estimated_hours && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  {task.estimatedHours}h
+                                  {task.estimated_hours}h
                                 </span>
                               )}
                             </div>
@@ -605,7 +723,7 @@ export default function ProjectPlanner() {
                         </div>
                       </div>
                     ))}
-                    {selectedProjectData.tasks.length === 0 && (
+                    {selectedProjectTasks.length === 0 && (
                       <div className="text-center py-12 text-gray-500">
                         <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                         <p className="text-lg font-medium mb-2">No tasks yet</p>
@@ -628,14 +746,15 @@ export default function ProjectPlanner() {
               </div>
               <div className="p-8">
                 <div className="space-y-4">
-                  {projects
-                    .flatMap((project) =>
-                      project.tasks.map((task) => ({
+                  {Object.entries(tasks)
+                    .flatMap(([projectId, projectTasks]) => {
+                      const project = projects.find(p => p.id === projectId)
+                      return projectTasks.map(task => ({
                         ...task,
-                        projectTitle: project.title,
-                        projectId: project.id,
-                      })),
-                    )
+                        projectTitle: project?.title || 'Unknown Project',
+                        projectId
+                      }))
+                    })
                     .map((task) => (
                       <div
                         key={`${task.projectId}-${task.id}`}
@@ -647,16 +766,16 @@ export default function ProjectPlanner() {
                             <p className="font-medium text-black">{task.title}</p>
                             <p className="text-sm text-gray-600 font-light">Project: {task.projectTitle}</p>
                             <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                              {task.dueDate && (
+                              {task.due_date && (
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
-                                  {task.dueDate}
+                                  {task.due_date}
                                 </span>
                               )}
-                              {task.estimatedHours && (
+                              {task.estimated_hours && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  {task.estimatedHours}h
+                                  {task.estimated_hours}h
                                 </span>
                               )}
                             </div>
@@ -672,7 +791,7 @@ export default function ProjectPlanner() {
                         </div>
                       </div>
                     ))}
-                  {projects.flatMap((p) => p.tasks).length === 0 && (
+                  {Object.values(tasks).every(projectTasks => projectTasks.length === 0) && (
                     <div className="text-center py-20 text-gray-500">
                       <AlertCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
                       <h3 className="text-xl font-medium mb-2">No tasks yet</h3>
@@ -705,56 +824,59 @@ export default function ProjectPlanner() {
               </div>
               <div className="p-8">
                 <div className="space-y-8">
-                  {projects.map((project) => (
-                    <div key={project.id} className="border border-gray-200 p-6">
-                      <div className="flex justify-between items-start mb-6">
-                        <div>
-                          <h4 className="font-medium text-black text-lg">{project.title}</h4>
-                          <div className="flex items-center gap-4 text-sm text-gray-600 mt-2">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {project.startDate} → {project.endDate}
-                            </span>
-                            <Badge variant="outline" className={`text-xs ${getProjectStatusColor(project.status)}`}>
-                              {project.status}
-                            </Badge>
+                  {projects.map((project) => {
+                    const projectTasks = tasks[project.id] || []
+                    return (
+                      <div key={project.id} className="border border-gray-200 p-6">
+                        <div className="flex justify-between items-start mb-6">
+                          <div>
+                            <h4 className="font-medium text-black text-lg">{project.title}</h4>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 mt-2">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {project.start_date || "No start"} → {project.end_date || "No end"}
+                              </span>
+                              <Badge variant="outline" className={`text-xs ${getProjectStatusColor(project.status)}`}>
+                                {project.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-light text-black">{project.progress}%</div>
+                            <div className="text-sm text-gray-600">Complete</div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-light text-black">{project.progress}%</div>
-                          <div className="text-sm text-gray-600">Complete</div>
+
+                        <div className="space-y-4">
+                          <h5 className="font-medium text-black">Upcoming Deadlines</h5>
+                          {projectTasks
+                            .filter((task) => task.due_date)
+                            .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+                            .slice(0, 5)
+                            .map((task) => (
+                              <div
+                                key={task.id}
+                                className="flex items-center justify-between text-sm border border-gray-200 p-3"
+                              >
+                                <span className="flex items-center gap-3">
+                                  {getStatusIcon(task.status)}
+                                  <span className="font-medium text-black">{task.title}</span>
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority)}`}>
+                                    {task.priority}
+                                  </Badge>
+                                  <span className="text-gray-600">{task.due_date}</span>
+                                </div>
+                              </div>
+                            ))}
+                          {projectTasks.filter((task) => task.due_date).length === 0 && (
+                            <p className="text-sm text-gray-500 italic font-light">No scheduled deadlines</p>
+                          )}
                         </div>
                       </div>
-
-                      <div className="space-y-4">
-                        <h5 className="font-medium text-black">Upcoming Deadlines</h5>
-                        {project.tasks
-                          .filter((task) => task.dueDate)
-                          .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-                          .slice(0, 5)
-                          .map((task) => (
-                            <div
-                              key={task.id}
-                              className="flex items-center justify-between text-sm border border-gray-200 p-3"
-                            >
-                              <span className="flex items-center gap-3">
-                                {getStatusIcon(task.status)}
-                                <span className="font-medium text-black">{task.title}</span>
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority)}`}>
-                                  {task.priority}
-                                </Badge>
-                                <span className="text-gray-600">{task.dueDate}</span>
-                              </div>
-                            </div>
-                          ))}
-                        {project.tasks.filter((task) => task.dueDate).length === 0 && (
-                          <p className="text-sm text-gray-500 italic font-light">No scheduled deadlines</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {projects.length === 0 && (
                     <div className="text-center py-20 text-gray-500">
                       <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-400" />

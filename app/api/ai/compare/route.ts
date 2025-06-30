@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { EnhancedAIService } from "@/lib/enhanced-ai-service"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import type { AIProvider } from "@/lib/ai-providers"
 
 export async function POST(request: NextRequest) {
@@ -10,7 +10,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 })
     }
 
-    const results = await EnhancedAIService.compareProviderResponses(prompt, providers as AIProvider[])
+    // Simple comparison implementation using chatCompletion
+    const results: Record<string, any> = {}
+    for (const provider of providers) {
+      try {
+        const response = await enhancedAIService.chatCompletion([
+          { role: 'user', content: prompt }
+        ], { preferredProvider: provider })
+        results[provider] = {
+          content: response.content,
+          provider: response.provider,
+          model: response.model,
+          usage: response.usage
+        }
+      } catch (error) {
+        results[provider] = {
+          error: error instanceof Error ? error.message : 'Failed to get response'
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

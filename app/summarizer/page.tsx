@@ -1,528 +1,461 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Upload, Link, Copy, Download, Clock, BookOpen, ArrowRight } from "lucide-react"
-import { useSocket } from "@/components/socket-provider"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { FileText, Upload, Link, Clock, TrendingUp, AlertCircle, Loader2, Copy, CheckCircle } from "lucide-react"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { useToast } from "@/hooks/use-toast"
-import { SummarizerService } from "@/lib/services/summarizer.service"
 
-interface Summary {
-  id: string
-  title: string
-  originalText: string
+interface SummaryResult {
   summary: string
   keyPoints: string[]
-  timestamp: Date
-  source: "text" | "file" | "url"
   readingTime: number
+  sentiment?: 'positive' | 'neutral' | 'negative'
+  originalLength: number
+  summaryLength: number
+  compressionRatio: string
 }
 
-export default function PaperSummarizer() {
-  const [inputText, setInputText] = useState("")
-  const [fileUrl, setFileUrl] = useState("")
+export default function Summarizer() {
+  const [content, setContent] = useState("")
+  const [url, setUrl] = useState("")
+  const [file, setFile] = useState<File | null>(null)
+  const [result, setResult] = useState<SummaryResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [summaries, setSummaries] = useState<Summary[]>([])
-  const [currentSummary, setCurrentSummary] = useState<Summary | null>(null)
-  const { socket } = useSocket()
+  const [error, setError] = useState<string | null>(null)
+  const [summaryStyle, setSummaryStyle] = useState<'academic' | 'executive' | 'bullet-points' | 'detailed'>('academic')
+  const [summaryLength, setSummaryLength] = useState<'brief' | 'medium' | 'comprehensive'>('medium')
+  const [copied, setCopied] = useState(false)
   const { toast } = useToast()
 
-  const handleSummarizeText = async () => {
-    if (!inputText.trim()) return
-
-    setLoading(true)
-    try {
-      // Call the AI service to summarize the text
-      const result = await SummarizerService.summarizeText(inputText)
-      
-      const summary: Summary = {
-        id: Date.now().toString(),
-        title: "Text Summary",
-        originalText: inputText,
-        summary: result.summary,
-        keyPoints: result.keyPoints,
-        timestamp: new Date(),
-        source: "text",
-        readingTime: result.readingTime || Math.ceil(inputText.length / 1000),
-      }
-
-      setSummaries((prev) => [summary, ...prev])
-      setCurrentSummary(summary)
-
-      if (socket) {
-        socket.emit("paper_summarized", {
-          title: summary.title,
-          source: summary.source,
-          length: inputText.length,
-        })
-      }
-
-      toast({
-        title: "Summary generated",
-        description: "Your text has been successfully summarized",
-      })
-    } catch (error) {
-      toast({
-        title: "Summarization failed",
-        description: "Please try again later",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSummarizeUrl = async () => {
-    if (!fileUrl.trim()) return
-
-    setLoading(true)
-    try {
-      // First fetch the URL content and then summarize it
-      const result = await SummarizerService.summarizeUrl(fileUrl)
-      
-      // Get the title from the URL
-      let title = "Research Paper Analysis"
-      try {
-        const url = new URL(fileUrl)
-        title = url.hostname.replace(/^www\./, '') + url.pathname
-      } catch (e) {
-        // Use default title if URL parsing fails
-      }
-      
-      const summary: Summary = {
-        id: Date.now().toString(),
-        title: title,
-        originalText: `Content extracted from ${fileUrl}`,
-        summary: result.summary,
-        keyPoints: result.keyPoints,
-        timestamp: new Date(),
-        source: "url",
-        readingTime: result.readingTime || 5,
-      }
-
-      setSummaries((prev) => [summary, ...prev])
-      setCurrentSummary(summary)
-
-      if (socket) {
-        socket.emit("paper_summarized", {
-          title: summary.title,
-          source: summary.source,
-          url: fileUrl,
-        })
-      }
-
-      toast({
-        title: "Paper summarized",
-        description: "The paper from the URL has been successfully summarized",
-      })
-    } catch (error) {
-      toast({
-        title: "Summarization failed",
-        description: "Could not process the URL. Please check the link and try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const selectedFile = event.target.files?.[0]
+    if (!selectedFile) return
 
-    setLoading(true)
+    if (selectedFile.size > 10 * 1024 * 1024) { // 10MB limit
+      setError("File size must be less than 10MB")
+      return
+    }
+
+    const allowedTypes = ['text/plain', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowedTypes.includes(selectedFile.type)) {
+      setError("Please upload a text file, PDF, or Word document")
+      return
+    }
+
+    setFile(selectedFile)
+    setError(null)
+
+    // Extract text content
     try {
-      // Use the AI service to summarize the file content
-      const result = await SummarizerService.summarizeFile(file)
+      let textContent = ""
       
-      const summary: Summary = {
-        id: Date.now().toString(),
-        title: file.name,
-        originalText: `Content extracted from ${file.name}`,
-        summary: result.summary,
-        keyPoints: result.keyPoints,
-        timestamp: new Date(),
-        source: "file",
-        readingTime: result.readingTime || Math.ceil(file.size / 5000),
+      if (selectedFile.type === 'text/plain') {
+        textContent = await selectedFile.text()
+      } else {
+        // For PDF and Word docs, we'll use a simple fallback
+        textContent = await selectedFile.text()
       }
-
-      setSummaries((prev) => [summary, ...prev])
-      setCurrentSummary(summary)
-
-      if (socket) {
-        socket.emit("paper_summarized", {
-          title: summary.title,
-          source: summary.source,
-          fileName: file.name,
-        })
-      }
-
+      
+      setContent(textContent)
       toast({
-        title: "File summarized",
-        description: `"${file.name}" has been successfully summarized`,
+        title: "File uploaded",
+        description: `${selectedFile.name} has been processed`,
       })
     } catch (error) {
-      toast({
-        title: "File processing failed",
-        description: "Could not process the uploaded file",
-        variant: "destructive",
+      setError("Failed to process file content")
+      setFile(null)
+    }
+  }
+
+  const handleUrlFetch = async () => {
+    if (!url.trim()) {
+      setError("Please enter a valid URL")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
       })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch URL content')
+      }
+
+      const data = await response.json()
+      setContent(data.content || data.text)
+      
+      toast({
+        title: "Content fetched",
+        description: "URL content has been extracted successfully",
+      })
+    } catch (error) {
+      console.error('URL fetch error:', error)
+      setError("Failed to fetch content from URL. Please check the URL and try again.")
     } finally {
       setLoading(false)
     }
   }
 
-  const copySummary = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied to clipboard",
-      description: "Summary has been copied to your clipboard",
-    })
-  }
-
-  const downloadSummary = (summary: Summary) => {
-    const content = `Title: ${summary.title}\n\nSummary:\n${summary.summary}\n\nKey Points:\n${summary.keyPoints.map((point) => `• ${point}`).join("\n")}\n\nGenerated: ${summary.timestamp.toLocaleString()}`
-    const blob = new Blob([content], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${summary.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_summary.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const getSourceIcon = (source: Summary["source"]) => {
-    switch (source) {
-      case "text":
-        return <FileText className="h-4 w-4" />
-      case "file":
-        return <Upload className="h-4 w-4" />
-      case "url":
-        return <Link className="h-4 w-4" />
+  const generateSummary = async () => {
+    if (!content.trim()) {
+      setError("Please provide content to summarize")
+      return
     }
+
+    if (content.length < 100) {
+      setError("Content is too short to summarize. Please provide at least 100 characters.")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      const summaryResult = await enhancedAIService.summarizeContent(content, {
+        style: summaryStyle,
+        length: summaryLength
+      })
+
+             const originalLength = content.length
+       const summaryTextLength = summaryResult.summary.length
+       const compressionRatio = ((originalLength - summaryTextLength) / originalLength * 100).toFixed(1)
+
+       setResult({
+         ...summaryResult,
+         originalLength,
+         summaryLength: summaryTextLength,
+         compressionRatio: `${compressionRatio}%`
+       })
+
+      toast({
+        title: "Summary generated!",
+        description: `Content summarized with ${compressionRatio}% compression`,
+      })
+    } catch (error) {
+      console.error('Summarization error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate summary'
+      setError(errorMessage)
+      
+      if (errorMessage.includes('No AI providers available')) {
+        toast({
+          title: "AI Configuration Required",
+          description: "Please configure your AI API keys in Settings to use the Summarizer.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Summary failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast({
+        title: "Copied to clipboard",
+        description: "Summary has been copied to your clipboard",
+      })
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getSentimentColor = (sentiment?: string) => {
+    switch (sentiment) {
+      case 'positive': return 'bg-green-100 text-green-800'
+      case 'negative': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getWordCount = (text: string) => {
+    return text.trim().split(/\s+/).length
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="container mx-auto px-8 py-12 max-w-7xl">
-
-
-        <div className="grid gap-12 lg:grid-cols-5">
-          {/* Input Section */}
-          <div className="lg:col-span-2 space-y-8">
-            <Tabs defaultValue="text" className="space-y-8">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1">
-                <TabsTrigger
-                  value="text"
-                  className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Text
-                </TabsTrigger>
-                <TabsTrigger
-                  value="file"
-                  className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  File
-                </TabsTrigger>
-                <TabsTrigger
-                  value="url"
-                  className="data-[state=active]:bg-white data-[state=active]:text-black font-medium"
-                >
-                  <Link className="h-4 w-4 mr-2" />
-                  URL
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="text" className="space-y-8">
-                <div className="border border-gray-200">
-                  <div className="p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
-                      <div className="w-1 h-6 bg-black"></div>
-                      Paste Your Text
-                    </h3>
-                    <p className="text-gray-600 text-sm mt-2 font-light">
-                      Paste research content, abstracts, or any text you want to summarize
-                    </p>
-                  </div>
-                  <div className="p-6 space-y-6">
-                    <Textarea
-                      placeholder="Paste your research paper, article, or text content here..."
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      rows={12}
-                      className="resize-none border-gray-300 focus:border-black focus:ring-black font-light"
-                    />
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>{inputText.length} characters</span>
-                      <span>~{Math.ceil(inputText.length / 1000)} min read</span>
-                    </div>
-                    <Button
-                      onClick={handleSummarizeText}
-                      disabled={loading || !inputText.trim()}
-                      className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4"
-                    >
-                      {loading ? (
-                        <>
-                          <Clock className="mr-2 h-4 w-4 animate-spin" />
-                          Analyzing Text...
-                        </>
-                      ) : (
-                        <>
-                          <ArrowRight className="mr-2 h-4 w-4" />
-                          Generate Summary
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="file" className="space-y-8">
-                <div className="border border-gray-200">
-                  <div className="p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
-                      <div className="w-1 h-6 bg-black"></div>
-                      Upload Document
-                    </h3>
-                    <p className="text-gray-600 text-sm mt-2 font-light">
-                      Upload PDF, DOC, DOCX, or TXT files for AI-powered summarization
-                    </p>
-                  </div>
-                  <div className="p-6">
-                    <div className="border-2 border-dashed border-gray-300 p-12 text-center hover:border-gray-400 transition-colors">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 mb-4">
-                        <Upload className="h-6 w-6 text-gray-600" />
-                      </div>
-                      <Label htmlFor="file-upload" className="cursor-pointer">
-                        <span className="text-lg font-medium text-black block mb-2">
-                          Drop files here or click to upload
-                        </span>
-                        <span className="text-sm text-gray-500">Supports PDF, DOC, DOCX, TXT up to 10MB</span>
-                      </Label>
-                      <Input
-                        id="file-upload"
-                        type="file"
-                        accept=".pdf,.doc,.docx,.txt"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="url" className="space-y-8">
-                <div className="border border-gray-200">
-                  <div className="p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
-                      <div className="w-1 h-6 bg-black"></div>
-                      Research Paper URL
-                    </h3>
-                    <p className="text-gray-600 text-sm mt-2 font-light">
-                      Enter a URL to research papers from arXiv, ACM, IEEE, or other academic sources
-                    </p>
-                  </div>
-                  <div className="p-6 space-y-6">
-                    <Input
-                      placeholder="https://arxiv.org/abs/2301.00001"
-                      value={fileUrl}
-                      onChange={(e) => setFileUrl(e.target.value)}
-                      className="border-gray-300 focus:border-black focus:ring-black font-light"
-                    />
-                    <div className="text-sm text-gray-500">
-                      <p className="mb-3 font-medium">Supported sources:</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {["arXiv", "ACM Digital Library", "IEEE Xplore", "PubMed", "ResearchGate"].map((source) => (
-                          <Badge key={source} variant="outline" className="text-xs justify-center py-1">
-                            {source}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleSummarizeUrl}
-                      disabled={loading || !fileUrl.trim()}
-                      className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4"
-                    >
-                      {loading ? (
-                        <>
-                          <Clock className="mr-2 h-4 w-4 animate-spin" />
-                          Processing URL...
-                        </>
-                      ) : (
-                        <>
-                          <ArrowRight className="mr-2 h-4 w-4" />
-                          Summarize from URL
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {/* Summary Display */}
-          <div className="lg:col-span-3 space-y-8">
-            {currentSummary ? (
-              <div className="border border-gray-200">
-                <div className="p-8 border-b border-gray-200">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="p-2 bg-black text-white">{getSourceIcon(currentSummary.source)}</div>
-                        <div>
-                          <h2 className="text-2xl font-light text-black">{currentSummary.title}</h2>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              {currentSummary.readingTime} min read
-                            </span>
-                            <span>{currentSummary.timestamp.toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copySummary(currentSummary.summary)}
-                        className="border-gray-300 hover:bg-gray-50"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadSummary(currentSummary)}
-                        className="border-gray-300 hover:bg-gray-50"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-8 space-y-10">
-                  {/* Summary */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
-                      <div className="w-1 h-6 bg-black"></div>
-                      Executive Summary
-                    </h3>
-                    <div className="bg-gray-50 p-6 border border-gray-200">
-                      <p className="text-gray-800 leading-relaxed font-light">{currentSummary.summary}</p>
-                    </div>
-                  </div>
-
-                  {/* Key Points */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-black flex items-center gap-3">
-                      <div className="w-1 h-6 bg-gray-400"></div>
-                      Key Insights
-                    </h3>
-                    <div className="space-y-3">
-                      {currentSummary.keyPoints.map((point, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-4 p-4 border border-gray-200 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex-shrink-0 w-6 h-6 bg-black text-white text-sm font-medium flex items-center justify-center">
-                            {index + 1}
-                          </div>
-                          <p className="text-gray-700 leading-relaxed font-light">{point}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Source Badge */}
-                  <div className="text-center pt-6 border-t border-gray-200">
-                    <Badge variant="outline" className="px-4 py-2">
-                      {currentSummary.source === "text" && "Text Input"}
-                      {currentSummary.source === "file" && "File Upload"}
-                      {currentSummary.source === "url" && "URL Source"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Welcome State */
-              <div className="border border-gray-200">
-                <div className="text-center py-20 px-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 mb-8">
-                    <BookOpen className="h-8 w-8 text-gray-600" />
-                  </div>
-                  <h3 className="text-2xl font-light text-black mb-4">Ready to Summarize</h3>
-                  <p className="text-gray-600 max-w-md mx-auto leading-relaxed font-light mb-8">
-                    Upload a document, paste text, or provide a URL to get started with AI-powered summarization
-                  </p>
-                  <div className="flex justify-center gap-6">
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-black mb-2 mx-auto"></div>
-                      <span className="text-xs text-gray-600 uppercase tracking-wide">Text Analysis</span>
-                    </div>
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-gray-300 mb-2 mx-auto"></div>
-                      <span className="text-xs text-gray-600 uppercase tracking-wide">File Processing</span>
-                    </div>
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-gray-500 mb-2 mx-auto"></div>
-                      <span className="text-xs text-gray-600 uppercase tracking-wide">URL Extraction</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Recent Summaries */}
-            {summaries.length > 0 && (
-              <div className="border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-black">Recent Summaries</h3>
-                  <p className="text-gray-600 text-sm mt-1">Your latest AI-generated summaries</p>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-3">
-                    {summaries.slice(0, 5).map((summary) => (
-                      <div
-                        key={summary.id}
-                        className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
-                        onClick={() => setCurrentSummary(summary)}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="p-2 bg-gray-100">{getSourceIcon(summary.source)}</div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{summary.title}</p>
-                            <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
-                              <span>{summary.timestamp.toLocaleDateString()}</span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {summary.readingTime} min
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {summary.source}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center gap-2 mb-6">
+        <FileText className="h-8 w-8 text-blue-500" />
+        <div>
+          <h1 className="text-3xl font-bold">AI Summarizer</h1>
+          <p className="text-muted-foreground">Intelligently summarize documents, articles, and content</p>
         </div>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Input Section */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Content Input</CardTitle>
+              <CardDescription>
+                Provide content through text input, file upload, or URL
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="text" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="text">Text Input</TabsTrigger>
+                  <TabsTrigger value="file">File Upload</TabsTrigger>
+                  <TabsTrigger value="url">From URL</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="text" className="space-y-4">
+                  <Textarea
+                    placeholder="Paste your content here..."
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    rows={12}
+                    className="resize-none"
+                  />
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{getWordCount(content)} words</span>
+                    <span>{content.length} characters</span>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="file" className="space-y-4">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Upload a text file, PDF, or Word document
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".txt,.pdf,.doc,.docx"
+                      onChange={handleFileUpload}
+                      className="max-w-xs mx-auto"
+                    />
+                  </div>
+                  {file && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm font-medium">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="url" className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://example.com/article"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !loading && handleUrlFetch()}
+                    />
+                    <Button 
+                      onClick={handleUrlFetch} 
+                      disabled={loading || !url.trim()}
+                      variant="outline"
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Link className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter a URL to automatically extract and summarize its content
+                  </p>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary Configuration</CardTitle>
+              <CardDescription>
+                Customize how your content is summarized
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Summary Style</label>
+                <Select value={summaryStyle} onValueChange={(value: any) => setSummaryStyle(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="academic">Academic</SelectItem>
+                    <SelectItem value="executive">Executive</SelectItem>
+                    <SelectItem value="bullet-points">Bullet Points</SelectItem>
+                    <SelectItem value="detailed">Detailed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Summary Length</label>
+                <Select value={summaryLength} onValueChange={(value: any) => setSummaryLength(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="brief">Brief</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="comprehensive">Comprehensive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button 
+            onClick={generateSummary} 
+            disabled={loading || !content.trim()}
+            className="w-full"
+            size="lg"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating Summary...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4 mr-2" />
+                Generate Summary
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Results Section */}
+        <div className="space-y-6">
+          {result && (
+            <>
+              {/* Summary Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Summary Statistics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Reading Time</span>
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-sm font-medium">{result.readingTime} min</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Compression</span>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" />
+                      <span className="text-sm font-medium">{result.compressionRatio}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Word Count</span>
+                    <span className="text-sm font-medium">
+                      {getWordCount(result.summary)} words
+                    </span>
+                  </div>
+
+                  {result.sentiment && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Sentiment</span>
+                      <Badge className={getSentimentColor(result.sentiment)}>
+                        {result.sentiment}
+                      </Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Key Points */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Key Points</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {result.keyPoints.map((point, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 shrink-0" />
+                        <span className="text-sm leading-relaxed">{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Summary Output */}
+      {result && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Generated Summary</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copyToClipboard(result.summary)}
+              >
+                {copied ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none bg-muted/20 p-4 rounded-lg">
+              <p className="whitespace-pre-wrap leading-relaxed">{result.summary}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

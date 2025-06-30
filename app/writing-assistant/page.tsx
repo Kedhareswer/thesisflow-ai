@@ -9,6 +9,15 @@ import { WebsocketProvider } from "y-websocket";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy } from "lucide-react";
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { PenTool, CheckCircle, Lightbulb, BarChart, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
+import { supabase } from "@/integrations/supabase/client"
 
 // Tiptap Editor MenuBar (basic formatting)
 function MenuBar({ editor }: { editor: any }) {
@@ -59,6 +68,30 @@ function getBookmarksFromStorage(): RecentItem[] {
 function saveBookmarksToStorage(items: RecentItem[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem("recentlySaved", JSON.stringify(items));
+}
+
+interface WritingResult {
+  improvedText: string
+  suggestions: Array<{
+    type: string
+    original: string
+    improved: string
+    reason: string
+  }>
+  metrics: {
+    readability: number
+    sentiment: string
+    wordCount: number
+  }
+}
+
+interface WritingAnalysis {
+  originalText: string
+  improvedText: string
+  task: string
+  suggestions: WritingResult['suggestions']
+  metrics: WritingResult['metrics']
+  timestamp: Date
 }
 
 export default function WritingAssistantPage() {
@@ -156,6 +189,169 @@ export default function WritingAssistantPage() {
       setLoading(false);
     }
   };
+
+  const [originalText, setOriginalText] = useState("")
+  const [result, setResult] = useState<WritingResult | null>(null)
+  const [history, setHistory] = useState<WritingAnalysis[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [task, setTask] = useState<'grammar' | 'clarity' | 'academic' | 'creative' | 'professional'>('grammar')
+  const [copied, setCopied] = useState(false)
+  const [authUser, setAuthUser] = useState<any>(null)
+
+  useEffect(() => {
+    checkUser()
+    loadHistory()
+  }, [])
+
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    setAuthUser(user)
+  }
+
+  const loadHistory = () => {
+    const savedHistory = localStorage.getItem('writing-assistant-history')
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory).map((item: any) => ({
+          ...item,
+          timestamp: new Date(item.timestamp)
+        }))
+        setHistory(parsed)
+      } catch (error) {
+        console.error('Error loading history:', error)
+      }
+    }
+  }
+
+  const saveToHistory = (analysis: WritingAnalysis) => {
+    const newHistory = [analysis, ...history].slice(0, 10) // Keep last 10 analyses
+    setHistory(newHistory)
+    localStorage.setItem('writing-assistant-history', JSON.stringify(newHistory))
+  }
+
+  const improveText = async () => {
+    if (!originalText.trim()) {
+      setError("Please enter some text to improve")
+      return
+    }
+
+    if (originalText.length < 10) {
+      setError("Text is too short. Please provide at least 10 characters.")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      const writingResult = await enhancedAIService.improveWriting(originalText, task)
+
+      setResult(writingResult)
+
+      // Save to history
+      const analysis: WritingAnalysis = {
+        originalText,
+        improvedText: writingResult.improvedText,
+        task,
+        suggestions: writingResult.suggestions,
+        metrics: writingResult.metrics,
+        timestamp: new Date()
+      }
+      saveToHistory(analysis)
+
+      toast({
+        title: "Text improved!",
+        description: `Applied ${writingResult.suggestions.length} improvements for ${task} writing`,
+      })
+    } catch (error) {
+      console.error('Writing improvement error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to improve text'
+      setError(errorMessage)
+      
+      if (errorMessage.includes('No AI providers available')) {
+        toast({
+          title: "AI Configuration Required",
+          description: "Please configure your AI API keys in Settings to use the Writing Assistant.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Improvement failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast({
+        title: "Copied to clipboard",
+        description: "Improved text has been copied to your clipboard",
+      })
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadFromHistory = (analysis: WritingAnalysis) => {
+    setOriginalText(analysis.originalText)
+    setResult({
+      improvedText: analysis.improvedText,
+      suggestions: analysis.suggestions,
+      metrics: analysis.metrics
+    })
+    setTask(analysis.task as any)
+  }
+
+  const getTaskDescription = (task: string) => {
+    const descriptions = {
+      grammar: "Fix grammar, spelling, and punctuation errors",
+      clarity: "Improve clarity, readability, and flow",
+      academic: "Enhance for academic writing style",
+      creative: "Boost creativity and expressiveness",
+      professional: "Polish for professional communication"
+    }
+    return descriptions[task as keyof typeof descriptions] || ""
+  }
+
+  const getSentimentColor = (sentiment: string) => {
+    switch (sentiment.toLowerCase()) {
+      case 'positive': return 'bg-green-100 text-green-800'
+      case 'negative': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getReadabilityColor = (score: number) => {
+    if (score >= 80) return 'text-green-600'
+    if (score >= 60) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  const getSuggestionIcon = (type: string) => {
+    switch (type) {
+      case 'grammar': return <CheckCircle className="h-4 w-4 text-green-600" />
+      case 'clarity': return <Lightbulb className="h-4 w-4 text-blue-600" />
+      case 'style': return <PenTool className="h-4 w-4 text-purple-600" />
+      default: return <RefreshCw className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const getWordCount = (text: string) => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length
+  }
 
   return (
     <div className="flex flex-row max-w-screen-xl mx-auto py-8 px-2 gap-6">

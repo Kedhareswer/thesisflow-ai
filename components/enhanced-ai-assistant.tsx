@@ -12,16 +12,34 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Brain, Loader2, Copy, Download, ContrastIcon as Compare, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { EnhancedAIService, type ResearchContext, type SummaryOptions } from "@/lib/enhanced-ai-service"
+import { enhancedAIService, type AIResponse as EnhancedAIResponse } from "@/lib/enhanced-ai-service"
 import type { AIProvider, AIResponse } from "@/lib/ai-providers"
 import AIProviderSelector from "./ai-provider-selector"
 
+// Types for the enhanced AI assistant
+interface ResearchContext {
+  topic: string
+  description: string
+  existingWork: string
+  researchGap: string
+  targetAudience: string
+  methodology: string
+}
+
+interface SummaryOptions {
+  length: "short" | "medium" | "long"
+  style: "academic" | "casual" | "technical"
+  includeKeywords: boolean
+  includeCitations: boolean
+  includeMethodology: boolean
+}
+
 export default function EnhancedAIAssistant() {
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
-  const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
-  const [selectedModel, setSelectedModel] = useState<string>("")
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider>("groq")
+  const [selectedModel, setSelectedModel] = useState("")
   const [loading, setLoading] = useState(false)
   const [compareMode, setCompareMode] = useState(false)
+  const [availableProviders] = useState<AIProvider[]>(["openai", "groq", "gemini"])
   const { toast } = useToast()
 
   // Research Suggestions State
@@ -53,7 +71,7 @@ export default function EnhancedAIAssistant() {
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([])
 
   // Comparison Results
-  const [comparisonResults, setComparisonResults] = useState<Partial<Record<AIProvider, AIResponse>>>({})
+  const [comparisonResults, setComparisonResults] = useState<Partial<Record<AIProvider, EnhancedAIResponse>>>({})
 
   const generateResearchSuggestions = async () => {
     if (!researchContext.topic || !researchContext.description) {
@@ -69,11 +87,22 @@ export default function EnhancedAIAssistant() {
     try {
       if (compareMode) {
         const prompt = `Generate research suggestions for: ${researchContext.topic}\nDescription: ${researchContext.description}`
-          const results = await EnhancedAIService.compareProviderResponses(prompt, availableProviders)
+        // Simple comparison using multiple calls
+        const results: Partial<Record<AIProvider, EnhancedAIResponse>> = {}
+        for (const provider of availableProviders) {
+          try {
+            const response = await enhancedAIService.chatCompletion([
+              { role: 'user', content: prompt }
+            ], { preferredProvider: provider })
+            results[provider] = response
+          } catch (error) {
+            console.error(`Error with provider ${provider}:`, error)
+          }
+        }
         setComparisonResults(results)
       } else {
-        const suggestions = await EnhancedAIService.getResearchSuggestions(researchContext, selectedProvider)
-        setResearchSuggestions(suggestions)
+        const response = await enhancedAIService.generateResearchIdeas(researchContext.topic, researchContext.description)
+        setResearchSuggestions(response.ideas)
       }
 
       toast({
@@ -103,8 +132,11 @@ export default function EnhancedAIAssistant() {
 
     setLoading(true)
     try {
-      const result = await EnhancedAIService.summarizeText(textToSummarize, summaryOptions, selectedProvider)
-      setSummary(result)
+      const result = await enhancedAIService.summarizeContent(textToSummarize, {
+        style: summaryOptions.style === 'casual' ? 'bullet-points' : summaryOptions.style === 'technical' ? 'detailed' : 'academic',
+        length: summaryOptions.length === 'short' ? 'brief' : summaryOptions.length === 'long' ? 'comprehensive' : 'medium'
+      })
+      setSummary(result.summary)
 
       toast({
         title: "Summary Generated",
@@ -133,7 +165,8 @@ export default function EnhancedAIAssistant() {
 
     setLoading(true)
     try {
-      const ideas = await EnhancedAIService.generateResearchIdeas(ideaTopic, ideaCount, ideaContext, selectedProvider)
+      const result = await enhancedAIService.generateResearchIdeas(ideaTopic, ideaContext)
+      const ideas = result.ideas.map(idea => `${idea.title}: ${idea.description}`)
       setGeneratedIdeas(ideas)
 
       toast({
@@ -393,7 +426,7 @@ export default function EnhancedAIAssistant() {
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">{response.content}</p>
                       {response.usage && (
-                        <div className="text-xs text-muted-foreground">Tokens: {response.usage.totalTokens}</div>
+                        <div className="text-xs text-muted-foreground">Tokens: {response.usage.tokens}</div>
                       )}
                     </div>
                   ))}

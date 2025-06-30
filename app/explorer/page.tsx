@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
-import { EnhancedAIService } from "@/lib/enhanced-ai-service"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { AIProviderService } from "@/lib/ai-providers"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { SearchInput } from "@/components/common/SearchInput"
@@ -90,10 +90,14 @@ The response should be ${depth <= 2 ? 'concise' : depth <= 4 ? 'detailed' : 'com
     timestamp: string;
   }> {
     try {
-      const ideas = await EnhancedAIService.generateResearchIdeas(topic, count, context)
+      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context)
+      const ideaObjects = researchResults.ideas
       
-      // Format the ideas nicely
-      const formattedIdeas = ideas.map((idea, index) => `${index + 1}. ${idea}`).join('\n\n')
+      // Convert idea objects to strings
+      const ideas = ideaObjects.map((idea, index) => `${index + 1}. ${idea.title}\n${idea.description}`)
+      
+      // Format the ideas nicely for display
+      const formattedIdeas = ideas.join('\n\n')
       
       return {
         content: formattedIdeas,

@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { AIProviderService } from "@/lib/ai-providers"
-import { EnhancedAIService } from "@/lib/enhanced-ai-service"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 
 interface AITool {
   id: string
@@ -125,29 +125,23 @@ Content:`
 
         case "idea-expander":
           try {
-            const researchContext = {
-              topic: input,
-              description: `Expand this research concept: ${input}`,
-            }
-            const suggestions = await EnhancedAIService.getResearchSuggestions(researchContext)
+            const result = await enhancedAIService.generateResearchIdeas(
+              input,
+              `Expand this research concept: ${input}`
+            )
             
-            generatedOutput = suggestions.map((suggestion, index) => `
-**Research Proposal ${index + 1}: ${suggestion.title}**
+            generatedOutput = result.ideas.map((idea, index) => `
+**Research Proposal ${index + 1}: ${idea.title}**
 
-**Description:** ${suggestion.description}
+**Description:** ${idea.description}
 
-**Methodology:** ${suggestion.methodology}
+**Research Question:** ${idea.research_question || 'To be determined'}
 
-**Potential Impact:** ${suggestion.potentialImpact}
+**Methodology:** ${idea.methodology || 'To be developed'}
 
-**Key Challenges:**
-${suggestion.keyChallenges.map(challenge => `• ${challenge}`).join('\n')}
+**Potential Impact:** ${idea.impact || 'To be assessed'}
 
-**Next Steps:**
-${suggestion.nextSteps.map(step => `• ${step}`).join('\n')}
-
-**Feasibility Score:** ${suggestion.feasibilityScore}/10
-**Novelty Score:** ${suggestion.noveltyScore}/10
+**Anticipated Challenges:** ${idea.challenges || 'To be identified'}
 
 ---`).join('\n')
           } catch (error) {

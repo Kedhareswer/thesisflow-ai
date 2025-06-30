@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/integrations/supabase/client';
 
 // GET /api/collaborate/teams
 export async function GET(request: NextRequest) {
@@ -53,35 +52,35 @@ export async function GET(request: NextRequest) {
     const { data: userProfiles, error: profilesError } = await supabase
       .from('user_profiles')
       .select('*')
-      .in('id', userIds);
+      .in('user_id', userIds);
 
     if (profilesError) {
       return NextResponse.json({ error: profilesError.message }, { status: 500 });
     }
 
     // Combine data to return complete team information with members
-    const enrichedTeams = teams.map(team => {
+    const enrichedTeams = teams?.map(team => {
       const teamMembers = allMembers
-        .filter(member => member.team_id === team.id)
+        ?.filter(member => member.team_id === team.id)
         .map(member => {
-          const profile = userProfiles.find(profile => profile.id === member.user_id);
+          const profile = userProfiles?.find(profile => profile.user_id === member.user_id);
           return {
             id: member.user_id,
-            name: profile?.full_name || 'Unknown User',
+            name: profile?.display_name || profile?.full_name || 'Unknown User',
             email: profile?.email || '',
             avatar: profile?.avatar_url || null,
             status: profile?.status || 'offline',
             role: member.role,
-            joinedAt: member.created_at,
+            joinedAt: team.created_at,
             lastActive: profile?.last_active || new Date().toISOString(),
           };
-        });
+        }) || [];
 
       return {
         ...team,
         members: teamMembers,
       };
-    });
+    }) || [];
 
     return NextResponse.json({ teams: enrichedTeams });
   } catch (error) {
@@ -100,19 +99,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and userId are required' }, { status: 400 });
     }
 
-    // Create new team
-    const teamId = uuidv4();
-    const { error: teamError } = await supabase
+    // Create new team using Supabase's auto-generated UUID
+    const { data: team, error: teamError } = await supabase
       .from('teams')
       .insert({
-        id: teamId,
         name,
         description: description || '',
         category: category || 'General',
         is_public: isPublic || false,
         owner_id: userId,
-        created_at: new Date().toISOString(),
-      });
+      })
+      .select()
+      .single();
 
     if (teamError) {
       return NextResponse.json({ error: teamError.message }, { status: 500 });
@@ -122,10 +120,9 @@ export async function POST(request: NextRequest) {
     const { error: memberError } = await supabase
       .from('team_members')
       .insert({
-        team_id: teamId,
+        team_id: team.id,
         user_id: userId,
         role: 'owner',
-        created_at: new Date().toISOString(),
       });
 
     if (memberError) {
@@ -134,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      teamId,
+      teamId: team.id,
       message: 'Team created successfully' 
     });
   } catch (error) {

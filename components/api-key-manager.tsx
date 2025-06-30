@@ -234,7 +234,7 @@ export function ApiKeyManager() {
         {AI_PROVIDERS.map((provider) => {
           const status = getProviderStatus(provider.id)
           const hasKey = apiKeys.some(key => key.provider === provider.id)
-          const lastTested = apiKeys.find(key => key.provider === provider.id)?.last_tested_at ?? null
+          const lastTested = apiKeys.find(key => key.provider === provider.id)?.last_tested_at
 
           return (
             <Card key={provider.id} className="relative">
@@ -270,7 +270,7 @@ export function ApiKeyManager() {
                 {hasKey ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Last tested: {formatDate(lastTested)}</span>
+                      <span>Last tested: {formatDate(lastTested || null)}</span>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
