@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,7 +17,8 @@ import type { AIProvider, AIResponse } from "@/lib/ai-providers"
 import AIProviderSelector from "./ai-provider-selector"
 
 export default function EnhancedAIAssistant() {
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider>("gemini")
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
+  const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [compareMode, setCompareMode] = useState(false)
@@ -66,10 +67,9 @@ export default function EnhancedAIAssistant() {
 
     setLoading(true)
     try {
-      if (compareMode) {
-        const providers: AIProvider[] = ["gemini", "groq", "aiml"]
-        const prompt = `Generate research suggestions for: ${researchContext.topic}\nDescription: ${researchContext.description}`
-        const results = await EnhancedAIService.compareProviderResponses(prompt, providers)
+              if (compareMode) {
+          const prompt = `Generate research suggestions for: ${researchContext.topic}\nDescription: ${researchContext.description}`
+          const results = await EnhancedAIService.compareProviderResponses(prompt, availableProviders)
         setComparisonResults(results)
       } else {
         const suggestions = await EnhancedAIService.getResearchSuggestions(researchContext, selectedProvider)

@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
-import type { Socket } from "socket.io-client"
+import React, { createContext, useContext, useEffect, useState } from "react"
+import { io, type Socket } from "socket.io-client"
 
 // Export the Event interface that was missing
 export interface Event {
@@ -39,7 +38,7 @@ interface SocketContextType {
   activeUsers: User[]
   events: SocketEvent[]
   isConnected: boolean
-  sendEvent: (eventType: string, payload: Record<string, unknown>) => void
+  connectionError: string | null
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -47,80 +46,110 @@ const SocketContext = createContext<SocketContextType>({
   activeUsers: [],
   events: [],
   isConnected: false,
-  sendEvent: () => {},
+  connectionError: null,
 })
 
-export function SocketProvider({ children }: { children: React.ReactNode }) {
+export function useSocket() {
+  return useContext(SocketContext)
+}
+
+interface SocketProviderProps {
+  children: React.ReactNode
+}
+
+export function SocketProvider({ children }: SocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [activeUsers, setActiveUsers] = useState<User[]>([])
   const [events, setEvents] = useState<SocketEvent[]>([])
   const [isConnected, setIsConnected] = useState(false)
-
-  const sendEvent = (eventType: string, payload: Record<string, unknown>) => {
-    if (!socket) return
-
-    const eventWithTimestamp: SocketEvent = {
-      type: eventType,
-      payload,
-      timestamp: new Date(),
-    }
-
-    // Emit to socket server
-    socket.emit("event", {
-      type: eventType,
-      userId: "user-1", // This should be replaced with actual user ID
-      payload,
-      timestamp: new Date().toISOString(),
-    })
-
-    // Add to local events
-    setEvents((prev) => [...prev, eventWithTimestamp])
-  }
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
   useEffect(() => {
-    // In a real app, connect to your socket server
-    // const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001')
+    // Only attempt socket connection if we have a socket server URL
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001'
+    
+    console.log('Attempting to connect to socket server:', socketUrl)
 
-    // For demo purposes, create a mock socket
-    const mockSocket = {
-      emit: (event: string, data: any) => {
-        console.log("Socket emit:", event, data)
-      },
-      on: (event: string, callback: Function) => {
-        console.log("Socket listener added for:", event)
-      },
-      off: (event: string, callback?: Function) => {
-        console.log("Socket listener removed for:", event)
-      },
-      disconnect: () => {
-        console.log("Socket disconnected")
+    const socketInstance = io(socketUrl, {
+      timeout: 5000,
+      retries: 3,
+      transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
+    })
+
+    // Connection success
+    socketInstance.on("connect", () => {
+      console.log("Connected to socket server")
+      setIsConnected(true)
+      setConnectionError(null)
+    })
+
+    // Connection error
+    socketInstance.on("connect_error", (error) => {
+      console.warn("Socket connection failed:", error.message)
+      setIsConnected(false)
+      setConnectionError("Real-time features unavailable. Operating in offline mode.")
+      // Don't retry immediately in production
+    })
+
+    // Disconnection
+    socketInstance.on("disconnect", (reason) => {
+      console.log("Disconnected from socket server:", reason)
         setIsConnected(false)
-      },
+      
+      if (reason === "io server disconnect") {
+        // Server initiated disconnect, try to reconnect
+        socketInstance.connect()
     }
+    })
 
-    setSocket(mockSocket as any)
+    // Reconnection success
+    socketInstance.on("reconnect", (attemptNumber) => {
+      console.log("Reconnected to socket server after", attemptNumber, "attempts")
     setIsConnected(true)
+      setConnectionError(null)
+    })
 
-    // Simulate some active users for demo
-    setActiveUsers([
-      { id: "1", name: "Alice Johnson", status: "online" },
-      { id: "2", name: "Bob Smith", status: "idle" },
-      { id: "3", name: "Carol Davis", status: "online" },
-    ])
+    // Reconnection failed
+    socketInstance.on("reconnect_failed", () => {
+      console.warn("Failed to reconnect to socket server")
+      setConnectionError("Unable to connect to real-time server. Some features may be limited.")
+    })
 
-    // Clean up on unmount
+    setSocket(socketInstance)
+
     return () => {
-      mockSocket.disconnect()
+      console.log("Cleaning up socket connection")
+      socketInstance.close()
     }
   }, [])
 
   return (
-    <SocketContext.Provider value={{ socket, activeUsers, events, isConnected, sendEvent }}>
+    <SocketContext.Provider
+      value={{
+        socket,
+        activeUsers,
+        events,
+        isConnected,
+        connectionError,
+      }}
+    >
       {children}
+      
+      {/* Optional: Show connection status in development */}
+      {process.env.NODE_ENV === 'development' && connectionError && (
+        <div className="fixed bottom-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 rounded shadow-lg text-sm max-w-sm">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm">{connectionError}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </SocketContext.Provider>
   )
-}
-
-export const useSocket = () => {
-  return useContext(SocketContext)
 }

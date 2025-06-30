@@ -9,7 +9,8 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
-import { ResearchService } from "@/lib/services/research.service"
+import { EnhancedAIService } from "@/lib/enhanced-ai-service"
+import { AIProviderService } from "@/lib/ai-providers"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { SearchInput } from "@/components/common/SearchInput"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
@@ -18,23 +19,126 @@ import { SkeletonCard, SkeletonList } from "@/components/common/SkeletonCard"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { ResearchChatbot } from "@/components/research-chatbot"
 
+// Enhanced research service that uses real AI
+class EnhancedResearchService {
+  static async exploreTopics(topic: string, depth: number = 3): Promise<{
+    content: string;
+    topic: string;
+    depth: number;
+    timestamp: string;
+  }> {
+    try {
+      const prompt = `Provide a comprehensive research overview for the topic: "${topic}"
+      
+Depth level: ${depth}/5 (1=basic, 5=comprehensive)
+
+Please provide a detailed analysis covering:
+1. Key Concepts and Definitions
+2. Current State of Research  
+3. Major Methodologies Used
+4. Leading Researchers and Institutions
+5. Recent Breakthroughs and Trends
+6. Research Gaps and Opportunities
+7. Practical Applications
+8. Future Directions
+
+Format the response in a clear, structured manner with headings and bullet points where appropriate.
+The response should be ${depth <= 2 ? 'concise' : depth <= 4 ? 'detailed' : 'comprehensive'}.`
+
+      const response = await AIProviderService.generateResponse(prompt)
+      return {
+        content: response.content,
+        topic,
+        depth,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error) {
+      console.error("Error exploring topic:", error)
+      throw new Error("Failed to explore research topic. Please check your AI provider configuration.")
+    }
+  }
+
+  static async searchPapers(query: string, searchType: string = "keyword"): Promise<any> {
+    try {
+      // Use the existing OpenAlex integration
+      const response = await fetch(`/api/search/papers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, searchType }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error("Error searching papers:", error)
+      throw new Error("Failed to search academic papers. Please try again.")
+    }
+  }
+
+  static async generateIdeas(topic: string, context: string = "", count: number = 5): Promise<{
+    content: string;
+    ideas: string[];
+    topic: string;
+    context: string;
+    count: number;
+    timestamp: string;
+  }> {
+    try {
+      const ideas = await EnhancedAIService.generateResearchIdeas(topic, count, context)
+      
+      // Format the ideas nicely
+      const formattedIdeas = ideas.map((idea, index) => `${index + 1}. ${idea}`).join('\n\n')
+      
+      return {
+        content: formattedIdeas,
+        ideas,
+        topic,
+        context,
+        count,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error) {
+      console.error("Error generating ideas:", error)
+      throw new Error("Failed to generate research ideas. Please check your AI provider configuration.")
+    }
+  }
+}
+
 export default function ResearchExplorer() {
   const { toast } = useToast()
 
   // Topic exploration state
   const [topic, setTopic] = useState("")
   const [depth, setDepth] = useState(3)
-  const topicExploration = useAsync(ResearchService.exploreTopics)
+  const topicExploration = useAsync<{
+    content: string;
+    topic: string;
+    depth: number;
+    timestamp: string;
+  }>(EnhancedResearchService.exploreTopics)
 
   // Literature search state
   const [searchType, setSearchType] = useState("keyword")
-  const paperSearch = useAsync(ResearchService.searchPapers)
+  const paperSearch = useAsync<any>(EnhancedResearchService.searchPapers)
 
   // Idea generation state
   const [ideaTopic, setIdeaTopic] = useState("")
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
-  const ideaGeneration = useAsync(ResearchService.generateIdeas)
+  const ideaGeneration = useAsync<{
+    content: string;
+    ideas: string[];
+    topic: string;
+    context: string;
+    count: number;
+    timestamp: string;
+  }>(EnhancedResearchService.generateIdeas)
 
   const handleTopicExploration = async () => {
     if (!topic.trim()) {
@@ -50,12 +154,12 @@ export default function ResearchExplorer() {
       await topicExploration.execute(topic, depth)
       toast({
         title: "Topic Explored",
-        description: "Research overview generated successfully.",
+        description: "AI-powered research overview generated successfully.",
       })
     } catch (error) {
       toast({
         title: "Exploration Failed",
-        description: "Failed to explore topic. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to explore topic. Please try again.",
         variant: "destructive",
       })
     }
@@ -69,7 +173,7 @@ export default function ResearchExplorer() {
     } catch (error) {
       toast({
         title: "Search Failed",
-        description: "Failed to search papers. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to search papers. Please try again.",
         variant: "destructive",
       })
     }
@@ -89,12 +193,12 @@ export default function ResearchExplorer() {
       await ideaGeneration.execute(ideaTopic, ideaContext, ideaCount)
       toast({
         title: "Ideas Generated",
-        description: `Generated ${ideaCount} research ideas successfully.`,
+        description: `Generated ${ideaCount} AI-powered research ideas successfully.`,
       })
     } catch (error) {
       toast({
         title: "Generation Failed",
-        description: "Failed to generate ideas. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to generate ideas. Please try again.",
         variant: "destructive",
       })
     }
@@ -269,7 +373,8 @@ export default function ResearchExplorer() {
                         if ("content" in topicExploration.data) {
                           content = topicExploration.data.content as string
                         } else if ("data" in topicExploration.data) {
-                          content = topicExploration.data.data as string
+                          const dataValue = (topicExploration.data as any).data
+                          content = typeof dataValue === "string" ? dataValue : JSON.stringify(dataValue, null, 2)
                         } else {
                           content = JSON.stringify(topicExploration.data, null, 2)
                         }
@@ -327,12 +432,17 @@ export default function ResearchExplorer() {
 
             {paperSearch.loading && <SkeletonList count={3} />}
 
-            {paperSearch.data && paperSearch.data.data && paperSearch.data.data.data && paperSearch.data.data.data.length > 0 ? (
+            {(() => {
+              const searchData = paperSearch.data as any
+              const papers = searchData?.data?.data || []
+              
+              if (papers.length > 0) {
+                return (
               <div className="space-y-4">
                 <div className="text-sm text-gray-600 mb-4">
-                  Found {paperSearch.data.data.count || paperSearch.data.data.data.length} papers
+                      Found {searchData?.data?.count || papers.length} papers
                 </div>
-                {paperSearch.data.data.data.map((paper: any, index: number) => (
+                    {papers.map((paper: any, index: number) => (
                   <Card key={paper.id || index}>
                     <CardHeader>
                       <CardTitle className="text-lg leading-tight">{paper.title || "Untitled Paper"}</CardTitle>
@@ -385,15 +495,21 @@ export default function ResearchExplorer() {
                   </Card>
                 ))}
               </div>
-            ) : (
-              paperSearch.data && (
+                )
+              }
+              
+              if (paperSearch.data) {
+                return (
                 <EmptyState
                   icon={BookOpen}
                   title="No papers found"
                   description="Try adjusting your search terms or exploring different keywords."
                 />
               )
-            )}
+              }
+              
+              return null
+            })()}
 
             {paperSearch.error && (
               <Card className="border-red-200 bg-red-50">
@@ -541,13 +657,10 @@ export default function ResearchExplorer() {
               <CardContent>
                 <ResearchChatbot
                   topic={topic || ideaTopic}
-                  papers={
-                    // Extract and transform papers to ensure correct type
-                    paperSearch.data && 
-                    paperSearch.data.data && 
-                    paperSearch.data.data.data ? 
-                    (paperSearch.data.data.data as any)?.data || [] : []
-                  }
+                  papers={(() => {
+                    const searchData = paperSearch.data as any
+                    return searchData?.data?.data || []
+                  })()}
                   ideas={ideaGeneration.data ? String(ideaGeneration.data) : undefined}
                   context={topicExploration.data ? String(topicExploration.data) : undefined}
                 />

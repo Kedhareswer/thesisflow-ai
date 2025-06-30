@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Brain, MessageSquare, BookOpen, Lightbulb, Search, Send } from "lucide-react"
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
+import { AIProviderService } from "@/lib/ai-providers"
+import { EnhancedAIService } from "@/lib/enhanced-ai-service"
 
 interface ChatMessage {
   id: string
@@ -41,7 +43,7 @@ export default function ResearchAssistant() {
       id: "welcome",
       role: "assistant",
       content:
-        "Hello! I'm your AI Research Assistant. I can help you with research questions, methodology advice, literature reviews, and more. How can I assist you today?",
+        "Hello! I'm your AI Research Assistant powered by advanced language models. I can help you with research questions, methodology advice, literature reviews, data analysis guidance, and more. How can I assist you today?",
       timestamp: new Date(),
     }
     setMessages([welcomeMessage])
@@ -62,13 +64,18 @@ export default function ResearchAssistant() {
     setLoading(true)
 
     try {
-      // Simulate AI response
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Generate contextual AI response using the enhanced AI service
+      const context = `You are an expert research assistant helping with academic and scientific research. 
+      Provide helpful, accurate, and detailed responses about research methodology, analysis, and best practices.
+      
+      User question: ${currentMessage}`
+
+      const response = await AIProviderService.generateResponse(context)
 
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: generateAIResponse(userMessage.content),
+        content: response.content,
         timestamp: new Date(),
       }
 
@@ -80,10 +87,27 @@ export default function ResearchAssistant() {
           response: assistantMessage.content,
         })
       }
-    } catch (error) {
+
       toast({
-        title: "Error",
-        description: "Failed to get response. Please try again.",
+        title: "Response generated",
+        description: "AI assistant has provided guidance on your research question",
+      })
+    } catch (error) {
+      console.error("Error generating AI response:", error)
+      
+      // Fallback response
+      const errorMessage: ChatMessage = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "I apologize, but I'm having trouble connecting to the AI service right now. Please check your AI provider configuration in settings and try again. In the meantime, I'd be happy to help if you can rephrase your question.",
+        timestamp: new Date(),
+      }
+
+      setMessages((prev) => [...prev, errorMessage])
+
+      toast({
+        title: "Service Unavailable",
+        description: "Please check your AI provider settings and try again.",
         variant: "destructive",
       })
     } finally {
@@ -96,13 +120,34 @@ export default function ResearchAssistant() {
 
     setLoading(true)
     try {
-      // Simulate research query processing
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Use enhanced AI service for research methodology advice
+      const constraints = ["Academic rigor", "Feasible timeline", "Available resources"]
+      const advice = await EnhancedAIService.generateMethodologyAdvice(
+        researchQuestion,
+        constraints
+      )
+
+      const detailedAnswer = `
+**Research Question Analysis:**
+${researchQuestion}
+
+**Recommended Approach:**
+${advice.recommendedApproach}
+
+**Alternative Approaches:**
+${advice.alternatives.map((alt, i) => `${i + 1}. ${alt}`).join('\n')}
+
+**Key Considerations:**
+${advice.considerations.map((consideration, i) => `• ${consideration}`).join('\n')}
+
+**Estimated Timeline:**
+${advice.timeline}
+      `.trim()
 
       const query: ResearchQuery = {
         id: `query-${Date.now()}`,
         question: researchQuestion,
-        answer: generateResearchAnswer(researchQuestion),
+        answer: detailedAnswer,
         category: categorizeQuestion(researchQuestion),
         timestamp: new Date(),
       }
@@ -111,13 +156,50 @@ export default function ResearchAssistant() {
       setResearchQuestion("")
 
       toast({
-        title: "Research query completed",
-        description: "Your question has been analyzed and answered",
+        title: "Research analysis complete",
+        description: "Your question has been analyzed with AI-powered methodology advice",
       })
     } catch (error) {
+      console.error("Error generating research advice:", error)
+      
+      // Fallback analysis
+      const fallbackAnswer = `
+**Research Question Analysis:**
+${researchQuestion}
+
+I'm having trouble connecting to the AI service right now. Here are some general research methodology guidelines:
+
+**General Approach:**
+1. Clearly define your research objectives and hypotheses
+2. Conduct a thorough literature review
+3. Choose appropriate research methods (quantitative, qualitative, or mixed)
+4. Design your data collection strategy
+5. Plan your analysis approach
+6. Consider ethical implications and limitations
+
+**Next Steps:**
+- Refine your research question to be more specific
+- Identify key variables and concepts
+- Review recent literature in your field
+- Consult with subject matter experts
+
+Please check your AI provider configuration and try again for more detailed guidance.
+      `.trim()
+
+      const query: ResearchQuery = {
+        id: `query-${Date.now()}`,
+        question: researchQuestion,
+        answer: fallbackAnswer,
+        category: categorizeQuestion(researchQuestion),
+        timestamp: new Date(),
+      }
+
+      setQueries((prev) => [query, ...prev])
+      setResearchQuestion("")
+
       toast({
-        title: "Query failed",
-        description: "Could not process your research question",
+        title: "Basic analysis provided",
+        description: "Check AI provider settings for enhanced analysis features",
         variant: "destructive",
       })
     } finally {
@@ -125,46 +207,17 @@ export default function ResearchAssistant() {
     }
   }
 
-  const generateAIResponse = (message: string): string => {
-    const lowerMessage = message.toLowerCase()
-
-    if (lowerMessage.includes("methodology") || lowerMessage.includes("method")) {
-      return "For research methodology, I recommend starting with a clear research question, then choosing appropriate methods based on your objectives. Consider mixed methods if you need both quantitative and qualitative insights. Would you like me to elaborate on any specific methodology?"
-    }
-
-    if (lowerMessage.includes("literature") || lowerMessage.includes("review")) {
-      return "For literature reviews, start by defining your search terms and databases. Use systematic approaches like PRISMA guidelines. I can help you identify key papers, analyze trends, and structure your review. What specific area are you reviewing?"
-    }
-
-    if (lowerMessage.includes("data") || lowerMessage.includes("analysis")) {
-      return "Data analysis approach depends on your research questions and data type. For quantitative data, consider statistical tests, regression analysis, or machine learning. For qualitative data, thematic analysis or content analysis might be appropriate. What type of data are you working with?"
-    }
-
-    return "That's an interesting question! I can help you explore this topic further. Could you provide more context about your research area or specific challenges you're facing? This will help me give you more targeted advice."
-  }
-
-  const generateResearchAnswer = (question: string): string => {
-    const lowerQuestion = question.toLowerCase()
-
-    if (lowerQuestion.includes("machine learning") || lowerQuestion.includes("ml")) {
-      return "Machine learning research typically involves problem formulation, data collection and preprocessing, model selection and training, evaluation, and interpretation. Key considerations include data quality, model interpretability, generalization, and ethical implications. Current trends focus on transformer architectures, federated learning, and explainable AI."
-    }
-
-    if (lowerQuestion.includes("deep learning") || lowerQuestion.includes("neural")) {
-      return "Deep learning research requires careful architecture design, proper regularization, and extensive experimentation. Consider transfer learning for limited data, attention mechanisms for sequence tasks, and proper evaluation metrics. Recent advances include vision transformers, large language models, and self-supervised learning."
-    }
-
-    return "This is a complex research question that requires systematic investigation. I recommend breaking it down into smaller, manageable components, conducting a thorough literature review, and developing a clear methodology. Consider the theoretical framework, data requirements, and potential limitations of your approach."
-  }
-
   const categorizeQuestion = (question: string): string => {
     const lowerQuestion = question.toLowerCase()
 
-    if (lowerQuestion.includes("machine learning") || lowerQuestion.includes("ml")) return "Machine Learning"
+    if (lowerQuestion.includes("machine learning") || lowerQuestion.includes("ml") || lowerQuestion.includes("ai")) return "AI/ML"
     if (lowerQuestion.includes("data")) return "Data Science"
-    if (lowerQuestion.includes("methodology")) return "Research Methods"
-    if (lowerQuestion.includes("literature")) return "Literature Review"
-    if (lowerQuestion.includes("statistics")) return "Statistics"
+    if (lowerQuestion.includes("methodology") || lowerQuestion.includes("method")) return "Research Methods"
+    if (lowerQuestion.includes("literature") || lowerQuestion.includes("review")) return "Literature Review"
+    if (lowerQuestion.includes("statistics") || lowerQuestion.includes("analysis")) return "Statistics"
+    if (lowerQuestion.includes("psychology") || lowerQuestion.includes("behavior")) return "Psychology"
+    if (lowerQuestion.includes("medicine") || lowerQuestion.includes("health")) return "Medicine/Health"
+    if (lowerQuestion.includes("computer") || lowerQuestion.includes("software")) return "Computer Science"
 
     return "General Research"
   }
