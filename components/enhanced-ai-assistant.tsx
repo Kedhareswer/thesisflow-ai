@@ -67,8 +67,8 @@ export default function EnhancedAIAssistant() {
 
     setLoading(true)
     try {
-              if (compareMode) {
-          const prompt = `Generate research suggestions for: ${researchContext.topic}\nDescription: ${researchContext.description}`
+      if (compareMode) {
+        const prompt = `Generate research suggestions for: ${researchContext.topic}\nDescription: ${researchContext.description}`
           const results = await EnhancedAIService.compareProviderResponses(prompt, availableProviders)
         setComparisonResults(results)
       } else {

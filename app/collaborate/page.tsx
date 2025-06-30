@@ -165,8 +165,8 @@ export default function CollaboratePage() {
             id: 'demo-team-1',
             name: 'AI Research Lab',
             description: 'Exploring cutting-edge machine learning techniques and neural networks.',
-            members: [
-              {
+              members: [
+                {
                 id: user.id,
                 name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
                 email: user.email || '',
@@ -175,18 +175,18 @@ export default function CollaboratePage() {
                 joinedAt: new Date().toISOString(),
                 lastActive: new Date().toISOString(),
               }
-            ],
+              ],
             createdAt: new Date().toISOString(),
-            isPublic: false,
+              isPublic: false,
             category: 'Research',
             owner: user.id,
-          },
-          {
+            },
+            {
             id: 'demo-team-2',
             name: 'Data Science Team',
             description: 'Working on predictive analytics and statistical modeling projects.',
-            members: [
-              {
+              members: [
+                {
                 id: user.id,
                 name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
                 email: user.email || '',
@@ -195,13 +195,13 @@ export default function CollaboratePage() {
                 joinedAt: new Date().toISOString(),
                 lastActive: new Date().toISOString(),
               }
-            ],
+              ],
             createdAt: new Date().toISOString(),
-            isPublic: true,
+              isPublic: true,
             category: 'Research',
             owner: user.id,
           }
-        ]
+          ]
         
         setTeams(demoTeams)
         setSelectedTeamId(demoTeams[0].id)
@@ -375,8 +375,8 @@ export default function CollaboratePage() {
         .from('teams')
         .insert([
           {
-            name: newTeam.name.trim(),
-            description: newTeam.description.trim(),
+      name: newTeam.name.trim(),
+      description: newTeam.description.trim(),
             owner_id: user.id,
             is_public: newTeam.isPublic,
             category: newTeam.category,
@@ -401,15 +401,15 @@ export default function CollaboratePage() {
             joinedAt: new Date().toISOString(),
             lastActive: new Date().toISOString(),
           }],
-          createdAt: new Date().toISOString(),
-          isPublic: newTeam.isPublic,
-          category: newTeam.category,
+      createdAt: new Date().toISOString(),
+      isPublic: newTeam.isPublic,
+      category: newTeam.category,
           owner: user.id,
-        }
+    }
 
         setTeams(prev => [newTeamData, ...prev])
         setSelectedTeamId(newTeamData.id)
-        setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
+    setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
 
         toast({
           title: "Demo team created",
@@ -517,8 +517,8 @@ export default function CollaboratePage() {
           description: "This user needs to sign up first before being invited",
           variant: "destructive",
         })
-        return
-      }
+      return
+    }
 
       // Check if already a member
       const { data: existingMember } = await supabase
@@ -550,7 +550,7 @@ export default function CollaboratePage() {
 
       if (memberError) throw memberError
 
-      // Add system message
+    // Add system message
       const { error: messageError } = await supabase
         .from('chat_messages')
         .insert([
@@ -560,14 +560,14 @@ export default function CollaboratePage() {
             sender_name: 'System',
             content: `${existingUser.display_name || existingUser.email} joined the team`,
             message_type: 'system',
-          }
+    }
         ])
 
       if (messageError) throw messageError
 
       // Reload team members
       await loadTeamMembers(selectedTeamId)
-      setInviteEmail("")
+    setInviteEmail("")
 
       toast({
         title: "Member invited",
@@ -594,14 +594,14 @@ export default function CollaboratePage() {
             team_id: selectedTeamId,
             sender_id: user.id,
             sender_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-            content: newMessage.trim(),
+      content: newMessage.trim(),
             message_type: 'text',
-          }
+    }
         ])
 
       if (error) throw error
 
-      setNewMessage("")
+    setNewMessage("")
 
       // Emit socket event
       if (socket) {

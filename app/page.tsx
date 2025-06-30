@@ -102,8 +102,8 @@ export default function HomePage() {
                 className="focus-ring"
                 onClick={() => handleProtectedAction('/explorer')}
               >
-                Start Exploring
-                <ArrowRight className="ml-2 h-4 w-4" />
+                  Start Exploring
+                  <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button variant="outline" size="lg" asChild className="focus-ring">
                 <Link href="/signup">Create Account</Link>
