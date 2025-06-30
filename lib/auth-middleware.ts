@@ -12,7 +12,6 @@ export async function middleware(req: NextRequest) {
 
   // Protected routes that require authentication
   const protectedRoutes = [
-    "/workspace",
     "/research-assistant",
     "/ai-tools",
     "/collaborate",
@@ -47,7 +46,7 @@ export async function middleware(req: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (session && (req.nextUrl.pathname === "/login" || req.nextUrl.pathname === "/signup")) {
-    const redirectTo = req.nextUrl.searchParams.get("redirectTo") || "/workspace"
+    const redirectTo = req.nextUrl.searchParams.get("redirectTo") || "/explorer"
     return NextResponse.redirect(new URL(redirectTo, req.url))
   }
 

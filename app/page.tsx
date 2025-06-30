@@ -1,10 +1,24 @@
+"use client"
+
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe } from "lucide-react"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 export default function HomePage() {
+  const { user } = useSupabaseAuth()
+  const router = useRouter()
+
+  const handleProtectedAction = (href: string) => {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    router.push(href)
+  }
   const features = [
     {
       icon: Search,
@@ -26,9 +40,9 @@ export default function HomePage() {
     },
     {
       icon: Lightbulb,
-      title: "Idea Workspace",
-      description: "Generate and develop research ideas with AI-powered brainstorming tools.",
-      href: "/workspace",
+      title: "AI Tools",
+      description: "Access powerful AI-powered research tools and utilities for analysis.",
+      href: "/ai-tools",
     },
     {
       icon: Users,
@@ -73,8 +87,8 @@ export default function HomePage() {
             </Badge>
 
             <h1 className="text-display text-balance mb-6">
-              Advanced Machine Learning
-              <span className="block">Research Platform</span>
+              Bolt Research Hub
+              <span className="block">for research purposes</span>
             </h1>
 
             <p className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto leading-relaxed">
@@ -83,11 +97,13 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" asChild className="focus-ring">
-                <Link href="/explorer">
-                  Start Exploring
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
+              <Button 
+                size="lg" 
+                className="focus-ring"
+                onClick={() => handleProtectedAction('/explorer')}
+              >
+                Start Exploring
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button variant="outline" size="lg" asChild className="focus-ring">
                 <Link href="/signup">Create Account</Link>
@@ -124,11 +140,16 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent className="pt-0">
                   <CardDescription className="text-body mb-4">{feature.description}</CardDescription>
-                  <Button variant="ghost" size="sm" asChild className="p-0 h-auto font-normal">
-                    <Link href={feature.href} className="inline-flex items-center text-sm">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-0 h-auto font-normal"
+                    onClick={() => handleProtectedAction(feature.href)}
+                  >
+                    <span className="inline-flex items-center text-sm">
                       Learn more
                       <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
+                    </span>
                   </Button>
                 </CardContent>
               </Card>
@@ -183,10 +204,10 @@ export default function HomePage() {
               <Button
                 variant="outline"
                 size="lg"
-                asChild
                 className="border-background/20 text-background hover:bg-background/10 focus-ring"
+                onClick={() => handleProtectedAction('/explorer')}
               >
-                <Link href="/explorer">View Demo</Link>
+                View Demo
               </Button>
             </div>
           </div>

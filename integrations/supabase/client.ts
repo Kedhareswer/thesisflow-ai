@@ -2,11 +2,20 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/integrations/supabase/types';
 
-// Get the Supabase URL and key from environment variables
+// Get the Supabase URL and key from environment variables with validation
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Validate environment variables
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error('Missing Supabase environment variables. Please check your .env file.');
+  console.error('Required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(
+  SUPABASE_URL || 'https://placeholder.supabase.co', 
+  SUPABASE_PUBLISHABLE_KEY || 'placeholder-key'
+);

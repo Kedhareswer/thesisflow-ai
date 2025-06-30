@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 
 // Securely access environment variables
 const getSupabaseConfig = () => {
-  const supabaseUrl = "https://hpobxsdixpkfiwonhszv.supabase.co";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
   // Validate environment variables are set
@@ -32,7 +32,7 @@ let supabase: SupabaseClient;
 try {
   // Get config from environment variables only
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
-  console.log("Using Supabase URL:", supabaseUrl); // Log only the domain for verification, not credentials
+  console.log("Using Supabase URL:", supabaseUrl ? supabaseUrl.split('.')[0] + '.supabase.co' : 'Not configured'); // Log only the domain for verification, not credentials
   
   // Create the Supabase client with validated values
   supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -41,10 +41,10 @@ try {
   // In a real app, you might want to show a more user-friendly error or fallback UI
   // For development, we'll create a minimal mock client that won't break the app
   if (typeof window !== 'undefined') {
-    window.alert('Supabase environment variables are missing. Authentication features will not work.');
+    console.warn('Supabase environment variables are missing. Authentication features will not work.');
   }
   // Create a minimal mock client to prevent TypeScript errors
-  supabase = createClient('https://example.com', 'mock-key');
+  supabase = createClient('https://placeholder.supabase.co', 'placeholder-key');
 }
 
 type SupabaseAuthContextType = {
