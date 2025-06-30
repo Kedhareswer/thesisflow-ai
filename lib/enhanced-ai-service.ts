@@ -452,8 +452,8 @@ Return a JSON object with this structure:
           readability: 75,
           sentiment: 'neutral',
           wordCount: text.split(/\s+/).length
-        }
-      }
+    }
+  }
     }
   }
 
@@ -486,7 +486,7 @@ Return a JSON object with this structure:
       return { 
         valid: false, 
         error: error instanceof Error ? error.message : 'Unknown error'
-      }
+        }
     }
   }
 }

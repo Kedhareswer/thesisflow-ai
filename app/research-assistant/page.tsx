@@ -78,7 +78,7 @@ export default function ResearchAssistant() {
       toast({
         title: "Research ideas generated!",
         description: `Generated ${result.ideas.length} research ideas for "${topic}"`,
-      })
+        })
     } catch (error) {
       console.error('Research generation error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate research ideas'
@@ -91,11 +91,11 @@ export default function ResearchAssistant() {
           variant: "destructive",
         })
       } else {
-        toast({
+      toast({
           title: "Generation failed",
           description: errorMessage,
-          variant: "destructive",
-        })
+        variant: "destructive",
+      })
       }
     } finally {
       setLoading(false)
@@ -177,26 +177,26 @@ export default function ResearchAssistant() {
           <h1 className="text-3xl font-bold">Research Assistant</h1>
           <p className="text-muted-foreground">Generate innovative research ideas with AI assistance</p>
         </div>
-      </div>
+        </div>
 
       <Tabs defaultValue="generate" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="generate">Generate Ideas</TabsTrigger>
           <TabsTrigger value="saved">Saved Ideas ({savedIdeas.length})</TabsTrigger>
-        </TabsList>
+          </TabsList>
 
         <TabsContent value="generate" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
                 Research Topic Input
-              </CardTitle>
-              <CardDescription>
+                    </CardTitle>
+                    <CardDescription>
                 Enter your research topic and optional context to generate innovative research ideas
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
               <div>
                 <label htmlFor="topic" className="text-sm font-medium mb-2 block">
                   Research Topic *
@@ -264,7 +264,7 @@ export default function ResearchAssistant() {
                       <div className="flex-1">
                         <CardTitle className="text-lg">{idea.title}</CardTitle>
                         <CardDescription className="mt-2">{idea.description}</CardDescription>
-                      </div>
+                          </div>
                       {user && (
                         <Button
                           size="sm"
@@ -317,14 +317,14 @@ export default function ResearchAssistant() {
                       <div>
                         <h4 className="font-medium text-sm text-muted-foreground mb-1">Challenges</h4>
                         <p className="text-sm">{idea.challenges}</p>
-                      </div>
+                    </div>
                     )}
                   </CardContent>
                 </Card>
               ))}
             </div>
           )}
-        </TabsContent>
+          </TabsContent>
 
         <TabsContent value="saved" className="space-y-6">
           {savedIdeas.length === 0 ? (
@@ -350,7 +350,7 @@ export default function ResearchAssistant() {
               
               {savedIdeas.map((idea) => (
                 <Card key={idea.id}>
-                  <CardHeader>
+                <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <CardTitle className="text-lg">{idea.title}</CardTitle>
@@ -392,15 +392,15 @@ export default function ResearchAssistant() {
                       <div>
                         <h4 className="font-medium text-sm text-muted-foreground mb-1">Challenges</h4>
                         <p className="text-sm">{idea.challenges}</p>
-                      </div>
+                    </div>
                     )}
-                  </CardContent>
-                </Card>
+                </CardContent>
+              </Card>
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
     </div>
   )
 }
