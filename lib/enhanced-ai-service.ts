@@ -27,8 +27,8 @@ export interface AIResponse {
 
 export interface ResearchResult {
   ideas: Array<{
-    title: string
-    description: string
+  title: string
+  description: string
     research_question?: string
     methodology?: string
     impact?: string

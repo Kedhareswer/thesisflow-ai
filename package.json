@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:full": "concurrently \"npm run dev\" \"npm run websocket\"",
+    "websocket": "node server/websocket-server.js",
     "build": "next build",
     "start": "next start",
+    "start:full": "concurrently \"npm run start\" \"npm run websocket\"",
     "lint": "next lint"
   },
   "dependencies": {
@@ -49,6 +52,7 @@
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
+    "concurrently": "^8.2.2",
     "clsx": "^2.1.1",
     "cmdk": "latest",
     "date-fns": "latest",
