@@ -1,4 +1,5 @@
 import { AIProviderService, type AIProvider, type AIResponse } from "./ai-providers"
+import { AIProviderDetector } from "./ai-provider-detector"
 
 export interface ResearchContext {
   topic: string
@@ -31,8 +32,15 @@ export interface SummaryOptions {
 export class EnhancedAIService {
   static async getResearchSuggestions(
     context: ResearchContext,
-    provider: AIProvider = "gemini",
+    provider?: AIProvider,
   ): Promise<ResearchSuggestion[]> {
+    // Use best available provider if none specified
+    if (!provider) {
+      provider = AIProviderDetector.getBestProvider()
+      if (!provider) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
     const prompt = `As an expert research advisor, analyze this research context and provide 3 innovative research suggestions:
 
 Research Topic: ${context.topic}
@@ -83,7 +91,14 @@ Respond with ONLY a valid JSON array of 3 objects with these exact fields:
     }
   }
 
-  static async summarizeText(text: string, options: SummaryOptions, provider: AIProvider = "gemini"): Promise<string> {
+  static async summarizeText(text: string, options: SummaryOptions, provider?: AIProvider): Promise<string> {
+    // Use best available provider if none specified
+    if (!provider) {
+      provider = AIProviderDetector.getBestProvider()
+      if (!provider) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
     const lengthMap = {
       short: "1-2 paragraphs",
       medium: "3-4 paragraphs",
@@ -115,8 +130,15 @@ Summary:`
     topic: string,
     count = 5,
     context?: string,
-    provider: AIProvider = "gemini",
+    provider?: AIProvider,
   ): Promise<string[]> {
+    // Use best available provider if none specified
+    if (!provider) {
+      provider = AIProviderDetector.getBestProvider()
+      if (!provider) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
     const prompt = `Generate ${count} innovative research ideas for the topic: "${topic}"
 ${context ? `Context: ${context}` : ""}
 
@@ -143,7 +165,7 @@ Format as a numbered list with brief descriptions.`
   static async analyzeResearchGaps(
     topic: string,
     existingLiterature: string,
-    provider: AIProvider = "gemini",
+    provider?: AIProvider,
   ): Promise<{
     gaps: string[]
     opportunities: string[]
@@ -161,6 +183,14 @@ Provide:
 
 Format as JSON with arrays for "gaps", "opportunities", and "recommendations".`
 
+    // Use best available provider if none specified
+    if (!provider) {
+      provider = AIProviderDetector.getBestProvider()
+      if (!provider) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
+
     const response = await AIProviderService.generateResponse(prompt, provider)
 
     try {
@@ -175,7 +205,7 @@ Format as JSON with arrays for "gaps", "opportunities", and "recommendations".`
   static async generateMethodologyAdvice(
     researchQuestion: string,
     constraints: string[],
-    provider: AIProvider = "gemini",
+    provider?: AIProvider,
   ): Promise<{
     recommendedApproach: string
     alternatives: string[]
@@ -194,6 +224,14 @@ Recommend:
 
 Format as JSON with fields: "recommendedApproach", "alternatives", "considerations", "timeline".`
 
+    // Use best available provider if none specified
+    if (!provider) {
+      provider = AIProviderDetector.getBestProvider()
+      if (!provider) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
+
     const response = await AIProviderService.generateResponse(prompt, provider)
 
     try {
@@ -207,8 +245,15 @@ Format as JSON with fields: "recommendedApproach", "alternatives", "consideratio
 
   static async compareProviderResponses(
     prompt: string,
-    providers: AIProvider[],
+    providers?: AIProvider[],
   ): Promise<Record<AIProvider, AIResponse>> {
+    // Use all available providers if none specified
+    if (!providers) {
+      providers = AIProviderDetector.getFallbackProviders()
+      if (providers.length === 0) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
     const results: Record<string, AIResponse> = {}
 
     await Promise.allSettled(

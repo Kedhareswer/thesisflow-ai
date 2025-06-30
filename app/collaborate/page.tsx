@@ -27,6 +27,10 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react"
+import { useSocket } from "@/components/socket-provider"
+import { useToast } from "@/hooks/use-toast"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { supabase } from "@/integrations/supabase/client"
 
 // Type definitions
 interface User {
@@ -61,62 +65,12 @@ interface ChatMessage {
   type: "text" | "system"
 }
 
-// Custom hook for safe localStorage
-function useLocalStorage<T>(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = useState<T>(initialValue)
-
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const item = window.localStorage.getItem(key)
-        if (item) {
-          setStoredValue(JSON.parse(item))
-        }
-      }
-    } catch (error) {
-      console.warn(`Error reading localStorage key "${key}":`, error)
-    }
-  }, [key])
-
-  const setValue = useCallback(
-    (value: T | ((val: T) => T)) => {
-      try {
-        const valueToStore = value instanceof Function ? value(storedValue) : value
-        setStoredValue(valueToStore)
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(key, JSON.stringify(valueToStore))
-        }
-      } catch (error) {
-        console.warn(`Error setting localStorage key "${key}":`, error)
-      }
-    },
-    [key, storedValue],
-  )
-
-  return [storedValue, setValue] as const
-}
-
-// Toast notification hook (simplified)
-function useToast() {
-  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "success" | "error" }>>([])
-
-  const toast = useCallback((message: string, type: "success" | "error" = "success") => {
-    const id = Math.random().toString(36).substr(2, 9)
-    setToasts((prev) => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, 3000)
-  }, [])
-
-  return { toast, toasts }
-}
-
 export default function CollaboratePage() {
   // State management
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [teams, setTeams] = useLocalStorage<Team[]>("collaboration_teams", [])
-  const [messages, setMessages] = useLocalStorage<ChatMessage[]>("collaboration_messages", [])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [newMessage, setNewMessage] = useState("")
@@ -128,98 +82,236 @@ export default function CollaboratePage() {
     isPublic: false,
   })
 
-  const { toast, toasts } = useToast()
+  const { toast } = useToast()
+  const { socket } = useSocket()
+  const { user, isLoading: authLoading } = useSupabaseAuth()
 
-  // Current user (mock)
-  const currentUser: User = {
-    id: "current-user",
-    name: "You",
-    email: "you@example.com",
-    status: "online",
-    role: "owner",
-    joinedAt: new Date().toISOString(),
-    lastActive: new Date().toISOString(),
-  }
-
-  // Initialize data
+  // Initialize data from Supabase
   useEffect(() => {
     const initializeData = async () => {
+      if (!user || authLoading) return
+
       try {
         setIsLoading(true)
         setError(null)
 
-        // If no teams exist, create sample data
-        if (teams.length === 0) {
-          const sampleTeams: Team[] = [
-            {
-              id: "team-1",
-              name: "ML Research Group",
-              description: "Collaborative research on machine learning algorithms and applications",
-              members: [
-                currentUser,
-                {
-                  id: "user-2",
-                  name: "Dr. Sarah Chen",
-                  email: "sarah@university.edu",
-                  status: "online",
-                  role: "editor",
-                  joinedAt: new Date(Date.now() - 86400000).toISOString(),
-                  lastActive: new Date(Date.now() - 300000).toISOString(),
-                },
-                {
-                  id: "user-3",
-                  name: "Alex Rodriguez",
-                  email: "alex@research.com",
-                  status: "away",
-                  role: "viewer",
-                  joinedAt: new Date(Date.now() - 172800000).toISOString(),
-                  lastActive: new Date(Date.now() - 3600000).toISOString(),
-                },
-              ],
-              createdAt: new Date(Date.now() - 604800000).toISOString(),
-              isPublic: false,
-              category: "Research",
-              owner: currentUser.id,
-            },
-            {
-              id: "team-2",
-              name: "Data Science Study Group",
-              description: "Weekly discussions on data science topics and projects",
-              members: [
-                currentUser,
-                {
-                  id: "user-4",
-                  name: "Emma Wilson",
-                  email: "emma@datascience.org",
-                  status: "offline",
-                  role: "admin",
-                  joinedAt: new Date(Date.now() - 259200000).toISOString(),
-                  lastActive: new Date(Date.now() - 7200000).toISOString(),
-                },
-              ],
-              createdAt: new Date(Date.now() - 1209600000).toISOString(),
-              isPublic: true,
-              category: "Study Group",
-              owner: currentUser.id,
-            },
-          ]
-          setTeams(sampleTeams)
-          setSelectedTeamId(sampleTeams[0].id)
-        } else if (teams.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(teams[0].id)
+        // Fetch user's teams
+        const { data: teamsData, error: teamsError } = await supabase
+          .from('teams')
+          .select(`
+            *,
+            team_members!inner(
+              user_id,
+              role,
+              joined_at
+            )
+          `)
+          .eq('team_members.user_id', user.id)
+
+        // Handle the case where no teams are found (not an error)
+        if (teamsError && teamsError.code !== 'PGRST116') {
+          throw teamsError
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate loading
+        // Transform the data to match our interface (handle null/empty results)
+        const transformedTeams: Team[] = (teamsData || []).map((team: any) => ({
+          id: team.id,
+          name: team.name,
+          description: team.description || "",
+          members: [], // Will be populated separately
+          createdAt: team.created_at,
+          isPublic: team.is_public || false,
+          category: team.category || "Research",
+          owner: team.owner_id,
+        }))
+
+        setTeams(transformedTeams)
+
+        // Select first team if available
+        if (transformedTeams.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(transformedTeams[0].id)
+        }
+
+        // Fetch team members for each team
+        for (const team of transformedTeams) {
+          await loadTeamMembers(team.id)
+        }
+
+        // Show appropriate message based on results
+        if (transformedTeams.length > 0) {
+          toast({
+            title: "Teams loaded",
+            description: `Found ${transformedTeams.length} team(s)`,
+          })
+        } else {
+          toast({
+            title: "Welcome to Collaboration",
+            description: "Create your first team to get started!",
+          })
+        }
       } catch (err) {
-        console.error("Error initializing data:", err)
-        setError("Failed to load collaboration data")
+        // Silently handle errors and show demo mode
+        console.log("Database connection not available, using demo mode")
+        
+        // Always show demo mode if there's any error
+        toast({
+          title: "Demo Mode",
+          description: "Using demo collaboration workspace. Database connection not available.",
+        })
+        
+        // Create demo teams for demonstration
+        const demoTeams: Team[] = [
+          {
+            id: 'demo-team-1',
+            name: 'AI Research Lab',
+            description: 'Exploring cutting-edge machine learning techniques and neural networks.',
+            members: [
+              {
+                id: user.id,
+                name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
+                email: user.email || '',
+                status: 'online',
+                role: 'owner',
+                joinedAt: new Date().toISOString(),
+                lastActive: new Date().toISOString(),
+              }
+            ],
+            createdAt: new Date().toISOString(),
+            isPublic: false,
+            category: 'Research',
+            owner: user.id,
+          },
+          {
+            id: 'demo-team-2',
+            name: 'Data Science Team',
+            description: 'Working on predictive analytics and statistical modeling projects.',
+            members: [
+              {
+                id: user.id,
+                name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
+                email: user.email || '',
+                status: 'online',
+                role: 'owner',
+                joinedAt: new Date().toISOString(),
+                lastActive: new Date().toISOString(),
+              }
+            ],
+            createdAt: new Date().toISOString(),
+            isPublic: true,
+            category: 'Research',
+            owner: user.id,
+          }
+        ]
+        
+        setTeams(demoTeams)
+        setSelectedTeamId(demoTeams[0].id)
       } finally {
         setIsLoading(false)
       }
     }
 
     initializeData()
-  }, [teams.length, selectedTeamId, setTeams])
+  }, [user, authLoading, selectedTeamId, supabase, toast])
+
+  // Load team members
+  const loadTeamMembers = async (teamId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select(`
+          *,
+          user_profiles!inner(*)
+        `)
+        .eq('team_id', teamId)
+
+      if (error) throw error
+
+      // Transform members data
+      const members: User[] = data.map((member: any) => ({
+        id: member.user_id,
+        name: member.user_profiles?.display_name || member.user_profiles?.email?.split('@')[0] || 'Unknown',
+        email: member.user_profiles?.email || '',
+        avatar: member.user_profiles?.avatar_url,
+        status: "offline", // Will be updated via real-time presence
+        role: member.role,
+        joinedAt: member.joined_at,
+        lastActive: member.user_profiles?.last_active || new Date().toISOString(),
+      }))
+
+      // Update the team with members
+      setTeams(prev => prev.map(team => 
+        team.id === teamId 
+          ? { ...team, members }
+          : team
+      ))
+    } catch (error) {
+      console.error("Error loading team members:", error)
+    }
+  }
+
+  // Load chat messages for selected team
+  useEffect(() => {
+    if (!selectedTeamId || !user) return
+
+    const loadMessages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('team_id', selectedTeamId)
+          .order('created_at', { ascending: true })
+          .limit(50)
+
+        if (error) throw error
+
+        const transformedMessages: ChatMessage[] = data.map((msg: any) => ({
+          id: msg.id,
+          senderId: msg.sender_id,
+          senderName: msg.sender_name,
+          content: msg.content,
+          timestamp: msg.created_at,
+          teamId: msg.team_id,
+          type: msg.message_type || "text",
+        }))
+
+        setMessages(transformedMessages)
+      } catch (error) {
+        console.error("Error loading messages:", error)
+      }
+    }
+
+    loadMessages()
+
+    // Subscribe to real-time messages
+    const messageSubscription = supabase
+      .channel(`chat:${selectedTeamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `team_id=eq.${selectedTeamId}`,
+        },
+        (payload: any) => {
+          const newMessage: ChatMessage = {
+            id: payload.new.id,
+            senderId: payload.new.sender_id,
+            senderName: payload.new.sender_name,
+            content: payload.new.content,
+            timestamp: payload.new.created_at,
+            teamId: payload.new.team_id,
+            type: payload.new.message_type || "text",
+          }
+          setMessages(prev => [...prev, newMessage])
+        }
+      )
+      .subscribe()
+
+    return () => {
+      messageSubscription.unsubscribe()
+    }
+  }, [selectedTeamId, user, supabase])
 
   // Helper functions
   const getStatusColor = (status: User["status"]) => {
@@ -267,94 +359,265 @@ export default function CollaboratePage() {
   }
 
   // Event handlers
-  const handleCreateTeam = () => {
-    if (!newTeam.name.trim()) {
-      toast("Team name is required", "error")
+  const handleCreateTeam = async () => {
+    if (!newTeam.name.trim() || !user) {
+      toast({
+        title: "Missing information",
+        description: "Team name is required and you must be logged in",
+        variant: "destructive",
+      })
       return
     }
 
-    const team: Team = {
-      id: `team-${Date.now()}`,
-      name: newTeam.name.trim(),
-      description: newTeam.description.trim(),
-      members: [currentUser],
-      createdAt: new Date().toISOString(),
-      isPublic: newTeam.isPublic,
-      category: newTeam.category,
-      owner: currentUser.id,
-    }
+    try {
+      // Check if we're in demo mode by trying to create team in database
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .insert([
+          {
+            name: newTeam.name.trim(),
+            description: newTeam.description.trim(),
+            owner_id: user.id,
+            is_public: newTeam.isPublic,
+            category: newTeam.category,
+          }
+        ])
+        .select()
+        .single()
 
-    setTeams((prev) => [team, ...prev])
-    setSelectedTeamId(team.id)
-    setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
-    toast(`Team "${team.name}" created successfully!`)
+      // If database connection fails, create demo team locally
+      if (teamError && (teamError.message?.includes('Invalid URL') || teamError.message?.includes('placeholder'))) {
+        // Demo mode - create team locally
+        const newTeamData: Team = {
+          id: `demo-team-${Date.now()}`,
+          name: newTeam.name.trim(),
+          description: newTeam.description.trim() || "",
+          members: [{
+            id: user.id,
+            name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
+            email: user.email || '',
+            status: "online",
+            role: "owner",
+            joinedAt: new Date().toISOString(),
+            lastActive: new Date().toISOString(),
+          }],
+          createdAt: new Date().toISOString(),
+          isPublic: newTeam.isPublic,
+          category: newTeam.category,
+          owner: user.id,
+        }
+
+        setTeams(prev => [newTeamData, ...prev])
+        setSelectedTeamId(newTeamData.id)
+        setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
+
+        toast({
+          title: "Demo team created",
+          description: `"${newTeamData.name}" created in demo mode. Set up database for persistence.`,
+        })
+        return
+      }
+
+      if (teamError) throw teamError
+
+      // Add creator as team member
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          {
+            team_id: teamData.id,
+            user_id: user.id,
+            role: 'owner',
+          }
+        ])
+
+      if (memberError) throw memberError
+
+      // Transform to local format
+      const newTeamData: Team = {
+        id: teamData.id,
+        name: teamData.name,
+        description: teamData.description || "",
+        members: [{
+          id: user.id,
+          name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
+          email: user.email || '',
+          status: "online",
+          role: "owner",
+          joinedAt: new Date().toISOString(),
+          lastActive: new Date().toISOString(),
+        }],
+        createdAt: teamData.created_at,
+        isPublic: teamData.is_public || false,
+        category: teamData.category || "Research",
+        owner: teamData.owner_id,
+      }
+
+      setTeams(prev => [newTeamData, ...prev])
+      setSelectedTeamId(newTeamData.id)
+      setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
+
+      toast({
+        title: "Team created",
+        description: `"${newTeamData.name}" has been created successfully!`,
+      })
+
+      // Emit socket event for real-time updates
+      if (socket) {
+        socket.emit("team_created", {
+          teamId: newTeamData.id,
+          name: newTeamData.name,
+        })
+      }
+    } catch (error) {
+      console.error("Error creating team:", error)
+      toast({
+        title: "Creation failed",
+        description: "Could not create team. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleInviteMember = () => {
-    if (!inviteEmail.trim() || !selectedTeamId) {
-      toast("Email address is required", "error")
+  const handleInviteMember = async () => {
+    if (!inviteEmail.trim() || !selectedTeamId || !user) {
+      toast({
+        title: "Missing information",
+        description: "Email address and team selection are required",
+        variant: "destructive",
+      })
       return
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(inviteEmail)) {
-      toast("Please enter a valid email address", "error")
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      })
       return
     }
 
-    const selectedTeam = teams.find((t) => t.id === selectedTeamId)
-    if (!selectedTeam) return
+    try {
+      // Check if user exists in user_profiles
+      const { data: existingUser, error: userError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('email', inviteEmail)
+        .single()
 
-    if (selectedTeam.members.some((m) => m.email === inviteEmail)) {
-      toast("User is already a member of this team", "error")
-      return
+      if (userError && userError.code !== 'PGRST116') {
+        throw userError
+      }
+
+      if (!existingUser) {
+        toast({
+          title: "User not found",
+          description: "This user needs to sign up first before being invited",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Check if already a member
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', selectedTeamId)
+        .eq('user_id', existingUser.user_id)
+        .single()
+
+      if (existingMember) {
+        toast({
+          title: "Already a member",
+          description: "This user is already a member of this team",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Add member to team
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          {
+            team_id: selectedTeamId,
+            user_id: existingUser.user_id,
+            role: 'viewer',
+          }
+        ])
+
+      if (memberError) throw memberError
+
+      // Add system message
+      const { error: messageError } = await supabase
+        .from('chat_messages')
+        .insert([
+          {
+            team_id: selectedTeamId,
+            sender_id: 'system',
+            sender_name: 'System',
+            content: `${existingUser.display_name || existingUser.email} joined the team`,
+            message_type: 'system',
+          }
+        ])
+
+      if (messageError) throw messageError
+
+      // Reload team members
+      await loadTeamMembers(selectedTeamId)
+      setInviteEmail("")
+
+      toast({
+        title: "Member invited",
+        description: `${inviteEmail} has been added to the team`,
+      })
+    } catch (error) {
+      console.error("Error inviting member:", error)
+      toast({
+        title: "Invitation failed",
+        description: "Could not invite member. Please try again.",
+        variant: "destructive",
+      })
     }
-
-    const newMember: User = {
-      id: `user-${Date.now()}`,
-      name: inviteEmail.split("@")[0].charAt(0).toUpperCase() + inviteEmail.split("@")[0].slice(1),
-      email: inviteEmail,
-      status: "offline",
-      role: "viewer",
-      joinedAt: new Date().toISOString(),
-      lastActive: new Date().toISOString(),
-    }
-
-    setTeams((prev) =>
-      prev.map((team) => (team.id === selectedTeamId ? { ...team, members: [...team.members, newMember] } : team)),
-    )
-
-    // Add system message
-    const systemMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      senderId: "system",
-      senderName: "System",
-      content: `${newMember.name} joined the team`,
-      timestamp: new Date().toISOString(),
-      teamId: selectedTeamId,
-      type: "system",
-    }
-
-    setMessages((prev) => [...prev, systemMessage])
-    setInviteEmail("")
-    toast(`Invitation sent to ${inviteEmail}`)
   }
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedTeamId) return
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedTeamId || !user) return
 
-    const message: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      content: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-      teamId: selectedTeamId,
-      type: "text",
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert([
+          {
+            team_id: selectedTeamId,
+            sender_id: user.id,
+            sender_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+            content: newMessage.trim(),
+            message_type: 'text',
+          }
+        ])
+
+      if (error) throw error
+
+      setNewMessage("")
+
+      // Emit socket event
+      if (socket) {
+        socket.emit("message_sent", {
+          teamId: selectedTeamId,
+          content: newMessage.trim(),
+        })
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      toast({
+        title: "Message failed",
+        description: "Could not send message. Please try again.",
+        variant: "destructive",
+      })
     }
-
-    setMessages((prev) => [...prev, message])
-    setNewMessage("")
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -405,20 +668,31 @@ export default function CollaboratePage() {
     )
   }
 
+  // Auth check
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+              <p className="text-gray-600 mb-4">Please sign in to access collaboration features</p>
+              <Button onClick={() => window.location.href = '/login'} className="w-full">
+                Sign In
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Toast notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`px-4 py-2 rounded-md shadow-lg ${
-              toast.type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"
-            }`}
-          >
-            {toast.message}
-          </div>
-        ))}
+        {/* Toast notifications from useToast */}
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">

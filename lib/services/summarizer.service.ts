@@ -1,4 +1,6 @@
 import { api } from "@/lib/utils/api"
+import { supabase } from "@/integrations/supabase/client"
+import type { Summary, SummaryInsert } from "@/src/integrations/supabase/types"
 
 // Define response types for API calls
 interface GenerateResponse {
@@ -17,13 +19,14 @@ export interface SummaryResult {
   summary: string
   keyPoints: string[]
   readingTime?: number
+  id?: string // Add ID for database reference
 }
 
 export class SummarizerService {
   /**
    * Summarize text content using AI
    */
-  static async summarizeText(text: string): Promise<SummaryResult> {
+  static async summarizeText(text: string, saveToDatabase = true): Promise<SummaryResult> {
     try {
       const response = await api.post<GenerateResponse>("/api/ai/generate", {
         prompt: `You are an expert research paper summarizer. Summarize the following text in a clear, concise manner. 
@@ -48,7 +51,33 @@ export class SummarizerService {
         ${text.substring(0, 8000)}`, // Limit input to prevent token overflow
       })
 
-      return this.parseSummaryResponse(response.data, text.length)
+      const result = this.parseSummaryResponse(response.data, text.length)
+
+      // Save to database if user is authenticated and saveToDatabase is true
+      if (saveToDatabase) {
+        try {
+          const title = text.length > 50 
+            ? text.substring(0, 50) + "..." 
+            : text
+          
+          const savedSummary = await this.saveSummary(
+            title,
+            text,
+            result.summary,
+            result.keyPoints,
+            'text',
+            undefined,
+            result.readingTime
+          )
+          
+          result.id = savedSummary.id
+        } catch (dbError) {
+          console.warn("Failed to save summary to database:", dbError)
+          // Don't throw error here, just continue without saving
+        }
+      }
+
+      return result
     } catch (error) {
       console.error("Error summarizing text:", error)
       throw new Error("Failed to summarize text. Please try again.")
@@ -58,7 +87,7 @@ export class SummarizerService {
   /**
    * Summarize content from a URL using AI
    */
-  static async summarizeUrl(url: string): Promise<SummaryResult> {
+  static async summarizeUrl(url: string, saveToDatabase = true): Promise<SummaryResult> {
     try {
       console.log("Fetching URL content:", url)
 
@@ -73,7 +102,37 @@ export class SummarizerService {
       console.log("Extracted content length:", content.length)
 
       // Then summarize the extracted content
-      return this.summarizeText(content)
+      const result = await this.summarizeText(content, false) // Don't auto-save as text
+
+      // Save to database if user is authenticated and saveToDatabase is true
+      if (saveToDatabase) {
+        try {
+          let title = "URL Summary"
+          try {
+            const urlObj = new URL(url)
+            title = urlObj.hostname.replace(/^www\./, '') + urlObj.pathname.split('/').pop()
+          } catch (e) {
+            title = "URL Summary"
+          }
+
+          const savedSummary = await this.saveSummary(
+            title,
+            content,
+            result.summary,
+            result.keyPoints,
+            'url',
+            url,
+            result.readingTime
+          )
+          
+          result.id = savedSummary.id
+        } catch (dbError) {
+          console.warn("Failed to save URL summary to database:", dbError)
+          // Don't throw error here, just continue without saving
+        }
+      }
+
+      return result
     } catch (error) {
       console.error("Error summarizing URL:", error)
       throw new Error("Failed to process URL. Please check the link and try again.")
@@ -83,7 +142,7 @@ export class SummarizerService {
   /**
    * Summarize content from an uploaded file using AI
    */
-  static async summarizeFile(file: File): Promise<SummaryResult> {
+  static async summarizeFile(file: File, saveToDatabase = true): Promise<SummaryResult> {
     try {
       console.log("Processing file:", file.name, file.type, file.size)
 
@@ -102,11 +161,115 @@ export class SummarizerService {
       console.log("Extracted text length:", extractedText.length)
 
       // Then summarize the extracted text
-      return this.summarizeText(extractedText)
+      const result = await this.summarizeText(extractedText, false) // Don't auto-save as text
+
+      // Save to database if user is authenticated and saveToDatabase is true
+      if (saveToDatabase) {
+        try {
+          const savedSummary = await this.saveSummary(
+            file.name,
+            extractedText,
+            result.summary,
+            result.keyPoints,
+            'file',
+            undefined,
+            result.readingTime
+          )
+          
+          result.id = savedSummary.id
+        } catch (dbError) {
+          console.warn("Failed to save file summary to database:", dbError)
+          // Don't throw error here, just continue without saving
+        }
+      }
+
+      return result
     } catch (error) {
       console.error("Error summarizing file:", error)
       throw new Error("Failed to process file. Please try a different file format.")
     }
+  }
+
+  /**
+   * Save summary to database
+   */
+  static async saveSummary(
+    title: string,
+    originalContent: string,
+    summary: string,
+    keyPoints: string[],
+    sourceType: 'text' | 'file' | 'url',
+    sourceUrl?: string,
+    readingTime?: number
+  ): Promise<Summary> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const summaryData: SummaryInsert = {
+      title,
+      original_content: originalContent,
+      summary_content: summary,
+      key_points: keyPoints,
+      source_type: sourceType,
+      source_url: sourceUrl,
+      reading_time: readingTime,
+      user_id: user.id,
+    }
+
+    const { data, error } = await supabase
+      .from('summaries')
+      .insert(summaryData)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+
+  /**
+   * Get user's summaries
+   */
+  static async getSummaries(): Promise<Summary[]> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('summaries')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  }
+
+  /**
+   * Get a specific summary
+   */
+  static async getSummary(id: string): Promise<Summary | null> {
+    const { data, error } = await supabase
+      .from('summaries')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw error
+    }
+    return data
+  }
+
+  /**
+   * Delete a summary
+   */
+  static async deleteSummary(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('summaries')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
   }
 
   /**

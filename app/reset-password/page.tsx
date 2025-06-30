@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
         title: "Password updated",
         description: "Your password has been successfully updated.",
       })
-      router.push("/workspace")
+      router.push("/explorer")
     } catch (error) {
       // Error is handled by the auth provider
     } finally {

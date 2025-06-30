@@ -13,7 +13,7 @@ import { AIProviderService, type AIProvider, AI_PROVIDERS } from "@/lib/ai-provi
 import { useToast } from "@/hooks/use-toast"
 
 interface AIProviderSelectorProps {
-  selectedProvider: AIProvider
+  selectedProvider: AIProvider | undefined
   onProviderChange: (provider: AIProvider) => void
   selectedModel?: string
   onModelChange?: (model: string) => void
@@ -117,7 +117,7 @@ export default function AIProviderSelector({
           {/* Provider Selection */}
           <div className="space-y-2">
             <Label>Primary AI Provider</Label>
-            <Select value={selectedProvider} onValueChange={onProviderChange}>
+            <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Select AI provider" />
               </SelectTrigger>

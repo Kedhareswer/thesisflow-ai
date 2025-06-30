@@ -18,8 +18,8 @@ export default function UnauthorizedPage() {
           <p className="text-sm text-muted-foreground mb-4">
             Contact your administrator if you believe this is an error.
           </p>
-          <Link href="/workspace">
-            <Button className="w-full">Return to Workspace</Button>
+          <Link href="/explorer">
+            <Button className="w-full">Return to Explorer</Button>
           </Link>
         </CardContent>
       </Card>

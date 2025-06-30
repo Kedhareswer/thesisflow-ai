@@ -21,6 +21,8 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { AIProviderService } from "@/lib/ai-providers"
+import { EnhancedAIService } from "@/lib/enhanced-ai-service"
 
 interface AITool {
   id: string
@@ -50,15 +52,15 @@ export default function AIToolsPage() {
   const aiTools: AITool[] = [
     {
       id: "text-generator",
-      name: "Text Generator",
-      description: "Generate high-quality text content for research papers, abstracts, and documentation",
+      name: "Academic Text Generator",
+      description: "Generate high-quality academic content, abstracts, and research documentation",
       icon: <FileText className="h-5 w-5" />,
       category: "Content",
       isPopular: true,
     },
     {
       id: "idea-expander",
-      name: "Idea Expander",
+      name: "Research Idea Expander",
       description: "Transform brief concepts into detailed research proposals and methodologies",
       icon: <Lightbulb className="h-5 w-5" />,
       category: "Research",
@@ -102,32 +104,133 @@ export default function AIToolsPage() {
 
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
       const tool = aiTools.find((t) => t.id === toolId)
       let generatedOutput = ""
 
       switch (toolId) {
         case "text-generator":
-          generatedOutput = `Generated academic content based on: "${input}"\n\nThis is a comprehensive analysis that explores the fundamental concepts and methodologies relevant to the specified topic. The research demonstrates significant potential for advancing our understanding in this domain through systematic investigation and empirical validation.`
+          const textPrompt = `Generate high-quality academic content based on this topic or outline: "${input}"
+
+Please create well-structured, professional academic text that:
+- Uses appropriate scholarly language and tone
+- Includes relevant concepts and terminology
+- Maintains logical flow and coherence
+- Follows academic writing conventions
+- Is substantial and informative
+
+Content:`
+          const textResponse = await AIProviderService.generateResponse(textPrompt)
+          generatedOutput = textResponse.content
           break
+
         case "idea-expander":
-          generatedOutput = `Expanded research proposal for: "${input}"\n\n1. Research Objectives:\n- Primary goal: Investigate the core mechanisms\n- Secondary goal: Develop practical applications\n\n2. Methodology:\n- Literature review and analysis\n- Experimental design and validation\n- Data collection and statistical analysis\n\n3. Expected Outcomes:\n- Novel insights into the research domain\n- Practical applications and implementations\n- Contribution to existing knowledge base`
+          try {
+            const researchContext = {
+              topic: input,
+              description: `Expand this research concept: ${input}`,
+            }
+            const suggestions = await EnhancedAIService.getResearchSuggestions(researchContext)
+            
+            generatedOutput = suggestions.map((suggestion, index) => `
+**Research Proposal ${index + 1}: ${suggestion.title}**
+
+**Description:** ${suggestion.description}
+
+**Methodology:** ${suggestion.methodology}
+
+**Potential Impact:** ${suggestion.potentialImpact}
+
+**Key Challenges:**
+${suggestion.keyChallenges.map(challenge => `• ${challenge}`).join('\n')}
+
+**Next Steps:**
+${suggestion.nextSteps.map(step => `• ${step}`).join('\n')}
+
+**Feasibility Score:** ${suggestion.feasibilityScore}/10
+**Novelty Score:** ${suggestion.noveltyScore}/10
+
+---`).join('\n')
+          } catch (error) {
+            // Fallback to simpler expansion
+            const expandPrompt = `Expand this research idea into a detailed proposal: "${input}"
+
+Provide:
+1. Detailed description and objectives
+2. Proposed methodology
+3. Expected outcomes and impact
+4. Potential challenges
+5. Implementation timeline`
+            const expandResponse = await AIProviderService.generateResponse(expandPrompt)
+            generatedOutput = expandResponse.content
+          }
           break
+
         case "translator":
-          generatedOutput = `Academic translation of: "${input}"\n\n[This would contain the professionally translated content maintaining technical accuracy and academic tone while preserving the original meaning and context.]`
+          const translatePrompt = `Translate the following academic text while maintaining technical accuracy, scholarly tone, and preserving all technical terms and concepts:
+
+Original text: "${input}"
+
+Please specify the target language if not obvious from context. If no target language is specified, provide a high-quality English revision that improves clarity and academic style.
+
+Translation:`
+          const translateResponse = await AIProviderService.generateResponse(translatePrompt)
+          generatedOutput = translateResponse.content
           break
+
         case "optimizer":
-          generatedOutput = `Optimized version of: "${input}"\n\nThe enhanced content demonstrates improved clarity, coherence, and academic rigor. Key improvements include refined terminology, better sentence structure, and enhanced logical flow while maintaining the original research intent and findings.`
+          const optimizePrompt = `Improve the following text for clarity, readability, and academic tone while preserving the original meaning and technical content:
+
+Original text: "${input}"
+
+Optimized version should:
+- Enhance clarity and flow
+- Improve sentence structure
+- Use appropriate academic language
+- Maintain technical accuracy
+- Fix any grammatical issues
+
+Optimized text:`
+          const optimizeResponse = await AIProviderService.generateResponse(optimizePrompt)
+          generatedOutput = optimizeResponse.content
           break
+
         case "keyword-extractor":
-          generatedOutput = `Keywords extracted from: "${input}"\n\nPrimary Keywords: machine learning, artificial intelligence, data analysis\nSecondary Keywords: neural networks, deep learning, computational methods\nLong-tail Keywords: supervised learning algorithms, predictive modeling techniques`
+          const keywordPrompt = `Extract and categorize relevant keywords and phrases from this research content: "${input}"
+
+Provide:
+1. Primary Keywords (most important terms)
+2. Secondary Keywords (supporting concepts)
+3. Technical Terms (domain-specific terminology)
+4. Long-tail Keywords (specific phrases)
+5. Related Concepts (connected ideas)
+
+Format as organized lists with brief explanations where helpful.`
+          const keywordResponse = await AIProviderService.generateResponse(keywordPrompt)
+          generatedOutput = keywordResponse.content
           break
+
         case "hypothesis-generator":
-          generatedOutput = `Research hypotheses for: "${input}"\n\nH1: The proposed methodology will demonstrate significant improvement over existing approaches (p < 0.05)\nH2: Implementation of the new framework will result in measurable performance gains\nH3: The research findings will be generalizable across multiple domains and applications`
+          const hypothesisPrompt = `Generate testable research hypotheses based on this research question or topic: "${input}"
+
+For each hypothesis, provide:
+1. Clear, testable statement
+2. Null hypothesis (H0)
+3. Alternative hypothesis (H1)
+4. Variables involved
+5. Suggested testing approach
+6. Expected significance level
+
+Generate 3-5 well-formed hypotheses.`
+          const hypothesisResponse = await AIProviderService.generateResponse(hypothesisPrompt)
+          generatedOutput = hypothesisResponse.content
           break
+
         default:
-          generatedOutput = `AI-generated content for: "${input}"\n\nThis is the result of advanced AI processing tailored to your specific requirements and research needs.`
+          const defaultPrompt = `Process this input for the ${tool?.name || 'AI tool'}: "${input}"
+
+Provide a helpful, detailed response appropriate for academic and research use.`
+          const defaultResponse = await AIProviderService.generateResponse(defaultPrompt)
+          generatedOutput = defaultResponse.content
       }
 
       setOutput(generatedOutput)
@@ -147,9 +250,10 @@ export default function AIToolsPage() {
         description: `${tool?.name} has processed your input successfully`,
       })
     } catch (error) {
+      console.error("AI generation error:", error)
       toast({
         title: "Generation failed",
-        description: "Please try again later",
+        description: "Please check your AI provider configuration and try again",
         variant: "destructive",
       })
     } finally {

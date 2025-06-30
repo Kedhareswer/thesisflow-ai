@@ -29,7 +29,7 @@ export default function LoginPage() {
       await signIn(email, password)
 
       // Handle redirect after login
-      const redirectTo = searchParams.get("redirectTo") || "/workspace"
+      const redirectTo = searchParams.get("redirectTo") || "/explorer"
       router.push(redirectTo)
 
       toast({

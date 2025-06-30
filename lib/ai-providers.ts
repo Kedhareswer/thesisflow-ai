@@ -1,3 +1,5 @@
+import { AIProviderDetector } from "./ai-provider-detector"
+
 // AI Provider Types
 export type AIProvider = "gemini" | "aiml" | "groq" | "deepinfra" | "openai"
 
@@ -59,7 +61,14 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
 
 // Client-side service that uses API routes instead of direct API calls
 export class AIProviderService {
-  static async generateResponse(prompt: string, provider: AIProvider = "gemini", model?: string): Promise<AIResponse> {
+  static async generateResponse(prompt: string, provider?: AIProvider, model?: string): Promise<AIResponse> {
+    // If no provider specified, use the best available one
+    if (!provider) {
+      provider = AIProviderDetector.getBestProvider()
+      if (!provider) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
     try {
       // Use our secure API route instead of direct API calls
       const response = await fetch("/api/ai/generate", {
@@ -87,8 +96,15 @@ export class AIProviderService {
 
   static async generateWithFallback(
     prompt: string,
-    preferredProviders: AIProvider[] = ["gemini", "groq", "aiml"],
+    preferredProviders?: AIProvider[],
   ): Promise<AIResponse> {
+    // If no preferred providers specified, use all available ones in priority order
+    if (!preferredProviders) {
+      preferredProviders = AIProviderDetector.getFallbackProviders()
+      if (preferredProviders.length === 0) {
+        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
+      }
+    }
     // Use our secure API route for fallback logic
     const response = await fetch("/api/ai/generate-with-fallback", {
       method: "POST",
@@ -109,7 +125,8 @@ export class AIProviderService {
   }
 
   static getAvailableProviders(): AIProvider[] {
-    return Object.keys(AI_PROVIDERS) as AIProvider[]
+    // Return only providers that actually have API keys configured
+    return AIProviderDetector.getFallbackProviders()
   }
 
   static getProviderInfo(provider: AIProvider): AIProviderConfig {

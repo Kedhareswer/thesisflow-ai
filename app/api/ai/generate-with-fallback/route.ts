@@ -1,12 +1,25 @@
 import { NextResponse } from "next/server"
 import type { AIProvider } from "@/lib/ai-providers"
+import { AIProviderDetector } from "@/lib/ai-provider-detector"
 
 export async function POST(request: Request) {
   try {
     const { prompt, preferredProviders } = await request.json()
 
+    // If no preferred providers specified, use all available ones
+    const providersToTry = preferredProviders || AIProviderDetector.getFallbackProviders()
+    
+    if (providersToTry.length === 0) {
+      return NextResponse.json(
+        { error: "No AI providers are configured. Please add at least one API key to your environment variables." }, 
+        { status: 500 }
+      )
+    }
+
+    console.log("Trying providers in order:", providersToTry)
+
     // Try each provider in sequence
-    for (const provider of preferredProviders) {
+    for (const provider of providersToTry) {
       try {
         const result = await generateWithProvider(prompt, provider)
         return NextResponse.json(result)
