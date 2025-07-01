@@ -200,7 +200,7 @@ export default function ResearchExplorer() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResearchChatbot 
+                <ResearchChatbot
                   topic={chatTopic}
                   papers={chatPapers}
                   ideas={chatIdeas}

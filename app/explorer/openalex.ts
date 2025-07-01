@@ -51,52 +51,44 @@ function parseSpecializedQuery(query: string): string {
 
 export async function fetchOpenAlexWorks(query: string, limit = 10): Promise<OpenAlexWork[]> {
   try {
-    // Parse domain-specific terms to enhance search relevance
-    const domainSpecificFilters = parseSpecializedQuery(query)
-    
     // Clean and encode the query while preserving important terms
     const cleanQuery = query
       .trim()
       .replace(/[^\w\s\-]/g, " ") // Keep hyphens for domain-specific terms like "machine-learning"
       .replace(/\s+/g, " ")
-    const encodedQuery = encodeURIComponent(cleanQuery)
+      .trim()
+
+    if (!cleanQuery) {
+      throw new Error("Empty search query")
+    }
 
     console.log("[OpenAlex] Original query:", query)
     console.log("[OpenAlex] Cleaned query:", cleanQuery)
     
-    // Add domain-specific filters when applicable
-    let additionalFilters = ""
-    if (domainSpecificFilters) {
-      additionalFilters = domainSpecificFilters
-      console.log("[OpenAlex] Using domain-specific filters:", domainSpecificFilters)
-    }
-    
-    // Build OpenAlex API URL with proper filters
-    // Use a combination of search and concept/title filters for better relevance
-    const apiUrl = `https://api.openalex.org/works?search=${encodedQuery}${additionalFilters}&filter=publication_year:>2010,has_abstract:true&sort=relevance_score:desc&per_page=${limit}&mailto=research@example.com`
+    // Build OpenAlex API URL with simplified, reliable filters
+    const baseUrl = "https://api.openalex.org/works"
+    const params = new URLSearchParams({
+      search: cleanQuery,
+      filter: "publication_year:>2010,has_abstract:true",
+      sort: "relevance_score:desc",
+      per_page: limit.toString(),
+      mailto: "research@example.com"
+    })
 
+    const apiUrl = `${baseUrl}?${params.toString()}`
     console.log("[OpenAlex] Fetching from URL:", apiUrl)
 
-    // Add CORS proxy for client-side requests
-    // Use a CORS proxy for client-side requests
-    // const corsProxyUrl = 'https://corsproxy.io/?'
-    // const finalUrl = typeof window !== 'undefined' ? corsProxyUrl + encodeURIComponent(apiUrl) : apiUrl
-    
-    // For debugging, let's try direct requests first
-    const finalUrl = apiUrl
-    console.log("Final URL with CORS handling:", finalUrl)
-
-    const response = await fetch(finalUrl, {
+    const response = await fetch(apiUrl, {
       headers: {
         "User-Agent": "ResearchHub/1.0 (mailto:research@example.com)",
-        Accept: "application/json",
+        "Accept": "application/json",
       },
-      // Adding no-cors mode might help with CORS issues but limits response usage
-      // mode: 'no-cors'
     })
 
     if (!response.ok) {
+      const errorText = await response.text()
       console.error(`OpenAlex API error: Status ${response.status} ${response.statusText}`)
+      console.error("Error response body:", errorText)
       throw new Error(`OpenAlex API error: ${response.status} ${response.statusText}`)
     }
 
@@ -153,5 +145,97 @@ function reconstructAbstract(invertedIndex: Record<string, number[]>): string {
   } catch (error) {
     console.error("Error reconstructing abstract:", error)
     return "Abstract reconstruction failed"
+  }
+}
+
+/**
+ * Enhanced search with additional filters for specific use cases
+ */
+export async function fetchOpenAlexWorksWithFilters(
+  query: string, 
+  filters: {
+    yearMin?: number
+    yearMax?: number
+    openAccess?: boolean
+    venueType?: string
+  } = {},
+  limit = 10
+): Promise<OpenAlexWork[]> {
+  try {
+    const cleanQuery = query.trim().replace(/[^\w\s\-]/g, " ").replace(/\s+/g, " ").trim()
+    
+    if (!cleanQuery) {
+      throw new Error("Empty search query")
+    }
+
+    // Build filter string
+    const filterParts = []
+    
+    // Year range filter
+    if (filters.yearMin && filters.yearMax) {
+      filterParts.push(`publication_year:${filters.yearMin}-${filters.yearMax}`)
+    } else if (filters.yearMin) {
+      filterParts.push(`publication_year:>${filters.yearMin}`)
+    } else {
+      filterParts.push("publication_year:>2010") // Default minimum year
+    }
+    
+    // Abstract requirement
+    filterParts.push("has_abstract:true")
+    
+    // Open access filter
+    if (filters.openAccess) {
+      filterParts.push("is_oa:true")
+    }
+    
+    const filterString = filterParts.join(",")
+    
+    const baseUrl = "https://api.openalex.org/works"
+    const params = new URLSearchParams({
+      search: cleanQuery,
+      filter: filterString,
+      sort: "relevance_score:desc",
+      per_page: limit.toString(),
+      mailto: "research@example.com"
+    })
+
+    const apiUrl = `${baseUrl}?${params.toString()}`
+    console.log("[OpenAlex] Enhanced search URL:", apiUrl)
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        "User-Agent": "ResearchHub/1.0 (mailto:research@example.com)",
+        "Accept": "application/json",
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`OpenAlex API error: Status ${response.status} ${response.statusText}`)
+      console.error("Error response body:", errorText)
+      throw new Error(`OpenAlex API error: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    
+    if (!data.results || !Array.isArray(data.results)) {
+      return []  
+    }
+
+    return data.results.map((work: any) => ({
+      id: work.id || "",
+      title: work.title || "Untitled",
+      authors: work.authorships?.slice(0, 5).map((auth: any) => auth.author?.display_name || "Unknown Author") || [],
+      publication_year: work.publication_year || new Date().getFullYear(),
+      host_venue: work.primary_location?.source?.display_name || "Unknown Journal",
+      abstract: work.abstract_inverted_index
+        ? reconstructAbstract(work.abstract_inverted_index)
+        : "No abstract available",
+      url: work.primary_location?.landing_page_url || work.id || "",
+      doi: work.doi || "",
+    }))
+  } catch (error) {
+    console.error("Error in enhanced OpenAlex search:", error)
+    throw error
   }
 }
