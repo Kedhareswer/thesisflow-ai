@@ -90,9 +90,9 @@ function validateApiKey(provider: string, apiKey: string): boolean {
   const patterns = {
     openai: /^sk-[a-zA-Z0-9]{48,}$/,
     groq: /^gsk_[a-zA-Z0-9]{50,}$/,
-    gemini: /^[a-zA-Z0-9_-]{35,}$/,
-    aiml: /^[a-zA-Z0-9_-]{32,}$/,
-    deepinfra: /^[a-zA-Z0-9_-]{20,}$/,
+    gemini: /^AIza[a-zA-Z0-9_-]{35,}$/,
+    anthropic: /^sk-ant-[a-zA-Z0-9]{40,}$/,
+    mistral: /^[a-zA-Z0-9]{32,}$/,
   }
   
   const pattern = patterns[provider as keyof typeof patterns]

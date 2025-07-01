@@ -20,7 +20,7 @@ import {
   Shield,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 interface ApiKey {
   id: string
@@ -40,7 +40,7 @@ const AI_PROVIDERS = [
   {
     id: "openai",
     name: "OpenAI",
-    description: "GPT-4, GPT-3.5 Turbo and other OpenAI models",
+    description: "GPT-4 Turbo, GPT-4, and GPT-3.5 Turbo models",
     docsUrl: "https://platform.openai.com/api-keys",
     placeholder: "sk-...",
     keyFormat: 'Starts with "sk-" followed by 48+ characters',
@@ -48,7 +48,7 @@ const AI_PROVIDERS = [
   {
     id: "groq",
     name: "Groq",
-    description: "Ultra-fast inference for LLaMA, Mixtral, and more",
+    description: "Ultra-fast inference with Llama 3.3, DeepSeek, and Gemma models",
     docsUrl: "https://console.groq.com/keys",
     placeholder: "gsk_...",
     keyFormat: 'Starts with "gsk_" followed by 50+ characters',
@@ -56,26 +56,26 @@ const AI_PROVIDERS = [
   {
     id: "gemini",
     name: "Google Gemini",
-    description: "Google's most capable AI model",
+    description: "Gemini 1.5 Pro and Ultra models",
     docsUrl: "https://aistudio.google.com/app/apikey",
     placeholder: "AIza...",
-    keyFormat: "35+ characters, alphanumeric with dashes/underscores",
+    keyFormat: "Starts with 'AIza' followed by 35+ characters",
   },
   {
-    id: "aiml",
-    name: "AI/ML API",
-    description: "Multiple models through AI/ML API",
-    docsUrl: "https://aimlapi.com/app/keys",
-    placeholder: "your-aiml-key",
-    keyFormat: "32+ characters, alphanumeric with dashes/underscores",
+    id: "anthropic",
+    name: "Anthropic",
+    description: "Claude 3 Opus, Sonnet, and Haiku models",
+    docsUrl: "https://console.anthropic.com/settings/keys",
+    placeholder: "sk-ant-...",
+    keyFormat: 'Starts with "sk-ant-" followed by 40+ characters',
   },
   {
-    id: "deepinfra",
-    name: "DeepInfra",
-    description: "Cost-effective inference for popular models",
-    docsUrl: "https://deepinfra.com/dash/api_keys",
-    placeholder: "your-deepinfra-key",
-    keyFormat: "20+ characters, alphanumeric with dashes/underscores",
+    id: "mistral",
+    name: "Mistral AI",
+    description: "Mistral Large, Medium, and Small models",
+    docsUrl: "https://console.mistral.ai/api-keys/",
+    placeholder: "...",
+    keyFormat: "32+ characters, alphanumeric",
   },
 ]
 
@@ -87,15 +87,17 @@ export function ApiKeyManager() {
   const [saving, setSaving] = useState<{ [provider: string]: boolean }>({})
   const [testing, setTesting] = useState<{ [provider: string]: boolean }>({})
   const { toast } = useToast()
+  const { session, user } = useSupabaseAuth()
 
   useEffect(() => {
-    loadApiKeys()
-  }, [])
+    if (session) {
+      loadApiKeys()
+    }
+  }, [session])
 
   const loadApiKeys = async () => {
     try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession()
+      // Get auth token from session
       const token = session?.access_token
 
       if (!token) {
@@ -121,7 +123,33 @@ export function ApiKeyManager() {
     }
   }
 
-  const saveApiKey = async (provider: string, testKey = false) => {
+  const testApiKey = async (provider: string, apiKey: string) => {
+    try {
+      const token = session?.access_token
+      if (!token) {
+        throw new Error("Authentication required")
+      }
+
+      const response = await fetch("/api/user-api-keys", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ provider, apiKey, testKey: true }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Validation failed")
+      }
+      return data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  const saveApiKey = async (provider: string, testFirst = false) => {
     const apiKey = formData[provider]?.trim()
 
     if (!apiKey) {
@@ -133,23 +161,23 @@ export function ApiKeyManager() {
       return
     }
 
-    const actionKey = testKey ? "testing" : "saving"
-    const setActionState = testKey ? setTesting : setSaving
-
-    setActionState((prev) => ({ ...prev, [provider]: true }))
+    const actionState = testFirst ? setTesting : setSaving
+    actionState((prev) => ({ ...prev, [provider]: true }))
 
     try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
-      if (!token) {
+      // Test the key first if requested
+      if (testFirst) {
+        const testResult = await testApiKey(provider, apiKey)
         toast({
-          title: "Authentication required",
-          description: "Please log in to save API keys",
-          variant: "destructive",
+          title: "API key validated",
+          description: testResult.message,
         })
-        return
+      }
+
+      // Save the key
+      const token = session?.access_token
+      if (!token) {
+        throw new Error("Authentication required")
       }
 
       const response = await fetch("/api/user-api-keys", {
@@ -158,36 +186,31 @@ export function ApiKeyManager() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ provider, apiKey, testKey }),
+        body: JSON.stringify({ provider, apiKey, testKey: false }),
       })
 
       const data = await response.json()
-
-      if (response.ok) {
-        toast({
-          title: testKey ? "API key validated" : "API key saved",
-          description: data.message,
-        })
-
-        // Clear form data and reload keys
-        setFormData((prev) => ({ ...prev, [provider]: "" }))
-        setShowKeys((prev) => ({ ...prev, [provider]: false }))
-        await loadApiKeys()
-      } else {
-        toast({
-          title: testKey ? "Validation failed" : "Save failed",
-          description: data.error,
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        throw new Error(data.error || "Save failed")
       }
+
+      toast({
+        title: "API key saved",
+        description: "Your API key has been saved successfully",
+      })
+
+      // Clear form data and reload keys
+      setFormData((prev) => ({ ...prev, [provider]: "" }))
+      setShowKeys((prev) => ({ ...prev, [provider]: false }))
+      await loadApiKeys()
     } catch (error) {
       toast({
         title: "Error",
-        description: "Network error. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       })
     } finally {
-      setActionState((prev) => ({ ...prev, [provider]: false }))
+      actionState((prev) => ({ ...prev, [provider]: false }))
     }
   }
 
@@ -197,8 +220,7 @@ export function ApiKeyManager() {
     }
 
     try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession()
+      // Get auth token from session
       const token = session?.access_token
 
       if (!token) {
@@ -264,6 +286,45 @@ export function ApiKeyManager() {
     })
   }
 
+  const testSavedKey = async (provider: string) => {
+    setTesting((prev) => ({ ...prev, [provider]: true }))
+    try {
+      const token = session?.access_token
+      if (!token) {
+        throw new Error("Authentication required")
+      }
+
+      const response = await fetch(`/api/user-api-keys/${provider}/test`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Test failed")
+      }
+
+      toast({
+        title: "API key test successful",
+        description: `Successfully tested ${provider} API key with model: ${data.model}`,
+      })
+      
+      // Reload keys to update test status
+      await loadApiKeys()
+    } catch (error) {
+      toast({
+        title: "Test failed",
+        description: error instanceof Error ? error.message : "Failed to test API key",
+        variant: "destructive",
+      })
+    } finally {
+      setTesting((prev) => ({ ...prev, [provider]: false }))
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -282,6 +343,10 @@ export function ApiKeyManager() {
           const status = getProviderStatus(provider.id)
           const hasKey = apiKeys.some((key) => key.provider === provider.id)
           const lastTested = apiKeys.find((key) => key.provider === provider.id)?.last_tested_at
+          const savedKey = apiKeys.find((k) => k.provider === provider.id)
+          const isSaving = saving[provider.id] || false
+          const isTesting = testing[provider.id] || false
+          const showKey = showKeys[provider.id] || false
 
           return (
             <Card key={provider.id} className="border">
@@ -320,11 +385,14 @@ export function ApiKeyManager() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => saveApiKey(provider.id, true)}
-                        disabled={testing[provider.id]}
+                        onClick={() => testSavedKey(provider.id)}
+                        disabled={isTesting}
                       >
-                        {testing[provider.id] ? (
-                          <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                        {isTesting ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                            Testing
+                          </>
                         ) : (
                           <TestTube className="h-3 w-3 mr-1" />
                         )}
@@ -345,7 +413,7 @@ export function ApiKeyManager() {
                       <div className="relative">
                         <Input
                           id={`${provider.id}-key`}
-                          type={showKeys[provider.id] ? "text" : "password"}
+                          type={showKey ? "text" : "password"}
                           placeholder={provider.placeholder}
                           value={formData[provider.id] || ""}
                           onChange={(e) =>
@@ -368,7 +436,7 @@ export function ApiKeyManager() {
                             }))
                           }
                         >
-                          {showKeys[provider.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">{provider.keyFormat}</p>
@@ -377,27 +445,22 @@ export function ApiKeyManager() {
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        onClick={() => saveApiKey(provider.id, false)}
-                        disabled={saving[provider.id] || !formData[provider.id]?.trim()}
+                        onClick={() => saveApiKey(provider.id, true)}
+                        disabled={isSaving || isTesting}
                         className="flex-1"
                       >
-                        {saving[provider.id] ? (
-                          <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                        {isTesting ? (
+                          <>
+                            <TestTube className="h-3 w-3 animate-spin mr-1" />
+                            Testing
+                          </>
+                        ) : isSaving ? (
+                          <>
+                            <Save className="h-3 w-3 animate-spin mr-1" />
+                            Saving
+                          </>
                         ) : (
-                          <Save className="h-3 w-3 mr-1" />
-                        )}
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => saveApiKey(provider.id, true)}
-                        disabled={testing[provider.id] || !formData[provider.id]?.trim()}
-                      >
-                        {testing[provider.id] ? (
-                          <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                        ) : (
-                          <TestTube className="h-3 w-3 mr-1" />
+                          <Shield className="h-3 w-3 mr-1" />
                         )}
                         Test & Save
                       </Button>

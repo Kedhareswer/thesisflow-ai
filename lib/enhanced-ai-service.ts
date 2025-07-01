@@ -44,7 +44,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     id: 'openai',
     name: 'OpenAI',
     baseURL: 'https://api.openai.com/v1',
-    models: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    models: ['gpt-4-0125-preview', 'gpt-4-turbo-preview', 'gpt-4', 'gpt-3.5-turbo'],
     priority: 1,
     requiresAuth: true
   },
@@ -52,7 +52,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     id: 'groq',
     name: 'Groq',
     baseURL: 'https://api.groq.com/openai/v1',
-    models: ['llama-3.1-70b-versatile', 'mixtral-8x7b-32768', 'gemma-7b-it'],
+    models: ['llama-3.3-70b-versatile', 'deepseek-r1-distill-llama-70b', 'gemma2-9b-it'],
     priority: 2,
     requiresAuth: true
   },
@@ -60,8 +60,24 @@ export const AI_PROVIDERS: AIProvider[] = [
     id: 'gemini',
     name: 'Google Gemini',
     baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-    models: ['gemini-1.5-pro', 'gemini-1.5-flash'],
+    models: ['gemini-1.5-pro', 'gemini-1.5-pro-latest', 'gemini-1.5-pro-vision'],
     priority: 3,
+    requiresAuth: true
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    baseURL: 'https://api.anthropic.com/v1',
+    models: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
+    priority: 4,
+    requiresAuth: true
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    baseURL: 'https://api.mistral.ai/v1',
+    models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'],
+    priority: 5,
     requiresAuth: true
   }
 ]
