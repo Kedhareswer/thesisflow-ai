@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 
 interface ApiKey {
   id: string
@@ -184,7 +185,9 @@ export function ApiKeyManager() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ provider, apiKey, testKey: false }),
       })
@@ -194,19 +197,24 @@ export function ApiKeyManager() {
         throw new Error(data.error || "Save failed")
       }
 
+      // Clear the form field
+      setFormData((prev) => ({ ...prev, [provider]: "" }))
+
+      // Refresh the list
+      await loadApiKeys()
+
+      // Force reload AI service configuration
+      await enhancedAIService.loadUserApiKeys(true)
+
       toast({
         title: "API key saved",
-        description: "Your API key has been saved successfully",
+        description: "Your API key has been saved and configured successfully",
       })
-
-      // Clear form data and reload keys
-      setFormData((prev) => ({ ...prev, [provider]: "" }))
-      setShowKeys((prev) => ({ ...prev, [provider]: false }))
-      await loadApiKeys()
     } catch (error) {
+      console.error(`Error saving ${provider} API key:`, error)
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "An error occurred",
+        title: "Error saving API key",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       })
     } finally {

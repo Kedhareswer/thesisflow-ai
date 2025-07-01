@@ -85,39 +85,62 @@ export const AI_PROVIDERS: AIProvider[] = [
 class EnhancedAIService {
   private userApiKeys: Map<string, string> = new Map()
   private fallbackKeys: Map<string, string> = new Map()
+  private initialized: boolean = false
 
   constructor() {
     // Load fallback keys from environment
     this.fallbackKeys.set('openai', process.env.NEXT_PUBLIC_OPENAI_API_KEY || '')
     this.fallbackKeys.set('groq', process.env.NEXT_PUBLIC_GROQ_API_KEY || '')
     this.fallbackKeys.set('gemini', process.env.NEXT_PUBLIC_GEMINI_API_KEY || '')
+    this.fallbackKeys.set('anthropic', process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || '')
+    this.fallbackKeys.set('mistral', process.env.NEXT_PUBLIC_MISTRAL_API_KEY || '')
   }
 
   // Load user API keys from database
-  async loadUserApiKeys(): Promise<void> {
+  async loadUserApiKeys(forceReload: boolean = false): Promise<void> {
+    if (this.initialized && !forceReload) return
+
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const response = await fetch('/api/user-api-keys')
-      if (response.ok) {
-        const data = await response.json()
-        const apiKeys = data.apiKeys || []
-        
-        this.userApiKeys.clear()
-        apiKeys.forEach((keyData: any) => {
-          if (keyData.is_active && keyData.test_status === 'valid') {
-            this.userApiKeys.set(keyData.provider, keyData.decrypted_key)
-          }
-        })
+      if (!user) {
+        console.warn('No authenticated user found')
+        return
       }
+
+      const response = await fetch('/api/user-api-keys', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to load API keys: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const apiKeys = data.apiKeys || []
+      
+      this.userApiKeys.clear()
+      apiKeys.forEach((keyData: any) => {
+        if (keyData.is_active && keyData.test_status === 'valid') {
+          this.userApiKeys.set(keyData.provider, keyData.api_key)
+        }
+      })
+
+      this.initialized = true
+      console.log('API keys loaded successfully')
     } catch (error) {
       console.error('Error loading user API keys:', error)
+      throw error
     }
   }
 
   // Get available API key for provider (user key takes priority)
-  private getApiKey(provider: string): string | null {
+  private async getApiKey(provider: string): Promise<string | null> {
+    if (!this.initialized) {
+      await this.loadUserApiKeys()
+    }
     return this.userApiKeys.get(provider) || this.fallbackKeys.get(provider) || null
   }
 
@@ -128,7 +151,7 @@ class EnhancedAIService {
     const sortedProviders = [...AI_PROVIDERS].sort((a, b) => a.priority - b.priority)
     
     for (const provider of sortedProviders) {
-      const apiKey = this.getApiKey(provider.id)
+      const apiKey = await this.getApiKey(provider.id)
       if (apiKey) {
         return { provider, apiKey }
       }
