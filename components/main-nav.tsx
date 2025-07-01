@@ -19,7 +19,6 @@ const navigation = [
   { name: "Explorer", href: "/explorer", icon: Search },
   { name: "Summarizer", href: "/summarizer", icon: FileText },
   { name: "Ideas", href: "/research-assistant", icon: Lightbulb },
-  { name: "AI Tools", href: "/ai-tools", icon: Bot },
   { name: "Planner", href: "/planner", icon: Calendar },
   { name: "Collaborate", href: "/collaborate", icon: Users },
 ]
@@ -95,27 +94,34 @@ export function MainNav() {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
+            {user && !isLoading ? (
+              navigation.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href
 
-              return (
-                <Link key={item.name} href={item.href}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-9 px-3 text-sm font-medium transition-colors",
-                      "hover:bg-gray-100 hover:text-black",
-                      isActive ? "bg-gray-100 text-black" : "text-gray-600",
-                    )}
-                  >
-                    <Icon className="mr-2 h-4 w-4" />
-                    {item.name}
-                  </Button>
-                </Link>
-              )
-            })}
+                return (
+                  <Link key={item.name} href={item.href}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-9 px-3 text-sm font-medium transition-colors",
+                        "hover:bg-gray-100 hover:text-black",
+                        isActive ? "bg-gray-100 text-black" : "text-gray-600",
+                      )}
+                    >
+                      <Icon className="mr-2 h-4 w-4" />
+                      {item.name}
+                    </Button>
+                  </Link>
+                )
+              })
+            ) : (
+              // Show limited navigation for unauthenticated users
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <span>Sign in to access research tools</span>
+              </div>
+            )}
           </nav>
 
           {/* User Menu */}

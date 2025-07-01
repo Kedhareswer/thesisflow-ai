@@ -24,6 +24,7 @@ import {
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { useToast } from "@/hooks/use-toast"
 import { FileUploader } from "./components/FileUploader"
+import { RouteGuard } from "@/components/route-guard"
 
 interface SummaryResult {
   summary: string
@@ -392,7 +393,8 @@ export default function Summarizer() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <RouteGuard requireAuth={true}>
+      <div className="min-h-screen bg-white">
       <div className="container mx-auto p-8 space-y-8">
         {/* Header */}
         <div className="border-b border-gray-200 pb-8">
@@ -755,6 +757,7 @@ export default function Summarizer() {
           </Card>
         )}
       </div>
-    </div>
+      </div>
+    </RouteGuard>
   )
 }

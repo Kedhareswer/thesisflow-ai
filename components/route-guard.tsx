@@ -18,6 +18,8 @@ interface RouteGuardProps {
 
 // Protected routes configuration
 const PROTECTED_ROUTES = [
+  "/explorer",
+  "/summarizer", 
   "/research-assistant",
   "/ai-tools",
   "/collaborate", 
@@ -37,8 +39,7 @@ const PUBLIC_ROUTES = [
   "/signup",
   "/forgot-password", 
   "/reset-password",
-  "/unauthorized",
-  "/explorer"
+  "/unauthorized"
 ]
 
 export function RouteGuard({ 

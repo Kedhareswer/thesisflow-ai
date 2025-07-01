@@ -21,6 +21,7 @@ import { ResearchChatbot } from "@/components/research-chatbot"
 import { EnhancedLiteratureSearch } from "./components/EnhancedLiteratureSearch"
 import { TopicExplorer } from "./components/TopicExplorer"
 import { IdeaGenerator } from "./components/IdeaGenerator"
+import { RouteGuard } from "@/components/route-guard"
 import Link from "next/link"
 
 // Enhanced research service that uses real AI
@@ -141,8 +142,9 @@ export default function ResearchExplorer() {
   const [chatIdeas, setChatIdeas] = useState("")
 
   return (
-    <ErrorBoundary>
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <RouteGuard requireAuth={true}>
+      <ErrorBoundary>
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Research Explorer</h1>
           <p className="text-gray-600">
@@ -247,6 +249,7 @@ export default function ResearchExplorer() {
           </CardContent>
         </Card>
       </div>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </RouteGuard>
   )
 }

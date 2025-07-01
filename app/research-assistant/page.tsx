@@ -12,6 +12,7 @@ import { enhancedAIService, type ResearchResult } from "@/lib/enhanced-ai-servic
 import { projectService, type ResearchIdea } from "@/lib/services/project.service"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
+import { RouteGuard } from "@/components/route-guard"
 
 interface GeneratedIdea {
   title: string
@@ -102,7 +103,7 @@ export default function ResearchAssistant() {
     }
   }
 
-  const saveIdea = async (idea: ResearchIdea) => {
+  const saveIdea = async (idea: GeneratedIdea) => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -123,7 +124,7 @@ export default function ResearchAssistant() {
         impact: idea.impact,
         challenges: idea.challenges,
         topic,
-        context,
+        context: context || undefined,
       })
 
       // Update the idea as saved
@@ -168,7 +169,8 @@ export default function ResearchAssistant() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <RouteGuard requireAuth={true}>
+      <div className="min-h-screen bg-white">
       <div className="container mx-auto p-8 space-y-8">
         {/* Header */}
         <div className="border-b border-gray-200 pb-8">
@@ -445,6 +447,7 @@ export default function ResearchAssistant() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+      </div>
+    </RouteGuard>
   )
 }
