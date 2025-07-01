@@ -178,4 +178,4 @@ export function UserProfileAvatar({ size = "md", editable = false, className = "
       </AvatarFallback>
     </Avatar>
   )
-} 
+}

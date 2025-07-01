@@ -18,4 +18,4 @@ export function AuthDebug() {
       </div>
     </div>
   )
-} 
+}

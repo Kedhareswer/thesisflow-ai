@@ -96,9 +96,9 @@ The following security issues have been automatically resolved via database migr
 After completing the manual configuration steps:
 
 1. Run security advisor check:
-   ```bash
+   \`\`\`bash
    # Check security warnings should reduce from 4 to 2
-   ```
+   \`\`\`
 
 2. Expected results:
    - ✅ Function search path warnings: **Resolved**
@@ -112,4 +112,4 @@ After completing the manual configuration steps:
 - [Supabase Dashboard](https://supabase.com/dashboard)
 - [Project URL](https://wvlxgbqjwgleizbpdulo.supabase.co)
 - [Password Security Docs](https://supabase.com/docs/guides/auth/password-security)
-- [MFA Setup Docs](https://supabase.com/docs/guides/auth/auth-mfa) 
+- [MFA Setup Docs](https://supabase.com/docs/guides/auth/auth-mfa)

@@ -21,13 +21,13 @@ The Collaborate page has been transformed from a localStorage-based prototype in
 
 Create a `.env.local` file in the root directory with the following variables:
 
-```
+\`\`\`
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
 SOCKET_PORT=3001
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
+\`\`\`
 
 ### 2. Supabase Setup
 
@@ -35,7 +35,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 2. Set up the following tables in your Supabase database:
 
 #### user_profiles
-```sql
+\`\`\`sql
 create table public.user_profiles (
   id uuid references auth.users on delete cascade not null primary key,
   email text not null,
@@ -55,10 +55,10 @@ create policy "Users can view all profiles" on public.user_profiles
 
 create policy "Users can update their own profile" on public.user_profiles
   for update using (auth.uid() = id);
-```
+\`\`\`
 
 #### teams
-```sql
+\`\`\`sql
 create table public.teams (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
@@ -88,10 +88,10 @@ create policy "Team owners can update their teams" on public.teams
       where team_id = id and user_id = auth.uid() and role = 'owner'
     )
   );
-```
+\`\`\`
 
 #### team_members
-```sql
+\`\`\`sql
 create table public.team_members (
   id uuid default uuid_generate_v4() primary key,
   team_id uuid references public.teams(id) on delete cascade not null,
@@ -123,10 +123,10 @@ create policy "Team owners can add members" on public.team_members
       role = 'owner' and user_id = auth.uid()
     )
   );
-```
+\`\`\`
 
 #### chat_messages
-```sql
+\`\`\`sql
 create table public.chat_messages (
   id uuid default uuid_generate_v4() primary key,
   team_id uuid references public.teams(id) on delete cascade not null,
@@ -155,25 +155,25 @@ create policy "Team members can send messages" on public.chat_messages
       where team_id = team_id and user_id = auth.uid()
     )
   );
-```
+\`\`\`
 
 ### 3. Running the Application
 
 To run both the Next.js application and the Socket.io server concurrently, use the provided script:
 
-```bash
+\`\`\`bash
 node start-dev.js
-```
+\`\`\`
 
 Alternatively, you can run them separately:
 
-```bash
+\`\`\`bash
 # Terminal 1: Start Next.js app
 npm run dev
 
 # Terminal 2: Start Socket.io server
 node server.js
-```
+\`\`\`
 
 ## Usage
 
