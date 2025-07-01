@@ -383,8 +383,8 @@ export interface Database {
     }
     CompositeTypes: {
       [_ in never]: never
+    }
   }
-}
 }
 
 // Helper types for easier use
@@ -426,4 +426,4 @@ export type UserProfileUpdate = Database['public']['Tables']['user_profiles']['U
 
 export type ActivityLog = Database['public']['Tables']['activity_logs']['Row']
 export type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert']
-export type ActivityLogUpdate = Database['public']['Tables']['activity_logs']['Update']
+export type ActivityLogUpdate = Database['public']['Tables']['activity_logs']['Update'] 

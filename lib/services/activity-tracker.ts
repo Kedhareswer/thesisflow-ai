@@ -1,6 +1,6 @@
 import { FileText, Users, Lightbulb, Calendar, BookOpen } from 'lucide-react';
 import { supabase } from '../../integrations/supabase/client';
-import type { Database } from '../../src/integrations/supabase/types';
+import type { Database } from '../../integrations/supabase/types';
 
 interface Activity {
   id?: string;

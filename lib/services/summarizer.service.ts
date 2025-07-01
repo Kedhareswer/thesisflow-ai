@@ -1,6 +1,6 @@
 import { api } from "@/lib/utils/api"
 import { supabase } from "@/integrations/supabase/client"
-import type { Summary, SummaryInsert } from "@/src/integrations/supabase/types"
+import type { Summary, SummaryInsert } from "@/integrations/supabase/types"
 
 // Define response types for API calls
 interface GenerateResponse {

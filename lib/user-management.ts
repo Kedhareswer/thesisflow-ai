@@ -1,5 +1,5 @@
-import { supabase } from "@/src/integrations/supabase/client"
-import type { Database } from "@/src/integrations/supabase/types"
+import { supabase } from "@/integrations/supabase/client"
+import type { Database } from "@/integrations/supabase/types"
 
 type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"]
 type UserProfileInsert = Database["public"]["Tables"]["user_profiles"]["Insert"]
