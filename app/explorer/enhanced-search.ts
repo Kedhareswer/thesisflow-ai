@@ -30,7 +30,7 @@ export class EnhancedSearchService {
     try {
       // Search OpenAlex first (primary source)
       console.log('[EnhancedSearch] Searching OpenAlex...')
-      const openAlexPapers = await this.searchOpenAlexWithFilters(query, filters, limit)
+      const openAlexPapers = await EnhancedSearchService.searchOpenAlexWithFilters(query, filters, limit)
       if (openAlexPapers.length > 0) {
         sources.push('openalex')
         allPapers.push(...openAlexPapers)
@@ -38,12 +38,12 @@ export class EnhancedSearchService {
       }
 
       // Enhance OpenAlex papers with citation data from Semantic Scholar
-      allPapers = await this.enhancePapersWithCitations(allPapers)
+      allPapers = await EnhancedSearchService.enhancePapersWithCitations(allPapers)
 
       // Remove duplicates and apply filters
-      const uniquePapers = this.removeDuplicates(allPapers)
-      const filteredPapers = this.applyFilters(uniquePapers, filters)
-      const sortedPapers = this.sortPapers(filteredPapers, filters.sort_by, filters.sort_order)
+      const uniquePapers = EnhancedSearchService.removeDuplicates(allPapers)
+      const filteredPapers = EnhancedSearchService.applyFilters(uniquePapers, filters)
+      const sortedPapers = EnhancedSearchService.sortPapers(filteredPapers, filters.sort_by, filters.sort_order)
 
       const searchTime = Date.now() - startTime
 
