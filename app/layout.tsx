@@ -5,6 +5,7 @@ import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
+import { AuthErrorBoundary } from "@/components/auth-error-boundary"
 import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
@@ -26,15 +27,17 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <SupabaseAuthProvider>
-            <div className="min-h-screen bg-gray-50">
-              <MainNav />
-              <main className="flex-1">{children}</main>
-            </div>
-            <Toaster />
-            <AuthDebug />
-            <Analytics />
-          </SupabaseAuthProvider>
+          <AuthErrorBoundary>
+            <SupabaseAuthProvider>
+              <div className="min-h-screen bg-gray-50">
+                <MainNav />
+                <main className="flex-1">{children}</main>
+              </div>
+              <Toaster />
+              <AuthDebug />
+              <Analytics />
+            </SupabaseAuthProvider>
+          </AuthErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

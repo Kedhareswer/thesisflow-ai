@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAuth } from '@/lib/contexts/auth-context'
+import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { Loader2 } from 'lucide-react'
 
 export function LoginForm() {
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp } = useSupabaseAuth()
   const [activeTab, setActiveTab] = useState<string>('login')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,11 +37,8 @@ export function LoginForm() {
       setIsLoading(true)
       setError(null)
       
-      const { success, error } = await signIn(loginEmail, loginPassword)
-      
-      if (!success) {
-        setError(error || 'Login failed')
-      }
+      await signIn(loginEmail, loginPassword)
+      // Success is handled by the auth provider with toast notifications
     } catch (err) {
       setError('An error occurred during login')
       console.error('Login error:', err)
@@ -68,11 +65,8 @@ export function LoginForm() {
       setIsLoading(true)
       setError(null)
       
-      const { success, error } = await signUp(registerEmail, registerPassword, registerName)
-      
-      if (!success) {
-        setError(error || 'Registration failed')
-      }
+      await signUp(registerEmail, registerPassword, { full_name: registerName })
+      // Success is handled by the auth provider with toast notifications
     } catch (err) {
       setError('An error occurred during registration')
       console.error('Registration error:', err)

@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 import { AIProviderStatus } from "@/components/ai-provider-status"
+import { ApiKeyManager } from "@/components/api-key-manager"
 
 interface UserSettings {
   email_notifications: boolean
@@ -518,98 +519,75 @@ export default function SettingsPage() {
 
         {/* AI Settings */}
         <TabsContent value="ai" className="space-y-6">
-          {/* AI Provider Status Component */}
-          <AIProviderStatus showActions={true} />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                Personal AI API Keys
+              </CardTitle>
+              <CardDescription>
+                Configure your own API keys for AI providers. Your keys are encrypted and used only for your requests.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ApiKeyManager />
+            </CardContent>
+          </Card>
 
+          {/* System AI Provider Status */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
-                AI Configuration Help
+                System Provider Status
               </CardTitle>
-              <CardDescription>Learn how to configure AI providers for the platform</CardDescription>
+              <CardDescription>
+                Fallback AI providers available when you don't have personal keys configured
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-medium text-blue-900">Environment Variables Setup</h3>
-                </div>
-                <p className="text-sm text-blue-800 mb-3">
-                  To use AI features, add your API keys to the{" "}
-                  <code className="bg-blue-100 px-1 rounded">.env.local</code> file:
-                </p>
-                <div className="bg-blue-100 p-3 rounded text-sm font-mono text-blue-900">
-                  GROQ_API_KEY=your_groq_key_here
-                  <br />
-                  OPENAI_API_KEY=your_openai_key_here
-                  <br />
-                  GEMINI_API_KEY=your_gemini_key_here
-                  <br />
-                  AIML_API_KEY=your_aiml_key_here
-                  <br />
-                  DEEPINFRA_API_KEY=your_deepinfra_key_here
-                </div>
-              </div>
+            <CardContent>
+              <AIProviderStatus showActions={false} />
+            </CardContent>
+          </Card>
 
-              <div className="p-4 border rounded-lg bg-amber-50 border-amber-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-600" />
-                  <h3 className="font-medium text-amber-900">API Key Security</h3>
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-full">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-green-900">Why Use Personal API Keys?</h3>
+                    <p className="text-sm text-green-800">Get the benefits of bringing your own keys</p>
+                  </div>
                 </div>
-                <p className="text-sm text-amber-800">
-                  API keys are stored securely on the server and never exposed to the client. They are used only for
-                  making AI requests on your behalf. Never share your API keys or commit them to version control.
-                </p>
-              </div>
-
-              <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <h3 className="font-medium text-green-900">Getting API Keys</h3>
-                </div>
-                <div className="text-sm text-green-800 space-y-2">
-                  <p>
-                    <strong>Groq:</strong> Visit{" "}
-                    <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="underline">
-                      console.groq.com
-                    </a>{" "}
-                    to get your free API key
-                  </p>
-                  <p>
-                    <strong>OpenAI:</strong> Get your API key from{" "}
-                    <a
-                      href="https://platform.openai.com/api-keys"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      platform.openai.com
-                    </a>
-                  </p>
-                  <p>
-                    <strong>Google Gemini:</strong> Create an API key at{" "}
-                    <a
-                      href="https://makersuite.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      makersuite.google.com
-                    </a>
-                  </p>
-                  <p>
-                    <strong>AI/ML API:</strong> Sign up at{" "}
-                    <a href="https://aimlapi.com" target="_blank" rel="noopener noreferrer" className="underline">
-                      aimlapi.com
-                    </a>
-                  </p>
-                  <p>
-                    <strong>DeepInfra:</strong> Get your key from{" "}
-                    <a href="https://deepinfra.com" target="_blank" rel="noopener noreferrer" className="underline">
-                      deepinfra.com
-                    </a>
-                  </p>
+                
+                <div className="grid gap-3 ml-12">
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2"></div>
+                    <p className="text-sm text-green-800">
+                      <strong>Full Control:</strong> Use your own usage limits and billing
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2"></div>
+                    <p className="text-sm text-green-800">
+                      <strong>Privacy:</strong> Direct communication with AI providers
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2"></div>
+                    <p className="text-sm text-green-800">
+                      <strong>Performance:</strong> No rate limiting from shared keys
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2"></div>
+                    <p className="text-sm text-green-800">
+                      <strong>Latest Models:</strong> Access newest models as soon as they're available
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>

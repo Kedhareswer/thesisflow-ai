@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Send } from "lucide-react"
-import { useAuth } from '@/lib/contexts/auth-context'
+import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { collaborateService } from '@/lib/services/collaborate.service'
 import { socketService, SocketEvent } from '@/lib/services/socket.service'
 import { usePresence } from '@/lib/services/presence.service'
@@ -18,7 +18,7 @@ interface TeamChatProps {
 }
 
 export function TeamChat({ team, onClose }: TeamChatProps) {
-  const { user } = useAuth()
+  const { user } = useSupabaseAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)

@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 import { LoginForm } from './components/login'
 import { TeamManagement } from './components/team-management'
 import { TeamChat } from './components/team-chat'
-import { useAuth } from '@/lib/contexts/auth-context'
+import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { collaborateService } from '@/lib/services/collaborate.service'
 import { Team } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
 
 export default function CollaborateClient() {
-  const { user, isLoading: isAuthLoading } = useAuth()
+  const { user, isLoading: isAuthLoading } = useSupabaseAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [isLoading, setIsLoading] = useState(true)

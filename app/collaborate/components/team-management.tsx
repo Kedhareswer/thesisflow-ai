@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Loader2, Plus, Users } from "lucide-react"
-import { useAuth } from '@/lib/contexts/auth-context'
+import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { collaborateService } from '@/lib/services/collaborate.service'
 import { Team } from '@/lib/supabase'
 
@@ -17,7 +17,7 @@ interface TeamManagementProps {
 }
 
 export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManagementProps) {
-  const { user } = useAuth()
+  const { user } = useSupabaseAuth()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
