@@ -9,6 +9,8 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Latest-green?style=flat-square&logo=supabase)](https://supabase.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Kedhareswer/ai-project-planner/blob/main/LICENSE)
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Kedhareswer/ai-project-planner?utm_source=oss&utm_medium=github&utm_campaign=Kedhareswer%2Fai-project-planner&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 **Advanced Machine Learning Research Platform**
 
 *Accelerate your research with AI-powered tools for discovery, analysis, and collaboration. Built for researchers, by researchers.*
