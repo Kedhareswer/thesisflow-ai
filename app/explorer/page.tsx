@@ -18,14 +18,19 @@ import { EmptyState } from "@/components/common/EmptyState"
 import { SkeletonCard, SkeletonList } from "@/components/common/SkeletonCard"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { ResearchChatbot } from "@/components/research-chatbot"
+import { AIConfig } from "@/lib/ai-config"
+import Link from "next/link"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
-  static async exploreTopics(topic: string, depth: number = 3): Promise<{
-    content: string;
-    topic: string;
-    depth: number;
-    timestamp: string;
+  static async exploreTopics(
+    topic: string,
+    depth = 3,
+  ): Promise<{
+    content: string
+    topic: string
+    depth: number
+    timestamp: string
   }> {
     try {
       const prompt = `Provide a comprehensive research overview for the topic: "${topic}"
@@ -43,14 +48,14 @@ Please provide a detailed analysis covering:
 8. Future Directions
 
 Format the response in a clear, structured manner with headings and bullet points where appropriate.
-The response should be ${depth <= 2 ? 'concise' : depth <= 4 ? 'detailed' : 'comprehensive'}.`
+The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "comprehensive"}.`
 
       const response = await AIProviderService.generateResponse(prompt)
       return {
         content: response.content,
         topic,
         depth,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }
     } catch (error) {
       console.error("Error exploring topic:", error)
@@ -58,19 +63,26 @@ The response should be ${depth <= 2 ? 'concise' : depth <= 4 ? 'detailed' : 'com
     }
   }
 
-  static async searchPapers(query: string, searchType: string = "keyword"): Promise<any> {
+  static async searchPapers(query: string, searchType = "keyword"): Promise<any> {
     try {
       // Use the existing OpenAlex integration
-      const response = await fetch(`/api/search/papers`, {
-        method: 'POST',
+      const response = await fetch(`/api/search/papers?query=${encodeURIComponent(query)}&type=${searchType}`, {
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query, searchType }),
       })
 
       if (!response.ok) {
+        console.error("Search papers API returned an error:", response.status, response.statusText)
         throw new Error(`Search failed: ${response.statusText}`)
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text()
+        console.error("Unexpected content type:", contentType, "Response body:", text)
+        throw new Error("Unexpected response from search papers API: Not valid JSON")
       }
 
       const data = await response.json()
@@ -81,31 +93,35 @@ The response should be ${depth <= 2 ? 'concise' : depth <= 4 ? 'detailed' : 'com
     }
   }
 
-  static async generateIdeas(topic: string, context: string = "", count: number = 5): Promise<{
-    content: string;
-    ideas: string[];
-    topic: string;
-    context: string;
-    count: number;
-    timestamp: string;
+  static async generateIdeas(
+    topic: string,
+    context = "",
+    count = 5,
+  ): Promise<{
+    content: string
+    ideas: string[]
+    topic: string
+    context: string
+    count: number
+    timestamp: string
   }> {
     try {
       const researchResults = await enhancedAIService.generateResearchIdeas(topic, context)
       const ideaObjects = researchResults.ideas
-      
+
       // Convert idea objects to strings
       const ideas = ideaObjects.map((idea, index) => `${index + 1}. ${idea.title}\n${idea.description}`)
-      
+
       // Format the ideas nicely for display
-      const formattedIdeas = ideas.join('\n\n')
-      
+      const formattedIdeas = ideas.join("\n\n")
+
       return {
         content: formattedIdeas,
         ideas,
         topic,
         context,
         count,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }
     } catch (error) {
       console.error("Error generating ideas:", error)
@@ -121,10 +137,10 @@ export default function ResearchExplorer() {
   const [topic, setTopic] = useState("")
   const [depth, setDepth] = useState(3)
   const topicExploration = useAsync<{
-    content: string;
-    topic: string;
-    depth: number;
-    timestamp: string;
+    content: string
+    topic: string
+    depth: number
+    timestamp: string
   }>(EnhancedResearchService.exploreTopics)
 
   // Literature search state
@@ -136,12 +152,12 @@ export default function ResearchExplorer() {
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
   const ideaGeneration = useAsync<{
-    content: string;
-    ideas: string[];
-    topic: string;
-    context: string;
-    count: number;
-    timestamp: string;
+    content: string
+    ideas: string[]
+    topic: string
+    context: string
+    count: number
+    timestamp: string
   }>(EnhancedResearchService.generateIdeas)
 
   const handleTopicExploration = async () => {
@@ -345,16 +361,41 @@ export default function ResearchExplorer() {
                   </div>
                 </div>
 
-                <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">
-                  {topicExploration.loading ? (
-                    <LoadingSpinner size="sm" text="Exploring..." />
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Explore Topic
-                    </>
-                  )}
-                </Button>
+                {(() => {
+                  const aiStatus = AIConfig.getProviderStatus()
+                  return (
+                    <Button
+                      onClick={handleTopicExploration}
+                      disabled={topicExploration.loading || (aiStatus && aiStatus.totalConfigured === 0)}
+                      className="w-full"
+                    >
+                      {topicExploration.loading ? (
+                        <LoadingSpinner size="sm" text="Exploring..." />
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          Explore Topic
+                        </>
+                      )}
+                    </Button>
+                  )
+                })()}
+
+                {topicExploration.error && (
+                  <div className="text-red-500 mt-2">
+                    {topicExploration.error.includes("AI provider configuration") ? (
+                      <>
+                        No AI providers are configured. Please add at least one API key in{" "}
+                        <Link href="/settings" className="underline">
+                          Settings
+                        </Link>
+                        .
+                      </>
+                    ) : (
+                      topicExploration.error
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -439,79 +480,81 @@ export default function ResearchExplorer() {
             {(() => {
               const searchData = paperSearch.data as any
               const papers = searchData?.data?.data || []
-              
+
               if (papers.length > 0) {
                 return (
-              <div className="space-y-4">
-                <div className="text-sm text-gray-600 mb-4">
+                  <div className="space-y-4">
+                    <div className="text-sm text-gray-600 mb-4">
                       Found {searchData?.data?.count || papers.length} papers
-                </div>
+                    </div>
                     {papers.map((paper: any, index: number) => (
-                  <Card key={paper.id || index}>
-                    <CardHeader>
-                      <CardTitle className="text-lg leading-tight">{paper.title || "Untitled Paper"}</CardTitle>
-                      <CardDescription className="flex flex-wrap items-center gap-2 text-sm">
-                        {paper.authors && paper.authors.length > 0 && (
-                          <span>
-                            {paper.authors.slice(0, 3).join(", ")}
-                            {paper.authors.length > 3 ? " et al." : ""}
-                          </span>
-                        )}
-                        {paper.year && (
-                          <>
-                            <span>•</span>
-                            <span>{paper.year}</span>
-                          </>
-                        )}
-                        {paper.journal && (
-                          <>
-                            <span>•</span>
-                            <span className="italic">{paper.journal}</span>
-                          </>
-                        )}
-                        {paper.citations !== undefined && paper.citations > 0 && (
-                          <>
-                            <span>•</span>
-                            <span>{paper.citations} citations</span>
-                          </>
-                        )}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {paper.abstract && <p className="text-sm text-gray-600 mb-4 line-clamp-3">{paper.abstract}</p>}
-                      <div className="flex gap-2">
-                        {paper.url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={paper.url} target="_blank" rel="noopener noreferrer">
-                              View Paper
-                            </a>
-                          </Button>
-                        )}
-                        {paper.pdf_url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer">
-                              PDF
-                            </a>
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      <Card key={paper.id || index}>
+                        <CardHeader>
+                          <CardTitle className="text-lg leading-tight">{paper.title || "Untitled Paper"}</CardTitle>
+                          <CardDescription className="flex flex-wrap items-center gap-2 text-sm">
+                            {paper.authors && paper.authors.length > 0 && (
+                              <span>
+                                {paper.authors.slice(0, 3).join(", ")}
+                                {paper.authors.length > 3 ? " et al." : ""}
+                              </span>
+                            )}
+                            {paper.year && (
+                              <>
+                                <span>•</span>
+                                <span>{paper.year}</span>
+                              </>
+                            )}
+                            {paper.journal && (
+                              <>
+                                <span>•</span>
+                                <span className="italic">{paper.journal}</span>
+                              </>
+                            )}
+                            {paper.citations !== undefined && paper.citations > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{paper.citations} citations</span>
+                              </>
+                            )}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {paper.abstract && (
+                            <p className="text-sm text-gray-600 mb-4 line-clamp-3">{paper.abstract}</p>
+                          )}
+                          <div className="flex gap-2">
+                            {paper.url && (
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={paper.url} target="_blank" rel="noopener noreferrer">
+                                  View Paper
+                                </a>
+                              </Button>
+                            )}
+                            {paper.pdf_url && (
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer">
+                                  PDF
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 )
               }
-              
+
               if (paperSearch.data) {
                 return (
-                <EmptyState
-                  icon={BookOpen}
-                  title="No papers found"
-                  description="Try adjusting your search terms or exploring different keywords."
-                />
-              )
+                  <EmptyState
+                    icon={BookOpen}
+                    title="No papers found"
+                    description="Try adjusting your search terms or exploring different keywords."
+                  />
+                )
               }
-              
+
               return null
             })()}
 

@@ -129,22 +129,22 @@ class SocketService {
 
   // Add event listener
   on(event: SocketEvent | string, callback: (...args: any[]) => void): void {
-    if (!this.socket) return;
-    this.socket.on(event, callback);
+    if (!this.socket) return
+    this.socket.on(event, callback)
   }
 
   // Remove event listener
   off(event: SocketEvent | string, callback: (...args: any[]) => void): void {
-    if (!this.socket) return;
-    this.socket.off(event, callback);
+    if (!this.socket) return
+    this.socket.off(event, callback)
   }
 
   // Send typing status (alias for startTyping/stopTyping)
   sendTypingStatus(teamId: string, isTyping: boolean): void {
     if (isTyping) {
-      this.startTyping(teamId);
+      this.startTyping(teamId)
     } else {
-      this.stopTyping(teamId);
+      this.stopTyping(teamId)
     }
   }
 

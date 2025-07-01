@@ -8,23 +8,11 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { 
-  Save, 
-  Shield, 
-  Bell, 
-  User, 
-  Palette, 
-  Database, 
-  Key, 
-  Download,
-  Trash2,
-  AlertTriangle,
-  CheckCircle
-} from "lucide-react"
+import { Save, Shield, Bell, User, Database, Key, Download, Trash2, AlertTriangle, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
+
 // Note: AI Status Indicator will be shown when component is available
 
 interface UserSettings {
@@ -33,7 +21,7 @@ interface UserSettings {
   collaboration_invites: boolean
   security_alerts: boolean
   marketing_emails: boolean
-  theme: 'light' | 'dark' | 'system'
+  theme: "light" | "dark" | "system"
   language: string
   timezone: string
   auto_save: boolean
@@ -50,14 +38,14 @@ export default function SettingsPage() {
     collaboration_invites: true,
     security_alerts: true,
     marketing_emails: false,
-    theme: 'system',
-    language: 'en',
-    timezone: 'UTC',
+    theme: "system",
+    language: "en",
+    timezone: "UTC",
     auto_save: true,
     data_sharing: false,
   })
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
@@ -70,14 +58,10 @@ export default function SettingsPage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('settings')
-        .eq('user_id', user.id)
-        .single()
+      const { data, error } = await supabase.from("user_profiles").select("settings").eq("user_id", user.id).single()
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading settings:', error)
+      if (error && error.code !== "PGRST116") {
+        console.error("Error loading settings:", error)
         return
       }
 
@@ -85,7 +69,7 @@ export default function SettingsPage() {
         setSettings({ ...settings, ...data.settings })
       }
     } catch (error) {
-      console.error('Error loading settings:', error)
+      console.error("Error loading settings:", error)
     }
   }
 
@@ -94,13 +78,11 @@ export default function SettingsPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          settings: settings,
-          updated_at: new Date().toISOString(),
-        })
+      const { error } = await supabase.from("user_profiles").upsert({
+        user_id: user.id,
+        settings: settings,
+        updated_at: new Date().toISOString(),
+      })
 
       if (error) throw error
 
@@ -109,7 +91,7 @@ export default function SettingsPage() {
         description: "Your preferences have been updated successfully.",
       })
     } catch (error) {
-      console.error('Error saving settings:', error)
+      console.error("Error saving settings:", error)
       toast({
         title: "Save failed",
         description: "Failed to save settings. Please try again.",
@@ -142,20 +124,20 @@ export default function SettingsPage() {
     setChangingPassword(true)
     try {
       const { error } = await supabase.auth.updateUser({
-        password: newPassword
+        password: newPassword,
       })
 
       if (error) throw error
 
-      setNewPassword('')
-      setConfirmPassword('')
-      
+      setNewPassword("")
+      setConfirmPassword("")
+
       toast({
         title: "Password updated",
         description: "Your password has been changed successfully.",
       })
     } catch (error) {
-      console.error('Error changing password:', error)
+      console.error("Error changing password:", error)
       toast({
         title: "Password change failed",
         description: error instanceof Error ? error.message : "Failed to change password",
@@ -179,13 +161,13 @@ export default function SettingsPage() {
       }
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: 'application/json'
+        type: "application/json",
       })
-      
+
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
+      const a = document.createElement("a")
       a.href = url
-      a.download = `bolt-research-hub-data-${new Date().toISOString().split('T')[0]}.json`
+      a.download = `bolt-research-hub-data-${new Date().toISOString().split("T")[0]}.json`
       a.click()
       URL.revokeObjectURL(url)
 
@@ -204,7 +186,7 @@ export default function SettingsPage() {
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
-      "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted."
+      "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
     )
 
     if (!confirmed) return
@@ -259,32 +241,26 @@ export default function SettingsPage() {
                 <User className="h-5 w-5" />
                 Account Information
               </CardTitle>
-              <CardDescription>
-                View and manage your account details
-              </CardDescription>
+              <CardDescription>View and manage your account details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label>Email Address</Label>
-                  <Input value={user.email || ''} disabled className="bg-muted" />
+                  <Input value={user.email || ""} disabled className="bg-muted" />
                 </div>
                 <div>
                   <Label>Account Created</Label>
-                  <Input 
-                    value={new Date(user.created_at).toLocaleDateString()} 
-                    disabled 
-                    className="bg-muted" 
-                  />
+                  <Input value={new Date(user.created_at).toLocaleDateString()} disabled className="bg-muted" />
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label>Language</Label>
-                  <select 
+                  <select
                     value={settings.language}
-                    onChange={(e) => setSettings({...settings, language: e.target.value})}
+                    onChange={(e) => setSettings({ ...settings, language: e.target.value })}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md"
                   >
                     <option value="en">English</option>
@@ -295,9 +271,9 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <Label>Timezone</Label>
-                  <select 
+                  <select
                     value={settings.timezone}
-                    onChange={(e) => setSettings({...settings, timezone: e.target.value})}
+                    onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md"
                   >
                     <option value="UTC">UTC</option>
@@ -316,14 +292,14 @@ export default function SettingsPage() {
                 <Switch
                   id="auto-save"
                   checked={settings.auto_save}
-                  onCheckedChange={(checked) => setSettings({...settings, auto_save: checked})}
+                  onCheckedChange={(checked) => setSettings({ ...settings, auto_save: checked })}
                 />
                 <Label htmlFor="auto-save">Enable auto-save for documents</Label>
               </div>
 
               <Button onClick={saveSettings} disabled={saving} className="flex items-center gap-2">
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? "Saving..." : "Save Changes"}
               </Button>
             </CardContent>
           </Card>
@@ -335,9 +311,7 @@ export default function SettingsPage() {
                 <Key className="h-5 w-5" />
                 Change Password
               </CardTitle>
-              <CardDescription>
-                Update your account password
-              </CardDescription>
+              <CardDescription>Update your account password</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -362,14 +336,14 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-              
-              <Button 
-                onClick={changePassword} 
+
+              <Button
+                onClick={changePassword}
                 disabled={changingPassword || !newPassword || newPassword !== confirmPassword}
                 className="flex items-center gap-2"
               >
                 <Key className="h-4 w-4" />
-                {changingPassword ? 'Changing...' : 'Change Password'}
+                {changingPassword ? "Changing..." : "Change Password"}
               </Button>
             </CardContent>
           </Card>
@@ -383,9 +357,7 @@ export default function SettingsPage() {
                 <Bell className="h-5 w-5" />
                 Email Notifications
               </CardTitle>
-              <CardDescription>
-                Choose what email notifications you'd like to receive
-              </CardDescription>
+              <CardDescription>Choose what email notifications you'd like to receive</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
@@ -397,7 +369,7 @@ export default function SettingsPage() {
                   <Switch
                     id="email-notifications"
                     checked={settings.email_notifications}
-                    onCheckedChange={(checked) => setSettings({...settings, email_notifications: checked})}
+                    onChange={(checked) => setSettings({ ...settings, email_notifications: checked })}
                   />
                 </div>
 
@@ -409,7 +381,7 @@ export default function SettingsPage() {
                   <Switch
                     id="research-updates"
                     checked={settings.research_updates}
-                    onCheckedChange={(checked) => setSettings({...settings, research_updates: checked})}
+                    onChange={(checked) => setSettings({ ...settings, research_updates: checked })}
                   />
                 </div>
 
@@ -421,7 +393,7 @@ export default function SettingsPage() {
                   <Switch
                     id="collaboration-invites"
                     checked={settings.collaboration_invites}
-                    onCheckedChange={(checked) => setSettings({...settings, collaboration_invites: checked})}
+                    onChange={(checked) => setSettings({ ...settings, collaboration_invites: checked })}
                   />
                 </div>
 
@@ -433,7 +405,7 @@ export default function SettingsPage() {
                   <Switch
                     id="security-alerts"
                     checked={settings.security_alerts}
-                    onCheckedChange={(checked) => setSettings({...settings, security_alerts: checked})}
+                    onChange={(checked) => setSettings({ ...settings, security_alerts: checked })}
                   />
                 </div>
 
@@ -445,14 +417,14 @@ export default function SettingsPage() {
                   <Switch
                     id="marketing-emails"
                     checked={settings.marketing_emails}
-                    onCheckedChange={(checked) => setSettings({...settings, marketing_emails: checked})}
+                    onChange={(checked) => setSettings({ ...settings, marketing_emails: checked })}
                   />
                 </div>
               </div>
 
               <Button onClick={saveSettings} disabled={saving} className="flex items-center gap-2">
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Preferences'}
+                {saving ? "Saving..." : "Save Preferences"}
               </Button>
             </CardContent>
           </Card>
@@ -466,9 +438,7 @@ export default function SettingsPage() {
                 <Shield className="h-5 w-5" />
                 Privacy & Data
               </CardTitle>
-              <CardDescription>
-                Control how your data is used and shared
-              </CardDescription>
+              <CardDescription>Control how your data is used and shared</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
@@ -481,7 +451,7 @@ export default function SettingsPage() {
                 <Switch
                   id="data-sharing"
                   checked={settings.data_sharing}
-                  onCheckedChange={(checked) => setSettings({...settings, data_sharing: checked})}
+                  onChange={(checked) => setSettings({ ...settings, data_sharing: checked })}
                 />
               </div>
 
@@ -489,15 +459,13 @@ export default function SettingsPage() {
 
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Data Management</h3>
-                
+
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
                     <Label>Export Your Data</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Download a copy of all your data
-                    </p>
+                    <p className="text-sm text-muted-foreground">Download a copy of all your data</p>
                   </div>
-                  <Button variant="outline" onClick={exportData} className="flex items-center gap-2">
+                  <Button variant="outline" onClick={exportData} className="flex items-center gap-2 bg-transparent">
                     <Download className="h-4 w-4" />
                     Export Data
                   </Button>
@@ -506,9 +474,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between p-4 border rounded-lg border-red-200">
                   <div>
                     <Label className="text-red-600">Delete Account</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Permanently delete your account and all data
-                    </p>
+                    <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
                   </div>
                   <Button variant="destructive" onClick={deleteAccount} className="flex items-center gap-2">
                     <Trash2 className="h-4 w-4" />
@@ -519,7 +485,7 @@ export default function SettingsPage() {
 
               <Button onClick={saveSettings} disabled={saving} className="flex items-center gap-2">
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Privacy Settings'}
+                {saving ? "Saving..." : "Save Privacy Settings"}
               </Button>
             </CardContent>
           </Card>
@@ -533,22 +499,23 @@ export default function SettingsPage() {
                 <Database className="h-5 w-5" />
                 AI Provider Configuration
               </CardTitle>
-              <CardDescription>
-                Manage your AI provider settings and preferences
-              </CardDescription>
+              <CardDescription>Manage your AI provider settings and preferences</CardDescription>
             </CardHeader>
-                         <CardContent className="space-y-6">
-               <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
+            <CardContent className="space-y-6">
+              <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="h-5 w-5 text-blue-600" />
                   <h3 className="font-medium text-blue-900">AI Configuration Help</h3>
                 </div>
                 <p className="text-sm text-blue-800 mb-3">
-                  To use AI features, add your API keys to the <code className="bg-blue-100 px-1 rounded">.env.local</code> file:
+                  To use AI features, add your API keys to the{" "}
+                  <code className="bg-blue-100 px-1 rounded">.env.local</code> file:
                 </p>
                 <div className="bg-blue-100 p-3 rounded text-sm font-mono text-blue-900">
-                  GROQ_API_KEY=your_groq_key_here<br/>
-                  OPENAI_API_KEY=your_openai_key_here<br/>
+                  GROQ_API_KEY=your_groq_key_here
+                  <br />
+                  OPENAI_API_KEY=your_openai_key_here
+                  <br />
                   GEMINI_API_KEY=your_gemini_key_here
                 </div>
               </div>
@@ -559,8 +526,8 @@ export default function SettingsPage() {
                   <h3 className="font-medium text-amber-900">API Key Security</h3>
                 </div>
                 <p className="text-sm text-amber-800">
-                  API keys are stored securely on the server and never exposed to the client. 
-                  They are used only for making AI requests on your behalf.
+                  API keys are stored securely on the server and never exposed to the client. They are used only for
+                  making AI requests on your behalf.
                 </p>
               </div>
             </CardContent>

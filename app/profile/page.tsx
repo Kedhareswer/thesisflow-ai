@@ -35,7 +35,10 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState<UserProfile>({})
 
   // Simple avatar component
-  const SimpleAvatar = ({ size = "xl", editable = false }: { size?: "sm" | "md" | "lg" | "xl", editable?: boolean }) => {
+  const SimpleAvatar = ({
+    size = "xl",
+    editable = false,
+  }: { size?: "sm" | "md" | "lg" | "xl"; editable?: boolean }) => {
     const getInitials = () => {
       if (user?.user_metadata?.display_name) {
         return user.user_metadata.display_name[0].toUpperCase()
@@ -43,18 +46,20 @@ export default function ProfilePage() {
       if (user?.email) {
         return user.email[0].toUpperCase()
       }
-      return 'U'
+      return "U"
     }
 
     const sizeClasses = {
       sm: "h-8 w-8 text-sm",
-      md: "h-12 w-12 text-base", 
+      md: "h-12 w-12 text-base",
       lg: "h-16 w-16 text-lg",
-      xl: "h-24 w-24 text-2xl"
+      xl: "h-24 w-24 text-2xl",
     }
-    
+
     return (
-      <div className={`${sizeClasses[size]} bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold rounded-full flex items-center justify-center relative group ${editable ? 'cursor-pointer' : ''}`}>
+      <div
+        className={`${sizeClasses[size]} bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold rounded-full flex items-center justify-center relative group ${editable ? "cursor-pointer" : ""}`}
+      >
         {getInitials()}
         {editable && (
           <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -76,26 +81,22 @@ export default function ProfilePage() {
 
     try {
       // Try to load from database first
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", user.id).single()
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error)
+      if (error && error.code !== "PGRST116") {
+        console.error("Error loading profile:", error)
       }
 
       // Merge database data with auth metadata
       const profileData: UserProfile = {
-        display_name: data?.display_name || user.user_metadata?.display_name || user.user_metadata?.name || '',
-        bio: data?.bio || '',
-        location: data?.location || '',
-        website: data?.website || '',
-        organization: data?.organization || '',
-        job_title: data?.job_title || '',
+        display_name: data?.display_name || user.user_metadata?.display_name || user.user_metadata?.name || "",
+        bio: data?.bio || "",
+        location: data?.location || "",
+        website: data?.website || "",
+        organization: data?.organization || "",
+        job_title: data?.job_title || "",
         research_interests: data?.research_interests || [],
-        phone: data?.phone || '',
+        phone: data?.phone || "",
         created_at: user.created_at,
         last_active: data?.last_active || new Date().toISOString(),
       }
@@ -103,7 +104,7 @@ export default function ProfilePage() {
       setProfile(profileData)
       setFormData(profileData)
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error("Error loading profile:", error)
     }
   }
 
@@ -117,28 +118,26 @@ export default function ProfilePage() {
         data: {
           display_name: formData.display_name,
           bio: formData.bio,
-        }
+        },
       })
 
       if (authError) throw authError
 
       // Update/insert profile in database
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          email: user.email,
-          display_name: formData.display_name,
-          bio: formData.bio,
-          location: formData.location,
-          website: formData.website,
-          organization: formData.organization,
-          job_title: formData.job_title,
-          research_interests: formData.research_interests,
-          phone: formData.phone,
-          updated_at: new Date().toISOString(),
-          last_active: new Date().toISOString(),
-        })
+      const { error: profileError } = await supabase.from("user_profiles").upsert({
+        user_id: user.id,
+        email: user.email,
+        display_name: formData.display_name,
+        bio: formData.bio,
+        location: formData.location,
+        website: formData.website,
+        organization: formData.organization,
+        job_title: formData.job_title,
+        research_interests: formData.research_interests,
+        phone: formData.phone,
+        updated_at: new Date().toISOString(),
+        last_active: new Date().toISOString(),
+      })
 
       if (profileError) throw profileError
 
@@ -149,9 +148,8 @@ export default function ProfilePage() {
         title: "Profile updated",
         description: "Your profile has been successfully updated.",
       })
-
     } catch (error) {
-      console.error('Error saving profile:', error)
+      console.error("Error saving profile:", error)
       toast({
         title: "Save failed",
         description: error instanceof Error ? error.message : "Failed to save profile changes",
@@ -168,16 +166,19 @@ export default function ProfilePage() {
   }
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Unknown'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    if (!dateString) return "Unknown"
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     })
   }
 
   const handleResearchInterestsChange = (value: string) => {
-    const interests = value.split(',').map(s => s.trim()).filter(Boolean)
+    const interests = value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
     setFormData({ ...formData, research_interests: interests })
   }
 
@@ -200,7 +201,7 @@ export default function ProfilePage() {
           <h1 className="text-3xl font-bold">Profile</h1>
           <p className="text-muted-foreground">Manage your account information and preferences</p>
         </div>
-        
+
         {!editing ? (
           <Button onClick={() => setEditing(true)} className="flex items-center gap-2">
             <Edit3 className="h-4 w-4" />
@@ -213,7 +214,7 @@ export default function ProfilePage() {
             </Button>
             <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         )}
@@ -227,9 +228,7 @@ export default function ProfilePage() {
               <div className="flex justify-center mb-4">
                 <SimpleAvatar size="xl" editable={editing} />
               </div>
-              <CardTitle className="text-xl">
-                {profile.display_name || 'User'}
-              </CardTitle>
+              <CardTitle className="text-xl">{profile.display_name || "User"}</CardTitle>
               <CardDescription className="flex items-center justify-center gap-1">
                 <Mail className="h-4 w-4" />
                 {user.email}
@@ -243,25 +242,30 @@ export default function ProfilePage() {
                     {profile.job_title}
                   </p>
                 )}
-                
+
                 {profile.organization && (
                   <p className="flex items-center justify-center gap-2 text-sm">
                     <GraduationCap className="h-4 w-4" />
                     {profile.organization}
                   </p>
                 )}
-                
+
                 {profile.location && (
                   <p className="flex items-center justify-center gap-2 text-sm">
                     <MapPin className="h-4 w-4" />
                     {profile.location}
                   </p>
                 )}
-                
+
                 {profile.website && (
                   <p className="flex items-center justify-center gap-2 text-sm">
                     <Globe className="h-4 w-4" />
-                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a
+                      href={profile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
                       Website
                     </a>
                   </p>
@@ -315,14 +319,12 @@ export default function ProfilePage() {
                   {editing ? (
                     <Input
                       id="display_name"
-                      value={formData.display_name || ''}
+                      value={formData.display_name || ""}
                       onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
                       placeholder="Your display name"
                     />
                   ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">
-                      {profile.display_name || 'Not set'}
-                    </p>
+                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.display_name || "Not set"}</p>
                   )}
                 </div>
 
@@ -331,14 +333,12 @@ export default function ProfilePage() {
                   {editing ? (
                     <Input
                       id="phone"
-                      value={formData.phone || ''}
+                      value={formData.phone || ""}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="Your phone number"
                     />
                   ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">
-                      {profile.phone || 'Not set'}
-                    </p>
+                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.phone || "Not set"}</p>
                   )}
                 </div>
               </div>
@@ -348,14 +348,14 @@ export default function ProfilePage() {
                 {editing ? (
                   <Textarea
                     id="bio"
-                    value={formData.bio || ''}
+                    value={formData.bio || ""}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                     placeholder="Tell us about yourself..."
                     rows={3}
                   />
                 ) : (
                   <p className="py-2 px-3 border rounded-md bg-muted/50 min-h-[80px]">
-                    {profile.bio || 'No bio added yet'}
+                    {profile.bio || "No bio added yet"}
                   </p>
                 )}
               </div>
@@ -366,14 +366,12 @@ export default function ProfilePage() {
                   {editing ? (
                     <Input
                       id="job_title"
-                      value={formData.job_title || ''}
+                      value={formData.job_title || ""}
                       onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
                       placeholder="Your job title"
                     />
                   ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">
-                      {profile.job_title || 'Not set'}
-                    </p>
+                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.job_title || "Not set"}</p>
                   )}
                 </div>
 
@@ -382,14 +380,12 @@ export default function ProfilePage() {
                   {editing ? (
                     <Input
                       id="organization"
-                      value={formData.organization || ''}
+                      value={formData.organization || ""}
                       onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
                       placeholder="Your organization"
                     />
                   ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">
-                      {profile.organization || 'Not set'}
-                    </p>
+                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.organization || "Not set"}</p>
                   )}
                 </div>
               </div>
@@ -400,14 +396,12 @@ export default function ProfilePage() {
                   {editing ? (
                     <Input
                       id="location"
-                      value={formData.location || ''}
+                      value={formData.location || ""}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                       placeholder="Your location"
                     />
                   ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">
-                      {profile.location || 'Not set'}
-                    </p>
+                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.location || "Not set"}</p>
                   )}
                 </div>
 
@@ -416,33 +410,29 @@ export default function ProfilePage() {
                   {editing ? (
                     <Input
                       id="website"
-                      value={formData.website || ''}
+                      value={formData.website || ""}
                       onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                       placeholder="https://yourwebsite.com"
                     />
                   ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">
-                      {profile.website || 'Not set'}
-                    </p>
+                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.website || "Not set"}</p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="research_interests">Research Interests</Label>
-                <p className="text-sm text-muted-foreground">
-                  Separate multiple interests with commas
-                </p>
+                <p className="text-sm text-muted-foreground">Separate multiple interests with commas</p>
                 {editing ? (
                   <Input
                     id="research_interests"
-                    value={formData.research_interests?.join(', ') || ''}
+                    value={formData.research_interests?.join(", ") || ""}
                     onChange={(e) => handleResearchInterestsChange(e.target.value)}
                     placeholder="AI, Machine Learning, Data Science, etc."
                   />
                 ) : (
                   <p className="py-2 px-3 border rounded-md bg-muted/50">
-                    {profile.research_interests?.join(', ') || 'None specified'}
+                    {profile.research_interests?.join(", ") || "None specified"}
                   </p>
                 )}
               </div>
