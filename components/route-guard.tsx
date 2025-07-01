@@ -21,7 +21,6 @@ const PROTECTED_ROUTES = [
   "/explorer",
   "/summarizer", 
   "/research-assistant",
-  "/ai-tools",
   "/collaborate", 
   "/collaboration",
   "/planner",
@@ -53,30 +52,21 @@ export function RouteGuard({
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Don't render anything until mounted (prevents hydration mismatch)
-  if (!mounted) {
-    return <LoadingSpinner text="Loading..." />
-  }
-
-  // Show loading while auth is being determined
-  if (isLoading) {
-    return fallback || <LoadingSpinner text="Authenticating..." />
-  }
-
-  // Determine if current route requires protection
+  // Determine if current route requires protection (must be calculated before any early returns)
   const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route))
   const isAdminRoute = ADMIN_ROUTES.some(route => pathname.startsWith(route))
   const isPublicRoute = PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route))
 
-  // Check authentication requirements
+  // Check authentication requirements (must be calculated before any early returns)
   const needsAuth = requireAuth || isProtectedRoute || isAdminRoute
   const needsAdmin = requireAdmin || isAdminRoute
 
-  // Redirect logic
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Redirect logic - this useEffect must always be called regardless of conditions
   useEffect(() => {
     if (mounted && !isLoading) {
       // Redirect unauthenticated users from protected routes
@@ -95,6 +85,18 @@ export function RouteGuard({
       }
     }
   }, [user, isLoading, mounted, needsAuth, pathname, router])
+
+  // NOW we can do early returns after all hooks have been called
+  
+  // Don't render anything until mounted (prevents hydration mismatch)
+  if (!mounted) {
+    return <LoadingSpinner text="Loading..." />
+  }
+
+  // Show loading while auth is being determined
+  if (isLoading) {
+    return fallback || <LoadingSpinner text="Authenticating..." />
+  }
 
   // Render unauthorized page for admin routes
   if (needsAdmin && user && !checkIsAdmin(user)) {

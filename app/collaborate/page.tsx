@@ -31,6 +31,7 @@ import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
+import { RouteGuard } from "@/components/route-guard"
 
 // Type definitions
 interface User {
@@ -276,7 +277,13 @@ export default function CollaboratePage() {
 
         setMessages(transformedMessages)
       } catch (error) {
-        console.error("Error loading messages:", error)
+        console.error("Error loading messages:", error instanceof Error ? error.message : String(error))
+        // Optional: Show user-friendly error message
+        toast({
+          title: "Failed to load messages",
+          description: "Unable to load chat history. Please try refreshing the page.",
+          variant: "destructive",
+        })
       }
     }
 
@@ -689,7 +696,8 @@ export default function CollaboratePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <RouteGuard requireAuth={true}>
+      <div className="min-h-screen bg-gray-50">
       {/* Toast notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {/* Toast notifications from useToast */}
@@ -1070,6 +1078,7 @@ export default function CollaboratePage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </RouteGuard>
   )
 }
