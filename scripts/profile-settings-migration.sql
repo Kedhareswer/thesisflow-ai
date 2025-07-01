@@ -73,4 +73,4 @@ COMMENT ON TABLE user_settings IS 'User preferences and application settings';
 COMMENT ON COLUMN user_profiles.display_name IS 'Public display name (can be different from full_name)';
 COMMENT ON COLUMN user_profiles.location IS 'User location (city, country)';
 COMMENT ON COLUMN user_profiles.website IS 'User website or personal page URL';
-COMMENT ON COLUMN user_profiles.position IS 'Job title or academic position'; 
+COMMENT ON COLUMN user_profiles.position IS 'Job title or academic position';

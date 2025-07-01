@@ -87,4 +87,4 @@ COMMENT ON COLUMN user_api_keys.api_key_encrypted IS 'Encrypted API key using AE
 COMMENT ON COLUMN user_api_keys.test_status IS 'Status of last API key validation test';
 COMMENT ON COLUMN user_api_keys.usage_count IS 'Number of times this API key has been used';
 COMMENT ON FUNCTION increment_api_key_usage IS 'Tracks API key usage for analytics';
-COMMENT ON FUNCTION get_user_active_api_keys IS 'Securely retrieves user API keys for server-side AI calls'; 
+COMMENT ON FUNCTION get_user_active_api_keys IS 'Securely retrieves user API keys for server-side AI calls';

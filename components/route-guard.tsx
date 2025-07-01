@@ -186,4 +186,4 @@ export function useAuthGuard() {
     canAccess: isProtectedRoute ? isAuthenticated : true,
     canAccessAdmin: isAdminRoute ? isAuthenticated && isUserAdmin : true
   }
-} 
+}
