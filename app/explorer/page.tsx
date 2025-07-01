@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { BookOpen, Brain, Lightbulb, MessageCircle } from "lucide-react"
+import { BookOpen, Brain, Lightbulb, MessageCircle, Database } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -14,6 +14,8 @@ import { TopicExplorer } from "./components/TopicExplorer"
 import { IdeaGenerator } from "./components/IdeaGenerator"
 import { RouteGuard } from "@/components/route-guard"
 import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
+import { ResearchSessionProvider } from "@/components/research-session-provider"
+import { ResearchSessionManager } from "@/components/research-session-manager"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
@@ -47,7 +49,7 @@ Format the response in a clear, structured manner with headings and bullet point
 The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "comprehensive"}.`
 
       // Use the enhanced AI service instead of the old provider service
-      await enhancedAIService.loadUserApiKeys(true) // Force reload to get latest keys
+      await enhancedAIService.loadUserApiKeys() // Load latest keys
 
       const response = await enhancedAIService.chatCompletion([{ role: "user", content: prompt }], {
         temperature: 0.7,
@@ -151,8 +153,9 @@ export default function ResearchExplorer() {
 
   return (
     <RouteGuard requireAuth={true}>
-      <ErrorBoundary>
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <ResearchSessionProvider>
+        <ErrorBoundary>
+          <div className="container mx-auto px-4 py-8 max-w-6xl">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Research Explorer</h1>
             <p className="text-gray-600">
@@ -170,7 +173,7 @@ export default function ResearchExplorer() {
           </div>
 
           <Tabs defaultValue="search" className="space-y-8">
-            <TabsList className="grid w-full grid-cols-4 bg-gray-50">
+            <TabsList className="grid w-full grid-cols-5 bg-gray-50">
               <TabsTrigger value="search" className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />
                 Literature Search
@@ -186,6 +189,10 @@ export default function ResearchExplorer() {
               <TabsTrigger value="assistant" className="flex items-center gap-2">
                 <MessageCircle className="h-4 w-4" />
                 Research Assistant
+              </TabsTrigger>
+              <TabsTrigger value="session" className="flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Session Manager
               </TabsTrigger>
             </TabsList>
 
@@ -222,6 +229,10 @@ export default function ResearchExplorer() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="session" className="space-y-6">
+              <ResearchSessionManager className="space-y-6" />
+            </TabsContent>
           </Tabs>
 
           {/* Help Section */}
@@ -255,6 +266,7 @@ export default function ResearchExplorer() {
           </Card>
         </div>
       </ErrorBoundary>
+      </ResearchSessionProvider>
     </RouteGuard>
   )
 }

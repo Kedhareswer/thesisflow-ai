@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Loader2, Send, Bot, User } from 'lucide-react'
-import { api } from '@/lib/utils/api'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Loader2, Send, Bot, User, Info, Brain, BookOpen, Lightbulb, Settings } from 'lucide-react'
+import { useResearchSession, useResearchContext } from '@/components/research-session-provider'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -18,14 +20,30 @@ interface ResearchChatbotProps {
 }
 
 export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatbotProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { 
-      role: 'assistant', 
-      content: `Hi! I'm your research assistant. You can ask me questions about ${topic || 'your research topic'}, related literature, or research ideas. How can I help you today?` 
+  const { 
+    session, 
+    addChatMessage, 
+    buildResearchContext
+  } = useResearchSession()
+  const { hasContext, contextSummary, currentTopic } = useResearchContext()
+  
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    // Initialize with session chat history or default message
+    if (session.chatHistory.length > 0) {
+      return session.chatHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
     }
-  ])
+    
+    return [{
+      role: 'assistant',
+      content: `Hi! I'm your context-aware research assistant. I have access to your research session and can help you with questions about your literature, ideas, topics, and research direction. How can I help you today?`
+    }]
+  })
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [useFullContext, setUseFullContext] = useState(hasContext)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when messages change
@@ -33,8 +51,13 @@ export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatb
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Build context from the current research session
+  // Build enhanced context from research session
   const buildPromptContext = () => {
+    if (useFullContext && hasContext) {
+      return buildResearchContext()
+    }
+    
+    // Fallback to legacy context for backward compatibility
     let contextStr = ''
     
     if (topic) {
@@ -73,8 +96,9 @@ export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatb
     const userMessage = input.trim()
     setInput('')
     
-    // Add user message to chat
+    // Add user message to chat and session
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
+    addChatMessage('user', userMessage)
     
     // Show loading state
     setIsLoading(true)
@@ -86,38 +110,59 @@ export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatb
       // Create a history of previous messages for context
       const messageHistory = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n')
       
-      // Send request to AI
-      const response = await api.post('/api/ai/generate', {
-        prompt: `You are a helpful research assistant chatbot. Your goal is to help the user with their research by answering questions, explaining concepts, suggesting directions, or clarifying information.
+      // Determine context sources used
+      const contextSources: string[] = []
+      if (useFullContext && hasContext) {
+        if (session.selectedPapers.length > 0) contextSources.push('literature')
+        if (session.selectedIdeas.length > 0) contextSources.push('ideas')
+        if (session.topics.length > 0) contextSources.push('topics')
+        if (session.searchSessions.length > 0) contextSources.push('searches')
+      }
+      
+      // Enhanced prompt with better context awareness
+      const enhancedPrompt = `Research Assistant | Context-aware response
 
-Context about the current research session:
-${sessionContext}
+${sessionContext ? `CONTEXT:\n${sessionContext}\n` : ''}CONVERSATION:\n${messageHistory}\n
+QUERY: ${userMessage}
 
-Previous conversation:
-${messageHistory}
+RESPONSE GUIDELINES:
+- Reference user's papers/ideas/topics when relevant
+- Suggest research connections
+- Concise, actionable insights
+- Acknowledge limitations honestly
+- Guide research direction
 
-User's question: ${userMessage}
+Response:`
 
-Provide a helpful, informative, and concise response. If you don't know something, admit it rather than making up information.`,
+      // Use enhanced AI service directly for better performance and authentication
+      const { enhancedAIService } = await import('@/lib/enhanced-ai-service')
+      
+      console.log("Research Chatbot: Calling enhanced AI service...")
+      
+      const result = await enhancedAIService.generateText({
+        prompt: enhancedPrompt,
+        maxTokens: 1500,
+        temperature: 0.7
       })
 
-      // Extract content from response
+      console.log("Research Chatbot: AI service result:", {
+        success: result.success,
+        contentLength: result.content?.length,
+        error: result.error
+      })
+
       let responseContent = ''
-      if (response && typeof response === 'object' && 'content' in response) {
-        responseContent = String(response.content)
-      } else if (response && typeof response === 'object' && 'data' in response) {
-        const data = response.data
-        if (data && typeof data === 'object' && 'content' in data) {
-          responseContent = String(data.content)
-        } else {
-          responseContent = String(data)
-        }
+      if (result.success && result.content) {
+        responseContent = result.content
       } else {
-        responseContent = String(response)
+        responseContent = `Sorry, I encountered an error: ${result.error || 'Unknown error'}. Please try again.`
       }
 
-      // Add assistant message to chat
+      console.log("Research Chatbot: Final response content:", responseContent.substring(0, 200) + "...")
+
+      // Add assistant message to chat and session
       setMessages((prev) => [...prev, { role: 'assistant', content: responseContent }])
+      addChatMessage('assistant', responseContent, contextSources)
     } catch (error) {
       console.error('Error in chat:', error)
       setMessages((prev) => [
@@ -133,9 +178,38 @@ Provide a helpful, informative, and concise response. If you don't know somethin
   }
 
   return (
-    <Card className="mt-4">
-      <CardContent className="p-4">
-        <div className="flex flex-col h-[400px]">
+    <div>
+      {/* Research Context Status */}
+      {hasContext && (
+        <Alert className="mb-4 border-green-200 bg-green-50">
+          <Brain className="h-4 w-4" />
+          <AlertDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <strong>Enhanced Context Available:</strong> {contextSummary}
+                <br />
+                <span className="text-sm text-green-600">
+                  {session.selectedPapers.length} papers • {session.selectedIdeas.length} ideas • {session.topics.length} topics
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="use-full-context-chat"
+                  checked={useFullContext}
+                  onCheckedChange={(checked) => setUseFullContext(checked as boolean)}
+                />
+                <label htmlFor="use-full-context-chat" className="text-sm font-medium">
+                  Use full context
+                </label>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <Card className="mt-4">
+        <CardContent className="p-4">
+          <div className="flex flex-col h-[400px]">
           <div className="flex-1 overflow-y-auto mb-4 pr-2">
             {messages.map((message, index) => (
               <div 
@@ -197,5 +271,6 @@ Provide a helpful, informative, and concise response. If you don't know somethin
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }

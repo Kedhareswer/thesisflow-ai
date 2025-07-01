@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { BookOpen, Download, Filter, ExternalLink, FileText, Eye, Calendar, Users, Quote, AlertCircle, Info } from "lucide-react"
+import { BookOpen, Download, Filter, ExternalLink, FileText, Eye, Calendar, Users, Quote, AlertCircle, Info, Save } from "lucide-react"
 import { SearchInput } from "@/components/common/SearchInput"
 import { SkeletonList } from "@/components/common/SkeletonCard"
 import { useAsync } from "@/lib/hooks/useAsync"
@@ -18,6 +18,7 @@ import { EnhancedSearchService } from "../enhanced-search"
 import { CitationExportService } from "@/lib/services/citation-export.service"
 import type { ResearchPaper, SearchFilters } from "@/lib/types/common"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { useResearchPapers, useResearchContext } from "@/components/research-session-provider"
 
 interface EnhancedLiteratureSearchProps {
   className?: string
@@ -25,14 +26,18 @@ interface EnhancedLiteratureSearchProps {
 
 export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearchProps) {
   const { toast } = useToast()
+  const { papers: sessionPapers, selectedPapers: sessionSelectedPapers, selectPaper, addPapers } = useResearchPapers()
+  const { hasContext, contextSummary } = useResearchContext()
+  
   const [showFilters, setShowFilters] = useState(false)
-  const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set())
+  const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set(sessionSelectedPapers.map(p => p.id)))
   const [filters, setFilters] = useState<SearchFilters>({
     publication_year_min: 2010,
     publication_year_max: new Date().getFullYear(),
     sort_by: 'relevance',
     sort_order: 'desc'
   })
+  const [lastSearchQuery, setLastSearchQuery] = useState<string>('')
 
   // Initialize search state manually since we're using API endpoint
   const [paperSearch, setPaperSearch] = useState<{
@@ -49,6 +54,8 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
   const handleSearch = async (query: string) => {
     if (!query.trim()) return
 
+    setLastSearchQuery(query.trim())
+    
     // Set loading state
     setPaperSearch(prev => ({ ...prev, loading: true, error: null }))
 
@@ -89,7 +96,10 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       // Update state with search results
       setPaperSearch(prev => ({ ...prev, data: searchResult, loading: false, error: null }))
 
+      // Add papers to research session
       if (searchResult.papers.length > 0) {
+        addPapers(searchResult.papers, query.trim(), filters)
+        
         toast({
           title: "Search Complete",
           description: `Found ${searchResult.papers.length} papers from ${searchResult.sources.join(', ') || 'academic databases'} (${searchResult.search_time}ms)${data.fallback ? ' - using demo data' : ''}`,
@@ -125,6 +135,9 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       newSelected.delete(paperId)
     }
     setSelectedPapers(newSelected)
+    
+    // Update research session
+    selectPaper(paperId, selected)
   }
 
   const handleSelectAll = () => {
@@ -178,6 +191,16 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
 
   return (
     <div className={className}>
+      {/* Research Context Status */}
+      {hasContext && (
+        <Alert className="mb-4 border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Research Context:</strong> {contextSummary}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -185,7 +208,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
             Enhanced Literature Search
           </CardTitle>
           <CardDescription>
-            Advanced search with citation data, filtering, and export capabilities
+            Advanced search with citation data, filtering, and export capabilities. Papers are automatically saved to your research session.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

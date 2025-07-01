@@ -1,14 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Lightbulb, TrendingUp } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Lightbulb, TrendingUp, Info, Save } from "lucide-react"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+import { useResearchIdeas, useResearchContext, useResearchTopics } from "@/components/research-session-provider"
 
 // Enhanced research service for idea generation
 class IdeaGenerationService {
@@ -60,9 +63,21 @@ interface IdeaGeneratorProps {
 
 export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const { toast } = useToast()
-  const [ideaTopic, setIdeaTopic] = useState("")
+  const { ideas: sessionIdeas, selectedIdeas, addIdeas, selectIdea } = useResearchIdeas()
+  const { hasContext, contextSummary, buildContext, currentTopic } = useResearchContext()
+  const { topics } = useResearchTopics()
+  
+  const [ideaTopic, setIdeaTopic] = useState(() => currentTopic || "")
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
+  const [useSessionContext, setUseSessionContext] = useState(hasContext)
+  
+  // Update topic field when currentTopic changes, but only if different and not currently generating
+  useEffect(() => {
+    if (currentTopic && currentTopic !== ideaTopic && !ideaGeneration.loading) {
+      setIdeaTopic(currentTopic)
+    }
+  }, [currentTopic])
   
   const ideaGeneration = useAsync<{
     content: string
@@ -84,10 +99,18 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
     }
 
     try {
-      await ideaGeneration.execute(ideaTopic, ideaContext, ideaCount)
+      // Build enhanced context if using session context
+      const enhancedContext = useSessionContext ? 
+        `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
+        ideaContext
+
+      await ideaGeneration.execute(ideaTopic, enhancedContext, ideaCount)
+      
+      // Ideas will be added to session via useEffect when data is available
+      
       toast({
         title: "Ideas Generated",
-        description: `Generated ${ideaCount} AI-powered research ideas successfully.`,
+        description: `Generated ${ideaCount} AI-powered research ideas and saved to your research session.`,
       })
     } catch (error) {
       toast({
@@ -98,6 +121,27 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
     }
   }
 
+  // Add ideas to session when generation data is available
+  useEffect(() => {
+    if (ideaGeneration.data && ideaGeneration.data.ideas) {
+      const newIdeas = ideaGeneration.data.ideas.map((ideaText: string) => {
+        // Parse the idea text to extract title and description
+        const lines = ideaText.split('\n')
+        const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+        const description = lines.slice(1).join('\n').trim() || title
+        
+        return {
+          title,
+          description,
+          topic: ideaTopic,
+          source: 'generated' as const
+        }
+      })
+      
+      addIdeas(newIdeas)
+    }
+  }, [ideaGeneration.data, ideaTopic, addIdeas])
+
   const extractContent = (data: any): string => {
     if (typeof data === "string") {
       return data
@@ -105,7 +149,14 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       if ("content" in data) {
         return data.content as string
       } else if ("ideas" in data && Array.isArray(data.ideas)) {
-        return data.ideas.join("\n\n")
+        // Format ideas nicely with titles and descriptions
+        return data.ideas.map((idea: string, index: number) => {
+          const lines = idea.split('\n')
+          const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+          const description = lines.slice(1).join('\n').trim()
+          
+          return `${index + 1}. **${title}**\n${description || title}`
+        }).join("\n\n")
       } else {
         return JSON.stringify(data, null, 2)
       }
@@ -115,6 +166,20 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
 
   return (
     <div className={className}>
+      {/* Research Context Status */}
+      {hasContext && (
+        <Alert className="mb-4 border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Research Context:</strong> {contextSummary}
+            <br />
+            <span className="text-sm text-blue-600">
+              Context will be automatically included in idea generation to provide more relevant suggestions.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -122,7 +187,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
             Research Idea Generator
           </CardTitle>
           <CardDescription>
-            Generate innovative research ideas with AI assistance based on your topic and context.
+            Generate innovative research ideas with AI assistance based on your topic and context. Ideas are automatically saved to your research session.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -156,6 +221,19 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
               <span className="text-sm font-medium w-8">{ideaCount}</span>
             </div>
           </div>
+
+          {hasContext && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="use-session-context"
+                checked={useSessionContext}
+                onCheckedChange={(checked) => setUseSessionContext(checked as boolean)}
+              />
+              <label htmlFor="use-session-context" className="text-sm font-medium">
+                Use research session context for enhanced idea generation
+              </label>
+            </div>
+          )}
 
           <Button onClick={handleIdeaGeneration} disabled={ideaGeneration.loading} className="w-full">
             {ideaGeneration.loading ? (
@@ -197,9 +275,24 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           <CardContent>
             <div className="prose max-w-none">
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <pre className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                  {extractContent(ideaGeneration.data)}
-                </pre>
+                <div className="space-y-4">
+                  {ideaGeneration.data.ideas.map((idea: string, index: number) => {
+                    const lines = idea.split('\n')
+                    const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+                    const description = lines.slice(1).join('\n').trim()
+                    
+                    return (
+                      <div key={index} className="border-l-4 border-blue-200 pl-4 py-2">
+                        <h4 className="font-semibold text-gray-900 mb-2">
+                          {index + 1}. {title}
+                        </h4>
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {description || title}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           </CardContent>

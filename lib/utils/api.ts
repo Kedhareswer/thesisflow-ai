@@ -18,7 +18,38 @@ export class APIError extends Error {
  * Both styles now work.
  */
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    // Try to get Supabase session
+    const { supabase } = await import('@/integrations/supabase/client')
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (session?.access_token) {
+      return {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to get auth headers:', error)
+  }
+  
+  return {}
+}
+
 export async function api<T>(input: RequestInfo, init?: RequestInit & { parseAsJson?: boolean }): Promise<T> {
+  // Add auth headers for API routes
+  const url = typeof input === 'string' ? input : input.url
+  if (url.includes('/api/')) {
+    const authHeaders = await getAuthHeaders()
+    init = {
+      ...init,
+      headers: {
+        ...authHeaders,
+        ...init?.headers,
+      }
+    }
+  }
+  
   const res = await fetch(input, init)
   if (!res.ok) throw new Error(`API error ${res.status}`)
   return (init?.parseAsJson ?? true) ? ((await res.json()) as T) : ((await res.text()) as unknown as T)

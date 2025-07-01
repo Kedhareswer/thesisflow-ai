@@ -451,23 +451,23 @@ class EnhancedAIService {
     count: number
     timestamp: string
   }> {
-    const prompt = `Generate ${count} innovative and feasible research ideas for the topic: "${topic}"
+    const prompt = `Generate ${count} innovative research ideas for "${topic}"${context ? `\nContext: ${context}` : ''}
 
-${context ? `Additional context: ${context}` : ''}
+Format:
+1. **[Title]**
+   [Approach] | [Impact] | [Methodology]
 
-Please provide creative, specific, and actionable research ideas that could lead to meaningful contributions in this field. For each idea, provide:
-1. A clear, concise title
-2. A detailed description explaining the research approach, potential impact, and feasibility
+Requirements:
+- Novel, feasible concepts
+- Clear research approach
+- Measurable outcomes
+- Practical implementation
 
-Format your response as a numbered list where each idea follows this structure:
-1. **Title**: [Clear research title]
-   Description: [2-3 sentences explaining the research approach, methodology, and expected outcomes]
-
-Focus on originality, practical feasibility, and potential for significant impact in the field.`
+Each idea: title + 3 key aspects separated by "|"`
 
     const result = await this.generateText({
       prompt,
-      maxTokens: 2000,
+      maxTokens: 3000, // Increased for more detailed ideas
       temperature: 0.9
     })
 
@@ -491,65 +491,154 @@ Focus on originality, practical feasibility, and potential for significant impac
   private parseResearchIdeas(content: string): Array<{ title: string; description: string }> {
     const ideas: Array<{ title: string; description: string }> = []
     
-    // Split content by numbered items
-    const lines = content.split('\n')
-    let currentIdea: { title: string; description: string } | null = null
+    // Parse optimized format: **Title** followed by Approach | Impact | Methodology
+    const optimizedPattern = /\d+\.\s*\*\*([^*]+)\*\*\s*([^|\n]+)\s*\|\s*([^|\n]+)\s*\|\s*([^\n]+)/g
+    let match
     
-    for (const line of lines) {
-      const trimmedLine = line.trim()
+    while ((match = optimizedPattern.exec(content)) !== null) {
+      const title = match[1]?.trim()
+      const approach = match[2]?.trim()
+      const impact = match[3]?.trim()
+      const methodology = match[4]?.trim()
       
-      // Check if this is a new numbered idea
-      const numberMatch = trimmedLine.match(/^\d+\.\s*\*\*(.*?)\*\*/)
-      if (numberMatch) {
-        // Save previous idea if exists
-        if (currentIdea) {
-          ideas.push(currentIdea)
-        }
-        
-        // Start new idea
-        currentIdea = {
-          title: numberMatch[1].trim(),
-          description: ''
-        }
-        
-        // Check if description is on the same line
-        const descMatch = trimmedLine.match(/Description:\s*(.+)/)
-        if (descMatch) {
-          currentIdea.description = descMatch[1].trim()
-        }
-      } else if (currentIdea) {
-        // Add to current idea's description
-        const descMatch = trimmedLine.match(/Description:\s*(.+)/)
-        if (descMatch) {
-          currentIdea.description = descMatch[1].trim()
-        } else if (trimmedLine && !trimmedLine.startsWith('**')) {
-          // Add continuation of description
-          if (currentIdea.description) {
-            currentIdea.description += ' ' + trimmedLine
-          } else {
-            currentIdea.description = trimmedLine
-          }
-        }
-      }
-    }
-    
-    // Add the last idea
-    if (currentIdea) {
-      ideas.push(currentIdea)
-    }
-    
-    // If parsing failed, create fallback ideas from the content
-    if (ideas.length === 0) {
-      const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20)
-      for (let i = 0; i < Math.min(5, sentences.length); i++) {
+      if (title) {
         ideas.push({
-          title: `Research Idea ${i + 1}`,
-          description: sentences[i].trim()
+          title,
+          description: `${approach}. ${impact}. ${methodology}`
         })
       }
     }
     
-    return ideas
+    // Fallback: Standard numbered list parsing
+    if (ideas.length === 0) {
+      const standardPattern = /\d+\.\s*\*\*([^*]+)\*\*[:\s]*([^\n]+(?:\n(?!\d+\.)[^\n]*)*)?/g
+      while ((match = standardPattern.exec(content)) !== null) {
+        const title = match[1]?.trim()
+        const description = match[2]?.trim().replace(/^Description:\s*/i, '')
+        
+        if (title) {
+          ideas.push({
+            title,
+            description: description || title
+          })
+        }
+      }
+    }
+    
+    // Final fallback: Extract any numbered items
+    if (ideas.length === 0) {
+      const fallbackPattern = /\d+\.\s*([^\n]+)/g
+      while ((match = fallbackPattern.exec(content)) !== null && ideas.length < 5) {
+        const line = match[1]?.trim()
+        if (line && line.length > 10) {
+          ideas.push({
+            title: `Research Idea ${ideas.length + 1}`,
+            description: line
+          })
+        }
+      }
+    }
+    
+    return ideas.slice(0, 10)
+  }
+
+  // Content summarization method
+  async summarizeContent(
+    content: string,
+    options: {
+      style?: 'academic' | 'executive' | 'bullet-points' | 'detailed'
+      length?: 'brief' | 'medium' | 'comprehensive'
+    } = {},
+    provider?: AIProvider,
+    model?: string
+  ): Promise<{
+    summary: string
+    keyPoints: string[]
+    readingTime: number
+    sentiment?: 'positive' | 'neutral' | 'negative'
+  }> {
+    const { style = 'academic', length = 'medium' } = options
+    
+    const prompt = `Summarize content | Style: ${style} | Length: ${length}
+
+CONTENT:
+${content.substring(0, 4000)}${content.length > 4000 ? '...[truncated]' : ''}
+
+OUTPUT FORMAT:
+SUMMARY: [${style} summary in ${length} detail]
+KEY_POINTS: [point1] | [point2] | [point3]
+READING_TIME: [minutes]
+SENTIMENT: [positive/neutral/negative]
+
+Requirements:
+- ${style} writing style
+- ${length} level of detail
+- Extract 3-5 key points
+- Estimate reading time (200 words/min)
+- Assess overall sentiment`
+
+    const result = await this.generateText({
+      prompt,
+      provider,
+      model,
+      maxTokens: length === 'comprehensive' ? 2000 : length === 'medium' ? 1000 : 500,
+      temperature: 0.3
+    })
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to summarize content')
+    }
+
+    return this.parseSummaryResult(result.content || '', content)
+  }
+
+  private parseSummaryResult(content: string, originalContent: string): {
+    summary: string
+    keyPoints: string[]
+    readingTime: number
+    sentiment?: 'positive' | 'neutral' | 'negative'
+  } {
+    const lines = content.split('\n').map(line => line.trim()).filter(line => line)
+    
+    let summary = ''
+    let keyPoints: string[] = []
+    let readingTime = 0
+    let sentiment: 'positive' | 'neutral' | 'negative' | undefined
+
+    for (const line of lines) {
+      if (line.startsWith('SUMMARY:')) {
+        summary = line.replace('SUMMARY:', '').trim()
+      } else if (line.startsWith('KEY_POINTS:')) {
+        const pointsStr = line.replace('KEY_POINTS:', '').trim()
+        keyPoints = pointsStr.split('|').map(p => p.trim()).filter(p => p)
+      } else if (line.startsWith('READING_TIME:')) {
+        const timeStr = line.replace('READING_TIME:', '').trim()
+        readingTime = parseInt(timeStr) || Math.ceil(originalContent.split(/\s+/).length / 200)
+      } else if (line.startsWith('SENTIMENT:')) {
+        const sentimentStr = line.replace('SENTIMENT:', '').trim().toLowerCase()
+        if (['positive', 'neutral', 'negative'].includes(sentimentStr)) {
+          sentiment = sentimentStr as 'positive' | 'neutral' | 'negative'
+        }
+      }
+    }
+
+    // Fallbacks
+    if (!summary) {
+      summary = content.split('\n').find(line => line.length > 50) || content.substring(0, 200)
+    }
+    if (keyPoints.length === 0) {
+      keyPoints = ['Content analyzed', 'Key insights extracted', 'Summary generated']
+    }
+    if (!readingTime) {
+      readingTime = Math.ceil(originalContent.split(/\s+/).length / 200)
+    }
+
+    return {
+      summary,
+      keyPoints,
+      readingTime,
+      sentiment
+    }
   }
 }
 
