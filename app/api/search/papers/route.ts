@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { EnhancedSearchService } from "@/app/explorer/enhanced-search"
+import type { SearchFilters } from "@/lib/types/common"
 
 export async function GET(request: Request) {
   try {
@@ -6,7 +8,7 @@ export async function GET(request: Request) {
     const query = searchParams.get("query")
     const type = searchParams.get("type") || "keyword"
 
-    console.log("API: Received search request for:", query)
+    console.log("API: Received enhanced search request for:", query)
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json(
@@ -18,14 +20,58 @@ export async function GET(request: Request) {
       )
     }
 
+    // Parse filters from query parameters
+    const filters: SearchFilters = {}
+    
+    const yearMin = searchParams.get("year_min")
+    const yearMax = searchParams.get("year_max")
+    const minCitations = searchParams.get("min_citations")
+    const openAccess = searchParams.get("open_access")
+    const venueType = searchParams.get("venue_type")
+    const sortBy = searchParams.get("sort_by")
+    const sortOrder = searchParams.get("sort_order")
+    const fieldOfStudy = searchParams.get("field_of_study")
+
+    if (yearMin) filters.publication_year_min = parseInt(yearMin)
+    if (yearMax) filters.publication_year_max = parseInt(yearMax)
+    if (minCitations) filters.min_citations = parseInt(minCitations)
+    if (openAccess) filters.open_access = openAccess === 'true'
+    if (venueType) filters.venue_type = [venueType]
+    if (sortBy) filters.sort_by = sortBy as any
+    if (sortOrder) filters.sort_order = sortOrder as any
+    if (fieldOfStudy) filters.field_of_study = fieldOfStudy.split(',')
+
+    const limit = parseInt(searchParams.get("limit") || "20")
+
     try {
-      // Use OpenAlex to search for papers
+      console.log("API: Using Enhanced Search Service with filters:", filters)
+      
+      // Use the new enhanced search service
+      const searchResult = await EnhancedSearchService.searchPapers(query.trim(), filters, limit)
+
+      console.log(`API: Enhanced search returned ${searchResult.papers.length} papers from ${searchResult.sources.join(', ')} in ${searchResult.search_time}ms`)
+
+      const responseData = {
+        success: true,
+        count: searchResult.papers.length,
+        total: searchResult.total,
+        sources: searchResult.sources,
+        search_time: searchResult.search_time,
+        filters_applied: searchResult.filters_applied,
+        data: searchResult.papers
+      }
+
+      return NextResponse.json(responseData)
+    } catch (searchError) {
+      console.error("API: Enhanced search failed, falling back to basic search:", searchError)
+      
+      // Fallback to original OpenAlex search
       const { fetchOpenAlexWorks } = await import("@/app/explorer/openalex")
-      const papers = await fetchOpenAlexWorks(query.trim(), 15)
+      const papers = await fetchOpenAlexWorks(query.trim(), limit)
 
-      console.log("API: Found papers from OpenAlex:", papers.length)
+      console.log("API: Fallback search found papers:", papers.length)
 
-      // Transform to expected format and ensure quality
+      // Transform to expected format
       const transformedPapers = papers
         .filter((paper) => paper.title && paper.title.trim() !== "")
         .map((paper) => ({
@@ -37,40 +83,23 @@ export async function GET(request: Request) {
           abstract: paper.abstract || "No abstract available",
           url: paper.url,
           doi: paper.doi,
-          citations: 0,
           pdf_url: paper.doi ? `https://doi.org/${paper.doi}` : paper.url,
+          source: 'openalex'
         }))
-        .slice(0, 10)
+        .slice(0, limit)
 
       const responseData = {
         success: true,
         count: transformedPapers.length,
-        source: "openalex",
+        total: transformedPapers.length,
+        sources: ['openalex'],
+        search_time: 0,
+        filters_applied: {},
         data: transformedPapers,
+        fallback: true
       }
 
-      console.log(`API: Returning ${transformedPapers.length} search results`)
       return NextResponse.json(responseData)
-    } catch (error) {
-      console.error("API: Error searching OpenAlex:", error)
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to search papers",
-          details: error instanceof Error ? error.message : String(error),
-          suggestion: "Please try again with different search terms. Make sure your search terms are specific and relevant.",
-          count: 0,
-          source: "openalex",
-          data: []
-        },
-        { 
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        },
-      )
     }
   } catch (error) {
     console.error("API: Unexpected error:", error)
@@ -81,7 +110,10 @@ export async function GET(request: Request) {
         details: error instanceof Error ? error.message : String(error),
         suggestion: "Please try again later",
         count: 0,
-        source: "openalex",
+        total: 0,
+        sources: [],
+        search_time: 0,
+        filters_applied: {},
         data: []
       },
       { 
