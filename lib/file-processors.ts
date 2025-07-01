@@ -94,4 +94,4 @@ export class FileProcessor {
     }
     return descriptions[type] || 'Unknown Format'
   }
-} 
+}

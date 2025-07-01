@@ -85,4 +85,4 @@ export function ContentFormatter({ content }: ContentFormatterProps) {
       {renderFormattedContent(content)}
     </div>
   )
-} 
+}

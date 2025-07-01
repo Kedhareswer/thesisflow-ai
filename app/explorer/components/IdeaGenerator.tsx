@@ -211,4 +211,4 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       )}
     </div>
   )
-} 
+}

@@ -51,4 +51,4 @@ export default function ResearchExplorer() {
       </div>
     </ErrorBoundary>
   )
-} 
+}

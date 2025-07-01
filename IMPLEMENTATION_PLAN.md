@@ -27,13 +27,13 @@ This document outlines the implementation plan for fixing the 4 critical issues 
 ### **Implementation Steps:**
 
 #### Step 1: Replace Main Component
-```bash
+\`\`\`bash
 # Backup current file
 mv app/explorer/page.tsx app/explorer/page-backup.tsx
 
 # Use refactored version
 mv app/explorer/page-refactored.tsx app/explorer/page.tsx
-```
+\`\`\`
 
 #### Step 2: Update Imports
 Ensure all components are properly imported and accessible.
@@ -67,10 +67,10 @@ Ensure all components are properly imported and accessible.
 ### **Implementation Steps:**
 
 #### Step 1: Install Additional Dependencies
-```bash
+\`\`\`bash
 # Already included in package.json, mammoth is available
 npm install  # Ensure mammoth is installed properly
-```
+\`\`\`
 
 #### Step 2: Update Summarizer
 The summarizer component has been updated to use the new FileUploader.
@@ -110,24 +110,24 @@ The summarizer component has been updated to use the new FileUploader.
 ### **Implementation Steps:**
 
 #### Step 1: Install Enhanced Dependencies
-```bash
+\`\`\`bash
 cd python
 pip install -r requirements-improved.txt
-```
+\`\`\`
 
 #### Step 2: Replace Backend
-```bash
+\`\`\`bash
 # Backup current backend
 mv app.py app-backup.py
 
 # Use enhanced version  
 mv improved_app.py app.py
-```
+\`\`\`
 
 #### Step 3: Test New Backend
-```bash
+\`\`\`bash
 python app.py
-```
+\`\`\`
 
 ### **Enhanced Features:**
 - **Multiple Search Sources**: OpenAlex → arXiv → pygetpapers fallback chain
@@ -169,14 +169,14 @@ python app.py
 #### Step 1: Update Import Statements
 Replace all Supabase imports across the codebase:
 
-```typescript
+\`\`\`typescript
 // OLD - Multiple different imports
 import { supabase } from '@/lib/supabase'
 import { supabase } from '@/integrations/supabase/client'
 
 // NEW - Single unified import
 import { supabase } from '@/lib/unified-supabase'
-```
+\`\`\`
 
 #### Step 2: Update Key Files
 Files that need import updates:
@@ -187,10 +187,10 @@ Files that need import updates:
 - All other files importing Supabase
 
 #### Step 3: Update Auth Provider
-```bash
+\`\`\`bash
 # Update the auth provider to use unified client
 # This ensures consistent authentication across the app
-```
+\`\`\`
 
 #### Step 4: Test Authentication Flow
 - Test login/logout
@@ -199,13 +199,13 @@ Files that need import updates:
 - Verify real-time subscriptions work
 
 ### **Migration Script Example:**
-```bash
+\`\`\`bash
 # Find all files that import Supabase
 grep -r "from.*supabase" app/ lib/ components/
 
 # Update imports (manual process recommended for safety)
 # Replace imports one by one and test
-```
+\`\`\`
 
 ### **Benefits:**
 - **Single Source of Truth**: One client configuration
@@ -319,4 +319,4 @@ After implementing all fixes:
 3. **Improved Reliability**: Robust backend with multiple fallbacks
 4. **Cleaner Architecture**: Unified configuration and reduced code duplication
 
-The AI Project Planner will be transformed from a good prototype into a production-ready research platform with enterprise-level reliability and maintainability. 
+The AI Project Planner will be transformed from a good prototype into a production-ready research platform with enterprise-level reliability and maintainability.

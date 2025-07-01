@@ -190,4 +190,4 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     utils: supabaseUtils,
     config: supabaseUtils.isConfigured() ? 'configured' : 'not configured'
   }
-} 
+}

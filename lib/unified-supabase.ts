@@ -43,4 +43,4 @@ try {
 }
 
 export const supabase = supabaseClient
-export type { Database, User, Session, AuthChangeEvent } 
+export type { Database, User, Session, AuthChangeEvent }

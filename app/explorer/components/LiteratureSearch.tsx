@@ -168,4 +168,4 @@ export function LiteratureSearch({ className }: LiteratureSearchProps) {
       )}
     </div>
   )
-} 
+}

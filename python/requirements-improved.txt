@@ -13,4 +13,4 @@ ratelimit==2.2.1  # For rate limiting
 
 # Optional dependencies for PDF processing
 # PyPDF2==3.0.1  # Uncomment if PDF processing is needed
-# pdfplumber==0.9.0  # Uncomment for advanced PDF processing 
+# pdfplumber==0.9.0  # Uncomment for advanced PDF processing
