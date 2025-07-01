@@ -1,66 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth, createSupabaseAdmin } from '@/lib/auth-utils'
 import crypto from 'crypto'
 import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
-// Get auth token from request headers or cookies
-async function getAuthUser(request: NextRequest) {
-  if (!supabaseAdmin) {
-    throw new Error('Supabase admin client not configured')
-  }
-
-  // Try to get token from Authorization header first
-  let authToken = request.headers.get('Authorization')?.replace('Bearer ', '')
-  
-  // If not in header, try to get from cookies
-  if (!authToken) {
-    const cookieHeader = request.headers.get('cookie')
-    if (cookieHeader) {
-      // Parse common Supabase cookie names
-      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split('=')
-        acc[key] = value
-        return acc
-      }, {} as Record<string, string>)
-      
-      authToken = cookies['sb-access-token'] || 
-                  cookies['supabase-auth-token'] || 
-                  cookies['sb-auth-token']
-    }
-  }
-
-  if (!authToken) {
-    throw new Error('No authentication token found')
-  }
-
-  // Verify token with admin client
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(authToken)
-  
-  if (error || !user) {
-    throw new Error('Invalid authentication token')
-  }
-
-  return user
-}
-
-// Create Supabase admin client for server-side operations
-const createSupabaseAdmin = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.warn('Supabase admin client not configured')
-    return null
-  }
-  
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
-}
-
+// Using shared authentication utilities from lib/auth-utils.ts
 const supabaseAdmin = createSupabaseAdmin()
 
 // Simple encryption/decryption for API keys (in production, use a proper key management service)
@@ -108,7 +51,7 @@ export async function GET(request: NextRequest) {
     // Get authenticated user
     let user
     try {
-      user = await getAuthUser(request)
+      user = await requireAuth(request, "user-api-keys")
     } catch (authError) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
@@ -132,7 +75,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Decrypt the API keys for internal use
-      const decryptedKeys = (apiKeys || []).map(key => {
+      const decryptedKeys = (apiKeys || []).map((key: any) => {
         try {
           return {
             ...key,
@@ -146,19 +89,19 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ apiKeys: decryptedKeys })
     } else {
-      // Get user's API keys (without decrypting for list view)
-      const { data: apiKeys, error } = await supabaseAdmin
-        .from('user_api_keys')
-        .select('id, provider, is_active, last_tested_at, test_status, created_at, updated_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+    // Get user's API keys (without decrypting for list view)
+    const { data: apiKeys, error } = await supabaseAdmin
+      .from('user_api_keys')
+      .select('id, provider, is_active, last_tested_at, test_status, created_at, updated_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('Error fetching API keys:', error)
-        return NextResponse.json({ error: 'Database error' }, { status: 500 })
-      }
+    if (error) {
+      console.error('Error fetching API keys:', error)
+      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    }
 
-      return NextResponse.json({ apiKeys: apiKeys || [] })
+    return NextResponse.json({ apiKeys: apiKeys || [] })
     }
   } catch (error) {
     console.error('API keys GET error:', error)
@@ -175,7 +118,7 @@ export async function POST(request: NextRequest) {
     // Get authenticated user
     let user
     try {
-      user = await getAuthUser(request)
+      user = await requireAuth(request, "user-api-keys")
     } catch (authError) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
@@ -264,7 +207,7 @@ export async function DELETE(request: NextRequest) {
     // Get authenticated user
     let user
     try {
-      user = await getAuthUser(request)
+      user = await requireAuth(request, "user-api-keys")
     } catch (authError) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }

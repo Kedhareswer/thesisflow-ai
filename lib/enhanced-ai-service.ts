@@ -101,39 +101,69 @@ class EnhancedAIService {
     if (this.initialized && !forceReload) return
 
     try {
+      console.log("Enhanced AI Service: Loading user API keys...")
+      
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        console.warn("No authenticated user found")
+        data: { session },
+        error: sessionError
+      } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error("Enhanced AI Service: Session error:", sessionError)
+        return
+      }
+      
+      if (!session?.user) {
+        console.warn("Enhanced AI Service: No authenticated user found")
         return
       }
 
+      console.log("Enhanced AI Service: Making authenticated request for API keys...")
+      
+      const headers: Record<string, string> = {
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Content-Type": "application/json",
+      }
+      
+      // Add authentication token if available
+      if (session.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`
+        console.log("Enhanced AI Service: Added auth token to request")
+      }
+
       const response = await fetch("/api/user-api-keys?include_keys=true", {
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
+        method: "GET",
+        credentials: "include",
+        headers,
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to load API keys: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error("Enhanced AI Service: API keys request failed:", response.status, errorText)
+        throw new Error(`Failed to load API keys: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
       const apiKeys = data.apiKeys || []
 
+      console.log("Enhanced AI Service: Received API keys data:", {
+        keyCount: apiKeys.length,
+        providers: apiKeys.map((k: any) => k.provider)
+      })
+
       this.userApiKeys.clear()
       apiKeys.forEach((keyData: any) => {
         if (keyData.is_active && keyData.test_status === "valid" && keyData.api_key) {
           this.userApiKeys.set(keyData.provider, keyData.api_key)
+          console.log("Enhanced AI Service: Loaded API key for provider:", keyData.provider)
         }
       })
 
       this.initialized = true
-      console.log(`API keys loaded successfully: ${this.userApiKeys.size} providers configured`)
+      console.log(`Enhanced AI Service: API keys loaded successfully - ${this.userApiKeys.size} providers configured`)
     } catch (error) {
-      console.error("Error loading user API keys:", error)
+      console.error("Enhanced AI Service: Error loading user API keys:", error)
       throw error
     }
   }

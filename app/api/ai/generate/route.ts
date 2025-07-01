@@ -1,65 +1,8 @@
 import { NextResponse } from "next/server"
-import { createClient } from '@supabase/supabase-js'
+import { getAuthUser, createSupabaseAdmin } from '@/lib/auth-utils'
 import crypto from 'crypto'
 
-// Get auth token from request headers or cookies
-async function getAuthUser(request: Request) {
-  const supabaseAdmin = createSupabaseAdmin()
-  if (!supabaseAdmin) {
-    throw new Error('Supabase admin client not configured')
-  }
-
-  // Try to get token from Authorization header first
-  let authToken = request.headers.get('Authorization')?.replace('Bearer ', '')
-  
-  // If not in header, try to get from cookies
-  if (!authToken) {
-    const cookieHeader = request.headers.get('cookie')
-    if (cookieHeader) {
-      // Parse common Supabase cookie names
-      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split('=')
-        acc[key] = value
-        return acc
-      }, {} as Record<string, string>)
-      
-      authToken = cookies['sb-access-token'] || 
-                  cookies['supabase-auth-token'] || 
-                  cookies['sb-auth-token']
-    }
-  }
-
-  if (!authToken) {
-    throw new Error('No authentication token found')
-  }
-
-  // Verify token with admin client
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(authToken)
-  
-  if (error || !user) {
-    throw new Error('Invalid authentication token')
-  }
-
-  return user
-}
-
-// Create Supabase admin client for server-side operations
-const createSupabaseAdmin = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.warn('Supabase admin client not configured')
-    return null
-  }
-  
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
-}
+// Using shared authentication utilities from lib/auth-utils.ts
 
 // Simple decryption for API keys
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
@@ -95,7 +38,7 @@ async function getUserApiKeys(userId: string) {
   }
 
   const decryptedKeys: Record<string, string> = {}
-  apiKeys?.forEach((keyData) => {
+  apiKeys?.forEach((keyData: any) => {
     try {
       decryptedKeys[keyData.provider] = decrypt(keyData.api_key_encrypted)
     } catch (error) {
@@ -180,12 +123,13 @@ export async function POST(request: Request) {
   try {
     const { prompt, provider: requestedProvider, model: requestedModel } = await request.json()
 
-    // Get authenticated user
+    // Get authenticated user (but don't fail if not authenticated - fallback to env vars)
     let user
     try {
-      user = await getAuthUser(request)
+      user = await getAuthUser(request, "generate")
     } catch (authError) {
       console.log('No authenticated user, using environment variables')
+      user = null
     }
 
     // Get user API keys if authenticated
