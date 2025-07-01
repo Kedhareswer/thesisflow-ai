@@ -12,6 +12,7 @@ import { SkeletonCard } from "@/components/common/SkeletonCard"
 import { ContentFormatter } from "./ContentFormatter"
 import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
+import type { AIProvider } from "@/lib/ai-providers"
 import Link from "next/link"
 
 // Enhanced research service that uses real AI
@@ -19,6 +20,8 @@ class EnhancedResearchService {
   static async exploreTopics(
     topic: string,
     depth = 3,
+    selectedProvider?: AIProvider,
+    selectedModel?: string,
   ): Promise<{
     content: string
     topic: string
@@ -52,7 +55,9 @@ The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "com
         { role: "user", content: prompt }
       ], {
         temperature: 0.7,
-        maxTokens: 2048
+        maxTokens: 2048,
+        preferredProvider: selectedProvider,
+        model: selectedModel
       })
 
       return {
@@ -73,9 +78,11 @@ The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "com
 
 interface TopicExplorerProps {
   className?: string
+  selectedProvider?: AIProvider
+  selectedModel?: string
 }
 
-export function TopicExplorer({ className }: TopicExplorerProps) {
+export function TopicExplorer({ className, selectedProvider, selectedModel }: TopicExplorerProps) {
   const { toast } = useToast()
   const [topic, setTopic] = useState("")
   const [depth, setDepth] = useState(3)
@@ -98,7 +105,7 @@ export function TopicExplorer({ className }: TopicExplorerProps) {
     }
 
     try {
-      await topicExploration.execute(topic, depth)
+      await topicExploration.execute(topic, depth, selectedProvider, selectedModel)
       toast({
         title: "Topic Explored",
         description: "AI-powered research overview generated successfully.",

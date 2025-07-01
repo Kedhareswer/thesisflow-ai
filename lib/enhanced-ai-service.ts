@@ -319,7 +319,7 @@ class EnhancedAIService {
       preferredProvider?: string
     } = {},
   ): Promise<AIResponse> {
-    const bestProvider = await this.getBestProvider()
+    const bestProvider = await this.getBestProvider(options.preferredProvider)
 
     if (!bestProvider) {
       throw new Error("No AI providers available. Please configure API keys in settings.")
