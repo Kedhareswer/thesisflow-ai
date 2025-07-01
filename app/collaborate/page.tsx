@@ -305,13 +305,13 @@ export default function CollaboratePage() {
       const members: User[] = membersData.map(member => {
         const profile = profilesMap.get(member.user_id);
         return {
-          id: member.user_id,
+        id: member.user_id,
           name: profile?.display_name || profile?.email?.split('@')[0] || 'Unknown',
           email: profile?.email || '',
           avatar: profile?.avatar_url,
           status: profile?.status || "offline",
-          role: member.role,
-          joinedAt: member.joined_at,
+        role: member.role,
+        joinedAt: member.joined_at,
           lastActive: profile?.last_active || new Date().toISOString(),
         };
       });

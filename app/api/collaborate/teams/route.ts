@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     // Transform the data to include member count and user role
     const transformedTeams = allTeams.map(team => {
       const userMember = team.team_members?.find((member: any) => member.user_id === user.id);
-      
+
       return {
         id: team.id,
         name: team.name,
@@ -444,8 +444,8 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       message: `Team "${team.name}" deleted successfully`
     });
   } catch (error) {

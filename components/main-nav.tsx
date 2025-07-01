@@ -136,7 +136,7 @@ export function MainNav() {
                   <NotificationBell />
                 </Suspense>
                 
-                <DropdownMenu
+              <DropdownMenu
                 trigger={
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-gray-100">
                     <SimpleAvatar size="sm" />
