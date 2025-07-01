@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Upload, Link, Clock, TrendingUp, AlertCircle, Loader2, Copy, CheckCircle } from "lucide-react"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { useToast } from "@/hooks/use-toast"
+import { FileUploader } from "./components/FileUploader"
 
 interface SummaryResult {
   summary: string
@@ -35,44 +36,15 @@ export default function Summarizer() {
   const [copied, setCopied] = useState(false)
   const { toast } = useToast()
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0]
-    if (!selectedFile) return
-
-    if (selectedFile.size > 10 * 1024 * 1024) { // 10MB limit
-      setError("File size must be less than 10MB")
-      return
-    }
-
-    const allowedTypes = ['text/plain', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-    if (!allowedTypes.includes(selectedFile.type)) {
-      setError("Please upload a text file, PDF, or Word document")
-      return
-    }
-
-    setFile(selectedFile)
+  const handleFileProcessed = (content: string, metadata: any) => {
+    setContent(content)
+    setFile(null) // Clear file since we now have content
     setError(null)
+  }
 
-    // Extract text content
-    try {
-      let textContent = ""
-      
-      if (selectedFile.type === 'text/plain') {
-        textContent = await selectedFile.text()
-      } else {
-        // For PDF and Word docs, we'll use a simple fallback
-        textContent = await selectedFile.text()
-      }
-      
-      setContent(textContent)
-      toast({
-        title: "File uploaded",
-        description: `${selectedFile.name} has been processed`,
-      })
-    } catch (error) {
-      setError("Failed to process file content")
-      setFile(null)
-    }
+  const handleFileError = (error: string) => {
+    setError(error)
+    setFile(null)
   }
 
   const handleUrlFetch = async () => {
@@ -242,26 +214,10 @@ export default function Summarizer() {
                 </TabsContent>
 
                 <TabsContent value="file" className="space-y-4">
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Upload a text file, PDF, or Word document
-                    </p>
-                    <Input
-                      type="file"
-                      accept=".txt,.pdf,.doc,.docx"
-                      onChange={handleFileUpload}
-                      className="max-w-xs mx-auto"
-                    />
-                  </div>
-                  {file && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                  )}
+                  <FileUploader 
+                    onFileProcessed={handleFileProcessed}
+                    onError={handleFileError}
+                  />
                 </TabsContent>
 
                 <TabsContent value="url" className="space-y-4">
