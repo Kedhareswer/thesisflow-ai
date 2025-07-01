@@ -56,23 +56,40 @@ export async function GET(request: Request) {
 
       return NextResponse.json(
         {
+          success: false,
           error: "Failed to search papers",
           details: error instanceof Error ? error.message : String(error),
-          suggestion:
-            "Please try again with different search terms. Make sure your search terms are specific and relevant.",
+          suggestion: "Please try again with different search terms. Make sure your search terms are specific and relevant.",
+          count: 0,
+          source: "openalex",
+          data: []
         },
-        { status: 500 },
+        { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        },
       )
     }
   } catch (error) {
     console.error("API: Unexpected error:", error)
     return NextResponse.json(
       {
+        success: false,
         error: "An unexpected error occurred",
         details: error instanceof Error ? error.message : String(error),
         suggestion: "Please try again later",
+        count: 0,
+        source: "openalex",
+        data: []
       },
-      { status: 500 },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      },
     )
   }
 }

@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/common/EmptyState"
 import { SkeletonCard, SkeletonList } from "@/components/common/SkeletonCard"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { ResearchChatbot } from "@/components/research-chatbot"
+import { AIProviderStatus } from "@/components/ai-provider-status"
 import { AIConfig } from "@/lib/ai-config"
 import Link from "next/link"
 
@@ -304,6 +305,11 @@ export default function ResearchExplorer() {
   return (
     <ErrorBoundary>
       <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* AI Provider Status */}
+        <div className="mb-6">
+          <AIProviderStatus showActions={false} />
+        </div>
+        
         <Tabs defaultValue="explore" className="space-y-8">
           <TabsList className="grid w-full grid-cols-4 bg-gray-50">
             <TabsTrigger value="explore" className="flex items-center gap-2">
@@ -361,25 +367,20 @@ export default function ResearchExplorer() {
                   </div>
                 </div>
 
-                {(() => {
-                  const aiStatus = AIConfig.getProviderStatus()
-                  return (
-                    <Button
-                      onClick={handleTopicExploration}
-                      disabled={topicExploration.loading || (aiStatus && aiStatus.totalConfigured === 0)}
-                      className="w-full"
-                    >
-                      {topicExploration.loading ? (
-                        <LoadingSpinner size="sm" text="Exploring..." />
-                      ) : (
-                        <>
-                          <Search className="mr-2 h-4 w-4" />
-                          Explore Topic
-                        </>
-                      )}
-                    </Button>
-                  )
-                })()}
+                <Button
+                  onClick={handleTopicExploration}
+                  disabled={topicExploration.loading}
+                  className="w-full"
+                >
+                  {topicExploration.loading ? (
+                    <LoadingSpinner size="sm" text="Exploring..." />
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Explore Topic
+                    </>
+                  )}
+                </Button>
 
                 {topicExploration.error && (
                   <div className="text-red-500 mt-2">
