@@ -193,4 +193,4 @@ export function createSocketHelper(socket: Socket | null, isConnected: boolean) 
       return safeSocketEmit(socket, 'leave_room', { roomId })
     },
   }
-} 
+}

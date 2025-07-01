@@ -178,28 +178,28 @@
 ### **🔄 Development Workflow Updates**
 
 #### **Start Development Server:**
-```bash
+\`\`\`bash
 # Option 1: Frontend only
 npm run dev
 
 # Option 2: Full stack (frontend + WebSocket)
 npm run dev:full
-```
+\`\`\`
 
 #### **Start Production:**
-```bash
+\`\`\`bash
 # Option 1: Frontend only  
 npm run start
 
 # Option 2: Full stack (frontend + WebSocket)
 npm run start:full
-```
+\`\`\`
 
 #### **Environment Setup:**
-```bash
+\`\`\`bash
 cp env.template .env.local
 # Fill in your Supabase credentials and API keys
-```
+\`\`\`
 
 ---
 
@@ -237,4 +237,4 @@ Your AI Project Planner is now a **fully optimized, enterprise-grade application
 **Performance Improvement**: 50-90% query speedup  
 **New Features**: Real-time collaboration + File uploads  
 
-**🎉 CONGRATULATIONS! Your project is now production-ready! 🎉** 
+**🎉 CONGRATULATIONS! Your project is now production-ready! 🎉**

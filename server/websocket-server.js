@@ -374,4 +374,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-module.exports = { io, httpServer }; 
+module.exports = { io, httpServer };

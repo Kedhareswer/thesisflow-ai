@@ -711,4 +711,4 @@ ProjectService.testConnection()
 
 // Export singleton instance
 export const projectService = new ProjectService()
-export default projectService 
+export default projectService
