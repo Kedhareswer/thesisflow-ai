@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle, AlertCircle, Settings, ExternalLink } from "lucide-react"
+import { CheckCircle, AlertCircle, Settings, ExternalLink, User, Database } from "lucide-react"
 import { AIConfig } from "@/lib/ai-config"
 
 interface AIProviderStatus {
@@ -18,8 +18,10 @@ interface AIProviderStatus {
 
 export function AIProviderStatus({ showActions = true }: { showActions?: boolean }) {
   const [providers, setProviders] = useState<AIProviderStatus[]>([])
+  const [userApiKeys, setUserApiKeys] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [totalAvailable, setTotalAvailable] = useState(0)
+  const [hasUserKeys, setHasUserKeys] = useState(false)
 
   useEffect(() => {
     checkProviderStatus()
@@ -28,6 +30,21 @@ export function AIProviderStatus({ showActions = true }: { showActions?: boolean
   const checkProviderStatus = async () => {
     try {
       setLoading(true)
+      
+      // Check user's personal API keys first
+      try {
+        const userKeysResponse = await fetch('/api/user-api-keys')
+        if (userKeysResponse.ok) {
+          const userData = await userKeysResponse.json()
+          setUserApiKeys(userData.apiKeys || [])
+          setHasUserKeys((userData.apiKeys || []).length > 0)
+        }
+      } catch (error) {
+        console.log('User not authenticated or no user keys')
+        setHasUserKeys(false)
+      }
+      
+      // Check system fallback providers
       const status = await AIConfig.getProviderStatus()
       
       const providerList: AIProviderStatus[] = [
@@ -87,17 +104,26 @@ export function AIProviderStatus({ showActions = true }: { showActions?: boolean
 
   return (
     <div className="space-y-4">
-      {totalAvailable === 0 && (
+      {hasUserKeys ? (
+        <Alert className="border-green-200 bg-green-50">
+          <User className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            <strong>Using your personal API keys.</strong> You have {userApiKeys.length} personal provider{userApiKeys.length !== 1 ? 's' : ''} configured.
+            System fallback providers are not needed.
+          </AlertDescription>
+        </Alert>
+      ) : totalAvailable === 0 ? (
         <Alert className="border-amber-200 bg-amber-50">
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
-            <strong>No AI providers configured.</strong> Add API keys to your environment variables to enable AI features.
-            <br />
-            <Button variant="link" className="p-0 h-auto text-amber-700 underline" asChild>
-              <a href="/settings" className="flex items-center gap-1 mt-2">
-                Configure in Settings <ExternalLink className="h-3 w-3" />
-              </a>
-            </Button>
+            <strong>No AI providers available.</strong> Configure personal API keys in the section above for the best experience.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Database className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Using system fallback providers.</strong> Configure personal API keys above for better performance and privacy.
           </AlertDescription>
         </Alert>
       )}
@@ -105,13 +131,15 @@ export function AIProviderStatus({ showActions = true }: { showActions?: boolean
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            AI Provider Status
+            <Database className="h-5 w-5" />
+            System Fallback Providers
           </CardTitle>
           <CardDescription>
-            {totalAvailable > 0 
-              ? `${totalAvailable} of ${providers.length} providers available`
-              : 'No providers configured'
+            {hasUserKeys 
+              ? 'These providers are available as fallbacks when your personal keys are not working'
+              : totalAvailable > 0 
+                ? `${totalAvailable} of ${providers.length} fallback providers available`
+                : 'No fallback providers configured'
             }
           </CardDescription>
         </CardHeader>
