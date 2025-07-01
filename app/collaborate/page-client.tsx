@@ -22,7 +22,7 @@ export default function CollaborateClient() {
       
       try {
         setIsLoading(true)
-        const userTeams = await collaborateService.getTeams()
+        const userTeams = await collaborateService.getTeams(user.id)
         setTeams(userTeams)
       } catch (error) {
         console.error('Error fetching teams:', error)
@@ -53,7 +53,7 @@ export default function CollaborateClient() {
     if (!user) return
     
     try {
-      const userTeams = await collaborateService.getTeams()
+      const userTeams = await collaborateService.getTeams(user.id)
       setTeams(userTeams)
     } catch (error) {
       console.error('Error refreshing teams:', error)

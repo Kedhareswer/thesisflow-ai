@@ -36,7 +36,13 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
       setIsLoading(true)
       setError(null)
       
-      await collaborateService.createTeam(newTeamName)
+      await collaborateService.createTeam(
+        newTeamName,
+        'Team for collaboration', // description
+        'general', // category  
+        false, // isPublic
+        user.id // userId
+      )
       
       // Reset form and close dialog
       setNewTeamName('')
@@ -62,7 +68,7 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
       setIsLoading(true)
       setError(null)
       
-      await collaborateService.addTeamMember(selectedTeam.id, inviteEmail)
+      await collaborateService.inviteMember(selectedTeam.id, inviteEmail)
       
       // Reset form and close dialog
       setInviteEmail('')
@@ -151,7 +157,7 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <p className="text-sm text-gray-500 mb-4">
-                  {team.members?.length || 0} members
+                  0 members
                 </p>
                 <div className="flex space-x-2">
                   <Button

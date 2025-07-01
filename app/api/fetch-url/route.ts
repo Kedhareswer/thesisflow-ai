@@ -15,14 +15,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid URL format" }, { status: 400 })
     }
 
-    // Fetch content from URL
+    // Fetch content from URL with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(url, {
       headers: {
         "User-Agent": "ResearchHub/1.0 (Content Extractor)",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      timeout: 10000, // 10 second timeout
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`)

@@ -23,7 +23,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
-  const [members, setMembers] = useState<TeamMember[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [isTyping, setIsTyping] = useState<Record<string, boolean>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
@@ -144,7 +144,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       socketService.sendTypingStatus(team.id, false)
       
       // Send message
-      await collaborateService.sendMessage(team.id, newMessage)
+      await collaborateService.sendMessage(team.id, user.id, newMessage)
       
       // Clear input
       setNewMessage('')
@@ -170,14 +170,14 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   
   // Get member name by ID
   const getMemberName = (userId: string) => {
-    const member = members.find(m => m.user_id === userId)
-    return member?.user_profile?.full_name || 'Unknown User'
+    const member = members.find(m => m.id === userId || m.user_id === userId)
+    return member?.name || member?.full_name || 'Unknown User'
   }
   
   // Get member avatar by ID
   const getMemberAvatar = (userId: string) => {
-    const member = members.find(m => m.user_id === userId)
-    return member?.user_profile?.avatar_url
+    const member = members.find(m => m.id === userId || m.user_id === userId)
+    return member?.avatar || member?.avatar_url
   }
   
   // Get initials for avatar fallback
@@ -260,7 +260,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                   
                   {dateMessages.map((message, index) => {
                     const isCurrentUser = message.sender_id === user?.id
-                    const isSystem = message.type === 'system'
+                                         const isSystem = message.message_type === 'system'
                     
                     if (isSystem) {
                       return (
@@ -345,7 +345,8 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
           <h3 className="font-medium mb-4">Members</h3>
           <div className="space-y-3">
             {members.map(member => {
-              const status = getUserStatus(member.user_id)
+              const userId = member.id || member.user_id
+              const status = getUserStatus(userId)
               const statusColor = {
                 online: 'bg-green-500',
                 away: 'bg-yellow-500',
@@ -353,12 +354,12 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
               }[status]
               
               return (
-                <div key={member.id} className="flex items-center gap-2">
+                <div key={member.id || member.user_id} className="flex items-center gap-2">
                   <div className="relative">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={member.user_profile?.avatar_url} />
+                      <AvatarImage src={member.avatar || member.avatar_url} />
                       <AvatarFallback>
-                        {getInitials(member.user_profile?.full_name || '')}
+                        {getInitials(member.name || member.full_name || '')}
                       </AvatarFallback>
                     </Avatar>
                     <span
@@ -366,7 +367,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                     />
                   </div>
                   <div className="text-sm">
-                    {member.user_profile?.full_name}
+                    {member.name || member.full_name}
                     {member.role === 'owner' && (
                       <Badge variant="outline" className="ml-1 text-xs">
                         Owner

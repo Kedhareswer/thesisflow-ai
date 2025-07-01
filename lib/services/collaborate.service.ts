@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, Team, ChatMessage } from '../supabase';
 import { socketService, SocketEvent } from './socket.service';
 
 // Types
@@ -13,26 +13,8 @@ export interface User {
   lastActive: string;
 }
 
-export interface Team {
-  id: string;
-  name: string;
-  description: string;
+export interface TeamWithMembers extends Team {
   members: User[];
-  createdAt: string;
-  isPublic: boolean;
-  category: string;
-  owner: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string | null;
-  content: string;
-  timestamp: string;
-  teamId: string;
-  type: 'text' | 'system';
 }
 
 // Collaborate service for handling team and chat operations
@@ -56,11 +38,11 @@ class CollaborateService {
         id: team.id,
         name: team.name,
         description: team.description,
-        members: team.members,
-        createdAt: team.created_at,
-        isPublic: team.is_public,
+        is_public: team.is_public,
         category: team.category,
-        owner: team.owner_id,
+        owner_id: team.owner_id,
+        created_at: team.created_at,
+        updated_at: team.updated_at || team.created_at,
       }));
     } catch (error) {
       console.error('Error fetching teams:', error);

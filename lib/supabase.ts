@@ -16,25 +16,28 @@ export type TeamMember = {
   team_id: string;
   user_id: string;
   role: 'owner' | 'admin' | 'editor' | 'viewer';
-  created_at: string;
+  joined_at: string;
+  created_at?: string;
 };
 
 export type Team = {
   id: string;
   name: string;
   description: string;
-  created_at: string;
   is_public: boolean;
   category: string;
   owner_id: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ChatMessage = {
   id: string;
   team_id: string;
-  user_id: string;
+  sender_id: string;
   content: string;
-  type: 'text' | 'system';
+  message_type: 'text' | 'system' | 'file';
+  file_url?: string;
   created_at: string;
 };
 

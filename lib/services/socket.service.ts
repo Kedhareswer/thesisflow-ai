@@ -9,6 +9,8 @@ export enum SocketEvent {
   JOIN_TEAM = 'join_team',
   LEAVE_TEAM = 'leave_team',
   NEW_MESSAGE = 'new_message',
+  MEMBER_JOINED = 'member_joined',
+  MEMBER_LEFT = 'member_left',
   USER_STATUS_CHANGE = 'user_status_change',
   TYPING = 'typing',
   STOP_TYPING = 'stop_typing',
@@ -102,7 +104,7 @@ class SocketService {
       })
       .eq('id', this.userId)
       .then(() => console.log(`User status updated to ${status}`))
-      .catch(err => console.error('Error updating user status:', err));
+      .catch((err: any) => console.error('Error updating user status:', err));
   }
 
   // Notify that user is typing
@@ -123,6 +125,27 @@ class SocketService {
       teamId,
       userId: this.userId,
     });
+  }
+
+  // Add event listener
+  on(event: SocketEvent | string, callback: (...args: any[]) => void): void {
+    if (!this.socket) return;
+    this.socket.on(event, callback);
+  }
+
+  // Remove event listener
+  off(event: SocketEvent | string, callback: (...args: any[]) => void): void {
+    if (!this.socket) return;
+    this.socket.off(event, callback);
+  }
+
+  // Send typing status (alias for startTyping/stopTyping)
+  sendTypingStatus(teamId: string, isTyping: boolean): void {
+    if (isTyping) {
+      this.startTyping(teamId);
+    } else {
+      this.stopTyping(teamId);
+    }
   }
 
   // Disconnect socket

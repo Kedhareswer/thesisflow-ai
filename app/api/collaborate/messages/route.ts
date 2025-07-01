@@ -34,10 +34,10 @@ export async function GET(request: NextRequest) {
 
     // Get user info for message senders
     const userIds = [...new Set(messages
-      .filter(msg => msg.user_id !== 'system')
-      .map(msg => msg.user_id))];
+      .filter(msg => msg.sender_id !== 'system')
+      .map(msg => msg.sender_id))];
     
-    let userProfiles = {};
+    let userProfiles: Record<string, { name: string; avatar: string | null }> = {};
     
     if (userIds.length > 0) {
       const { data: profiles, error: profilesError } = await supabase
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
             avatar: profile.avatar_url
           };
           return acc;
-        }, {});
+        }, {} as Record<string, { name: string; avatar: string | null }>);
       }
     }
 
@@ -60,16 +60,16 @@ export async function GET(request: NextRequest) {
     const formattedMessages = messages.map(msg => ({
       id: msg.id,
       content: msg.content,
-      type: msg.type,
+      type: msg.message_type,
       timestamp: msg.created_at,
       teamId: msg.team_id,
-      senderId: msg.user_id,
-      senderName: msg.user_id === 'system' 
+      senderId: msg.sender_id,
+      senderName: msg.sender_id === 'system' 
         ? 'System' 
-        : userProfiles[msg.user_id]?.name || 'Unknown User',
-      senderAvatar: msg.user_id === 'system'
+        : userProfiles[msg.sender_id]?.name || 'Unknown User',
+      senderAvatar: msg.sender_id === 'system'
         ? null
-        : userProfiles[msg.user_id]?.avatar || null
+        : userProfiles[msg.sender_id]?.avatar || null
     })).reverse(); // Reverse to get chronological order
 
     return NextResponse.json({ messages: formattedMessages });
@@ -123,9 +123,9 @@ export async function POST(request: NextRequest) {
       .from('chat_messages')
       .insert({
         team_id: teamId,
-        user_id: userId,
+        sender_id: userId,
         content,
-        type,
+        message_type: type,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -156,10 +156,10 @@ export async function POST(request: NextRequest) {
     const formattedMessage = {
       id: message.id,
       content: message.content,
-      type: message.type,
+      type: message.message_type,
       timestamp: message.created_at,
       teamId: message.team_id,
-      senderId: message.user_id,
+      senderId: message.sender_id,
       senderName,
       senderAvatar
     };
