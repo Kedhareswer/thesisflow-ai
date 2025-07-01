@@ -89,22 +89,60 @@ export default function SettingsPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.from("user_settings").upsert({
-        user_id: user.id,
-        email_notifications: settings.email_notifications,
-        research_updates: settings.research_updates,
-        collaboration_invites: settings.collaboration_invites,
-        security_alerts: settings.security_alerts,
-        marketing_emails: settings.marketing_emails,
-        theme: settings.theme,
-        language: settings.language,
-        timezone: settings.timezone,
-        auto_save: settings.auto_save,
-        data_sharing: settings.data_sharing,
-        updated_at: new Date().toISOString(),
-      })
+      // First check if settings already exist for this user
+      const { data: existingSettings, error: checkError } = await supabase
+        .from("user_settings")
+        .select("id")
+        .eq("user_id", user.id)
+        .single()
 
-      if (error) throw error
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Error checking existing settings:", checkError)
+        throw checkError
+      }
+
+      let result
+      
+      if (existingSettings) {
+        // Update existing settings
+        result = await supabase
+          .from("user_settings")
+          .update({
+            email_notifications: settings.email_notifications,
+            research_updates: settings.research_updates,
+            collaboration_invites: settings.collaboration_invites,
+            security_alerts: settings.security_alerts,
+            marketing_emails: settings.marketing_emails,
+            theme: settings.theme,
+            language: settings.language,
+            timezone: settings.timezone,
+            auto_save: settings.auto_save,
+            data_sharing: settings.data_sharing,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id)
+      } else {
+        // Insert new settings
+        result = await supabase
+          .from("user_settings")
+          .insert({
+            user_id: user.id,
+            email_notifications: settings.email_notifications,
+            research_updates: settings.research_updates,
+            collaboration_invites: settings.collaboration_invites,
+            security_alerts: settings.security_alerts,
+            marketing_emails: settings.marketing_emails,
+            theme: settings.theme,
+            language: settings.language,
+            timezone: settings.timezone,
+            auto_save: settings.auto_save,
+            data_sharing: settings.data_sharing,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+      }
+
+      if (result.error) throw result.error
 
       toast({
         title: "Settings saved",

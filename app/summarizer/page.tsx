@@ -682,15 +682,15 @@ export default function Summarizer() {
                     Show Setup Guide
                   </Button>
                 )}
-                {(content || result) && (
-                  <Button
-                    onClick={clearContent}
-                    variant="outline"
-                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                  >
-                    Clear All
-                  </Button>
-                )}
+              {(content || result) && (
+                <Button
+                  onClick={clearContent}
+                  variant="outline"
+                  className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                >
+                  Clear All
+                </Button>
+              )}
               </div>
             </div>
           </div>

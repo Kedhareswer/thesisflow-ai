@@ -1,63 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getAuthUser, requireAuth, createSupabaseAdmin } from '@/lib/auth-utils';
 
-// GET /api/collaborate/messages - Get messages for a team
+// Messages API endpoints
+// Handles: Get team messages, Send messages, Message mentions
+
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuth(request, "collaborate-messages");
+    
     const { searchParams } = new URL(request.url);
     const teamId = searchParams.get('teamId');
     const limit = parseInt(searchParams.get('limit') || '50');
     const before = searchParams.get('before'); // Timestamp for pagination
+    const after = searchParams.get('after');   // Timestamp for new messages
     
     if (!teamId) {
-      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Team ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Verify user is a member of the team
+    const { data: membership } = await supabaseAdmin
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: "You must be a member of this team to view messages" },
+        { status: 403 }
+      );
     }
 
     // Build query
-    let query = supabase
+    let query = supabaseAdmin
       .from('chat_messages')
-      .select('*')
+      .select(`
+        *,
+        sender:user_profiles!chat_messages_sender_id_fkey(
+          id,
+          full_name,
+          avatar_url
+        )
+      `)
       .eq('team_id', teamId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    // Add pagination if before timestamp is provided
+    // Add pagination
     if (before) {
       query = query.lt('created_at', before);
+    } else if (after) {
+      query = query.gt('created_at', after);
+      query = query.order('created_at', { ascending: true });
     }
 
     const { data: messages, error } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('Error fetching messages:', error);
+      return NextResponse.json(
+        { error: "Failed to fetch messages" },
+        { status: 500 }
+      );
     }
 
-    // Get user info for message senders
-    const userIds = [...new Set(messages
-      .filter(msg => msg.sender_id !== 'system')
-      .map(msg => msg.sender_id))];
-    
-    let userProfiles: Record<string, { name: string; avatar: string | null }> = {};
-    
-    if (userIds.length > 0) {
-      const { data: profiles, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
-
-      if (!profilesError && profiles) {
-        userProfiles = profiles.reduce((acc, profile) => {
-          acc[profile.id] = {
-            name: profile.full_name,
-            avatar: profile.avatar_url
-          };
-          return acc;
-        }, {} as Record<string, { name: string; avatar: string | null }>);
-      }
-    }
-
-    // Format messages with sender info
-    const formattedMessages = messages.map(msg => ({
+    // Format messages
+    const formattedMessages = (messages || []).map(msg => ({
       id: msg.id,
       content: msg.content,
       type: msg.message_type,
@@ -66,89 +87,197 @@ export async function GET(request: NextRequest) {
       senderId: msg.sender_id,
       senderName: msg.sender_id === 'system' 
         ? 'System' 
-        : userProfiles[msg.sender_id]?.name || 'Unknown User',
+        : msg.sender?.full_name || 'Unknown User',
       senderAvatar: msg.sender_id === 'system'
         ? null
-        : userProfiles[msg.sender_id]?.avatar || null
-    })).reverse(); // Reverse to get chronological order
+        : msg.sender?.avatar_url || null,
+      mentions: msg.mentions || [],
+      metadata: msg.metadata || {}
+    }));
 
-    return NextResponse.json({ messages: formattedMessages });
+    // If we were fetching older messages (before), reverse to maintain chronological order
+    if (before) {
+      formattedMessages.reverse();
+    }
+
+    return NextResponse.json({
+      success: true,
+      messages: formattedMessages,
+      hasMore: messages?.length === limit
+    });
   } catch (error) {
-    console.error('Error fetching messages:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Messages GET error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
-// POST /api/collaborate/messages - Send a new message
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { teamId, userId, content, type = 'text' } = body;
+    const user = await requireAuth(request, "collaborate-messages");
+    
+    const { teamId, content, type = 'text', mentions = [] } = await request.json();
 
-    if (!teamId || !userId || !content) {
-      return NextResponse.json({ 
-        error: 'Team ID, user ID, and content are required' 
-      }, { status: 400 });
+    if (!teamId || !content?.trim()) {
+      return NextResponse.json(
+        { error: "Team ID and content are required" },
+        { status: 400 }
+      );
     }
 
-    // Check if team exists
-    const { data: team, error: teamError } = await supabase
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Verify user is a member of the team
+    const { data: membership } = await supabaseAdmin
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: "You must be a member of this team to send messages" },
+        { status: 403 }
+      );
+    }
+
+    // Get team info for notifications
+    const { data: team } = await supabaseAdmin
       .from('teams')
-      .select('id')
+      .select('name')
       .eq('id', teamId)
       .single();
 
-    if (teamError || !team) {
-      return NextResponse.json({ error: 'Team not found' }, { status: 404 });
+    if (!team) {
+      return NextResponse.json(
+        { error: "Team not found" },
+        { status: 404 }
+      );
     }
 
-    // Check if user is a member of the team (except for system messages)
-    if (userId !== 'system') {
-      const { data: membership, error: membershipError } = await supabase
+    // Extract mentions from content (format: @username or @user_id)
+    const mentionPattern = /@(\w+)/g;
+    const contentMentions = [...content.matchAll(mentionPattern)].map(match => match[1]);
+    
+    // Combine with explicit mentions
+    const allMentions = [...new Set([...mentions, ...contentMentions])];
+    
+    // Validate mentioned users are team members
+    let validMentions: string[] = [];
+    if (allMentions.length > 0) {
+      const { data: mentionedMembers } = await supabaseAdmin
         .from('team_members')
-        .select('*')
+        .select('user_id')
         .eq('team_id', teamId)
-        .eq('user_id', userId)
-        .single();
+        .in('user_id', allMentions);
 
-      if (membershipError || !membership) {
-        return NextResponse.json({ 
-          error: 'User is not a member of this team' 
-        }, { status: 403 });
-      }
+      validMentions = mentionedMembers?.map(m => m.user_id) || [];
     }
 
     // Insert message
-    const { data: message, error: messageError } = await supabase
+    const { data: message, error: messageError } = await supabaseAdmin
       .from('chat_messages')
       .insert({
         team_id: teamId,
-        sender_id: userId,
-        content,
+        sender_id: user.id,
+        content: content.trim(),
         message_type: type,
-        created_at: new Date().toISOString(),
+        mentions: validMentions,
+        metadata: {},
+        created_at: new Date().toISOString()
       })
-      .select()
+      .select(`
+        *,
+        sender:user_profiles!chat_messages_sender_id_fkey(
+          id,
+          full_name,
+          avatar_url
+        )
+      `)
       .single();
 
     if (messageError) {
-      return NextResponse.json({ error: messageError.message }, { status: 500 });
+      console.error('Error creating message:', messageError);
+      return NextResponse.json(
+        { error: "Failed to send message" },
+        { status: 500 }
+      );
     }
 
-    // Get sender info if not system
-    let senderName = 'System';
-    let senderAvatar = null;
+    // Get user profile for notification
+    const { data: userProfile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
 
-    if (userId !== 'system') {
-      const { data: user, error: userError } = await supabase
-        .from('user_profiles')
-        .select('full_name, avatar_url')
-        .eq('id', userId)
-        .single();
+    const senderName = userProfile?.full_name || user.email?.split('@')[0] || 'Someone';
 
-      if (!userError && user) {
-        senderName = user.full_name;
-        senderAvatar = user.avatar_url;
+    // Create notifications for mentioned users
+    if (validMentions.length > 0) {
+      const notificationData = {
+        message_id: message.id,
+        team_id: teamId,
+        team_name: team.name,
+        sender_id: user.id,
+        sender_name: senderName,
+        message_preview: content.length > 100 ? content.substring(0, 100) + '...' : content
+      };
+
+      for (const mentionedUserId of validMentions) {
+        if (mentionedUserId !== user.id) { // Don't notify self
+          await supabaseAdmin.rpc('create_notification', {
+            target_user_id: mentionedUserId,
+            notification_type: 'message_mention',
+            notification_title: `Mentioned in ${team.name}`,
+            notification_message: `${senderName} mentioned you: "${notificationData.message_preview}"`,
+            notification_data: notificationData,
+            action_url: `/collaborate?team=${teamId}&message=${message.id}`
+          });
+        }
+      }
+    }
+
+    // Also notify all team members about new message (if they have it enabled)
+    const { data: teamMembers } = await supabaseAdmin
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', teamId)
+      .neq('user_id', user.id); // Don't notify sender
+
+    if (teamMembers && teamMembers.length > 0) {
+      const notificationData = {
+        message_id: message.id,
+        team_id: teamId,
+        team_name: team.name,
+        sender_id: user.id,
+        sender_name: senderName,
+        message_preview: content.length > 100 ? content.substring(0, 100) + '...' : content
+      };
+
+      // Only notify members not already mentioned
+      const membersToNotify = teamMembers.filter(
+        member => !validMentions.includes(member.user_id)
+      );
+
+      for (const member of membersToNotify) {
+        await supabaseAdmin.rpc('create_notification', {
+          target_user_id: member.user_id,
+          notification_type: 'new_message',
+          notification_title: `New message in ${team.name}`,
+          notification_message: `${senderName}: ${notificationData.message_preview}`,
+          notification_data: notificationData,
+          action_url: `/collaborate?team=${teamId}`
+        });
       }
     }
 
@@ -160,16 +289,112 @@ export async function POST(request: NextRequest) {
       timestamp: message.created_at,
       teamId: message.team_id,
       senderId: message.sender_id,
-      senderName,
-      senderAvatar
+      senderName: message.sender?.full_name || 'Unknown User',
+      senderAvatar: message.sender?.avatar_url || null,
+      mentions: message.mentions || [],
+      metadata: message.metadata || {}
     };
 
-    return NextResponse.json({ 
-      success: true, 
-      message: formattedMessage 
+    return NextResponse.json({
+      success: true,
+      message: formattedMessage
     });
   } catch (error) {
-    console.error('Error sending message:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Messages POST error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireAuth(request, "collaborate-messages");
+    
+    const { searchParams } = new URL(request.url);
+    const messageId = searchParams.get('id');
+
+    if (!messageId) {
+      return NextResponse.json(
+        { error: "Message ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Get the message to check ownership and team
+    const { data: message } = await supabaseAdmin
+      .from('chat_messages')
+      .select('sender_id, team_id')
+      .eq('id', messageId)
+      .single();
+
+    if (!message) {
+      return NextResponse.json(
+        { error: "Message not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check if user is the message sender or team admin/owner
+    let canDelete = false;
+
+    if (message.sender_id === user.id) {
+      canDelete = true;
+    } else {
+      const { data: membership } = await supabaseAdmin
+        .from('team_members')
+        .select('role')
+        .eq('team_id', message.team_id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (membership && ['owner', 'admin'].includes(membership.role)) {
+        canDelete = true;
+      }
+    }
+
+    if (!canDelete) {
+      return NextResponse.json(
+        { error: "You don't have permission to delete this message" },
+        { status: 403 }
+      );
+    }
+
+    // Soft delete by updating content
+    const { error: deleteError } = await supabaseAdmin
+      .from('chat_messages')
+      .update({
+        content: '[Message deleted]',
+        metadata: { deleted: true, deleted_by: user.id, deleted_at: new Date().toISOString() }
+      })
+      .eq('id', messageId);
+
+    if (deleteError) {
+      console.error('Error deleting message:', deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete message" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Message deleted successfully"
+    });
+  } catch (error) {
+    console.error("Messages DELETE error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

@@ -251,36 +251,92 @@ export default function CollaboratePage() {
   // Load team members
   const loadTeamMembers = async (teamId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('team_members')
-        .select(`
-          *,
-          user_profiles!inner(*)
-        `)
-        .eq('team_id', teamId)
+      // First try to get the team to verify it exists
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .select('id, name')
+        .eq('id', teamId)
+        .single();
 
-      if (error) throw error
+      if (teamError) {
+        console.error("Error verifying team:", teamError);
+        throw new Error(`Team not found: ${teamError.message}`);
+      }
+
+      // Then get the members with a simpler query to avoid join issues
+      const { data: membersData, error: membersError } = await supabase
+        .from('team_members')
+        .select('user_id, role, joined_at')
+        .eq('team_id', teamId);
+
+      if (membersError) {
+        console.error("Error fetching team members:", membersError);
+        throw new Error(`Failed to load team members: ${membersError.message}`);
+      }
+
+      // Now get user profiles separately
+      const userIds = membersData.map(member => member.user_id);
+      
+      if (userIds.length === 0) {
+        // No members found, update team with empty members array
+        setTeams(prev => prev.map(team => 
+          team.id === teamId ? { ...team, members: [] } : team
+        ));
+        return;
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error("Error fetching user profiles:", profilesError);
+        throw new Error(`Failed to load user profiles: ${profilesError.message}`);
+      }
+
+      // Create a map of user profiles for easy lookup
+      const profilesMap = new Map();
+      profilesData.forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
 
       // Transform members data
-      const members: User[] = data.map((member: any) => ({
-        id: member.user_id,
-        name: member.user_profiles?.display_name || member.user_profiles?.email?.split('@')[0] || 'Unknown',
-        email: member.user_profiles?.email || '',
-        avatar: member.user_profiles?.avatar_url,
-        status: "offline", // Will be updated via real-time presence
-        role: member.role,
-        joinedAt: member.joined_at,
-        lastActive: member.user_profiles?.last_active || new Date().toISOString(),
-      }))
+      const members: User[] = membersData.map(member => {
+        const profile = profilesMap.get(member.user_id);
+        return {
+          id: member.user_id,
+          name: profile?.display_name || profile?.email?.split('@')[0] || 'Unknown',
+          email: profile?.email || '',
+          avatar: profile?.avatar_url,
+          status: profile?.status || "offline",
+          role: member.role,
+          joinedAt: member.joined_at,
+          lastActive: profile?.last_active || new Date().toISOString(),
+        };
+      });
 
       // Update the team with members
       setTeams(prev => prev.map(team => 
-        team.id === teamId 
-          ? { ...team, members }
-          : team
-      ))
+        team.id === teamId ? { ...team, members } : team
+      ));
     } catch (error) {
-      console.error("Error loading team members:", error)
+      console.error("Error loading team members:", error);
+      
+      // Show user-friendly error message
+      toast({
+        title: "Failed to load team members",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
+      
+      // Check if we're in demo mode
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Invalid URL') || errorMessage.includes('placeholder')) {
+        console.log("Using demo team members");
+        // Keep existing members in demo mode
+        return;
+      }
     }
   }
 
@@ -373,7 +429,7 @@ export default function CollaboratePage() {
     return () => {
       messageSubscription.unsubscribe()
     }
-  }, [selectedTeamId, user, supabase])
+  }, [selectedTeamId, user, supabase, toast])
 
   // Helper functions
   const getStatusColor = (status: User["status"]) => {
@@ -986,28 +1042,6 @@ export default function CollaboratePage() {
                     </TabsContent>
 
                     <TabsContent value="members" className="mt-6 space-y-6">
-                      {/* Invite Member */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <UserPlus className="h-4 w-4" />
-                            Invite New Member
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Enter email address"
-                              value={inviteEmail}
-                              onChange={(e) => setInviteEmail(e.target.value)}
-                              className="flex-1"
-                            />
-                            <Button onClick={handleInviteMember} disabled={!inviteEmail.trim()}>
-                              <ArrowRight className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
 
                       {/* Members List */}
                       <Card>

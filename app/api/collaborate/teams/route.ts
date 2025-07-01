@@ -1,141 +1,458 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/integrations/supabase/client';
+import { getAuthUser, requireAuth, createSupabaseAdmin } from '@/lib/auth-utils';
 
-// GET /api/collaborate/teams
+// Teams API endpoints
+// Handles: Create team, Get user teams, Update team, Delete team
+
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const user = await requireAuth(request, "collaborate-teams");
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    const { searchParams } = new URL(request.url);
+    const includePublic = searchParams.get('public') === 'true';
+    const category = searchParams.get('category');
+    const search = searchParams.get('search');
+    
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
     }
 
-    // Get teams where user is a member
-    const { data: teamMemberships, error: membershipError } = await supabase
-      .from('team_members')
-      .select('team_id, role')
-      .eq('user_id', userId);
-
-    if (membershipError) {
-      return NextResponse.json({ error: membershipError.message }, { status: 500 });
-    }
-
-    if (!teamMemberships || teamMemberships.length === 0) {
-      return NextResponse.json({ teams: [] });
-    }
-
-    const teamIds = teamMemberships.map(membership => membership.team_id);
-
-    // Get team details
-    const { data: teams, error: teamsError } = await supabase
+    // Get teams where user is a member or owner
+    let query = supabaseAdmin
       .from('teams')
-      .select('*')
-      .in('id', teamIds);
+      .select(`
+        *,
+        team_members!inner(user_id, role, joined_at),
+        members:team_members(
+          user_id,
+          role,
+          joined_at,
+          user_profile:user_profiles!team_members_user_id_fkey(
+            id,
+            full_name,
+            avatar_url,
+            status,
+            last_active
+          )
+        )
+      `)
+      .eq('team_members.user_id', user.id)
+      .order('created_at', { ascending: false });
 
-    if (teamsError) {
-      return NextResponse.json({ error: teamsError.message }, { status: 500 });
+    // Add category filter if specified
+    if (category && category !== 'all') {
+      query = query.eq('category', category);
     }
 
-    // Get all members for these teams
-    const { data: allMembers, error: membersError } = await supabase
-      .from('team_members')
-      .select('team_id, user_id, role')
-      .in('team_id', teamIds);
-
-    if (membersError) {
-      return NextResponse.json({ error: membersError.message }, { status: 500 });
+    // Add search filter if specified
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    // Get user profiles for all members
-    const userIds = [...new Set(allMembers.map(member => member.user_id))];
-    const { data: userProfiles, error: profilesError } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .in('user_id', userIds);
+    const { data: userTeams, error: userTeamsError } = await query;
 
-    if (profilesError) {
-      return NextResponse.json({ error: profilesError.message }, { status: 500 });
+    if (userTeamsError) {
+      console.error('Error fetching user teams:', userTeamsError);
+      return NextResponse.json(
+        { error: "Failed to fetch teams" },
+        { status: 500 }
+      );
     }
 
-    // Combine data to return complete team information with members
-    const enrichedTeams = teams?.map(team => {
-      const teamMembers = allMembers
-        ?.filter(member => member.team_id === team.id)
-        .map(member => {
-          const profile = userProfiles?.find(profile => profile.user_id === member.user_id);
-          return {
-            id: member.user_id,
-            name: profile?.display_name || profile?.full_name || 'Unknown User',
-            email: profile?.email || '',
-            avatar: profile?.avatar_url || null,
-            status: profile?.status || 'offline',
-            role: member.role,
-            joinedAt: team.created_at,
-            lastActive: profile?.last_active || new Date().toISOString(),
-          };
-        }) || [];
+    let allTeams = userTeams || [];
 
+    // If includePublic is true, also fetch public teams user is not a member of
+    if (includePublic) {
+      const userTeamIds = allTeams.map(team => team.id);
+      
+      let publicQuery = supabaseAdmin
+        .from('teams')
+        .select(`
+          *,
+          members:team_members(
+            user_id,
+            role,
+            joined_at,
+            user_profile:user_profiles!team_members_user_id_fkey(
+              id,
+              full_name,
+              avatar_url,
+              status,
+              last_active
+            )
+          )
+        `)
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+
+      // Exclude teams user is already a member of
+      if (userTeamIds.length > 0) {
+        publicQuery = publicQuery.not('id', 'in', `(${userTeamIds.join(',')})`);
+      }
+
+      // Add category filter if specified
+      if (category && category !== 'all') {
+        publicQuery = publicQuery.eq('category', category);
+      }
+
+      // Add search filter if specified
+      if (search) {
+        publicQuery = publicQuery.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      }
+
+      const { data: publicTeams, error: publicTeamsError } = await publicQuery;
+
+      if (!publicTeamsError && publicTeams) {
+        // Mark public teams as discoverable
+        const discoverableTeams = publicTeams.map(team => ({
+          ...team,
+          isDiscoverable: true,
+          userRole: null
+        }));
+        allTeams = [...allTeams, ...discoverableTeams];
+      }
+    }
+
+    // Transform the data to include member count and user role
+    const transformedTeams = allTeams.map(team => {
+      const userMember = team.team_members?.find((member: any) => member.user_id === user.id);
+      
       return {
-        ...team,
-        members: teamMembers,
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        category: team.category,
+        is_public: team.is_public,
+        owner_id: team.owner_id,
+        created_at: team.created_at,
+        updated_at: team.updated_at,
+        member_count: team.members?.length || 0,
+        user_role: userMember?.role || null,
+        joined_at: userMember?.joined_at || null,
+        isDiscoverable: team.isDiscoverable || false,
+        members: team.members?.map((member: any) => ({
+          user_id: member.user_id,
+          role: member.role,
+          joined_at: member.joined_at,
+          user_profile: member.user_profile
+        })) || []
       };
-    }) || [];
+    });
 
-    return NextResponse.json({ teams: enrichedTeams });
+    return NextResponse.json({
+      success: true,
+      teams: transformedTeams
+    });
   } catch (error) {
-    console.error('Error fetching teams:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Teams GET error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
-// POST /api/collaborate/teams
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, description, category, isPublic, userId } = body;
+    const user = await requireAuth(request, "collaborate-teams");
+    
+    const { name, description, category = 'Research', isPublic = false } = await request.json();
 
-    if (!name || !userId) {
-      return NextResponse.json({ error: 'Name and userId are required' }, { status: 400 });
+    if (!name?.trim()) {
+      return NextResponse.json(
+        { error: "Team name is required" },
+        { status: 400 }
+      );
     }
 
-    // Create new team using Supabase's auto-generated UUID
-    const { data: team, error: teamError } = await supabase
+    // Validate category
+    const validCategories = ['Research', 'Study Group', 'Project', 'Discussion'];
+    if (!validCategories.includes(category)) {
+      return NextResponse.json(
+        { error: "Invalid category" },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Check if user already has too many teams (optional limit)
+    const { data: userTeamsCount } = await supabaseAdmin
+      .from('team_members')
+      .select('team_id', { count: 'exact' })
+      .eq('user_id', user.id)
+      .eq('role', 'owner');
+
+    if (userTeamsCount && userTeamsCount.length >= 10) { // Limit to 10 owned teams
+      return NextResponse.json(
+        { error: "You have reached the maximum number of teams (10)" },
+        { status: 429 }
+      );
+    }
+
+    // Create the team
+    const { data: team, error: teamError } = await supabaseAdmin
       .from('teams')
       .insert({
-        name,
-        description: description || '',
-        category: category || 'General',
-        is_public: isPublic || false,
-        owner_id: userId,
+        name: name.trim(),
+        description: description?.trim() || '',
+        category,
+        is_public: isPublic,
+        owner_id: user.id
       })
       .select()
       .single();
 
     if (teamError) {
-      return NextResponse.json({ error: teamError.message }, { status: 500 });
+      console.error('Error creating team:', teamError);
+      return NextResponse.json(
+        { error: "Failed to create team" },
+        { status: 500 }
+      );
     }
 
-    // Add creator as team member with owner role
-    const { error: memberError } = await supabase
+    // Add creator as team owner
+    const { error: memberError } = await supabaseAdmin
       .from('team_members')
       .insert({
         team_id: team.id,
-        user_id: userId,
+        user_id: user.id,
         role: 'owner',
+        joined_at: new Date().toISOString()
       });
 
     if (memberError) {
-      return NextResponse.json({ error: memberError.message }, { status: 500 });
+      console.error('Error adding team owner:', memberError);
+      
+      // Cleanup: delete the team if we can't add the owner
+      await supabaseAdmin
+        .from('teams')
+        .delete()
+        .eq('id', team.id);
+
+      return NextResponse.json(
+        { error: "Failed to set up team ownership" },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      teamId: team.id,
-      message: 'Team created successfully' 
+    // Get the complete team data with member info
+    const { data: completeTeam } = await supabaseAdmin
+      .from('teams')
+      .select(`
+        *,
+        members:team_members(
+          user_id,
+          role,
+          joined_at,
+          user_profile:user_profiles!team_members_user_id_fkey(
+            id,
+            full_name,
+            avatar_url
+          )
+        )
+      `)
+      .eq('id', team.id)
+      .single();
+
+    return NextResponse.json({
+      success: true,
+      team: {
+        ...completeTeam,
+        member_count: completeTeam.members?.length || 0,
+        user_role: 'owner'
+      },
+      message: `Team "${team.name}" created successfully`
     });
   } catch (error) {
-    console.error('Error creating team:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error("Teams POST error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await requireAuth(request, "collaborate-teams");
+    
+    const { teamId, name, description, category, isPublic } = await request.json();
+
+    if (!teamId) {
+      return NextResponse.json(
+        { error: "Team ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Check if user is owner or admin
+    const { data: membership } = await supabaseAdmin
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return NextResponse.json(
+        { error: "Only team owners and admins can update team settings" },
+        { status: 403 }
+      );
+    }
+
+    // Prepare update data
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (name?.trim()) updateData.name = name.trim();
+    if (description !== undefined) updateData.description = description?.trim() || '';
+    if (category) {
+      const validCategories = ['Research', 'Study Group', 'Project', 'Discussion'];
+      if (validCategories.includes(category)) {
+        updateData.category = category;
+      }
+    }
+    if (typeof isPublic === 'boolean') updateData.is_public = isPublic;
+
+    // Update the team
+    const { data: updatedTeam, error: updateError } = await supabaseAdmin
+      .from('teams')
+      .update(updateData)
+      .eq('id', teamId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating team:', updateError);
+      return NextResponse.json(
+        { error: "Failed to update team" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      team: updatedTeam,
+      message: "Team updated successfully"
+    });
+  } catch (error) {
+    console.error("Teams PUT error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireAuth(request, "collaborate-teams");
+    
+    const { searchParams } = new URL(request.url);
+    const teamId = searchParams.get('id');
+
+    if (!teamId) {
+      return NextResponse.json(
+        { error: "Team ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Check if user is the owner
+    const { data: team } = await supabaseAdmin
+      .from('teams')
+      .select('owner_id, name')
+      .eq('id', teamId)
+      .single();
+
+    if (!team) {
+      return NextResponse.json(
+        { error: "Team not found" },
+        { status: 404 }
+      );
+    }
+
+    if (team.owner_id !== user.id) {
+      return NextResponse.json(
+        { error: "Only the team owner can delete the team" },
+        { status: 403 }
+      );
+    }
+
+    // Get all team members for notifications
+    const { data: members } = await supabaseAdmin
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', teamId)
+      .neq('user_id', user.id); // Exclude the owner
+
+    // Delete the team (cascades to team_members, invitations, etc.)
+    const { error: deleteError } = await supabaseAdmin
+      .from('teams')
+      .delete()
+      .eq('id', teamId);
+
+    if (deleteError) {
+      console.error('Error deleting team:', deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete team" },
+        { status: 500 }
+      );
+    }
+
+    // Send notifications to all members about team deletion
+    if (members && members.length > 0) {
+      const notifications = members.map(member => ({
+        target_user_id: member.user_id,
+        notification_type: 'team_updated',
+        notification_title: 'Team Deleted',
+        notification_message: `The team "${team.name}" has been deleted by the owner`,
+        notification_data: { team_name: team.name }
+      }));
+
+      // Create notifications for all members
+      for (const notification of notifications) {
+        await supabaseAdmin.rpc('create_notification', notification);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Team "${team.name}" deleted successfully`
+    });
+  } catch (error) {
+    console.error("Teams DELETE error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

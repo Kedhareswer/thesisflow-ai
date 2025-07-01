@@ -13,7 +13,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import { useEffect, useState } from "react"
+import { useEffect, useState, lazy, Suspense } from "react"
+
+// Lazy load the notification bell
+const NotificationBell = lazy(() => import("@/app/collaborate/components/notification-bell"))
 
 const navigation = [
   { name: "Explorer", href: "/explorer", icon: Search },
@@ -127,7 +130,13 @@ export function MainNav() {
           {/* User Menu */}
           <div className="flex items-center space-x-4">
             {user && !isLoading ? (
-              <DropdownMenu
+              <>
+                {/* Notification Bell */}
+                <Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
+                  <NotificationBell />
+                </Suspense>
+                
+                <DropdownMenu
                 trigger={
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-gray-100">
                     <SimpleAvatar size="sm" />
@@ -165,6 +174,7 @@ export function MainNav() {
                   Log out
                 </DropdownMenuItem>
               </DropdownMenu>
+              </>
             ) : (
               <div className="flex items-center space-x-2">
                 <Button variant="ghost" size="sm" asChild>
