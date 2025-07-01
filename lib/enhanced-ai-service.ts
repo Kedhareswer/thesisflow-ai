@@ -1,593 +1,556 @@
-import { supabase } from "@/integrations/supabase/client"
+import { createClient } from '@supabase/supabase-js'
+import { AI_PROVIDERS, type AIProvider } from './ai-providers'
 
-// Types for AI service
-export interface AIProvider {
-  id: string
-  name: string
-  baseURL: string
-  models: string[]
-  priority: number
-  requiresAuth: boolean
+export interface GenerateTextOptions {
+  prompt: string
+  provider?: AIProvider
+  model?: string
+  maxTokens?: number
+  temperature?: number
+  userId?: string
 }
 
-export interface AIMessage {
-  role: "system" | "user" | "assistant"
-  content: string
-}
-
-export interface AIResponse {
-  content: string
-  provider: string
-  model: string
+export interface GenerateTextResult {
+  success: boolean
+  content?: string
+  error?: string
+  provider?: AIProvider
+  model?: string
   usage?: {
-    tokens: number
-    cost?: number
+    promptTokens?: number
+    completionTokens?: number
+    totalTokens?: number
   }
 }
 
-export interface ResearchResult {
-  ideas: Array<{
-    title: string
-    description: string
-    research_question?: string
-    methodology?: string
-    impact?: string
-    challenges?: string
-  }>
-  context: string
-  references?: string[]
+export interface UserApiKey {
+  provider: string
+  decrypted_key?: string
+  is_active: boolean
+  test_status: string
 }
-
-// AI Providers configuration
-export const AI_PROVIDERS: AIProvider[] = [
-  {
-    id: "openai",
-    name: "OpenAI",
-    baseURL: "https://api.openai.com/v1",
-    models: ["gpt-4-0125-preview", "gpt-4-turbo-preview", "gpt-4", "gpt-3.5-turbo"],
-    priority: 1,
-    requiresAuth: true,
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    baseURL: "https://api.groq.com/openai/v1",
-    models: ["llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b", "gemma2-9b-it"],
-    priority: 2,
-    requiresAuth: true,
-  },
-  {
-    id: "gemini",
-    name: "Google Gemini",
-    baseURL: "https://generativelanguage.googleapis.com/v1beta",
-    models: ["gemini-1.5-pro", "gemini-1.5-pro-latest", "gemini-1.5-pro-vision"],
-    priority: 3,
-    requiresAuth: true,
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    baseURL: "https://api.anthropic.com/v1",
-    models: ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
-    priority: 4,
-    requiresAuth: true,
-  },
-  {
-    id: "mistral",
-    name: "Mistral AI",
-    baseURL: "https://api.mistral.ai/v1",
-    models: ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"],
-    priority: 5,
-    requiresAuth: true,
-  },
-]
 
 class EnhancedAIService {
-  private userApiKeys: Map<string, string> = new Map()
-  private fallbackKeys: Map<string, string> = new Map()
-  private initialized = false
+  private supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        storageKey: 'ai-research-platform-auth',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      }
+    }
+  )
 
-  constructor() {
-    // Load fallback keys from environment
-    this.fallbackKeys.set("openai", process.env.NEXT_PUBLIC_OPENAI_API_KEY || "")
-    this.fallbackKeys.set("groq", process.env.NEXT_PUBLIC_GROQ_API_KEY || "")
-    this.fallbackKeys.set("gemini", process.env.NEXT_PUBLIC_GEMINI_API_KEY || "")
-    this.fallbackKeys.set("anthropic", process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "")
-    this.fallbackKeys.set("mistral", process.env.NEXT_PUBLIC_MISTRAL_API_KEY || "")
-  }
-
-  // Load user API keys from database
-  async loadUserApiKeys(forceReload = false): Promise<void> {
-    if (this.initialized && !forceReload) return
-
+  async loadUserApiKeys(): Promise<UserApiKey[]> {
     try {
       console.log("Enhanced AI Service: Loading user API keys...")
       
-      const {
-        data: { session },
-        error: sessionError
-      } = await supabase.auth.getSession()
+      // Get current session for authentication
+      const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
       
       if (sessionError) {
         console.error("Enhanced AI Service: Session error:", sessionError)
-        return
-      }
-      
-      if (!session?.user) {
-        console.warn("Enhanced AI Service: No authenticated user found")
-        return
+        return []
       }
 
-      console.log("Enhanced AI Service: Making authenticated request for API keys...")
-      
+      if (!session) {
+        console.log("Enhanced AI Service: No active session found")
+        return []
+      }
+
+      console.log("Enhanced AI Service: Found active session, making authenticated request")
+
+      // Prepare headers with authentication
       const headers: Record<string, string> = {
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Content-Type": "application/json",
-      }
-      
-      // Add authentication token if available
-      if (session.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`
-        console.log("Enhanced AI Service: Added auth token to request")
+        'Content-Type': 'application/json',
       }
 
-      const response = await fetch("/api/user-api-keys?include_keys=true", {
-        method: "GET",
-        credentials: "include",
-        headers,
+      // Add authorization header with access token
+      if (session.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+        console.log("Enhanced AI Service: Added authorization header")
+      }
+
+      // Make authenticated request to get API keys with decrypted values
+      const response = await fetch('/api/user-api-keys?include_keys=true', {
+        method: 'GET',
+        credentials: 'include',
+        headers
       })
+
+      console.log("Enhanced AI Service: API response status:", response.status)
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error("Enhanced AI Service: API keys request failed:", response.status, errorText)
-        throw new Error(`Failed to load API keys: ${response.status} ${response.statusText}`)
+        console.error("Enhanced AI Service: API request failed:", response.status, errorText)
+        return []
       }
 
       const data = await response.json()
-      const apiKeys = data.apiKeys || []
-
-      console.log("Enhanced AI Service: Received API keys data:", {
-        keyCount: apiKeys.length,
-        providers: apiKeys.map((k: any) => k.provider)
+      console.log("Enhanced AI Service: API keys loaded:", {
+        success: data.success,
+        keyCount: data.apiKeys?.length || 0,
+        providers: data.apiKeys?.map((key: UserApiKey) => key.provider) || []
       })
 
-      this.userApiKeys.clear()
-      apiKeys.forEach((keyData: any) => {
-        if (keyData.is_active && keyData.test_status === "valid" && keyData.api_key) {
-          this.userApiKeys.set(keyData.provider, keyData.api_key)
-          console.log("Enhanced AI Service: Loaded API key for provider:", keyData.provider)
-        }
-      })
+      if (!data.success) {
+        console.error("Enhanced AI Service: API returned error:", data.error)
+        return []
+      }
 
-      this.initialized = true
-      console.log(`Enhanced AI Service: API keys loaded successfully - ${this.userApiKeys.size} providers configured`)
+      return data.apiKeys || []
     } catch (error) {
       console.error("Enhanced AI Service: Error loading user API keys:", error)
-      throw error
+      return []
     }
   }
 
-  // Get available API key for provider (user key takes priority)
-  private async getApiKey(provider: string): Promise<string | null> {
-    if (!this.initialized) {
-      await this.loadUserApiKeys()
-    }
-    return this.userApiKeys.get(provider) || this.fallbackKeys.get(provider) || null
-  }
+  async generateText(options: GenerateTextOptions): Promise<GenerateTextResult> {
+    try {
+      console.log("Enhanced AI Service: Starting text generation...")
+      console.log("Enhanced AI Service: Options:", {
+        provider: options.provider,
+        model: options.model,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        promptLength: options.prompt?.length
+      })
 
-  // Get best available provider
-  private async getBestProvider(preferredProvider?: string): Promise<{ provider: AIProvider; apiKey: string } | null> {
-    await this.loadUserApiKeys()
+      // Load user API keys
+      const userApiKeys = await this.loadUserApiKeys()
+      console.log("Enhanced AI Service: Loaded user API keys:", userApiKeys.map(k => ({ provider: k.provider, active: k.is_active, status: k.test_status })))
 
-    const sortedProviders = [...AI_PROVIDERS].sort((a, b) => a.priority - b.priority)
+      // Find available providers
+      const availableProviders = userApiKeys
+        .filter(key => key.is_active && key.test_status === 'valid' && key.decrypted_key)
+        .map(key => key.provider as AIProvider)
 
-    if (preferredProvider) {
-      const specificProvider = sortedProviders.find((p) => p.id === preferredProvider)
-      if (specificProvider) {
-        const apiKey = await this.getApiKey(specificProvider.id)
-        if (apiKey) {
-          return { provider: specificProvider, apiKey }
+      console.log("Enhanced AI Service: Available providers:", availableProviders)
+
+      if (availableProviders.length === 0) {
+        return {
+          success: false,
+          error: "No valid API keys available. Please configure API keys in Settings."
         }
       }
-    }
 
-    for (const provider of sortedProviders) {
-      const apiKey = await this.getApiKey(provider.id)
-      if (apiKey) {
-        return { provider, apiKey }
+      // Determine which provider to use
+      let selectedProvider = options.provider
+      if (!selectedProvider || !availableProviders.includes(selectedProvider)) {
+        selectedProvider = availableProviders[0]
+        console.log("Enhanced AI Service: Auto-selected provider:", selectedProvider)
+      }
+
+      // Get the API key for the selected provider
+      const userApiKey = userApiKeys.find(key => 
+        key.provider === selectedProvider && 
+        key.is_active && 
+        key.test_status === 'valid' &&
+        key.decrypted_key
+      )
+
+      if (!userApiKey || !userApiKey.decrypted_key) {
+        return {
+          success: false,
+          error: `No valid API key found for provider: ${selectedProvider}`
+        }
+      }
+
+      console.log("Enhanced AI Service: Using provider:", selectedProvider)
+
+      // Get provider configuration
+      const providerConfig = AI_PROVIDERS[selectedProvider]
+      if (!providerConfig) {
+        return {
+          success: false,
+          error: `Unknown provider: ${selectedProvider}`
+        }
+      }
+
+      // Determine model to use
+      const selectedModel = options.model || providerConfig.models[0]
+      console.log("Enhanced AI Service: Using model:", selectedModel)
+
+      // Generate the response using the provider's API
+      const result = await this.callProviderAPI(
+        selectedProvider,
+        userApiKey.decrypted_key,
+        {
+          ...options,
+          model: selectedModel,
+          provider: selectedProvider
+        }
+      )
+
+      console.log("Enhanced AI Service: Generation result:", {
+        success: result.success,
+        contentLength: result.content?.length,
+        error: result.error
+      })
+
+      return result
+
+    } catch (error) {
+      console.error("Enhanced AI Service: Error in generateText:", error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error occurred"
       }
     }
-
-    return null
   }
 
-  // Make API call to OpenAI-compatible endpoint
-  private async callOpenAICompatible(
+  private async callProviderAPI(
     provider: AIProvider,
     apiKey: string,
-    messages: AIMessage[],
-    options: { model?: string; temperature?: number; maxTokens?: number } = {},
-  ): Promise<AIResponse> {
-    const model = options.model || provider.models[0]
+    options: GenerateTextOptions
+  ): Promise<GenerateTextResult> {
+    try {
+      console.log(`Enhanced AI Service: Calling ${provider} API...`)
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      const providerConfig = AI_PROVIDERS[provider]
+      const maxTokens = Math.min(options.maxTokens || 1000, providerConfig.maxTokens)
+      const temperature = Math.min(Math.max(options.temperature || 0.7, 0), 1)
+
+      switch (provider) {
+        case 'groq':
+          return await this.callGroqAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        case 'openai':
+          return await this.callOpenAIAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        // Anthropic not currently in AI_PROVIDERS, skip for now
+        // case 'anthropic':
+        //   return await this.callAnthropicAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        case 'gemini':
+          return await this.callGeminiAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        default:
+          return {
+            success: false,
+            error: `Provider ${provider} is not yet implemented`
+          }
+      }
+    } catch (error) {
+      console.error(`Enhanced AI Service: Error calling ${provider} API:`, error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : `Failed to call ${provider} API`
+      }
     }
+  }
 
-    if (provider.id === "openai" || provider.id === "groq") {
-      headers["Authorization"] = `Bearer ${apiKey}`
-    }
-
-    const body = {
-      model,
-      messages,
-      temperature: options.temperature || 0.7,
-      max_tokens: options.maxTokens || 2000,
-      stream: false,
-    }
-
-    const response = await fetch(`${provider.baseURL}/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
+  private async callGroqAPI(
+    apiKey: string,
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature,
+      }),
     })
 
     if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`${provider.name} API error: ${error}`)
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Groq API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
-
+    
     return {
-      content: data.choices[0]?.message?.content || "",
-      provider: provider.name,
+      success: true,
+      content: data.choices?.[0]?.message?.content || '',
+      provider: 'groq',
       model,
-      usage: data.usage
-        ? {
-            tokens: data.usage.total_tokens,
-            cost: this.calculateCost(provider.id, model, data.usage.total_tokens),
-          }
-        : undefined,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+        totalTokens: data.usage?.total_tokens,
+      }
     }
   }
 
-  // Make API call to Gemini
-  private async callGemini(
+  private async callOpenAIAPI(
     apiKey: string,
-    messages: AIMessage[],
-    options: { model?: string; temperature?: number } = {},
-  ): Promise<AIResponse> {
-    const model = options.model || "gemini-1.5-pro"
-
-    // Convert messages to Gemini format
-    const contents = messages
-      .filter((msg) => msg.role !== "system")
-      .map((msg) => ({
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      }))
-
-    // Add system message as instruction if present
-    const systemMessage = messages.find((msg) => msg.role === "system")
-    const generationConfig: any = {
-      temperature: options.temperature || 0.7,
-      maxOutputTokens: 2000,
-    }
-
-    if (systemMessage) {
-      generationConfig.systemInstruction = {
-        role: "system",
-        parts: [{ text: systemMessage.content }],
-      }
-    }
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          generationConfig,
-        }),
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    )
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    })
 
     if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Gemini API error: ${error}`)
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
-
+    
     return {
-      content: data.candidates[0]?.content?.parts[0]?.text || "",
-      provider: "Google Gemini",
+      success: true,
+      content: data.choices?.[0]?.message?.content || '',
+      provider: 'openai',
       model,
-      usage: data.usageMetadata
-        ? {
-            tokens: data.usageMetadata.totalTokenCount,
-            cost: this.calculateCost("gemini", model, data.usageMetadata.totalTokenCount),
-          }
-        : undefined,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+        totalTokens: data.usage?.total_tokens,
+      }
     }
   }
 
-  // Calculate approximate cost
-  private calculateCost(provider: string, model: string, tokens: number): number {
-    const rates: Record<string, Record<string, number>> = {
-      openai: {
-        "gpt-4": 0.00003,
-        "gpt-4-turbo": 0.00001,
-        "gpt-3.5-turbo": 0.000002,
+  private async callAnthropicAPI(
+    apiKey: string,
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01'
       },
-      groq: {
-        "llama-3.1-70b-versatile": 0.00000059,
-        "mixtral-8x7b-32768": 0.00000024,
-        "gemma-7b-it": 0.0000001,
-      },
-      gemini: {
-        "gemini-1.5-pro": 0.000007,
-        "gemini-1.5-flash": 0.00000035,
-      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [{ role: 'user', content: prompt }]
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
     }
 
-    const providerRates = rates[provider]
-    const rate = providerRates?.[model] || 0
-    return tokens * rate
+    const data = await response.json()
+    
+    return {
+      success: true,
+      content: data.content?.[0]?.text || '',
+      provider: 'openai', // Fallback since anthropic not in AIProvider type
+      model,
+      usage: {
+        promptTokens: data.usage?.input_tokens,
+        completionTokens: data.usage?.output_tokens,
+        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+      }
+    }
   }
 
-  // Main chat completion method
+  private async callGeminiAPI(
+    apiKey: string,
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature,
+        }
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+    }
+
+    const data = await response.json()
+    
+    return {
+      success: true,
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text || '',
+      provider: 'gemini',
+      model,
+      usage: {
+        promptTokens: data.usageMetadata?.promptTokenCount,
+        completionTokens: data.usageMetadata?.candidatesTokenCount,
+        totalTokens: data.usageMetadata?.totalTokenCount,
+      }
+    }
+  }
+
+  // Backward compatibility method for components that expect chatCompletion
   async chatCompletion(
-    messages: AIMessage[],
-    options: {
-      model?: string
+    messages: { role: string; content: string }[],
+    options?: {
       temperature?: number
       maxTokens?: number
-      preferredProvider?: string
-    } = {},
-  ): Promise<AIResponse> {
-    const bestProvider = await this.getBestProvider(options.preferredProvider)
-
-    if (!bestProvider) {
-      throw new Error("No AI providers available. Please configure API keys in settings.")
+      preferredProvider?: AIProvider
+      model?: string
+    }
+  ): Promise<{ content: string }> {
+    // Convert messages to simple prompt (for now, just use the last user message)
+    const userMessage = messages.filter(m => m.role === 'user').pop()
+    if (!userMessage) {
+      throw new Error('No user message found')
     }
 
-    const { provider, apiKey } = bestProvider
+    const result = await this.generateText({
+      prompt: userMessage.content,
+      provider: options?.preferredProvider,
+      model: options?.model,
+      maxTokens: options?.maxTokens,
+      temperature: options?.temperature
+    })
 
-    try {
-      if (provider.id === "gemini") {
-        return await this.callGemini(apiKey, messages, options)
-      } else {
-        return await this.callOpenAICompatible(provider, apiKey, messages, options)
-      }
-    } catch (error) {
-      console.error(`AI API Error (${provider.name}):`, error)
-      throw error
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate response')
     }
+
+    return { content: result.content || '' }
   }
 
-  // Research assistance
+  // Research-specific methods
   async generateResearchIdeas(
     topic: string,
-    context?: string,
-    preferredProvider?: string,
-    preferredModel?: string,
-  ): Promise<ResearchResult> {
-    const messages: AIMessage[] = [
-      {
-        role: "system",
-        content:
-          "You are a research assistant. Generate innovative, practical research ideas with detailed methodology and impact analysis. Return only valid JSON.",
-      },
-      {
-        role: "user",
-        content: `Generate 3-5 research ideas for the topic: "${topic}"${context ? ` in the context of: ${context}` : ""}
+    context: string = "",
+    count: number = 5
+  ): Promise<{
+    ideas: Array<{ title: string; description: string }>
+    topic: string
+    context: string
+    count: number
+    timestamp: string
+  }> {
+    const prompt = `Generate ${count} innovative and feasible research ideas for the topic: "${topic}"
+
+${context ? `Additional context: ${context}` : ''}
+
+Please provide creative, specific, and actionable research ideas that could lead to meaningful contributions in this field. For each idea, provide:
+1. A clear, concise title
+2. A detailed description explaining the research approach, potential impact, and feasibility
+
+Format your response as a numbered list where each idea follows this structure:
+1. **Title**: [Clear research title]
+   Description: [2-3 sentences explaining the research approach, methodology, and expected outcomes]
+
+Focus on originality, practical feasibility, and potential for significant impact in the field.`
+
+    const result = await this.generateText({
+      prompt,
+      maxTokens: 2000,
+      temperature: 0.9
+    })
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate research ideas')
+    }
+
+    // Parse the response to extract ideas
+    const content = result.content || ''
+    const ideas = this.parseResearchIdeas(content)
+
+    return {
+      ideas,
+      topic,
+      context,
+      count,
+      timestamp: new Date().toISOString()
+    }
+  }
+
+  private parseResearchIdeas(content: string): Array<{ title: string; description: string }> {
+    const ideas: Array<{ title: string; description: string }> = []
+    
+    // Split content by numbered items
+    const lines = content.split('\n')
+    let currentIdea: { title: string; description: string } | null = null
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim()
+      
+      // Check if this is a new numbered idea
+      const numberMatch = trimmedLine.match(/^\d+\.\s*\*\*(.*?)\*\*/)
+      if (numberMatch) {
+        // Save previous idea if exists
+        if (currentIdea) {
+          ideas.push(currentIdea)
+        }
         
-        Return a JSON object with this structure:
-        {
-          "ideas": [
-            {
-              "title": "Research idea title",
-              "description": "Brief description",
-              "research_question": "Main research question",
-              "methodology": "Proposed methodology",
-              "impact": "Potential impact and applications", 
-              "challenges": "Anticipated challenges"
-            }
-          ],
-          "context": "Brief analysis of the research landscape",
-          "references": ["Suggested reference areas"]
-        }`,
-      },
-    ]
-
-    const response = await this.chatCompletion(messages, { preferredProvider, model: preferredModel })
-
-    try {
-      return JSON.parse(response.content)
-    } catch (error) {
-      // Fallback if JSON parsing fails
-      return {
-        ideas: [
-          {
-            title: `Research on ${topic}`,
-            description: response.content,
-            research_question: `How can we advance understanding of ${topic}?`,
-            methodology: "Mixed methods approach with literature review and empirical analysis",
-            impact: "Potential to contribute to academic knowledge and practical applications",
-            challenges: "Data availability and methodological constraints",
-          },
-        ],
-        context: `Research in ${topic} is an active field with many opportunities for contribution.`,
-      }
-    }
-  }
-
-  // Content summarization
-  async summarizeContent(
-    content: string,
-    options: {
-      style?: "academic" | "executive" | "bullet-points" | "detailed"
-      length?: "brief" | "medium" | "comprehensive"
-    } = {},
-    preferredProvider?: string,
-    preferredModel?: string,
-  ): Promise<{
-    summary: string
-    keyPoints: string[]
-    readingTime: number
-    sentiment?: "positive" | "neutral" | "negative"
-  }> {
-    const { style = "academic", length = "medium" } = options
-
-    const messages: AIMessage[] = [
-      {
-        role: "system",
-        content: `You are an expert content summarizer. Create ${style} summaries that are ${length} in length. Return only valid JSON.`,
-      },
-      {
-        role: "user",
-        content: `Analyze and summarize this content:
-
-"${content}"
-
-Return a JSON object with this structure:
-{
-  "summary": "${style} summary in ${length} detail",
-  "keyPoints": ["Key point 1", "Key point 2", "Key point 3"],
-  "readingTime": estimated_reading_time_in_minutes,
-  "sentiment": "positive|neutral|negative"
-}`,
-      },
-    ]
-
-    const response = await this.chatCompletion(messages, { preferredProvider, model: preferredModel })
-
-    try {
-      return JSON.parse(response.content)
-    } catch (error) {
-      // Fallback
-      const wordCount = content.split(/\s+/).length
-      return {
-        summary: response.content,
-        keyPoints: ["Content analysis completed", "Key insights extracted", "Summary generated"],
-        readingTime: Math.ceil(wordCount / 200),
-        sentiment: "neutral",
-      }
-    }
-  }
-
-  // Writing assistance
-  async improveWriting(
-    text: string,
-    task: "grammar" | "clarity" | "academic" | "creative" | "professional",
-  ): Promise<{
-    improvedText: string
-    suggestions: Array<{
-      type: string
-      original: string
-      improved: string
-      reason: string
-    }>
-    metrics: {
-      readability: number
-      sentiment: string
-      wordCount: number
-    }
-  }> {
-    const messages: AIMessage[] = [
-      {
-        role: "system",
-        content: `You are a professional writing assistant. Improve text for ${task} purposes. Return only valid JSON.`,
-      },
-      {
-        role: "user",
-        content: `Improve this text for ${task}:
-
-"${text}"
-
-Return a JSON object with this structure:
-{
-  "improvedText": "The improved version of the text",
-  "suggestions": [
-    {
-      "type": "grammar|style|clarity|structure",
-      "original": "original phrase",
-      "improved": "improved phrase", 
-      "reason": "explanation of improvement"
-    }
-  ],
-  "metrics": {
-    "readability": score_out_of_100,
-    "sentiment": "positive|neutral|negative",
-    "wordCount": number_of_words
-  }
-}`,
-      },
-    ]
-
-    const response = await this.chatCompletion(messages)
-
-    try {
-      return JSON.parse(response.content)
-    } catch (error) {
-      // Fallback
-      return {
-        improvedText: response.content,
-        suggestions: [
-          {
-            type: "improvement",
-            original: text.substring(0, 50) + "...",
-            improved: response.content.substring(0, 50) + "...",
-            reason: "AI-assisted improvement applied",
-          },
-        ],
-        metrics: {
-          readability: 75,
-          sentiment: "neutral",
-          wordCount: text.split(/\s+/).length,
-        },
-      }
-    }
-  }
-
-  // Test API key
-  async testApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; error?: string; model?: string }> {
-    try {
-      const providerConfig = AI_PROVIDERS.find((p) => p.id === provider)
-      if (!providerConfig) {
-        return { valid: false, error: "Unknown provider" }
-      }
-
-      const testMessages: AIMessage[] = [
-        { role: "user", content: 'Hello! Please respond with just the word "SUCCESS" if you can read this.' },
-      ]
-
-      if (provider === "gemini") {
-        const response = await this.callGemini(apiKey, testMessages)
-        return {
-          valid: response.content.toLowerCase().includes("success"),
-          model: response.model,
+        // Start new idea
+        currentIdea = {
+          title: numberMatch[1].trim(),
+          description: ''
         }
-      } else {
-        const response = await this.callOpenAICompatible(providerConfig, apiKey, testMessages)
-        return {
-          valid: response.content.toLowerCase().includes("success"),
-          model: response.model,
+        
+        // Check if description is on the same line
+        const descMatch = trimmedLine.match(/Description:\s*(.+)/)
+        if (descMatch) {
+          currentIdea.description = descMatch[1].trim()
+        }
+      } else if (currentIdea) {
+        // Add to current idea's description
+        const descMatch = trimmedLine.match(/Description:\s*(.+)/)
+        if (descMatch) {
+          currentIdea.description = descMatch[1].trim()
+        } else if (trimmedLine && !trimmedLine.startsWith('**')) {
+          // Add continuation of description
+          if (currentIdea.description) {
+            currentIdea.description += ' ' + trimmedLine
+          } else {
+            currentIdea.description = trimmedLine
+          }
         }
       }
-    } catch (error) {
-      return {
-        valid: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+    }
+    
+    // Add the last idea
+    if (currentIdea) {
+      ideas.push(currentIdea)
+    }
+    
+    // If parsing failed, create fallback ideas from the content
+    if (ideas.length === 0) {
+      const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20)
+      for (let i = 0; i < Math.min(5, sentences.length); i++) {
+        ideas.push({
+          title: `Research Idea ${i + 1}`,
+          description: sentences[i].trim()
+        })
       }
     }
+    
+    return ideas
   }
 }
 
-// Export singleton instance
 export const enhancedAIService = new EnhancedAIService()
-export default enhancedAIService

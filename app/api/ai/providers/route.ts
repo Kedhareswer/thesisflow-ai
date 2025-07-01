@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { getAuthUser, createSupabaseAdmin } from '@/lib/auth-utils'
-import crypto from 'crypto'
-
-// Using shared authentication utilities from lib/auth-utils.ts
 
 // Get user API keys
 async function getUserApiKeys(userId: string) {

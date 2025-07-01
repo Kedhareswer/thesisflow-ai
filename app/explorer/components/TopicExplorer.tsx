@@ -48,30 +48,49 @@ Please provide a detailed analysis covering:
 Format the response in a clear, structured manner with headings and bullet points where appropriate.
 The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "comprehensive"}.`
 
-      // Use the enhanced AI service instead of the old provider service
-      await enhancedAIService.loadUserApiKeys(true) // Force reload to get latest keys
-      
-      const response = await enhancedAIService.chatCompletion([
-        { role: "user", content: prompt }
-      ], {
+      // Use the enhanced AI service to generate the response
+      const response = await enhancedAIService.generateText({
+        prompt,
+        provider: selectedProvider,
+        model: selectedModel,
         temperature: 0.7,
-        maxTokens: 2048,
-        preferredProvider: selectedProvider,
-        model: selectedModel
+        maxTokens: 2048
       })
 
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to generate research overview')
+      }
+
       return {
-        content: response.content,
+        content: response.content || '',
         topic,
         depth,
         timestamp: new Date().toISOString(),
       }
     } catch (error) {
       console.error("Error exploring topic:", error)
-      if (error instanceof Error && error.message.includes("No AI providers")) {
-        throw new Error("No AI providers are configured. Please add at least one API key in Settings.")
+      
+      let errorMessage = "Failed to explore research topic"
+      
+      if (error instanceof Error) {
+        if (error.message.includes("No AI providers")) {
+          errorMessage = "No AI providers are configured. Please add at least one API key in Settings."
+        } else if (error.message.includes("authentication") || error.message.includes("sign in")) {
+          errorMessage = "Authentication error. Please sign in again to access AI features."
+        } else if (error.message.includes("API key")) {
+          errorMessage = "API key error. Please check your AI provider configuration in Settings."
+        } else if (error.message.includes("rate limit")) {
+          errorMessage = "Rate limit exceeded. Please try again in a few minutes."
+        } else if (error.message.includes("quota") || error.message.includes("billing")) {
+          errorMessage = "API quota exceeded. Please check your billing status with your AI provider."
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Network error. Please check your connection and try again."
+        } else {
+          errorMessage = error.message
+        }
       }
-      throw new Error("Failed to explore research topic. Please check your AI provider configuration.")
+      
+      throw new Error(errorMessage)
     }
   }
 }

@@ -103,10 +103,17 @@ Provide a helpful, informative, and concise response. If you don't know somethin
 
       // Extract content from response
       let responseContent = ''
-      if (response.data && typeof response.data === 'object' && 'content' in response.data) {
-        responseContent = String(response.data.content)
+      if (response && typeof response === 'object' && 'content' in response) {
+        responseContent = String(response.content)
+      } else if (response && typeof response === 'object' && 'data' in response) {
+        const data = response.data
+        if (data && typeof data === 'object' && 'content' in data) {
+          responseContent = String(data.content)
+        } else {
+          responseContent = String(data)
+        }
       } else {
-        responseContent = String(response.data)
+        responseContent = String(response)
       }
 
       // Add assistant message to chat

@@ -34,8 +34,13 @@ try {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
   console.log("Using Supabase URL:", supabaseUrl ? supabaseUrl.split('.')[0] + '.supabase.co' : 'Not configured'); // Log only the domain for verification, not credentials
   
-  // Create the Supabase client with validated values
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Create the Supabase client with validated values and custom storage key
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storageKey: 'ai-research-platform-auth',
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    }
+  });
 } catch (error) {
   console.error('Failed to initialize Supabase client:', error);
   // In a real app, you might want to show a more user-friendly error or fallback UI

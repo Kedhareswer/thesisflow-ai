@@ -83,19 +83,56 @@ export default function ProfilePage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.from("user_profiles").upsert({
-        id: user.id,
-        display_name: profile.display_name,
-        bio: profile.bio,
-        location: profile.location,
-        website: profile.website,
-        research_interests: profile.research_interests,
-        institution: profile.institution,
-        position: profile.position,
-        updated_at: new Date().toISOString(),
-      })
+      console.log("Saving profile for user:", user.id)
+      console.log("Profile data:", profile)
 
-      if (error) throw error
+      // First check if profile exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("id", user.id)
+        .single()
+
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Error checking existing profile:", checkError)
+        throw new Error(`Failed to check existing profile: ${checkError.message}`)
+      }
+
+      const profileData = {
+        id: user.id,
+        display_name: profile.display_name || null,
+        bio: profile.bio || null,
+        location: profile.location || null,
+        website: profile.website || null,
+        research_interests: profile.research_interests || [],
+        institution: profile.institution || null,
+        position: profile.position || null,
+        updated_at: new Date().toISOString(),
+      }
+
+      let result
+      if (existingProfile) {
+        // Update existing profile
+        console.log("Updating existing profile")
+        result = await supabase
+          .from("user_profiles")
+          .update(profileData)
+          .eq("id", user.id)
+      } else {
+        // Insert new profile
+        console.log("Creating new profile")
+        result = await supabase
+          .from("user_profiles")
+          .insert({
+            ...profileData,
+            created_at: new Date().toISOString(),
+          })
+      }
+
+      if (result.error) {
+        console.error("Database operation error:", result.error)
+        throw new Error(`Database error: ${result.error.message}`)
+      }
 
       setEditing(false)
       toast({
@@ -104,15 +141,30 @@ export default function ProfilePage() {
       })
     } catch (error) {
       console.error("Error saving profile:", error)
-      const errorMessage = error instanceof Error ? error.message : 
-                          (error as any)?.message || 
-                          JSON.stringify(error, null, 2) || 
-                          "Unknown error occurred"
+      
+      let errorMessage = "Unknown error occurred"
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String((error as any).message)
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
       console.error("Detailed error:", errorMessage)
+      
+      // Provide user-friendly error messages
+      if (errorMessage.includes("row-level security")) {
+        errorMessage = "You don't have permission to save this profile. Please try logging out and back in."
+      } else if (errorMessage.includes("auth")) {
+        errorMessage = "Authentication error. Please try logging out and back in."
+      } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
+        errorMessage = "Network error. Please check your connection and try again."
+      }
       
       toast({
         title: "Save failed",
-        description: `Failed to save profile: ${errorMessage}`,
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

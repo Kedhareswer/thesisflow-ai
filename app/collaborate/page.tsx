@@ -277,11 +277,32 @@ export default function CollaboratePage() {
 
         setMessages(transformedMessages)
       } catch (error) {
-        console.error("Error loading messages:", error instanceof Error ? error.message : String(error))
-        // Optional: Show user-friendly error message
+        let errorMessage = "Unknown error occurred"
+        if (error instanceof Error) {
+          errorMessage = error.message
+        } else if (typeof error === 'object' && error !== null && 'message' in error) {
+          errorMessage = String((error as any).message)
+        } else if (typeof error === 'string') {
+          errorMessage = error
+        } else {
+          errorMessage = JSON.stringify(error)
+        }
+        
+        console.error("Error loading messages:", errorMessage)
+        
+        // Provide user-friendly error message
+        let userMessage = "Unable to load chat history. Please try refreshing the page."
+        if (errorMessage.includes("auth") || errorMessage.includes("permission")) {
+          userMessage = "Authentication error. Please try logging out and back in."
+        } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
+          userMessage = "Network error. Please check your connection and try again."
+        } else if (errorMessage.includes("rate limit")) {
+          userMessage = "Too many requests. Please wait a moment and try again."
+        }
+        
         toast({
           title: "Failed to load messages",
-          description: "Unable to load chat history. Please try refreshing the page.",
+          description: userMessage,
           variant: "destructive",
         })
       }

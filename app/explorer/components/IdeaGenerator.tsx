@@ -27,10 +27,7 @@ class IdeaGenerationService {
     try {
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
       
-      // Force reload API keys to ensure latest configuration
-      await enhancedAIService.loadUserApiKeys(true)
-      
-      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context)
+      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count)
       const ideaObjects = researchResults.ideas
 
       // Convert idea objects to strings
