@@ -18,8 +18,6 @@ import { EmptyState } from "@/components/common/EmptyState"
 import { SkeletonCard, SkeletonList } from "@/components/common/SkeletonCard"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { ResearchChatbot } from "@/components/research-chatbot"
-import { AIProviderStatus } from "@/components/ai-provider-status"
-import { AIConfig } from "@/lib/ai-config"
 import Link from "next/link"
 
 // Enhanced research service that uses real AI
@@ -305,11 +303,6 @@ export default function ResearchExplorer() {
   return (
     <ErrorBoundary>
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* AI Provider Status */}
-        <div className="mb-6">
-          <AIProviderStatus showActions={false} />
-        </div>
-        
         <Tabs defaultValue="explore" className="space-y-8">
           <TabsList className="grid w-full grid-cols-4 bg-gray-50">
             <TabsTrigger value="explore" className="flex items-center gap-2">
@@ -367,11 +360,7 @@ export default function ResearchExplorer() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={handleTopicExploration}
-                  disabled={topicExploration.loading}
-                  className="w-full"
-                >
+                <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">
                   {topicExploration.loading ? (
                     <LoadingSpinner size="sm" text="Exploring..." />
                   ) : (

@@ -47,4 +47,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION is_team_member(UUID, UUID) TO authenticated;
 
 -- Add performance index
-CREATE INDEX IF NOT EXISTS idx_team_members_lookup ON team_members(team_id, user_id); 
+CREATE INDEX IF NOT EXISTS idx_team_members_lookup ON team_members(team_id, user_id);

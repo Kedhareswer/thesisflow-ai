@@ -82,7 +82,7 @@ Successfully identified and resolved four critical issues in the AI Project Plan
 **Problem:** "infinite recursion detected in policy for relation team_members" database error.
 
 **Root Cause:** RLS policy on `team_members` table referenced itself, causing infinite recursion:
-```sql
+\`\`\`sql
 -- PROBLEMATIC POLICY
 CREATE POLICY "Users can view team members of their teams" ON team_members
     FOR SELECT USING (
@@ -90,7 +90,7 @@ CREATE POLICY "Users can view team members of their teams" ON team_members
             SELECT team_id FROM team_members WHERE user_id = auth.uid() -- RECURSION!
         )
     );
-```
+\`\`\`
 
 **Solution Implemented:**
 - ✅ Created `scripts/setup-database-schema-fixed.sql` with corrected RLS policies
@@ -99,14 +99,14 @@ CREATE POLICY "Users can view team members of their teams" ON team_members
 - ✅ Optimized related policies for teams, chat messages, and documents
 
 **Key Fixes:**
-```sql
+\`\`\`sql
 -- FIXED POLICIES (No Recursion)
 CREATE POLICY "Team owners can view all team members" ON team_members
     FOR SELECT USING (team_id IN (SELECT id FROM teams WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can view their own team memberships" ON team_members
     FOR SELECT USING (user_id = auth.uid());
-```
+\`\`\`
 
 **User Benefits:**
 - Collaborate page now loads without database errors
@@ -127,10 +127,10 @@ CREATE POLICY "Users can view their own team memberships" ON team_members
 ### **Database Changes Required:**
 
 To fix the collaboration issue, run the fixed schema script:
-```bash
+\`\`\`bash
 # Apply the database fixes
 psql -f scripts/setup-database-schema-fixed.sql
-```
+\`\`\`
 
 **What the script does:**
 - Drops problematic RLS policies
@@ -173,12 +173,12 @@ psql -f scripts/setup-database-schema-fixed.sql
 4. **Test the collaboration features** to ensure team creation and chat work properly
 
 ### **Environment Setup:**
-```bash
+\`\`\`bash
 # Add to .env.local
 GROQ_API_KEY=your_groq_key_here
 OPENAI_API_KEY=your_openai_key_here
 GEMINI_API_KEY=your_gemini_key_here
-```
+\`\`\`
 
 ---
 
@@ -192,4 +192,4 @@ GEMINI_API_KEY=your_gemini_key_here
 - [ ] Team creation and chat functionality working
 - [ ] All navigation links functional
 
-**All critical issues have been resolved with production-ready solutions.** 
+**All critical issues have been resolved with production-ready solutions.**

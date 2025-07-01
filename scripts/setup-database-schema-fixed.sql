@@ -120,4 +120,4 @@ GRANT EXECUTE ON FUNCTION is_team_member(UUID, UUID) TO authenticated;
 -- Create an index on team_members for better performance
 CREATE INDEX IF NOT EXISTS idx_team_members_lookup ON team_members(team_id, user_id);
 
-COMMENT ON FUNCTION is_team_member(UUID, UUID) IS 'Helper function to check team membership without causing RLS recursion'; 
+COMMENT ON FUNCTION is_team_member(UUID, UUID) IS 'Helper function to check team membership without causing RLS recursion';

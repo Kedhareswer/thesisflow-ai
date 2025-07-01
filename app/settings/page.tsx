@@ -12,8 +12,7 @@ import { Save, Shield, Bell, User, Database, Key, Download, Trash2, AlertTriangl
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
-
-// Note: AI Status Indicator will be shown when component is available
+import { AIProviderStatus } from "@/components/ai-provider-status"
 
 interface UserSettings {
   email_notifications: boolean
@@ -369,7 +368,7 @@ export default function SettingsPage() {
                   <Switch
                     id="email-notifications"
                     checked={settings.email_notifications}
-                    onChange={(checked) => setSettings({ ...settings, email_notifications: checked })}
+                    onCheckedChange={(checked) => setSettings({ ...settings, email_notifications: checked })}
                   />
                 </div>
 
@@ -381,7 +380,7 @@ export default function SettingsPage() {
                   <Switch
                     id="research-updates"
                     checked={settings.research_updates}
-                    onChange={(checked) => setSettings({ ...settings, research_updates: checked })}
+                    onCheckedChange={(checked) => setSettings({ ...settings, research_updates: checked })}
                   />
                 </div>
 
@@ -393,7 +392,7 @@ export default function SettingsPage() {
                   <Switch
                     id="collaboration-invites"
                     checked={settings.collaboration_invites}
-                    onChange={(checked) => setSettings({ ...settings, collaboration_invites: checked })}
+                    onCheckedChange={(checked) => setSettings({ ...settings, collaboration_invites: checked })}
                   />
                 </div>
 
@@ -405,7 +404,7 @@ export default function SettingsPage() {
                   <Switch
                     id="security-alerts"
                     checked={settings.security_alerts}
-                    onChange={(checked) => setSettings({ ...settings, security_alerts: checked })}
+                    onCheckedChange={(checked) => setSettings({ ...settings, security_alerts: checked })}
                   />
                 </div>
 
@@ -417,7 +416,7 @@ export default function SettingsPage() {
                   <Switch
                     id="marketing-emails"
                     checked={settings.marketing_emails}
-                    onChange={(checked) => setSettings({ ...settings, marketing_emails: checked })}
+                    onCheckedChange={(checked) => setSettings({ ...settings, marketing_emails: checked })}
                   />
                 </div>
               </div>
@@ -451,7 +450,7 @@ export default function SettingsPage() {
                 <Switch
                   id="data-sharing"
                   checked={settings.data_sharing}
-                  onChange={(checked) => setSettings({ ...settings, data_sharing: checked })}
+                  onCheckedChange={(checked) => setSettings({ ...settings, data_sharing: checked })}
                 />
               </div>
 
@@ -493,19 +492,22 @@ export default function SettingsPage() {
 
         {/* AI Settings */}
         <TabsContent value="ai" className="space-y-6">
+          {/* AI Provider Status Component */}
+          <AIProviderStatus showActions={true} />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
-                AI Provider Configuration
+                AI Configuration Help
               </CardTitle>
-              <CardDescription>Manage your AI provider settings and preferences</CardDescription>
+              <CardDescription>Learn how to configure AI providers for the platform</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-medium text-blue-900">AI Configuration Help</h3>
+                  <h3 className="font-medium text-blue-900">Environment Variables Setup</h3>
                 </div>
                 <p className="text-sm text-blue-800 mb-3">
                   To use AI features, add your API keys to the{" "}
@@ -517,6 +519,10 @@ export default function SettingsPage() {
                   OPENAI_API_KEY=your_openai_key_here
                   <br />
                   GEMINI_API_KEY=your_gemini_key_here
+                  <br />
+                  AIML_API_KEY=your_aiml_key_here
+                  <br />
+                  DEEPINFRA_API_KEY=your_deepinfra_key_here
                 </div>
               </div>
 
@@ -527,8 +533,58 @@ export default function SettingsPage() {
                 </div>
                 <p className="text-sm text-amber-800">
                   API keys are stored securely on the server and never exposed to the client. They are used only for
-                  making AI requests on your behalf.
+                  making AI requests on your behalf. Never share your API keys or commit them to version control.
                 </p>
+              </div>
+
+              <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <h3 className="font-medium text-green-900">Getting API Keys</h3>
+                </div>
+                <div className="text-sm text-green-800 space-y-2">
+                  <p>
+                    <strong>Groq:</strong> Visit{" "}
+                    <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="underline">
+                      console.groq.com
+                    </a>{" "}
+                    to get your free API key
+                  </p>
+                  <p>
+                    <strong>OpenAI:</strong> Get your API key from{" "}
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      platform.openai.com
+                    </a>
+                  </p>
+                  <p>
+                    <strong>Google Gemini:</strong> Create an API key at{" "}
+                    <a
+                      href="https://makersuite.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      makersuite.google.com
+                    </a>
+                  </p>
+                  <p>
+                    <strong>AI/ML API:</strong> Sign up at{" "}
+                    <a href="https://aimlapi.com" target="_blank" rel="noopener noreferrer" className="underline">
+                      aimlapi.com
+                    </a>
+                  </p>
+                  <p>
+                    <strong>DeepInfra:</strong> Get your key from{" "}
+                    <a href="https://deepinfra.com" target="_blank" rel="noopener noreferrer" className="underline">
+                      deepinfra.com
+                    </a>
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

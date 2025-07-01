@@ -161,4 +161,4 @@ export function AIProviderStatus({ showActions = true }: { showActions?: boolean
       </Card>
     </div>
   )
-} 
+}

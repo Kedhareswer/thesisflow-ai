@@ -1,29 +1,26 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Save, Edit3, Mail, Calendar, MapPin, Briefcase, GraduationCap, Globe, Camera } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { User, Mail, Calendar, MapPin, LinkIcon, Save, Edit, BookOpen, Lightbulb, Users, Activity } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 
 interface UserProfile {
-  display_name?: string
-  bio?: string
-  location?: string
-  website?: string
-  organization?: string
-  job_title?: string
-  research_interests?: string[]
-  phone?: string
-  created_at?: string
-  last_active?: string
+  display_name: string
+  bio: string
+  location: string
+  website: string
+  research_interests: string[]
+  institution: string
+  position: string
 }
 
 export default function ProfilePage() {
@@ -31,44 +28,16 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [profile, setProfile] = useState<UserProfile>({})
-  const [formData, setFormData] = useState<UserProfile>({})
-
-  // Simple avatar component
-  const SimpleAvatar = ({
-    size = "xl",
-    editable = false,
-  }: { size?: "sm" | "md" | "lg" | "xl"; editable?: boolean }) => {
-    const getInitials = () => {
-      if (user?.user_metadata?.display_name) {
-        return user.user_metadata.display_name[0].toUpperCase()
-      }
-      if (user?.email) {
-        return user.email[0].toUpperCase()
-      }
-      return "U"
-    }
-
-    const sizeClasses = {
-      sm: "h-8 w-8 text-sm",
-      md: "h-12 w-12 text-base",
-      lg: "h-16 w-16 text-lg",
-      xl: "h-24 w-24 text-2xl",
-    }
-
-    return (
-      <div
-        className={`${sizeClasses[size]} bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold rounded-full flex items-center justify-center relative group ${editable ? "cursor-pointer" : ""}`}
-      >
-        {getInitials()}
-        {editable && (
-          <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Camera className="h-6 w-6 text-white" />
-          </div>
-        )}
-      </div>
-    )
-  }
+  const [profile, setProfile] = useState<UserProfile>({
+    display_name: "",
+    bio: "",
+    location: "",
+    website: "",
+    research_interests: [],
+    institution: "",
+    position: "",
+  })
+  const [newInterest, setNewInterest] = useState("")
 
   useEffect(() => {
     if (user) {
@@ -80,79 +49,64 @@ export default function ProfilePage() {
     if (!user) return
 
     try {
-      // Try to load from database first
       const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", user.id).single()
 
       if (error && error.code !== "PGRST116") {
         console.error("Error loading profile:", error)
+        return
       }
 
-      // Merge database data with auth metadata
-      const profileData: UserProfile = {
-        display_name: data?.display_name || user.user_metadata?.display_name || user.user_metadata?.name || "",
-        bio: data?.bio || "",
-        location: data?.location || "",
-        website: data?.website || "",
-        organization: data?.organization || "",
-        job_title: data?.job_title || "",
-        research_interests: data?.research_interests || [],
-        phone: data?.phone || "",
-        created_at: user.created_at,
-        last_active: data?.last_active || new Date().toISOString(),
+      if (data) {
+        setProfile({
+          display_name: data.display_name || user.user_metadata?.display_name || user.user_metadata?.name || "",
+          bio: data.bio || "",
+          location: data.location || "",
+          website: data.website || "",
+          research_interests: data.research_interests || [],
+          institution: data.institution || "",
+          position: data.position || "",
+        })
+      } else {
+        // Set default values from user metadata
+        setProfile((prev) => ({
+          ...prev,
+          display_name: user.user_metadata?.display_name || user.user_metadata?.name || "",
+        }))
       }
-
-      setProfile(profileData)
-      setFormData(profileData)
     } catch (error) {
       console.error("Error loading profile:", error)
     }
   }
 
-  const handleSave = async () => {
+  const saveProfile = async () => {
     if (!user) return
 
     setSaving(true)
     try {
-      // Update auth metadata
-      const { error: authError } = await supabase.auth.updateUser({
-        data: {
-          display_name: formData.display_name,
-          bio: formData.bio,
-        },
-      })
-
-      if (authError) throw authError
-
-      // Update/insert profile in database
-      const { error: profileError } = await supabase.from("user_profiles").upsert({
+      const { error } = await supabase.from("user_profiles").upsert({
         user_id: user.id,
-        email: user.email,
-        display_name: formData.display_name,
-        bio: formData.bio,
-        location: formData.location,
-        website: formData.website,
-        organization: formData.organization,
-        job_title: formData.job_title,
-        research_interests: formData.research_interests,
-        phone: formData.phone,
+        display_name: profile.display_name,
+        bio: profile.bio,
+        location: profile.location,
+        website: profile.website,
+        research_interests: profile.research_interests,
+        institution: profile.institution,
+        position: profile.position,
         updated_at: new Date().toISOString(),
-        last_active: new Date().toISOString(),
       })
 
-      if (profileError) throw profileError
+      if (error) throw error
 
-      setProfile(formData)
       setEditing(false)
-
       toast({
         title: "Profile updated",
-        description: "Your profile has been successfully updated.",
+        description: "Your profile has been saved successfully.",
       })
     } catch (error) {
       console.error("Error saving profile:", error)
       toast({
         title: "Save failed",
-        description: error instanceof Error ? error.message : "Failed to save profile changes",
+        description: "Failed to save profile. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -160,26 +114,36 @@ export default function ProfilePage() {
     }
   }
 
-  const handleCancel = () => {
-    setFormData(profile)
-    setEditing(false)
+  const addResearchInterest = () => {
+    if (newInterest.trim() && !profile.research_interests.includes(newInterest.trim())) {
+      setProfile({
+        ...profile,
+        research_interests: [...profile.research_interests, newInterest.trim()],
+      })
+      setNewInterest("")
+    }
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "Unknown"
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+  const removeResearchInterest = (interest: string) => {
+    setProfile({
+      ...profile,
+      research_interests: profile.research_interests.filter((i) => i !== interest),
     })
   }
 
-  const handleResearchInterestsChange = (value: string) => {
-    const interests = value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-    setFormData({ ...formData, research_interests: interests })
+  const getInitials = () => {
+    if (profile.display_name) {
+      return profile.display_name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    }
+    if (user?.email) {
+      return user.email[0].toUpperCase()
+    }
+    return "U"
   }
 
   if (!user) {
@@ -194,245 +158,238 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      {/* Header */}
+    <div className="container mx-auto py-8 space-y-8 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Profile</h1>
-          <p className="text-muted-foreground">Manage your account information and preferences</p>
+          <p className="text-muted-foreground">Manage your public profile and research information</p>
         </div>
-
-        {!editing ? (
-          <Button onClick={() => setEditing(true)} className="flex items-center gap-2">
-            <Edit3 className="h-4 w-4" />
-            Edit Profile
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+        <Button
+          onClick={() => (editing ? saveProfile() : setEditing(true))}
+          disabled={saving}
+          className="flex items-center gap-2"
+        >
+          {editing ? (
+            <>
               <Save className="h-4 w-4" />
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        )}
+              {saving ? "Saving..." : "Save Profile"}
+            </>
+          ) : (
+            <>
+              <Edit className="h-4 w-4" />
+              Edit Profile
+            </>
+          )}
+        </Button>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-3">
-        {/* Profile Picture & Basic Info */}
-        <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Profile Overview */}
+        <div className="md:col-span-1">
           <Card>
-            <CardHeader className="text-center">
-              <div className="flex justify-center mb-4">
-                <SimpleAvatar size="xl" editable={editing} />
-              </div>
-              <CardTitle className="text-xl">{profile.display_name || "User"}</CardTitle>
-              <CardDescription className="flex items-center justify-center gap-1">
-                <Mail className="h-4 w-4" />
-                {user.email}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center space-y-2">
-                {profile.job_title && (
-                  <p className="flex items-center justify-center gap-2 text-sm">
-                    <Briefcase className="h-4 w-4" />
-                    {profile.job_title}
-                  </p>
-                )}
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src="/placeholder.svg" alt={profile.display_name} />
+                  <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                    {getInitials()}
+                  </AvatarFallback>
+                </Avatar>
 
-                {profile.organization && (
-                  <p className="flex items-center justify-center gap-2 text-sm">
-                    <GraduationCap className="h-4 w-4" />
-                    {profile.organization}
-                  </p>
-                )}
+                <div className="space-y-1">
+                  <h2 className="text-xl font-semibold">{profile.display_name || "Anonymous User"}</h2>
+                  {profile.position && profile.institution && (
+                    <p className="text-sm text-muted-foreground">
+                      {profile.position} at {profile.institution}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Mail className="h-4 w-4" />
+                  {user.email}
+                </div>
 
                 {profile.location && (
-                  <p className="flex items-center justify-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />
                     {profile.location}
-                  </p>
+                  </div>
                 )}
 
                 {profile.website && (
-                  <p className="flex items-center justify-center gap-2 text-sm">
-                    <Globe className="h-4 w-4" />
-                    <a
-                      href={profile.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <LinkIcon className="h-4 w-4" />
+                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="hover:underline">
                       Website
                     </a>
-                  </p>
+                  </div>
                 )}
+
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Joined {new Date(user.created_at).toLocaleDateString()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Activity Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Papers Explored</span>
+                </div>
+                <Badge variant="secondary">0</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4 text-yellow-600" />
+                  <span className="text-sm">Ideas Generated</span>
+                </div>
+                <Badge variant="secondary">0</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-green-600" />
+                  <span className="text-sm">Collaborations</span>
+                </div>
+                <Badge variant="secondary">0</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Profile Details */}
+        <div className="md:col-span-2 space-y-6">
+          {/* Basic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Basic Information
+              </CardTitle>
+              <CardDescription>Your public profile information</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="display_name">Display Name</Label>
+                  <Input
+                    id="display_name"
+                    value={profile.display_name}
+                    onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
+                    disabled={!editing}
+                    placeholder="Your display name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="location">Location</Label>
+                  <Input
+                    id="location"
+                    value={profile.location}
+                    onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                    disabled={!editing}
+                    placeholder="City, Country"
+                  />
+                </div>
               </div>
 
-              <Separator />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="institution">Institution</Label>
+                  <Input
+                    id="institution"
+                    value={profile.institution}
+                    onChange={(e) => setProfile({ ...profile, institution: e.target.value })}
+                    disabled={!editing}
+                    placeholder="University or Organization"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="position">Position</Label>
+                  <Input
+                    id="position"
+                    value={profile.position}
+                    onChange={(e) => setProfile({ ...profile, position: e.target.value })}
+                    disabled={!editing}
+                    placeholder="Your role or title"
+                  />
+                </div>
+              </div>
 
-              <div className="text-center text-xs text-muted-foreground space-y-1">
-                <p className="flex items-center justify-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Joined {formatDate(profile.created_at)}
-                </p>
-                <p>Last active {formatDate(profile.last_active)}</p>
+              <div>
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={profile.website}
+                  onChange={(e) => setProfile({ ...profile, website: e.target.value })}
+                  disabled={!editing}
+                  placeholder="https://your-website.com"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={profile.bio}
+                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                  disabled={!editing}
+                  placeholder="Tell us about yourself and your research..."
+                  rows={4}
+                />
               </div>
             </CardContent>
           </Card>
 
           {/* Research Interests */}
-          {profile.research_interests && profile.research_interests.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Research Interests</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {profile.research_interests.map((interest, index) => (
-                    <Badge key={index} variant="secondary">
-                      {interest}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Profile Details Form */}
-        <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>
-                {editing ? "Edit your personal information below" : "Your personal information"}
-              </CardDescription>
+              <CardTitle>Research Interests</CardTitle>
+              <CardDescription>Add topics and areas you're interested in researching</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="display_name">Display Name</Label>
-                  {editing ? (
-                    <Input
-                      id="display_name"
-                      value={formData.display_name || ""}
-                      onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                      placeholder="Your display name"
-                    />
-                  ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.display_name || "Not set"}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  {editing ? (
-                    <Input
-                      id="phone"
-                      value={formData.phone || ""}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Your phone number"
-                    />
-                  ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.phone || "Not set"}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                {editing ? (
-                  <Textarea
-                    id="bio"
-                    value={formData.bio || ""}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    placeholder="Tell us about yourself..."
-                    rows={3}
-                  />
-                ) : (
-                  <p className="py-2 px-3 border rounded-md bg-muted/50 min-h-[80px]">
-                    {profile.bio || "No bio added yet"}
-                  </p>
-                )}
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="job_title">Job Title</Label>
-                  {editing ? (
-                    <Input
-                      id="job_title"
-                      value={formData.job_title || ""}
-                      onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
-                      placeholder="Your job title"
-                    />
-                  ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.job_title || "Not set"}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="organization">Organization</Label>
-                  {editing ? (
-                    <Input
-                      id="organization"
-                      value={formData.organization || ""}
-                      onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                      placeholder="Your organization"
-                    />
-                  ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.organization || "Not set"}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  {editing ? (
-                    <Input
-                      id="location"
-                      value={formData.location || ""}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      placeholder="Your location"
-                    />
-                  ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.location || "Not set"}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  {editing ? (
-                    <Input
-                      id="website"
-                      value={formData.website || ""}
-                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                      placeholder="https://yourwebsite.com"
-                    />
-                  ) : (
-                    <p className="py-2 px-3 border rounded-md bg-muted/50">{profile.website || "Not set"}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="research_interests">Research Interests</Label>
-                <p className="text-sm text-muted-foreground">Separate multiple interests with commas</p>
-                {editing ? (
+            <CardContent className="space-y-4">
+              {editing && (
+                <div className="flex gap-2">
                   <Input
-                    id="research_interests"
-                    value={formData.research_interests?.join(", ") || ""}
-                    onChange={(e) => handleResearchInterestsChange(e.target.value)}
-                    placeholder="AI, Machine Learning, Data Science, etc."
+                    value={newInterest}
+                    onChange={(e) => setNewInterest(e.target.value)}
+                    placeholder="Add a research interest"
+                    onKeyPress={(e) => e.key === "Enter" && addResearchInterest()}
                   />
+                  <Button onClick={addResearchInterest} variant="outline">
+                    Add
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {profile.research_interests.length > 0 ? (
+                  profile.research_interests.map((interest, index) => (
+                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                      {interest}
+                      {editing && (
+                        <button
+                          onClick={() => removeResearchInterest(interest)}
+                          className="ml-1 text-xs hover:text-red-600"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </Badge>
+                  ))
                 ) : (
-                  <p className="py-2 px-3 border rounded-md bg-muted/50">
-                    {profile.research_interests?.join(", ") || "None specified"}
+                  <p className="text-sm text-muted-foreground">
+                    {editing ? "Add your research interests above" : "No research interests added yet"}
                   </p>
                 )}
               </div>
