@@ -20,6 +20,7 @@ import {
   Shield,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/integrations/supabase/client"
 
 interface ApiKey {
   id: string
@@ -50,7 +51,7 @@ const AI_PROVIDERS = [
     description: "Ultra-fast inference for LLaMA, Mixtral, and more",
     docsUrl: "https://console.groq.com/keys",
     placeholder: "gsk_...",
-    keyFormat: 'Starts with "gsk_" followed by 52 characters',
+    keyFormat: 'Starts with "gsk_" followed by 50+ characters',
   },
   {
     id: "gemini",
@@ -58,7 +59,7 @@ const AI_PROVIDERS = [
     description: "Google's most capable AI model",
     docsUrl: "https://aistudio.google.com/app/apikey",
     placeholder: "AIza...",
-    keyFormat: "39 characters, alphanumeric with dashes/underscores",
+    keyFormat: "35+ characters, alphanumeric with dashes/underscores",
   },
   {
     id: "aiml",
@@ -93,10 +94,25 @@ export function ApiKeyManager() {
 
   const loadApiKeys = async () => {
     try {
-      const response = await fetch("/api/user-api-keys")
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      if (!token) {
+        console.error("No authentication token available")
+        return
+      }
+
+      const response = await fetch("/api/user-api-keys", {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setApiKeys(data.apiKeys || [])
+      } else {
+        console.error("Failed to load API keys:", await response.text())
       }
     } catch (error) {
       console.error("Error loading API keys:", error)
@@ -123,9 +139,25 @@ export function ApiKeyManager() {
     setActionState((prev) => ({ ...prev, [provider]: true }))
 
     try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      if (!token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to save API keys",
+          variant: "destructive",
+        })
+        return
+      }
+
       const response = await fetch("/api/user-api-keys", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ provider, apiKey, testKey }),
       })
 
@@ -165,8 +197,24 @@ export function ApiKeyManager() {
     }
 
     try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      if (!token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to delete API keys",
+          variant: "destructive",
+        })
+        return
+      }
+
       const response = await fetch(`/api/user-api-keys?provider=${provider}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       })
 
       const data = await response.json()

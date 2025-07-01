@@ -1,8 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/integrations/supabase/client'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { enhancedAIService } from '@/lib/enhanced-ai-service'
+
+// Get auth token from request headers or cookies
+async function getAuthUser(request: NextRequest) {
+  if (!supabaseAdmin) {
+    throw new Error('Supabase admin client not configured')
+  }
+
+  // Try to get token from Authorization header first
+  let authToken = request.headers.get('Authorization')?.replace('Bearer ', '')
+  
+  // If not in header, try to get from cookies
+  if (!authToken) {
+    const cookieHeader = request.headers.get('cookie')
+    if (cookieHeader) {
+      // Parse common Supabase cookie names
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=')
+        acc[key] = value
+        return acc
+      }, {} as Record<string, string>)
+      
+      authToken = cookies['sb-access-token'] || 
+                  cookies['supabase-auth-token'] || 
+                  cookies['sb-auth-token']
+    }
+  }
+
+  if (!authToken) {
+    throw new Error('No authentication token found')
+  }
+
+  // Verify token with admin client
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(authToken)
+  
+  if (error || !user) {
+    throw new Error('Invalid authentication token')
+  }
+
+  return user
+}
+
+// Create Supabase admin client for server-side operations
+const createSupabaseAdmin = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.warn('Supabase admin client not configured')
+    return null
+  }
+  
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+const supabaseAdmin = createSupabaseAdmin()
 
 // Simple encryption/decryption for API keys (in production, use a proper key management service)
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
@@ -30,8 +89,8 @@ function decrypt(text: string): string {
 function validateApiKey(provider: string, apiKey: string): boolean {
   const patterns = {
     openai: /^sk-[a-zA-Z0-9]{48,}$/,
-    groq: /^gsk_[a-zA-Z0-9]{52}$/,
-    gemini: /^[a-zA-Z0-9_-]{39}$/,
+    groq: /^gsk_[a-zA-Z0-9]{50,}$/,
+    gemini: /^[a-zA-Z0-9_-]{35,}$/,
     aiml: /^[a-zA-Z0-9_-]{32,}$/,
     deepinfra: /^[a-zA-Z0-9_-]{20,}$/,
   }
@@ -40,18 +99,22 @@ function validateApiKey(provider: string, apiKey: string): boolean {
   return pattern ? pattern.test(apiKey) : apiKey.length > 10
 }
 
-
-
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    }
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user
+    let user
+    try {
+      user = await getAuthUser(request)
+    } catch (authError) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     // Get user's API keys (without decrypting for list view)
-    const { data: apiKeys, error } = await supabase
+    const { data: apiKeys, error } = await supabaseAdmin
       .from('user_api_keys')
       .select('id, provider, is_active, last_tested_at, test_status, created_at, updated_at')
       .eq('user_id', user.id)
@@ -71,10 +134,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    }
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user
+    let user
+    try {
+      user = await getAuthUser(request)
+    } catch (authError) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { provider, apiKey, testKey } = await request.json()
@@ -123,7 +192,7 @@ export async function POST(request: NextRequest) {
     const encryptedKey = encrypt(apiKey)
 
     // Insert or update the API key
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await supabaseAdmin
       .from('user_api_keys')
       .upsert({
         user_id: user.id,
@@ -154,10 +223,16 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    }
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user
+    let user
+    try {
+      user = await getAuthUser(request)
+    } catch (authError) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -167,7 +242,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Provider is required' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('user_api_keys')
       .delete()
       .eq('user_id', user.id)
