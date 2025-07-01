@@ -25,6 +25,8 @@ import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { useToast } from "@/hooks/use-toast"
 import { FileUploader } from "./components/FileUploader"
 import { RouteGuard } from "@/components/route-guard"
+import type { AIProvider } from "@/lib/ai-providers"
+import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
 
 interface SummaryResult {
   summary: string
@@ -50,6 +52,9 @@ export default function Summarizer() {
   const [copied, setCopied] = useState(false)
   const [urlFetching, setUrlFetching] = useState(false)
   const { toast } = useToast()
+
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
 
   const handleFileProcessed = (content: string, metadata: any) => {
     setContent(content)
@@ -141,10 +146,15 @@ export default function Summarizer() {
 
     try {
       // Enhanced summary generation with additional features
-      const summaryResult = await enhancedAIService.summarizeContent(content, {
-        style: summaryStyle,
-        length: summaryLength,
-      })
+      const summaryResult = await enhancedAIService.summarizeContent(
+        content,
+        {
+          style: summaryStyle,
+          length: summaryLength,
+        },
+        selectedProvider,
+        selectedModel,
+      )
 
       const originalLength = content.length
       const summaryTextLength = summaryResult.summary.length
@@ -395,368 +405,331 @@ export default function Summarizer() {
   return (
     <RouteGuard requireAuth={true}>
       <div className="min-h-screen bg-white">
-      <div className="container mx-auto p-8 space-y-8">
-        {/* Header */}
-        <div className="border-b border-gray-200 pb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-black rounded-xl">
-                <FileText className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-light text-black tracking-tight">AI Summarizer</h1>
-                <p className="text-gray-600 mt-2 text-lg">
-                  Transform lengthy content into concise, intelligent summaries
-                </p>
-              </div>
-            </div>
-            {(content || result) && (
-              <Button
-                onClick={clearContent}
-                variant="outline"
-                className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-              >
-                Clear All
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Input Section */}
-          <div className="lg:col-span-2 space-y-8">
-            <Card className="border-gray-200 shadow-sm bg-white">
-              <CardHeader className="border-b border-gray-100 pb-6">
-                <CardTitle className="text-black font-medium text-xl">Content Input</CardTitle>
-                <CardDescription className="text-gray-600 text-base">
-                  Provide content through text input, file upload, or URL extraction
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-8">
-                <Tabs defaultValue="text" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-xl h-12">
-                    <TabsTrigger
-                      value="text"
-                      className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
-                    >
-                      Text Input
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="file"
-                      className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
-                    >
-                      File Upload
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="url"
-                      className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
-                    >
-                      From URL
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="text" className="space-y-6 mt-8">
-                    <Textarea
-                      placeholder="Paste your content here for intelligent summarization..."
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      rows={14}
-                      className="resize-none border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400"
-                    />
-                    <div className="flex justify-between text-sm border-t border-gray-100 pt-4">
-                      <span className="text-gray-500 font-medium">{getWordCount(content)} words</span>
-                      <span className="text-gray-500 font-medium">{content.length} characters</span>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="file" className="space-y-6 mt-8">
-                    <FileUploader onFileProcessed={handleFileProcessed} onError={handleFileError} />
-                  </TabsContent>
-
-                  <TabsContent value="url" className="space-y-6 mt-8">
-                    <div className="flex gap-3">
-                      <Input
-                        placeholder="https://example.com/article"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && !urlFetching && handleUrlFetch()}
-                        className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-12"
-                      />
-                      <Button
-                        onClick={handleUrlFetch}
-                        disabled={urlFetching || !url.trim()}
-                        variant="outline"
-                        className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 px-6 bg-transparent h-12"
-                      >
-                        {urlFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      Enter a URL to automatically extract and summarize its content
-                    </p>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-
-            {/* Configuration */}
-            <Card className="border-gray-200 shadow-sm bg-white">
-              <CardHeader className="border-b border-gray-100 pb-6">
-                <CardTitle className="text-black font-medium text-xl">Summary Configuration</CardTitle>
-                <CardDescription className="text-gray-600 text-base">
-                  Customize the style and length of your summary
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-8 md:grid-cols-2 p-8">
-                <div>
-                  <label className="text-sm font-medium mb-3 block text-gray-700">Summary Style</label>
-                  <Select value={summaryStyle} onValueChange={(value: any) => setSummaryStyle(value)}>
-                    <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-12">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200">
-                      <SelectItem value="academic" className="hover:bg-gray-50">
-                        Academic - Formal and structured
-                      </SelectItem>
-                      <SelectItem value="executive" className="hover:bg-gray-50">
-                        Executive - Business-focused
-                      </SelectItem>
-                      <SelectItem value="bullet-points" className="hover:bg-gray-50">
-                        Bullet Points - Easy to scan
-                      </SelectItem>
-                      <SelectItem value="detailed" className="hover:bg-gray-50">
-                        Detailed - Comprehensive analysis
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+        <div className="container mx-auto p-8 space-y-8">
+          {/* Header */}
+          <div className="border-b border-gray-200 pb-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-black rounded-xl">
+                  <FileText className="h-7 w-7 text-white" />
                 </div>
-
                 <div>
-                  <label className="text-sm font-medium mb-3 block text-gray-700">Summary Length</label>
-                  <Select value={summaryLength} onValueChange={(value: any) => setSummaryLength(value)}>
-                    <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-12">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200">
-                      <SelectItem value="brief" className="hover:bg-gray-50">
-                        Brief - Quick overview
-                      </SelectItem>
-                      <SelectItem value="medium" className="hover:bg-gray-50">
-                        Medium - Balanced detail
-                      </SelectItem>
-                      <SelectItem value="comprehensive" className="hover:bg-gray-50">
-                        Comprehensive - Full analysis
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <h1 className="text-4xl font-light text-black tracking-tight">AI Summarizer</h1>
+                  <p className="text-gray-600 mt-2 text-lg">
+                    Transform lengthy content into concise, intelligent summaries
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            {error && (
-              <Alert variant="destructive" className="border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-700">{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button
-              onClick={generateSummary}
-              disabled={loading || !content.trim()}
-              className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 h-auto transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                  Generating Summary...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-5 w-5 mr-3" />
-                  Generate Summary
-                </>
+              </div>
+              {(content || result) && (
+                <Button
+                  onClick={clearContent}
+                  variant="outline"
+                  className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                >
+                  Clear All
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
 
-          {/* Results Section */}
-          <div className="space-y-8">
-            {result && (
-              <>
-                {/* Summary Stats */}
-                <Card className="border-gray-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-gray-100 pb-6">
-                    <CardTitle className="text-lg text-black font-medium">Summary Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6 p-8">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Reading Time</span>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm font-medium text-black">{result.readingTime} min</span>
+          <CompactAIProviderSelector
+            selectedProvider={selectedProvider}
+            onProviderChange={(provider) => setSelectedProvider(provider)}
+            selectedModel={selectedModel}
+            onModelChange={(model) => setSelectedModel(model)}
+          />
+
+          <div className="grid gap-8 lg:grid-cols-3">
+            {/* Input Section */}
+            <div className="lg:col-span-2 space-y-8">
+              <Card className="border-gray-200 shadow-sm bg-white">
+                <CardHeader className="border-b border-gray-100 pb-6">
+                  <CardTitle className="text-black font-medium text-xl">Content Input</CardTitle>
+                  <CardDescription className="text-gray-600 text-base">
+                    Provide content through text input, file upload, or URL extraction
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-8">
+                  <Tabs defaultValue="text" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-xl h-12">
+                      <TabsTrigger
+                        value="text"
+                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                      >
+                        Text Input
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="file"
+                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                      >
+                        File Upload
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="url"
+                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                      >
+                        From URL
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="text" className="space-y-6 mt-8">
+                      <Textarea
+                        placeholder="Paste your content here for intelligent summarization..."
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        rows={14}
+                        className="resize-none border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400"
+                      />
+                      <div className="flex justify-between text-sm border-t border-gray-100 pt-4">
+                        <span className="text-gray-500 font-medium">{getWordCount(content)} words</span>
+                        <span className="text-gray-500 font-medium">{content.length} characters</span>
                       </div>
-                    </div>
+                    </TabsContent>
 
-                    <div className="flex justify-between items-center border-t border-gray-100 pt-6">
-                      <span className="text-sm text-gray-600">Compression</span>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm font-medium text-black">{result.compressionRatio}</span>
+                    <TabsContent value="file" className="space-y-6 mt-8">
+                      <FileUploader onFileProcessed={handleFileProcessed} onError={handleFileError} />
+                    </TabsContent>
+
+                    <TabsContent value="url" className="space-y-6 mt-8">
+                      <div className="flex gap-3">
+                        <Input
+                          placeholder="https://example.com/article"
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && !urlFetching && handleUrlFetch()}
+                          className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-12"
+                        />
+                        <Button
+                          onClick={handleUrlFetch}
+                          disabled={urlFetching || !url.trim()}
+                          variant="outline"
+                          className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 px-6 bg-transparent h-12"
+                        >
+                          {urlFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link className="h-4 w-4" />}
+                        </Button>
                       </div>
-                    </div>
+                      <p className="text-sm text-gray-500">
+                        Enter a URL to automatically extract and summarize its content
+                      </p>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
 
-                    <div className="flex justify-between items-center border-t border-gray-100 pt-6">
-                      <span className="text-sm text-gray-600">Word Count</span>
-                      <span className="text-sm font-medium text-black">{getWordCount(result.summary)} words</span>
-                    </div>
+              {/* Configuration */}
+              <Card className="border-gray-200 shadow-sm bg-white">
+                <CardHeader className="border-b border-gray-100 pb-6">
+                  <CardTitle className="text-black font-medium text-xl">Summary Configuration</CardTitle>
+                  <CardDescription className="text-gray-600 text-base">
+                    Customize the style and length of your summary
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-8 md:grid-cols-2 p-8">
+                  <div>
+                    <label className="text-sm font-medium mb-3 block text-gray-700">Summary Style</label>
+                    <Select value={summaryStyle} onValueChange={(value: any) => setSummaryStyle(value)}>
+                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-gray-200">
+                        <SelectItem value="academic" className="hover:bg-gray-50">
+                          Academic - Formal and structured
+                        </SelectItem>
+                        <SelectItem value="executive" className="hover:bg-gray-50">
+                          Executive - Business-focused
+                        </SelectItem>
+                        <SelectItem value="bullet-points" className="hover:bg-gray-50">
+                          Bullet Points - Easy to scan
+                        </SelectItem>
+                        <SelectItem value="detailed" className="hover:bg-gray-50">
+                          Detailed - Comprehensive analysis
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    {result.sentiment && (
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-6">
-                        <span className="text-sm text-gray-600">Sentiment</span>
-                        <Badge className={getSentimentColor(result.sentiment)}>{result.sentiment}</Badge>
-                      </div>
-                    )}
+                  <div>
+                    <label className="text-sm font-medium mb-3 block text-gray-700">Summary Length</label>
+                    <Select value={summaryLength} onValueChange={(value: any) => setSummaryLength(value)}>
+                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-gray-200">
+                        <SelectItem value="brief" className="hover:bg-gray-50">
+                          Brief - Quick overview
+                        </SelectItem>
+                        <SelectItem value="medium" className="hover:bg-gray-50">
+                          Medium - Balanced detail
+                        </SelectItem>
+                        <SelectItem value="comprehensive" className="hover:bg-gray-50">
+                          Comprehensive - Full analysis
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
 
-                    {result.difficulty && (
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-6">
-                        <span className="text-sm text-gray-600">Difficulty</span>
-                        <Badge className={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+              {error && (
+                <Alert variant="destructive" className="border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-700">{error}</AlertDescription>
+                </Alert>
+              )}
 
-                {/* Topics */}
-                {result.topics && result.topics.length > 0 && (
+              <Button
+                onClick={generateSummary}
+                disabled={loading || !content.trim()}
+                className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 h-auto transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                    Generating Summary...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-5 w-5 mr-3" />
+                    Generate Summary
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Results Section */}
+            <div className="space-y-8">
+              {result && (
+                <>
+                  {/* Summary Stats */}
                   <Card className="border-gray-200 shadow-sm bg-white">
                     <CardHeader className="border-b border-gray-100 pb-6">
-                      <CardTitle className="text-lg text-black font-medium">Key Topics</CardTitle>
+                      <CardTitle className="text-lg text-black font-medium">Summary Statistics</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6 p-8">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Reading Time</span>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm font-medium text-black">{result.readingTime} min</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                        <span className="text-sm text-gray-600">Compression</span>
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm font-medium text-black">{result.compressionRatio}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                        <span className="text-sm text-gray-600">Word Count</span>
+                        <span className="text-sm font-medium text-black">{getWordCount(result.summary)} words</span>
+                      </div>
+
+                      {result.sentiment && (
+                        <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                          <span className="text-sm text-gray-600">Sentiment</span>
+                          <Badge className={getSentimentColor(result.sentiment)}>{result.sentiment}</Badge>
+                        </div>
+                      )}
+
+                      {result.difficulty && (
+                        <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                          <span className="text-sm text-gray-600">Difficulty</span>
+                          <Badge className={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Topics */}
+                  {result.topics && result.topics.length > 0 && (
+                    <Card className="border-gray-200 shadow-sm bg-white">
+                      <CardHeader className="border-b border-gray-100 pb-6">
+                        <CardTitle className="text-lg text-black font-medium">Key Topics</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-8">
+                        <div className="flex flex-wrap gap-2">
+                          {result.topics.map((topic, index) => (
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="bg-gray-100 text-gray-800 border border-gray-300"
+                            >
+                              {topic}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Key Points */}
+                  <Card className="border-gray-200 shadow-sm bg-white">
+                    <CardHeader className="border-b border-gray-100 pb-6">
+                      <CardTitle className="text-lg text-black font-medium">Key Points</CardTitle>
                     </CardHeader>
                     <CardContent className="p-8">
-                      <div className="flex flex-wrap gap-2">
-                        {result.topics.map((topic, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="bg-gray-100 text-gray-800 border border-gray-300"
+                      <ul className="space-y-4">
+                        {result.keyPoints.map((point, index) => (
+                          <li key={index} className="flex items-start gap-4">
+                            <div className="w-2 h-2 bg-black rounde-full mt-2 flex-shrink-0"></div>
+                            <span className="text-sm text-gray-800 leading-relaxed">{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  {/* Summary */}
+                  <Card className="border-gray-200 shadow-sm bg-white">
+                    <CardHeader className="border-b border-gray-100 pb-6">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg text-black font-medium">Generated Summary</CardTitle>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyToClipboard(result.summary)}
+                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
                           >
-                            {topic}
-                          </Badge>
+                            {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={downloadSummary}
+                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={shareSummary}
+                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                      <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+                        {result.summary.split("\n").map((paragraph, index) => (
+                          <p key={index} className="mb-4 last:mb-0">
+                            {paragraph}
+                          </p>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
-                )}
-
-                {/* Key Points */}
-                <Card className="border-gray-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-gray-100 pb-6">
-                    <CardTitle className="text-lg text-black font-medium">Key Points</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-8">
-                    <ul className="space-y-4">
-                      {result.keyPoints.map((point, index) => (
-                        <li key={index} className="flex items-start gap-4">
-                          <div className="w-2 h-2 bg-black rounded-full mt-2 shrink-0" />
-                          <span className="text-sm leading-relaxed text-gray-700">{point}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Summary Output */}
-        {result && (
-          <Card className="border-gray-200 shadow-sm bg-white">
-            <CardHeader className="border-b border-gray-100 pb-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-black font-medium text-xl">Generated Summary</CardTitle>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyToClipboard(result.summary)}
-                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700"
-                  >
-                    {copied ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={downloadSummary}
-                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={shareSummary}
-                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="bg-gray-50 border border-gray-200 p-8 rounded-xl">
-                <p className="whitespace-pre-wrap leading-relaxed text-gray-800 text-base">{result.summary}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Help Section */}
-        {!content && !result && (
-          <Card className="border-gray-200 shadow-sm bg-white">
-            <CardHeader className="border-b border-gray-100 pb-6">
-              <CardTitle className="text-black font-medium text-xl">How to Use the AI Summarizer</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="grid gap-6 md:grid-cols-3">
-                <div className="text-center">
-                  <div className="p-3 bg-gray-100 rounded-xl w-fit mx-auto mb-4">
-                    <FileText className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 mb-2">1. Add Content</h3>
-                  <p className="text-sm text-gray-600">Paste text, upload a file, or fetch content from a URL</p>
-                </div>
-                <div className="text-center">
-                  <div className="p-3 bg-gray-100 rounded-xl w-fit mx-auto mb-4">
-                    <TrendingUp className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 mb-2">2. Configure</h3>
-                  <p className="text-sm text-gray-600">Choose your preferred summary style and length</p>
-                </div>
-                <div className="text-center">
-                  <div className="p-3 bg-gray-100 rounded-xl w-fit mx-auto mb-4">
-                    <CheckCircle className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <h3 className="font-medium text-gray-900 mb-2">3. Generate</h3>
-                  <p className="text-sm text-gray-600">Get your AI-powered summary with key insights</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
       </div>
     </RouteGuard>
   )
