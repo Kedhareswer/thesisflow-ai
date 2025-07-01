@@ -318,4 +318,4 @@ export function PDFViewer({ paper, className }: PDFViewerProps) {
       </Card>
     </div>
   )
-} 
+}

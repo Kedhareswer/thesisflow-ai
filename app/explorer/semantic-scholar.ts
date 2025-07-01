@@ -209,4 +209,4 @@ function determineVenueType(paper: SemanticScholarPaper): 'journal' | 'conferenc
   }
   
   return 'other'
-} 
+}

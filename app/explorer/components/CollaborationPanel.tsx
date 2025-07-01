@@ -356,4 +356,4 @@ export function CollaborationPanel({ papers, className }: CollaborationPanelProp
       </Card>
     </div>
   )
-} 
+}

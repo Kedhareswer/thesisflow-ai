@@ -17,7 +17,6 @@ import { EnhancedSearchService } from "../enhanced-search"
 import { CitationExportService } from "@/lib/services/citation-export.service"
 import type { ResearchPaper, SearchFilters } from "@/lib/types/common"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface EnhancedLiteratureSearchProps {
   className?: string
@@ -30,8 +29,8 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
   const [filters, setFilters] = useState<SearchFilters>({
     publication_year_min: 2010,
     publication_year_max: new Date().getFullYear(),
-    sort_by: 'relevance',
-    sort_order: 'desc'
+    sort_by: "relevance",
+    sort_order: "desc",
   })
 
   const paperSearch = useAsync<any>(EnhancedSearchService.searchPapers)
@@ -44,7 +43,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       await paperSearch.execute(query, filters, 20)
       toast({
         title: "Search Complete",
-        description: `Found papers from ${paperSearch.data?.sources?.join(', ') || 'academic databases'} in ${paperSearch.data?.search_time || 0}ms`,
+        description: `Found papers from ${paperSearch.data?.sources?.join(", ") || "academic databases"} in ${paperSearch.data?.search_time || 0}ms`,
       })
     } catch (error) {
       toast({
@@ -56,7 +55,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
   }
 
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
+    setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   const handlePaperSelect = (paperId: string, selected: boolean) => {
@@ -73,13 +72,13 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
     if (selectedPapers.size === papers.length) {
       setSelectedPapers(new Set())
     } else {
-      setSelectedPapers(new Set(papers.map(p => p.id)))
+      setSelectedPapers(new Set(papers.map((p) => p.id)))
     }
   }
 
-  const handleExport = async (format: 'bibtex' | 'apa' | 'mla' | 'chicago' | 'harvard' | 'json' | 'csv') => {
-    const papersToExport = papers.filter(p => selectedPapers.has(p.id))
-    
+  const handleExport = async (format: "bibtex" | "apa" | "mla" | "chicago" | "harvard" | "json" | "csv") => {
+    const papersToExport = papers.filter((p) => selectedPapers.has(p.id))
+
     if (papersToExport.length === 0) {
       toast({
         title: "No Papers Selected",
@@ -91,11 +90,11 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
 
     try {
       const content = await CitationExportService.exportPapers(papersToExport, format)
-      const timestamp = new Date().toISOString().split('T')[0]
-      const filename = `research_papers_${timestamp}.${format === 'bibtex' ? 'bib' : format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'txt'}`
-      
+      const timestamp = new Date().toISOString().split("T")[0]
+      const filename = `research_papers_${timestamp}.${format === "bibtex" ? "bib" : format === "json" ? "json" : format === "csv" ? "csv" : "txt"}`
+
       CitationExportService.downloadFile(content, filename, format)
-      
+
       toast({
         title: "Export Complete",
         description: `Exported ${papersToExport.length} papers in ${format.toUpperCase()} format.`,
@@ -122,9 +121,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
             <BookOpen className="h-5 w-5" />
             Enhanced Literature Search
           </CardTitle>
-          <CardDescription>
-            Advanced search with citation data, filtering, and export capabilities
-          </CardDescription>
+          <CardDescription>Advanced search with citation data, filtering, and export capabilities</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <SearchInput
@@ -136,25 +133,17 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
           />
 
           <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
               <Filter className="h-4 w-4 mr-2" />
               Filters
             </Button>
-            
+
             {papers.length > 0 && (
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectAll}
-                >
-                  {selectedPapers.size === papers.length ? 'Deselect All' : 'Select All'}
+                <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                  {selectedPapers.size === papers.length ? "Deselect All" : "Select All"}
                 </Button>
-                
+
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm" disabled={selectedPapers.size === 0}>
@@ -167,25 +156,25 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                       <DialogTitle>Export Selected Papers</DialogTitle>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-2 mt-4">
-                      <Button onClick={() => handleExport('bibtex')} variant="outline">
+                      <Button onClick={() => handleExport("bibtex")} variant="outline">
                         BibTeX (.bib)
                       </Button>
-                      <Button onClick={() => handleExport('apa')} variant="outline">
+                      <Button onClick={() => handleExport("apa")} variant="outline">
                         APA Style
                       </Button>
-                      <Button onClick={() => handleExport('mla')} variant="outline">
+                      <Button onClick={() => handleExport("mla")} variant="outline">
                         MLA Style
                       </Button>
-                      <Button onClick={() => handleExport('chicago')} variant="outline">
+                      <Button onClick={() => handleExport("chicago")} variant="outline">
                         Chicago Style
                       </Button>
-                      <Button onClick={() => handleExport('harvard')} variant="outline">
+                      <Button onClick={() => handleExport("harvard")} variant="outline">
                         Harvard Style
                       </Button>
-                      <Button onClick={() => handleExport('json')} variant="outline">
+                      <Button onClick={() => handleExport("json")} variant="outline">
                         JSON Data
                       </Button>
-                      <Button onClick={() => handleExport('csv')} variant="outline">
+                      <Button onClick={() => handleExport("csv")} variant="outline">
                         CSV Spreadsheet
                       </Button>
                     </div>
@@ -202,10 +191,13 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                   <Label>Publication Year Range</Label>
                   <div className="px-2">
                     <Slider
-                      value={[filters.publication_year_min || 2010, filters.publication_year_max || new Date().getFullYear()]}
+                      value={[
+                        filters.publication_year_min || 2010,
+                        filters.publication_year_max || new Date().getFullYear(),
+                      ]}
                       onValueChange={([min, max]) => {
-                        handleFilterChange('publication_year_min', min)
-                        handleFilterChange('publication_year_max', max)
+                        handleFilterChange("publication_year_min", min)
+                        handleFilterChange("publication_year_max", max)
                       }}
                       min={1990}
                       max={new Date().getFullYear()}
@@ -222,15 +214,15 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                 <div className="space-y-2">
                   <Label>Venue Type</Label>
                   <Select
-                    value={filters.venue_type?.[0] || ''}
-                    onValueChange={(value) => handleFilterChange('venue_type', value ? [value] : [])}
+                    value={filters.venue_type?.[0] ?? "all"}
+                    onValueChange={(value) => handleFilterChange("venue_type", value === "all" ? [] : [value])}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Any venue type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Types</SelectItem>
-                      {filterOptions.venue_types.map(option => (
+                      <SelectItem value="all">All Types</SelectItem>
+                      {filterOptions.venue_types.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -242,14 +234,14 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                 <div className="space-y-2">
                   <Label>Sort By</Label>
                   <Select
-                    value={filters.sort_by || 'relevance'}
-                    onValueChange={(value) => handleFilterChange('sort_by', value)}
+                    value={filters.sort_by || "relevance"}
+                    onValueChange={(value) => handleFilterChange("sort_by", value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {filterOptions.sort_options.map(option => (
+                      {filterOptions.sort_options.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -262,7 +254,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                   <Label>Minimum Citations</Label>
                   <Slider
                     value={[filters.min_citations || 0]}
-                    onValueChange={([value]) => handleFilterChange('min_citations', value)}
+                    onValueChange={([value]) => handleFilterChange("min_citations", value)}
                     min={0}
                     max={1000}
                     step={10}
@@ -275,7 +267,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                   <Checkbox
                     id="open-access"
                     checked={filters.open_access || false}
-                    onCheckedChange={(checked) => handleFilterChange('open_access', checked)}
+                    onCheckedChange={(checked) => handleFilterChange("open_access", checked)}
                   />
                   <Label htmlFor="open-access">Open Access Only</Label>
                 </div>
@@ -291,7 +283,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
         <div className="space-y-4">
           <div className="flex justify-between items-center text-sm text-gray-600">
             <span>
-              Found {totalPapers} papers from {sources.join(', ')} ({searchTime}ms)
+              Found {totalPapers} papers from {sources.join(", ")} ({searchTime}ms)
             </span>
           </div>
 
@@ -305,9 +297,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                     className="mt-1"
                   />
                   <div className="flex-1">
-                    <CardTitle className="text-lg leading-tight mb-2">
-                      {paper.title}
-                    </CardTitle>
+                    <CardTitle className="text-lg leading-tight mb-2">{paper.title}</CardTitle>
                     <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                       {paper.authors && paper.authors.length > 0 && (
                         <div className="flex items-center gap-1">
@@ -351,7 +341,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="pt-0">
                 {paper.tldr && (
                   <div className="bg-blue-50 p-3 rounded-md mb-3">
@@ -359,13 +349,9 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
                     <p className="text-sm text-blue-700">{paper.tldr}</p>
                   </div>
                 )}
-                
-                {paper.abstract && (
-                  <p className="text-sm text-gray-700 mb-4 line-clamp-3">
-                    {paper.abstract}
-                  </p>
-                )}
-                
+
+                {paper.abstract && <p className="text-sm text-gray-700 mb-4 line-clamp-3">{paper.abstract}</p>}
+
                 <div className="flex gap-2 flex-wrap">
                   {paper.url && (
                     <Button variant="outline" size="sm" asChild>
@@ -407,4 +393,4 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       )}
     </div>
   )
-} 
+}

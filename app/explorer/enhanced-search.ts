@@ -241,4 +241,4 @@ export class EnhancedSearchService {
       ]
     }
   }
-} 
+}

@@ -282,4 +282,4 @@ export class CitationExportService {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
   }
-} 
+}

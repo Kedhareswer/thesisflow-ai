@@ -154,17 +154,17 @@ This document outlines the comprehensive enhancements made to the research paper
 ## 🔧 Technical Architecture
 
 ### Service Layer
-```
+\`\`\`
 EnhancedSearchService
 ├── OpenAlex Integration (fetchOpenAlexWorks)
 ├── Semantic Scholar Integration (searchSemanticScholar)
 ├── Citation Enhancement (enhancePapersWithCitations)
 ├── Filtering & Sorting (applyFilters, sortPapers)
 └── Export Services (CitationExportService)
-```
+\`\`\`
 
 ### Component Hierarchy
-```
+\`\`\`
 ResearchExplorer (Main Page)
 ├── EnhancedLiteratureSearch
 │   ├── Advanced Filters
@@ -178,7 +178,7 @@ ResearchExplorer (Main Page)
 └── CollaborationPanel
     ├── Collection Management
     └── Sharing Controls
-```
+\`\`\`
 
 ## 📈 Performance Metrics
 
@@ -196,7 +196,7 @@ ResearchExplorer (Main Page)
 ## 🛠 Usage Examples
 
 ### Advanced Search with Filters
-```typescript
+\`\`\`typescript
 const filters: SearchFilters = {
   publication_year_min: 2020,
   publication_year_max: 2024,
@@ -207,23 +207,23 @@ const filters: SearchFilters = {
 }
 
 const results = await EnhancedSearchService.searchPapers("machine learning", filters, 20)
-```
+\`\`\`
 
 ### Citation Export
-```typescript
+\`\`\`typescript
 const selectedPapers = papers.filter(p => selectedIds.has(p.id))
 const bibtex = await CitationExportService.exportPapers(selectedPapers, 'bibtex')
 CitationExportService.downloadFile(bibtex, 'research_papers.bib', 'bibtex')
-```
+\`\`\`
 
 ### PDF Annotation
-```typescript
+\`\`\`typescript
 const annotation: PaperAnnotation = {
   type: 'highlight',
   content: 'Important finding about neural networks',
   position: { start: 150, end: 200 }
 }
-```
+\`\`\`
 
 ## 🔮 Future Enhancements
 
@@ -242,7 +242,7 @@ const annotation: PaperAnnotation = {
 
 ## 📚 Dependencies Added
 
-```json
+\`\`\`json
 {
   "new-dependencies": [
     "@semantic-scholar/api",
@@ -251,7 +251,7 @@ const annotation: PaperAnnotation = {
     "react-pdf"
   ]
 }
-```
+\`\`\`
 
 ## 🎯 Impact Summary
 
@@ -281,4 +281,4 @@ const annotation: PaperAnnotation = {
 4. **Annotate PDFs**: Use the PDF viewer for note-taking
 5. **Collaborate**: Share collections with team members
 
-The enhanced research functionality is now live and ready to significantly improve your academic research workflow! 
+The enhanced research functionality is now live and ready to significantly improve your academic research workflow!
