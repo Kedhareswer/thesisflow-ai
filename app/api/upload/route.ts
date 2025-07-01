@@ -3,16 +3,25 @@ import { supabase } from '@/integrations/supabase/client'
 import { createClient } from '@supabase/supabase-js'
 
 // Create Supabase client with service key for file operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // Service role key for admin operations
-  {
+// Handle missing environment variables during build
+const createSupabaseAdmin = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.warn('Supabase environment variables not configured')
+    return null
+  }
+  
+  return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     }
-  }
-)
+  })
+}
+
+const supabaseAdmin = createSupabaseAdmin()
 
 // Allowed file types and their MIME types
 const ALLOWED_FILE_TYPES = {
@@ -45,6 +54,14 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Supabase admin is available
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Service configuration error' },
+        { status: 500 }
+      )
+    }
+    
     // Get user from auth
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
@@ -108,7 +125,7 @@ export async function POST(request: NextRequest) {
     const fileBuffer = new Uint8Array(arrayBuffer)
 
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin!.storage
       .from('documents')
       .upload(storagePath, fileBuffer, {
         contentType: file.type,
@@ -125,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
+    const { data: urlData } = supabaseAdmin!.storage
       .from('documents')
       .getPublicUrl(storagePath)
 
@@ -151,7 +168,7 @@ export async function POST(request: NextRequest) {
       console.error('Database error:', dbError)
       
       // Clean up uploaded file if database insert fails
-      await supabaseAdmin.storage
+      await supabaseAdmin!.storage
         .from('documents')
         .remove([storagePath])
       
@@ -266,6 +283,14 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // Check if Supabase admin is available
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Service configuration error' },
+        { status: 500 }
+      )
+    }
+    
     const { searchParams } = new URL(request.url)
     const documentId = searchParams.get('id')
 
@@ -307,7 +332,7 @@ export async function DELETE(request: NextRequest) {
     const storagePath = pathSegments.slice(pathSegments.indexOf('documents') + 1).join('/')
 
     // Delete from storage
-    const { error: storageError } = await supabaseAdmin.storage
+    const { error: storageError } = await supabaseAdmin!.storage
       .from('documents')
       .remove([storagePath])
 
