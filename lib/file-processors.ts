@@ -1,5 +1,15 @@
 import mammoth from 'mammoth'
 
+// Dynamically import pdf-parse to handle potential build issues
+const getPdfParse = async () => {
+  try {
+    const pdfParse = await import('pdf-parse')
+    return pdfParse.default || pdfParse
+  } catch (error) {
+    throw new Error('PDF parsing library not available. Please install pdf-parse dependency.')
+  }
+}
+
 export interface FileProcessingResult {
   content: string
   metadata: {
@@ -26,7 +36,9 @@ export class FileProcessor {
           break
         
         case 'application/pdf':
-          content = await this.processPDFFile(file)
+          const pdfResult = await this.processPDFFile(file)
+          content = pdfResult.content
+          metadata.pages = pdfResult.pages
           break
         
         case 'application/msword':
@@ -51,9 +63,22 @@ export class FileProcessor {
     return await file.text()
   }
 
-  private static async processPDFFile(file: File): Promise<string> {
-    // For now, return a helpful message - PDF processing requires additional setup
-    return `PDF processing requires additional setup. Please convert to text or use the URL fetch feature for online PDFs. File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`
+  private static async processPDFFile(file: File): Promise<{ content: string; pages: number }> {
+    try {
+      const pdfParse = await getPdfParse()
+      const arrayBuffer = await file.arrayBuffer()
+      const data = await pdfParse(Buffer.from(arrayBuffer))
+      
+      return {
+        content: data.text,
+        pages: data.numpages
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('PDF parsing library not available')) {
+        throw error
+      }
+      throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the PDF is not password protected and contains readable text.`)
+    }
   }
 
   private static async processWordFile(file: File): Promise<string> {
@@ -88,7 +113,7 @@ export class FileProcessor {
   static getTypeDescription(type: string): string {
     const descriptions: Record<string, string> = {
       'text/plain': 'Text File',
-      'application/pdf': 'PDF Document (basic support)',
+      'application/pdf': 'PDF Document',
       'application/msword': 'Word Document (legacy)',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word Document'
     }

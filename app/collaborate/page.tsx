@@ -151,14 +151,48 @@ export default function CollaboratePage() {
           })
         }
       } catch (err) {
-        // Silently handle errors and show demo mode
-        console.log("Database connection not available, using demo mode")
+        // Check if this is a configuration issue vs a policy/permission issue
+        const error = err as any
+        const errorMessage = error?.message || String(err)
         
-        // Always show demo mode if there's any error
-        toast({
-          title: "Demo Mode",
-          description: "Using demo collaboration workspace. Database connection not available.",
-        })
+        // Only go to demo mode for configuration issues, not policy errors
+        const isConfigurationError = errorMessage.includes('Invalid URL') || 
+                                      errorMessage.includes('placeholder') ||
+                                      errorMessage.includes('fetch')
+        
+        const isPolicyError = errorMessage.includes('infinite recursion') ||
+                             errorMessage.includes('policy') ||
+                             errorMessage.includes('permission denied')
+        
+        if (isPolicyError) {
+          // Show specific error for policy issues
+          console.error("Database policy error:", errorMessage)
+          toast({
+            title: "Database Policy Error",
+            description: "Please check database RLS policies. See console for details.",
+            variant: "destructive",
+          })
+          setError("Database policy configuration needs to be updated. Please check the RLS policies.")
+          return
+        }
+        
+        if (isConfigurationError) {
+          console.log("Database connection not available, using demo mode")
+          toast({
+            title: "Demo Mode",
+            description: "Using demo collaboration workspace. Database connection not available.",
+          })
+        } else {
+          // For other errors, show more helpful message
+          console.error("Database error:", errorMessage)
+          toast({
+            title: "Database Error",
+            description: isPolicyError ? "Database policy issue detected" : "Database query failed. Check configuration.",
+            variant: "destructive",
+          })
+          setError(errorMessage)
+          return
+        }
         
         // Create demo teams for demonstration
         const demoTeams: Team[] = [

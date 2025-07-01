@@ -53,6 +53,7 @@
     "@tiptap/starter-kit": "latest",
     "@vercel/analytics": "latest",
     "autoprefixer": "^10.4.20",
+    "cheerio": "^1.0.0",
     "child_process": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -71,6 +72,7 @@
     "next": "15.2.4",
     "next-themes": "latest",
     "path": "latest",
+    "pdf-parse": "^1.1.1",
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",
@@ -96,6 +98,7 @@
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
     "@types/node": "^22",
+    "@types/pdf-parse": "^1.1.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",

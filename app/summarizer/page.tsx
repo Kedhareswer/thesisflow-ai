@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,6 +20,7 @@ import {
   CheckCircle,
   Download,
   Share2,
+  X,
 } from "lucide-react"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { useToast } from "@/hooks/use-toast"
@@ -40,6 +41,238 @@ interface SummaryResult {
   difficulty?: "beginner" | "intermediate" | "advanced"
 }
 
+interface SetupWizardProps {
+  onClose: () => void
+}
+
+function SetupWizard({ onClose }: SetupWizardProps) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-medium text-black">Welcome to AI Summarizer</h2>
+            <Button variant="ghost" onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-lg font-medium text-blue-900 mb-3">🚀 Get Started in 3 Steps</h3>
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                    1
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-blue-900">Configure AI Provider</h4>
+                    <p className="text-blue-700 text-sm">
+                      Add your API keys in Settings to enable AI-powered summarization
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                    2
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-blue-900">Add Content</h4>
+                    <p className="text-blue-700 text-sm">
+                      Paste text, upload a document, or provide a URL to extract content
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                    3
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-blue-900">Generate Summary</h4>
+                    <p className="text-blue-700 text-sm">
+                      Customize the style and length, then generate your intelligent summary
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-amber-50 border border-amber-200 rounded-lg">
+              <h3 className="text-lg font-medium text-amber-900 mb-3">🔑 Supported AI Providers</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="text-sm">
+                  <div className="font-medium text-amber-900">OpenAI</div>
+                  <div className="text-amber-700">GPT-4, GPT-3.5 Turbo</div>
+                </div>
+                <div className="text-sm">
+                  <div className="font-medium text-amber-900">Google Gemini</div>
+                  <div className="text-amber-700">Gemini Pro, Gemini Flash</div>
+                </div>
+                <div className="text-sm">
+                  <div className="font-medium text-amber-900">Groq</div>
+                  <div className="text-amber-700">Llama, Mixtral models</div>
+                </div>
+                <div className="text-sm">
+                  <div className="font-medium text-amber-900">AIML API</div>
+                  <div className="text-amber-700">Multiple model access</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="text-lg font-medium text-green-900 mb-3">💡 Pro Tips</h3>
+              <ul className="space-y-2 text-sm text-green-700">
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  For best results, provide content with at least 100 words
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  PDFs work best when they contain selectable text (not scanned images)
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  URLs work better with article pages rather than dynamic web apps
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  Try different summary styles based on your use case
+                </li>
+              </ul>
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <Button 
+                onClick={() => window.open('/settings', '_blank')}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Configure AI Settings
+              </Button>
+              <Button variant="outline" onClick={onClose}>
+                Continue Without Setup
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface ErrorDisplayProps {
+  error: string
+  onRetry?: () => void
+  onShowHelp?: () => void
+}
+
+function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
+  const getErrorInfo = (errorMessage: string) => {
+    if (errorMessage.includes("No AI providers available") || errorMessage.includes("API keys")) {
+      return {
+        type: "setup",
+        title: "AI Configuration Required",
+        message: "You need to configure at least one AI provider to use the summarizer.",
+        actions: [
+          { label: "Configure AI Settings", action: () => window.open('/settings', '_blank'), primary: true },
+          { label: "View Setup Guide", action: onShowHelp }
+        ]
+      }
+    }
+    
+    if (errorMessage.includes("No content could be extracted")) {
+      return {
+        type: "content",
+        title: "Content Extraction Failed",
+        message: "We couldn't extract readable content from this source.",
+        actions: [
+          { label: "Try Different URL", action: onRetry },
+                     { label: "Upload File Instead", action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click() },
+           { label: "Paste Text Manually", action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click() }
+        ]
+      }
+    }
+    
+    if (errorMessage.includes("Failed to fetch URL") || errorMessage.includes("timeout")) {
+      return {
+        type: "network",
+        title: "Network or Access Issue",
+        message: "The URL couldn't be accessed. This might be due to network issues or website restrictions.",
+        actions: [
+          { label: "Try Again", action: onRetry, primary: true },
+          { label: "Check URL", action: () => {} },
+                     { label: "Use Different Method", action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click() }
+        ]
+      }
+    }
+    
+    if (errorMessage.includes("PDF")) {
+      return {
+        type: "pdf",
+        title: "PDF Processing Issue",
+        message: "There was an issue processing your PDF file.",
+        actions: [
+          { label: "Try Different PDF", action: onRetry },
+          { label: "Convert to Text", action: () => {} },
+          { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() }
+        ]
+      }
+    }
+    
+    if (errorMessage.includes("File size") || errorMessage.includes("too large")) {
+      return {
+        type: "size",
+        title: "File Too Large",
+        message: "Your file exceeds the 10MB limit.",
+        actions: [
+          { label: "Try Smaller File", action: onRetry, primary: true },
+          { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() },
+          { label: "Copy Text Manually", action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click() }
+        ]
+      }
+    }
+    
+    return {
+      type: "general",
+      title: "Something Went Wrong",
+      message: errorMessage,
+      actions: [
+        { label: "Try Again", action: onRetry, primary: true },
+        { label: "Get Help", action: onShowHelp }
+      ]
+    }
+  }
+  
+  const errorInfo = getErrorInfo(error)
+  
+  return (
+    <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+      <div className="flex items-start gap-4">
+        <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
+        <div className="flex-1">
+          <h3 className="text-lg font-medium text-red-900 mb-2">{errorInfo.title}</h3>
+          <p className="text-red-700 mb-4">{errorInfo.message}</p>
+          
+          <div className="flex flex-wrap gap-2">
+            {errorInfo.actions.map((action, index) => (
+              <Button
+                key={index}
+                onClick={action.action}
+                variant={action.primary ? "default" : "outline"}
+                size="sm"
+                className={action.primary ? "bg-red-600 hover:bg-red-700 text-white" : "border-red-300 text-red-700 hover:bg-red-50"}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Summarizer() {
   const [content, setContent] = useState("")
   const [url, setUrl] = useState("")
@@ -51,10 +284,22 @@ export default function Summarizer() {
   const [summaryLength, setSummaryLength] = useState<"brief" | "medium" | "comprehensive">("medium")
   const [copied, setCopied] = useState(false)
   const [urlFetching, setUrlFetching] = useState(false)
+  const [showSetupWizard, setShowSetupWizard] = useState(false)
+  const [isFirstVisit, setIsFirstVisit] = useState(false)
   const { toast } = useToast()
 
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
+
+  // Check if this is the user's first visit
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('summarizer-visited')
+    if (!hasVisited) {
+      setIsFirstVisit(true)
+      setShowSetupWizard(true)
+      localStorage.setItem('summarizer-visited', 'true')
+    }
+  }, [])
 
   const handleFileProcessed = (content: string, metadata: any) => {
     setContent(content)
@@ -63,7 +308,7 @@ export default function Summarizer() {
 
     toast({
       title: "File processed successfully",
-      description: `Content loaded with ${metadata.wordCount} words`,
+      description: `Content loaded with ${metadata.wordCount} words${metadata.pages ? ` from ${metadata.pages} pages` : ''}`,
     })
   }
 
@@ -82,7 +327,7 @@ export default function Summarizer() {
     try {
       new URL(url)
     } catch {
-      setError("Please enter a valid URL format")
+      setError("Please enter a valid URL format (e.g., https://example.com/article)")
       return
     }
 
@@ -96,23 +341,23 @@ export default function Summarizer() {
         body: JSON.stringify({ url }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to fetch URL content")
+        throw new Error(data.action ? `${data.error}: ${data.action}` : data.error || "Failed to fetch URL content")
       }
 
-      const data = await response.json()
-      const fetchedContent = data.content || data.text || ""
+      const fetchedContent = data.content || ""
 
       if (!fetchedContent.trim()) {
-        throw new Error("No content could be extracted from the URL")
+        throw new Error("No content could be extracted from the URL. The page might be dynamically generated or protected.")
       }
 
       setContent(fetchedContent)
 
       toast({
         title: "Content fetched successfully",
-        description: `Extracted ${getWordCount(fetchedContent)} words from URL`,
+        description: `Extracted ${data.wordCount || getWordCount(fetchedContent)} words${data.title ? ` from "${data.title}"` : ' from URL'}`,
       })
     } catch (error) {
       console.error("URL fetch error:", error)
@@ -121,7 +366,7 @@ export default function Summarizer() {
 
       toast({
         title: "URL fetch failed",
-        description: errorMessage,
+        description: "See error details below for help",
         variant: "destructive",
       })
     } finally {
@@ -131,12 +376,12 @@ export default function Summarizer() {
 
   const generateSummary = async () => {
     if (!content.trim()) {
-      setError("Please provide content to summarize")
+      setError("Please provide content to summarize using one of the input methods above")
       return
     }
 
     if (content.length < 100) {
-      setError("Content is too short to summarize. Please provide at least 100 characters.")
+      setError("Content is too short to summarize effectively. Please provide at least 100 characters for better results.")
       return
     }
 
@@ -182,16 +427,11 @@ export default function Summarizer() {
       const errorMessage = error instanceof Error ? error.message : "Failed to generate summary"
       setError(errorMessage)
 
-      if (errorMessage.includes("No AI providers available")) {
-        toast({
-          title: "AI Configuration Required",
-          description: "Please configure your AI API keys in Settings to use the Summarizer.",
-          variant: "destructive",
-        })
-      } else {
+      // Don't show toast for API key errors - the error display will handle it
+      if (!errorMessage.includes("No AI providers available")) {
         toast({
           title: "Summary generation failed",
-          description: errorMessage,
+          description: "See error details below for help",
           variant: "destructive",
         })
       }
@@ -402,8 +642,20 @@ export default function Summarizer() {
     })
   }
 
+  const retryLastAction = () => {
+    if (url && !content) {
+      handleUrlFetch()
+    } else {
+      setError(null)
+    }
+  }
+
   return (
     <RouteGuard requireAuth={true}>
+      {showSetupWizard && (
+        <SetupWizard onClose={() => setShowSetupWizard(false)} />
+      )}
+      
       <div className="min-h-screen bg-white">
         <div className="container mx-auto p-8 space-y-8">
           {/* Header */}
@@ -420,15 +672,26 @@ export default function Summarizer() {
                   </p>
                 </div>
               </div>
-              {(content || result) && (
-                <Button
-                  onClick={clearContent}
-                  variant="outline"
-                  className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                >
-                  Clear All
-                </Button>
-              )}
+              <div className="flex gap-3">
+                {isFirstVisit && (
+                  <Button
+                    onClick={() => setShowSetupWizard(true)}
+                    variant="outline"
+                    className="border-blue-300 hover:bg-blue-50 hover:border-blue-400 text-blue-700 bg-transparent"
+                  >
+                    Show Setup Guide
+                  </Button>
+                )}
+                {(content || result) && (
+                  <Button
+                    onClick={clearContent}
+                    variant="outline"
+                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -509,7 +772,7 @@ export default function Summarizer() {
                         </Button>
                       </div>
                       <p className="text-sm text-gray-500">
-                        Enter a URL to automatically extract and summarize its content
+                        Enter a URL to automatically extract and summarize its content. Works best with article pages and blog posts.
                       </p>
                     </TabsContent>
                   </Tabs>
@@ -571,10 +834,11 @@ export default function Summarizer() {
               </Card>
 
               {error && (
-                <Alert variant="destructive" className="border-red-200 bg-red-50">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-700">{error}</AlertDescription>
-                </Alert>
+                <ErrorDisplay 
+                  error={error} 
+                  onRetry={retryLastAction}
+                  onShowHelp={() => setShowSetupWizard(true)}
+                />
               )}
 
               <Button

@@ -331,13 +331,13 @@ class EnhancedAIService {
     temperature: number
   ): Promise<GenerateTextResult> {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
+        method: 'POST',
       headers: {
         'x-api-key': apiKey,
         'Content-Type': 'application/json',
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
+        body: JSON.stringify({
         model,
         max_tokens: maxTokens,
         temperature,
@@ -544,8 +544,8 @@ Each idea: title + 3 key aspects separated by "|"`
 
   // Content summarization method
   async summarizeContent(
-    content: string,
-    options: {
+    content: string, 
+    options: { 
       style?: 'academic' | 'executive' | 'bullet-points' | 'detailed'
       length?: 'brief' | 'medium' | 'comprehensive'
     } = {},
@@ -633,7 +633,7 @@ Requirements:
       readingTime = Math.ceil(originalContent.split(/\s+/).length / 200)
     }
 
-    return {
+        return { 
       summary,
       keyPoints,
       readingTime,
