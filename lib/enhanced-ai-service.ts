@@ -107,7 +107,7 @@ class EnhancedAIService {
         return
       }
 
-      const response = await fetch('/api/user-api-keys', {
+      const response = await fetch('/api/user-api-keys?include_keys=true', {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -123,13 +123,13 @@ class EnhancedAIService {
       
       this.userApiKeys.clear()
       apiKeys.forEach((keyData: any) => {
-        if (keyData.is_active && keyData.test_status === 'valid') {
+        if (keyData.is_active && keyData.test_status === 'valid' && keyData.api_key) {
           this.userApiKeys.set(keyData.provider, keyData.api_key)
         }
       })
 
       this.initialized = true
-      console.log('API keys loaded successfully')
+      console.log(`API keys loaded successfully: ${this.userApiKeys.size} providers configured`)
     } catch (error) {
       console.error('Error loading user API keys:', error)
       throw error

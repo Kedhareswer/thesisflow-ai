@@ -113,19 +113,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Get user's API keys (without decrypting for list view)
-    const { data: apiKeys, error } = await supabaseAdmin
-      .from('user_api_keys')
-      .select('id, provider, is_active, last_tested_at, test_status, created_at, updated_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    const { searchParams } = new URL(request.url)
+    const includeKeys = searchParams.get('include_keys') === 'true'
 
-    if (error) {
-      console.error('Error fetching API keys:', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    if (includeKeys) {
+      // Get user's API keys WITH decryption for AI service use
+      const { data: apiKeys, error } = await supabaseAdmin
+        .from('user_api_keys')
+        .select('id, provider, api_key_encrypted, is_active, last_tested_at, test_status, created_at, updated_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('test_status', 'valid')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching API keys:', error)
+        return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      }
+
+      // Decrypt the API keys for internal use
+      const decryptedKeys = (apiKeys || []).map(key => {
+        try {
+          return {
+            ...key,
+            api_key: decrypt(key.api_key_encrypted)
+          }
+        } catch (decryptError) {
+          console.error(`Failed to decrypt API key for ${key.provider}:`, decryptError)
+          return null
+        }
+      }).filter(Boolean)
+
+      return NextResponse.json({ apiKeys: decryptedKeys })
+    } else {
+      // Get user's API keys (without decrypting for list view)
+      const { data: apiKeys, error } = await supabaseAdmin
+        .from('user_api_keys')
+        .select('id, provider, is_active, last_tested_at, test_status, created_at, updated_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching API keys:', error)
+        return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      }
+
+      return NextResponse.json({ apiKeys: apiKeys || [] })
     }
-
-    return NextResponse.json({ apiKeys: apiKeys || [] })
   } catch (error) {
     console.error('API keys GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

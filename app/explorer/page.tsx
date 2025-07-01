@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
-import { AIProviderService } from "@/lib/ai-providers"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { SearchInput } from "@/components/common/SearchInput"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
@@ -53,7 +52,16 @@ Please provide a detailed analysis covering:
 Format the response in a clear, structured manner with headings and bullet points where appropriate.
 The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "comprehensive"}.`
 
-      const response = await AIProviderService.generateResponse(prompt)
+      // Use the enhanced AI service instead of the old provider service
+      await enhancedAIService.loadUserApiKeys(true) // Force reload to get latest keys
+      
+      const response = await enhancedAIService.chatCompletion([
+        { role: "user", content: prompt }
+      ], {
+        temperature: 0.7,
+        maxTokens: 2048
+      })
+
       return {
         content: response.content,
         topic,
@@ -62,6 +70,9 @@ The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "com
       }
     } catch (error) {
       console.error("Error exploring topic:", error)
+      if (error instanceof Error && error.message.includes("No AI providers")) {
+        throw new Error("No AI providers are configured. Please add at least one API key in Settings.")
+      }
       throw new Error("Failed to explore research topic. Please check your AI provider configuration.")
     }
   }

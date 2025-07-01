@@ -1,9 +1,115 @@
 import { NextResponse } from "next/server"
+import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
+
+// Get auth token from request headers or cookies
+async function getAuthUser(request: Request) {
+  const supabaseAdmin = createSupabaseAdmin()
+  if (!supabaseAdmin) {
+    throw new Error('Supabase admin client not configured')
+  }
+
+  // Try to get token from Authorization header first
+  let authToken = request.headers.get('Authorization')?.replace('Bearer ', '')
+  
+  // If not in header, try to get from cookies
+  if (!authToken) {
+    const cookieHeader = request.headers.get('cookie')
+    if (cookieHeader) {
+      // Parse common Supabase cookie names
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=')
+        acc[key] = value
+        return acc
+      }, {} as Record<string, string>)
+      
+      authToken = cookies['sb-access-token'] || 
+                  cookies['supabase-auth-token'] || 
+                  cookies['sb-auth-token']
+    }
+  }
+
+  if (!authToken) {
+    throw new Error('No authentication token found')
+  }
+
+  // Verify token with admin client
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(authToken)
+  
+  if (error || !user) {
+    throw new Error('Invalid authentication token')
+  }
+
+  return user
+}
+
+// Create Supabase admin client for server-side operations
+const createSupabaseAdmin = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.warn('Supabase admin client not configured')
+    return null
+  }
+  
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+// Simple decryption for API keys
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
+const ALGORITHM = 'aes-256-cbc'
+
+function decrypt(text: string): string {
+  const textParts = text.split(':')
+  const iv = Buffer.from(textParts.shift()!, 'hex')
+  const encryptedText = textParts.join(':')
+  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
+  let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
+  decrypted += decipher.final('utf8')
+  return decrypted
+}
+
+// Get user API keys
+async function getUserApiKeys(userId: string) {
+  const supabaseAdmin = createSupabaseAdmin()
+  if (!supabaseAdmin) {
+    throw new Error('Supabase admin client not configured')
+  }
+
+  const { data: apiKeys, error } = await supabaseAdmin
+    .from('user_api_keys')
+    .select('provider, api_key_encrypted, is_active, test_status')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .eq('test_status', 'valid')
+
+  if (error) {
+    console.error('Error fetching user API keys:', error)
+    return {}
+  }
+
+  const decryptedKeys: Record<string, string> = {}
+  apiKeys?.forEach((keyData) => {
+    try {
+      decryptedKeys[keyData.provider] = decrypt(keyData.api_key_encrypted)
+    } catch (error) {
+      console.error(`Failed to decrypt API key for ${keyData.provider}:`, error)
+    }
+  })
+
+  return decryptedKeys
+}
 
 type Provider = {
   name: string
   envKey: string
-  apiUrl: (model: string) => string
+  apiUrl: (model: string, apiKey?: string) => string
   headers: (apiKey: string) => Record<string, string>
   body: (prompt: string, model: string) => any
   extractContent: (data: any) => string
@@ -33,8 +139,8 @@ const providers: Provider[] = [
   {
     name: "gemini",
     envKey: "GEMINI_API_KEY",
-    apiUrl: (model) =>
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    apiUrl: (model, apiKey) =>
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     headers: () => ({
       "Content-Type": "application/json",
     }),
@@ -60,49 +166,77 @@ const providers: Provider[] = [
       Authorization: `Bearer ${apiKey}`,
     }),
     body: (prompt, model) => ({
-      model: model || "llama3-8b-8192",
+      model: model || "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
       max_tokens: 2048,
     }),
     extractContent: (data) => data.choices?.[0]?.message?.content || "No content generated.",
-    defaultModel: "llama3-8b-8192",
+    defaultModel: "llama-3.3-70b-versatile",
   },
-  // Add more providers as needed
 ]
 
 export async function POST(request: Request) {
   try {
     const { prompt, provider: requestedProvider, model: requestedModel } = await request.json()
 
-    // Debug: Log all environment variables related to API keys
-    console.log("Environment variables check:")
-    console.log("OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY)
-    console.log("GEMINI_API_KEY present:", !!process.env.GEMINI_API_KEY)
-    console.log("GROQ_API_KEY present:", !!process.env.GROQ_API_KEY)
-
-    // Use GROQ API key from environment variables
-    const groqApiKey = process.env.GROQ_API_KEY
-    if (!groqApiKey) {
-      return NextResponse.json({ error: "GROQ API key not configured" }, { status: 500 })
+    // Get authenticated user
+    let user
+    try {
+      user = await getAuthUser(request)
+    } catch (authError) {
+      console.log('No authenticated user, using environment variables')
     }
-    console.log("Using GROQ API key from environment variables")
 
-    // Use GROQ provider directly
-    const selectedProvider = providers.find((p) => p.name === "groq")
-    if (!selectedProvider) {
-      return NextResponse.json({ error: "GROQ provider not found in configuration" }, { status: 500 })
+    // Get user API keys if authenticated
+    let userApiKeys: Record<string, string> = {}
+    if (user) {
+      try {
+        userApiKeys = await getUserApiKeys(user.id)
+      } catch (error) {
+        console.error('Error loading user API keys:', error)
+      }
+    }
+
+    // Find available provider in priority order
+    const providerPriority = ['groq', 'openai', 'gemini']
+    let selectedProvider: Provider | null = null
+    let apiKey: string | null = null
+
+    // If a specific provider is requested, try it first
+    if (requestedProvider) {
+      selectedProvider = providers.find(p => p.name === requestedProvider) || null
+      if (selectedProvider) {
+        apiKey = userApiKeys[selectedProvider.name] || process.env[selectedProvider.envKey] || null
+      }
+    }
+
+    // If no specific provider or the requested one isn't available, find the best available
+    if (!selectedProvider || !apiKey) {
+      for (const providerName of providerPriority) {
+        const provider = providers.find(p => p.name === providerName)
+        if (provider) {
+          const key = userApiKeys[provider.name] || process.env[provider.envKey] || null
+          if (key) {
+            selectedProvider = provider
+            apiKey = key
+            break
+          }
+        }
+      }
+    }
+
+    if (!selectedProvider || !apiKey) {
+      return NextResponse.json({ 
+        error: "No AI providers are configured. Please add at least one API key to your environment variables." 
+      }, { status: 500 })
     }
 
     const model = requestedModel || selectedProvider.defaultModel
-    console.log(`Using AI provider: groq with model: ${model}`)
+    console.log(`Using AI provider: ${selectedProvider.name} with model: ${model}`)
 
-    // Override the apiUrl and headers functions to use our hardcoded key
-    const apiUrl = selectedProvider.apiUrl(model)
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${groqApiKey}`,
-    }
+    const apiUrl = selectedProvider.apiUrl(model, apiKey)
+    const headers = selectedProvider.headers(apiKey)
 
     const response = await fetch(apiUrl, {
       method: "POST",

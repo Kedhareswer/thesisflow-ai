@@ -27,7 +27,6 @@ class EnhancedResearchService {
   }> {
     try {
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-      const { AIProviderService } = await import("@/lib/ai-providers")
       
       const prompt = `Provide a comprehensive research overview for the topic: "${topic}"
       
@@ -46,7 +45,16 @@ Please provide a detailed analysis covering:
 Format the response in a clear, structured manner with headings and bullet points where appropriate.
 The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "comprehensive"}.`
 
-      const response = await AIProviderService.generateResponse(prompt)
+      // Use the enhanced AI service instead of the old provider service
+      await enhancedAIService.loadUserApiKeys(true) // Force reload to get latest keys
+      
+      const response = await enhancedAIService.chatCompletion([
+        { role: "user", content: prompt }
+      ], {
+        temperature: 0.7,
+        maxTokens: 2048
+      })
+
       return {
         content: response.content,
         topic,
@@ -55,6 +63,9 @@ The response should be ${depth <= 2 ? "concise" : depth <= 4 ? "detailed" : "com
       }
     } catch (error) {
       console.error("Error exploring topic:", error)
+      if (error instanceof Error && error.message.includes("No AI providers")) {
+        throw new Error("No AI providers are configured. Please add at least one API key in Settings.")
+      }
       throw new Error("Failed to explore research topic. Please check your AI provider configuration.")
     }
   }

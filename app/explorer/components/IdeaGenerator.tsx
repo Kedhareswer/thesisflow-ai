@@ -26,6 +26,10 @@ class IdeaGenerationService {
   }> {
     try {
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
+      
+      // Force reload API keys to ensure latest configuration
+      await enhancedAIService.loadUserApiKeys(true)
+      
       const researchResults = await enhancedAIService.generateResearchIdeas(topic, context)
       const ideaObjects = researchResults.ideas
 
@@ -45,6 +49,9 @@ class IdeaGenerationService {
       }
     } catch (error) {
       console.error("Error generating ideas:", error)
+      if (error instanceof Error && error.message.includes("No AI providers")) {
+        throw new Error("No AI providers are configured. Please add at least one API key in Settings.")
+      }
       throw new Error("Failed to generate research ideas. Please check your AI provider configuration.")
     }
   }
