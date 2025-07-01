@@ -57,15 +57,26 @@ export default function SettingsPage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase.from("user_profiles").select("settings").eq("user_id", user.id).single()
+      const { data, error } = await supabase.from("user_settings").select("*").eq("user_id", user.id).single()
 
       if (error && error.code !== "PGRST116") {
         console.error("Error loading settings:", error)
         return
       }
 
-      if (data?.settings) {
-        setSettings({ ...settings, ...data.settings })
+      if (data) {
+        setSettings({
+          email_notifications: data.email_notifications ?? true,
+          research_updates: data.research_updates ?? true,
+          collaboration_invites: data.collaboration_invites ?? true,
+          security_alerts: data.security_alerts ?? true,
+          marketing_emails: data.marketing_emails ?? false,
+          theme: data.theme ?? 'system',
+          language: data.language ?? 'en',
+          timezone: data.timezone ?? 'UTC',
+          auto_save: data.auto_save ?? true,
+          data_sharing: data.data_sharing ?? false,
+        })
       }
     } catch (error) {
       console.error("Error loading settings:", error)
@@ -77,9 +88,18 @@ export default function SettingsPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.from("user_profiles").upsert({
+      const { error } = await supabase.from("user_settings").upsert({
         user_id: user.id,
-        settings: settings,
+        email_notifications: settings.email_notifications,
+        research_updates: settings.research_updates,
+        collaboration_invites: settings.collaboration_invites,
+        security_alerts: settings.security_alerts,
+        marketing_emails: settings.marketing_emails,
+        theme: settings.theme,
+        language: settings.language,
+        timezone: settings.timezone,
+        auto_save: settings.auto_save,
+        data_sharing: settings.data_sharing,
         updated_at: new Date().toISOString(),
       })
 
@@ -91,9 +111,15 @@ export default function SettingsPage() {
       })
     } catch (error) {
       console.error("Error saving settings:", error)
+      const errorMessage = error instanceof Error ? error.message : 
+                          (error as any)?.message || 
+                          JSON.stringify(error, null, 2) || 
+                          "Unknown error occurred"
+      console.error("Detailed error:", errorMessage)
+      
       toast({
         title: "Save failed",
-        description: "Failed to save settings. Please try again.",
+        description: `Failed to save settings: ${errorMessage}`,
         variant: "destructive",
       })
     } finally {

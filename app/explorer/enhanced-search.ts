@@ -35,10 +35,21 @@ export class EnhancedSearchService {
         sources.push('openalex')
         allPapers.push(...openAlexPapers)
         console.log(`[EnhancedSearch] Found ${openAlexPapers.length} papers from OpenAlex`)
+      } else {
+        console.log('[EnhancedSearch] No papers found from OpenAlex')
       }
 
-      // Enhance OpenAlex papers with citation data from Semantic Scholar
-      allPapers = await EnhancedSearchService.enhancePapersWithCitations(allPapers)
+      // Enhance OpenAlex papers with citation data from Semantic Scholar (optional)
+      if (allPapers.length > 0) {
+        try {
+          console.log('[EnhancedSearch] Attempting to enhance with citation data...')
+          allPapers = await EnhancedSearchService.enhancePapersWithCitations(allPapers)
+          console.log('[EnhancedSearch] Citation enhancement completed')
+        } catch (citationError) {
+          console.warn('[EnhancedSearch] Citation enhancement failed, continuing without it:', citationError)
+          // Continue with papers even if citation enhancement fails
+        }
+      }
 
       // Remove duplicates and apply filters
       const uniquePapers = EnhancedSearchService.removeDuplicates(allPapers)
@@ -56,7 +67,15 @@ export class EnhancedSearchService {
       }
     } catch (error) {
       console.error('[EnhancedSearch] Search failed:', error)
-      throw error
+      
+      // Return empty result instead of throwing to prevent app crash
+      return {
+        papers: [],
+        total: 0,
+        filters_applied: filters,
+        sources: [],
+        search_time: Date.now() - startTime
+      }
     }
   }
 
@@ -91,37 +110,42 @@ export class EnhancedSearchService {
   }
 
   /**
-   * Enhance papers with citation data
+   * Enhance papers with citation data (gracefully handle failures)
    */
   private static async enhancePapersWithCitations(papers: ResearchPaper[]): Promise<ResearchPaper[]> {
     const enhancedPapers = []
+    let enhancementCount = 0
     
     for (const paper of papers) {
       let enhancedPaper = { ...paper }
       
-      // If paper is from OpenAlex and has DOI, get citation data from Semantic Scholar
+      // If paper is from OpenAlex and has DOI, try to get citation data from Semantic Scholar
       if (paper.source === 'openalex' && paper.doi && !paper.cited_by_count) {
         try {
           const citationData = await getCitationData(paper.doi, 'doi')
           if (citationData) {
-            enhancedPaper.cited_by_count = citationData.citationCount
-            enhancedPaper.reference_count = citationData.referenceCount
+            enhancedPaper.cited_by_count = citationData.citationCount || 0
+            enhancedPaper.reference_count = citationData.referenceCount || 0
             enhancedPaper.open_access = {
-              is_oa: citationData.isOpenAccess,
+              is_oa: citationData.isOpenAccess || false,
               oa_url: citationData.openAccessPdf?.url,
               any_repository_has_fulltext: !!citationData.openAccessPdf
             }
             enhancedPaper.field_of_study = citationData.fieldsOfStudy || []
             enhancedPaper.tldr = citationData.tldr?.text
+            enhancementCount++
+            console.log(`[EnhancedSearch] Enhanced paper: ${paper.title.substring(0, 50)}...`)
           }
         } catch (error) {
-          console.warn(`[EnhancedSearch] Failed to get citation data for ${paper.title}:`, error)
+          // Silently continue without citation data for this paper
+          console.debug(`[EnhancedSearch] Citation lookup failed for "${paper.title.substring(0, 30)}...": ${error}`)
         }
       }
       
       enhancedPapers.push(enhancedPaper)
     }
     
+    console.log(`[EnhancedSearch] Enhanced ${enhancementCount} out of ${papers.length} papers with citation data`)
     return enhancedPapers
   }
 

@@ -120,52 +120,44 @@ export function MainNav() {
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
-            {/* Debug what we have */}
-            {process.env.NODE_ENV === "development" && (
-              <div className="text-xs bg-yellow-100 px-2 py-1 rounded border">
-                User: {user ? "✅" : "❌"} | Loading: {isLoading ? "⏳" : "✅"} | Email: {user?.email || "none"}
-              </div>
-            )}
-
             {user && !isLoading ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <DropdownMenu
+                trigger={
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-gray-100">
                     <SimpleAvatar size="sm" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
-                  <div className="flex items-center justify-start gap-3 p-3">
-                    <SimpleAvatar size="md" />
-                    <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium text-sm">
-                        {user.user_metadata?.display_name || user.user_metadata?.name || "User"}
-                      </p>
-                      <p className="w-[180px] truncate text-xs text-gray-600">{user.email}</p>
-                    </div>
+                }
+                className="w-56 right-0"
+              >
+                <div className="flex items-center justify-start gap-3 p-3 border-b">
+                  <SimpleAvatar size="md" />
+                  <div className="flex flex-col space-y-1 leading-none">
+                    <p className="font-medium text-sm">
+                      {user.user_metadata?.display_name || user.user_metadata?.name || "User"}
+                    </p>
+                    <p className="w-[180px] truncate text-xs text-gray-600">{user.email}</p>
                   </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile" className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="cursor-pointer text-red-600 focus:text-red-600"
-                    onClick={() => signOut()}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
+                </div>
+                <DropdownMenuItem>
+                  <Link href="/profile" className="flex items-center w-full">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/settings" className="flex items-center w-full">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-red-600 focus:text-red-600"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">

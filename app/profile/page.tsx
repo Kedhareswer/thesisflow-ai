@@ -49,7 +49,7 @@ export default function ProfilePage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", user.id).single()
+      const { data, error } = await supabase.from("user_profiles").select("*").eq("id", user.id).single()
 
       if (error && error.code !== "PGRST116") {
         console.error("Error loading profile:", error)
@@ -84,7 +84,7 @@ export default function ProfilePage() {
     setSaving(true)
     try {
       const { error } = await supabase.from("user_profiles").upsert({
-        user_id: user.id,
+        id: user.id,
         display_name: profile.display_name,
         bio: profile.bio,
         location: profile.location,
@@ -104,9 +104,15 @@ export default function ProfilePage() {
       })
     } catch (error) {
       console.error("Error saving profile:", error)
+      const errorMessage = error instanceof Error ? error.message : 
+                          (error as any)?.message || 
+                          JSON.stringify(error, null, 2) || 
+                          "Unknown error occurred"
+      console.error("Detailed error:", errorMessage)
+      
       toast({
         title: "Save failed",
-        description: "Failed to save profile. Please try again.",
+        description: `Failed to save profile: ${errorMessage}`,
         variant: "destructive",
       })
     } finally {

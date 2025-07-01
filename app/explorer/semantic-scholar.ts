@@ -81,8 +81,8 @@ export async function searchSemanticScholar(
     })
 
     if (!response.ok) {
-      console.error(`Semantic Scholar API error: ${response.status} ${response.statusText}`)
-      throw new Error(`Semantic Scholar API error: ${response.status}`)
+      console.warn(`[SemanticScholar] Search failed: ${response.status} ${response.statusText}`)
+      return []
     }
 
     const data: SemanticScholarSearchResponse = await response.json()
@@ -90,7 +90,7 @@ export async function searchSemanticScholar(
     
     return data.data || []
   } catch (error) {
-    console.error('Error searching Semantic Scholar:', error)
+    console.warn('[SemanticScholar] Search error:', error)
     return []
   }
 }
@@ -104,13 +104,17 @@ export async function getCitationData(identifier: string, type: 'doi' | 'title' 
     const fields = 'paperId,title,citationCount,referenceCount,influentialCitationCount,isOpenAccess,openAccessPdf,fieldsOfStudy,publicationDate,journal,externalIds,tldr'
     
     if (type === 'doi') {
-      url = `${SEMANTIC_SCHOLAR_BASE_URL}/paper/DOI:${identifier}?fields=${fields}`
+      // Clean the DOI - remove any URL prefix
+      const cleanDoi = identifier.replace(/^https?:\/\/(dx\.)?doi\.org\//, '')
+      url = `${SEMANTIC_SCHOLAR_BASE_URL}/paper/DOI:${cleanDoi}?fields=${fields}`
     } else {
       // Search by title and get the first result
       const searchResults = await searchSemanticScholar(identifier, 1)
       if (searchResults.length === 0) return null
       return searchResults[0]
     }
+
+    console.log(`[SemanticScholar] Looking up citation data: ${url}`)
 
     const response = await fetch(url, {
       headers: {
@@ -120,14 +124,20 @@ export async function getCitationData(identifier: string, type: 'doi' | 'title' 
     })
 
     if (!response.ok) {
-      console.error(`Semantic Scholar citation lookup error: ${response.status}`)
+      // 404 is common for papers not in Semantic Scholar - don't log as error
+      if (response.status === 404) {
+        console.debug(`[SemanticScholar] Paper not found (404): ${identifier}`)
+      } else {
+        console.warn(`[SemanticScholar] Citation lookup failed: ${response.status} for ${identifier}`)
+      }
       return null
     }
 
     const data: SemanticScholarPaper = await response.json()
+    console.log(`[SemanticScholar] Successfully retrieved citation data for: ${data.title?.substring(0, 50)}...`)
     return data
   } catch (error) {
-    console.error('Error getting citation data:', error)
+    console.debug(`[SemanticScholar] Citation lookup error for ${identifier}:`, error)
     return null
   }
 }
@@ -148,14 +158,14 @@ export async function getRecommendations(paperId: string, limit = 10): Promise<S
     })
 
     if (!response.ok) {
-      console.error(`Semantic Scholar recommendations error: ${response.status}`)
+      console.warn(`[SemanticScholar] Recommendations failed: ${response.status}`)
       return []
     }
 
     const data = await response.json()
     return data.recommendedPapers || []
   } catch (error) {
-    console.error('Error getting recommendations:', error)
+    console.warn('[SemanticScholar] Recommendations error:', error)
     return []
   }
 }
@@ -209,4 +219,17 @@ function determineVenueType(paper: SemanticScholarPaper): 'journal' | 'conferenc
   }
   
   return 'other'
+}
+
+/**
+ * Test Semantic Scholar API availability
+ */
+export async function testSemanticScholarAPI(): Promise<boolean> {
+  try {
+    const response = await fetch(`${SEMANTIC_SCHOLAR_BASE_URL}/paper/search?query=test&limit=1`)
+    return response.ok
+  } catch (error) {
+    console.warn('[SemanticScholar] API test failed:', error)
+    return false
+  }
 }
