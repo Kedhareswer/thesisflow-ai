@@ -168,4 +168,4 @@ CREATE POLICY "chat_messages_insert_policy" ON chat_messages
     );
 
 -- Enable RLS on chat_messages if not already enabled
-ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY; 
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;

@@ -42,4 +42,4 @@ GRANT SELECT, INSERT, UPDATE ON user_profiles TO authenticated;
 GRANT SELECT ON team_members TO authenticated;
 
 COMMENT ON CONSTRAINT team_members_user_id_user_profiles_fkey ON team_members 
-IS 'Foreign key to user_profiles to enable automatic Supabase joins'; 
+IS 'Foreign key to user_profiles to enable automatic Supabase joins';

@@ -806,4 +806,4 @@ export function TeamFiles({ teamId, currentUserRole }: TeamFilesProps) {
       </Tabs>
     </div>
   )
-} 
+}

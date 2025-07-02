@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   FileText,
   Link,
@@ -57,7 +56,7 @@ function SetupWizard({ onClose }: SetupWizardProps) {
               <X className="h-5 w-5" />
             </Button>
           </div>
-          
+
           <div className="space-y-6">
             <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="text-lg font-medium text-blue-900 mb-3">🚀 Get Started in 3 Steps</h3>
@@ -73,7 +72,7 @@ function SetupWizard({ onClose }: SetupWizardProps) {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-4">
                   <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                     2
@@ -85,7 +84,7 @@ function SetupWizard({ onClose }: SetupWizardProps) {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-4">
                   <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                     3
@@ -99,7 +98,7 @@ function SetupWizard({ onClose }: SetupWizardProps) {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6 bg-amber-50 border border-amber-200 rounded-lg">
               <h3 className="text-lg font-medium text-amber-900 mb-3">🔑 Supported AI Providers</h3>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -121,7 +120,7 @@ function SetupWizard({ onClose }: SetupWizardProps) {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6 bg-green-50 border border-green-200 rounded-lg">
               <h3 className="text-lg font-medium text-green-900 mb-3">💡 Pro Tips</h3>
               <ul className="space-y-2 text-sm text-green-700">
@@ -143,10 +142,10 @@ function SetupWizard({ onClose }: SetupWizardProps) {
                 </li>
               </ul>
             </div>
-            
+
             <div className="flex gap-3 pt-4">
-              <Button 
-                onClick={() => window.open('/settings', '_blank')}
+              <Button
+                onClick={() => window.open("/settings", "_blank")}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Configure AI Settings
@@ -176,12 +175,12 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
         title: "AI Configuration Required",
         message: "You need to configure at least one AI provider to use the summarizer.",
         actions: [
-          { label: "Configure AI Settings", action: () => window.open('/settings', '_blank'), primary: true },
-          { label: "View Setup Guide", action: onShowHelp }
-        ]
+          { label: "Configure AI Settings", action: () => window.open("/settings", "_blank"), primary: true },
+          { label: "View Setup Guide", action: onShowHelp },
+        ],
       }
     }
-    
+
     if (errorMessage.includes("No content could be extracted")) {
       return {
         type: "content",
@@ -189,12 +188,18 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
         message: "We couldn't extract readable content from this source.",
         actions: [
           { label: "Try Different URL", action: onRetry },
-                     { label: "Upload File Instead", action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click() },
-           { label: "Paste Text Manually", action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click() }
-        ]
+          {
+            label: "Upload File Instead",
+            action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click(),
+          },
+          {
+            label: "Paste Text Manually",
+            action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click(),
+          },
+        ],
       }
     }
-    
+
     if (errorMessage.includes("Failed to fetch URL") || errorMessage.includes("timeout")) {
       return {
         type: "network",
@@ -203,11 +208,14 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
         actions: [
           { label: "Try Again", action: onRetry, primary: true },
           { label: "Check URL", action: () => {} },
-                     { label: "Use Different Method", action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click() }
-        ]
+          {
+            label: "Use Different Method",
+            action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click(),
+          },
+        ],
       }
     }
-    
+
     if (errorMessage.includes("PDF")) {
       return {
         type: "pdf",
@@ -216,11 +224,11 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
         actions: [
           { label: "Try Different PDF", action: onRetry },
           { label: "Convert to Text", action: () => {} },
-          { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() }
-        ]
+          { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() },
+        ],
       }
     }
-    
+
     if (errorMessage.includes("File size") || errorMessage.includes("too large")) {
       return {
         type: "size",
@@ -229,24 +237,27 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
         actions: [
           { label: "Try Smaller File", action: onRetry, primary: true },
           { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() },
-          { label: "Copy Text Manually", action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click() }
-        ]
+          {
+            label: "Copy Text Manually",
+            action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click(),
+          },
+        ],
       }
     }
-    
+
     return {
       type: "general",
       title: "Something Went Wrong",
       message: errorMessage,
       actions: [
         { label: "Try Again", action: onRetry, primary: true },
-        { label: "Get Help", action: onShowHelp }
-      ]
+        { label: "Get Help", action: onShowHelp },
+      ],
     }
   }
-  
+
   const errorInfo = getErrorInfo(error)
-  
+
   return (
     <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
       <div className="flex items-start gap-4">
@@ -254,7 +265,7 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
         <div className="flex-1">
           <h3 className="text-lg font-medium text-red-900 mb-2">{errorInfo.title}</h3>
           <p className="text-red-700 mb-4">{errorInfo.message}</p>
-          
+
           <div className="flex flex-wrap gap-2">
             {errorInfo.actions.map((action, index) => (
               <Button
@@ -262,7 +273,11 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
                 onClick={action.action}
                 variant={action.primary ? "default" : "outline"}
                 size="sm"
-                className={action.primary ? "bg-red-600 hover:bg-red-700 text-white" : "border-red-300 text-red-700 hover:bg-red-50"}
+                className={
+                  action.primary
+                    ? "bg-red-600 hover:bg-red-700 text-white"
+                    : "border-red-300 text-red-700 hover:bg-red-50"
+                }
               >
                 {action.label}
               </Button>
@@ -273,6 +288,10 @@ function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
     </div>
   )
 }
+
+const containerStyle = "container mx-auto p-8 max-w-4xl"
+const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
+const sectionDescriptionStyle = "text-gray-600"
 
 export default function Summarizer() {
   const [content, setContent] = useState("")
@@ -294,11 +313,11 @@ export default function Summarizer() {
 
   // Check if this is the user's first visit
   useEffect(() => {
-    const hasVisited = localStorage.getItem('summarizer-visited')
+    const hasVisited = localStorage.getItem("summarizer-visited")
     if (!hasVisited) {
       setIsFirstVisit(true)
       setShowSetupWizard(true)
-      localStorage.setItem('summarizer-visited', 'true')
+      localStorage.setItem("summarizer-visited", "true")
     }
   }, [])
 
@@ -309,7 +328,7 @@ export default function Summarizer() {
 
     toast({
       title: "File processed successfully",
-      description: `Content loaded with ${metadata.wordCount} words${metadata.pages ? ` from ${metadata.pages} pages` : ''}`,
+      description: `Content loaded with ${metadata.wordCount} words${metadata.pages ? ` from ${metadata.pages} pages` : ""}`,
     })
   }
 
@@ -351,14 +370,16 @@ export default function Summarizer() {
       const fetchedContent = data.content || ""
 
       if (!fetchedContent.trim()) {
-        throw new Error("No content could be extracted from the URL. The page might be dynamically generated or protected.")
+        throw new Error(
+          "No content could be extracted from the URL. The page might be dynamically generated or protected.",
+        )
       }
 
       setContent(fetchedContent)
 
       toast({
         title: "Content fetched successfully",
-        description: `Extracted ${data.wordCount || getWordCount(fetchedContent)} words${data.title ? ` from "${data.title}"` : ' from URL'}`,
+        description: `Extracted ${data.wordCount || getWordCount(fetchedContent)} words${data.title ? ` from "${data.title}"` : " from URL"}`,
       })
     } catch (error) {
       console.error("URL fetch error:", error)
@@ -382,7 +403,9 @@ export default function Summarizer() {
     }
 
     if (content.length < 100) {
-      setError("Content is too short to summarize effectively. Please provide at least 100 characters for better results.")
+      setError(
+        "Content is too short to summarize effectively. Please provide at least 100 characters for better results.",
+      )
       return
     }
 
@@ -409,7 +432,7 @@ export default function Summarizer() {
         selectedProvider,
         selectedModel,
       )
-      
+
       console.log("Summary result received:", summaryResult)
 
       const originalLength = content.length
@@ -440,9 +463,9 @@ export default function Summarizer() {
         message: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
         type: typeof error,
-        error
+        error,
       })
-      
+
       setError(errorMessage)
 
       // Don't show toast for API key errors - the error display will handle it
@@ -670,22 +693,20 @@ export default function Summarizer() {
 
   return (
     <RouteGuard requireAuth={true}>
-      {showSetupWizard && (
-        <SetupWizard onClose={() => setShowSetupWizard(false)} />
-      )}
-      
-      <div className="min-h-screen bg-white">
-        <div className="container mx-auto p-8 space-y-8">
+      {showSetupWizard && <SetupWizard onClose={() => setShowSetupWizard(false)} />}
+
+      <div className="min-h-screen bg-white text-gray-900">
+        <div className={containerStyle}>
           {/* Header */}
-          <div className="border-b border-gray-200 pb-8">
+          <header className="mb-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-black rounded-xl">
-                  <FileText className="h-7 w-7 text-white" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <FileText className="h-7 w-7 text-gray-900" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-light text-black tracking-tight">AI Summarizer</h1>
-                  <p className="text-gray-600 mt-2 text-lg">
+                  <h1 className="text-3xl font-bold text-gray-900">AI Summarizer</h1>
+                  <p className={sectionDescriptionStyle}>
                     Transform lengthy content into concise, intelligent summaries
                   </p>
                 </div>
@@ -695,102 +716,105 @@ export default function Summarizer() {
                   <Button
                     onClick={() => setShowSetupWizard(true)}
                     variant="outline"
-                    className="border-blue-300 hover:bg-blue-50 hover:border-blue-400 text-blue-700 bg-transparent"
+                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
                   >
                     Show Setup Guide
                   </Button>
                 )}
-              {(content || result) && (
-                <Button
-                  onClick={clearContent}
-                  variant="outline"
-                  className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                >
-                  Clear All
-                </Button>
-              )}
+                {(content || result) && (
+                  <Button
+                    onClick={clearContent}
+                    variant="outline"
+                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                  >
+                    Clear All
+                  </Button>
+                )}
               </div>
             </div>
-          </div>
+          </header>
 
-          <CompactAIProviderSelector
-            selectedProvider={selectedProvider}
-            onProviderChange={(provider) => setSelectedProvider(provider)}
-            selectedModel={selectedModel}
-            onModelChange={(model) => setSelectedModel(model)}
-          />
+          <section className="mb-6">
+            <CompactAIProviderSelector
+              selectedProvider={selectedProvider}
+              onProviderChange={(provider) => setSelectedProvider(provider)}
+              selectedModel={selectedModel}
+              onModelChange={(model) => setSelectedModel(model)}
+            />
+          </section>
 
           <div className="grid gap-8 lg:grid-cols-3">
             {/* Input Section */}
-            <div className="lg:col-span-2 space-y-8">
+            <div className="lg:col-span-2 space-y-6">
               <Card className="border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100 pb-6">
-                  <CardTitle className="text-black font-medium text-xl">Content Input</CardTitle>
-                  <CardDescription className="text-gray-600 text-base">
+                <CardHeader className="border-b border-gray-100 pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900">Content Input</CardTitle>
+                  <CardDescription className={sectionDescriptionStyle}>
                     Provide content through text input, file upload, or URL extraction
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-8">
+                <CardContent className="p-6">
                   <Tabs defaultValue="text" className="w-full">
                     <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-xl h-12">
                       <TabsTrigger
                         value="text"
-                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                        className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
                       >
-                        Text Input
+                        Text
                       </TabsTrigger>
                       <TabsTrigger
                         value="file"
-                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                        className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
                       >
-                        File Upload
+                        File
                       </TabsTrigger>
                       <TabsTrigger
                         value="url"
-                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                        className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
                       >
-                        From URL
+                        URL
                       </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="text" className="space-y-6 mt-8">
+                    <TabsContent value="text" className="space-y-4 mt-4">
                       <Textarea
                         placeholder="Paste your content here for intelligent summarization..."
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
-                        rows={14}
+                        rows={8}
                         className="resize-none border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400"
                       />
-                      <div className="flex justify-between text-sm border-t border-gray-100 pt-4">
+                      <div className="flex justify-between text-sm border-t border-gray-100 pt-2">
                         <span className="text-gray-500 font-medium">{getWordCount(content)} words</span>
                         <span className="text-gray-500 font-medium">{content.length} characters</span>
                       </div>
                     </TabsContent>
 
-                    <TabsContent value="file" className="space-y-6 mt-8">
+                    <TabsContent value="file" className="space-y-4 mt-4">
                       <FileUploader onFileProcessed={handleFileProcessed} onError={handleFileError} />
                     </TabsContent>
 
-                    <TabsContent value="url" className="space-y-6 mt-8">
+                    <TabsContent value="url" className="space-y-4 mt-4">
                       <div className="flex gap-3">
                         <Input
                           placeholder="https://example.com/article"
                           value={url}
                           onChange={(e) => setUrl(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && !urlFetching && handleUrlFetch()}
-                          className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-12"
+                          className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-10"
                         />
                         <Button
                           onClick={handleUrlFetch}
                           disabled={urlFetching || !url.trim()}
                           variant="outline"
-                          className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 px-6 bg-transparent h-12"
+                          className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 px-5 bg-transparent h-10"
                         >
                           {urlFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link className="h-4 w-4" />}
                         </Button>
                       </div>
                       <p className="text-sm text-gray-500">
-                        Enter a URL to automatically extract and summarize its content. Works best with article pages and blog posts.
+                        Enter a URL to automatically extract and summarize its content. Works best with article pages
+                        and blog posts.
                       </p>
                     </TabsContent>
                   </Tabs>
@@ -799,51 +823,51 @@ export default function Summarizer() {
 
               {/* Configuration */}
               <Card className="border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100 pb-6">
-                  <CardTitle className="text-black font-medium text-xl">Summary Configuration</CardTitle>
-                  <CardDescription className="text-gray-600 text-base">
+                <CardHeader className="border-b border-gray-100 pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900">Summary Configuration</CardTitle>
+                  <CardDescription className={sectionDescriptionStyle}>
                     Customize the style and length of your summary
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-8 md:grid-cols-2 p-8">
+                <CardContent className="grid gap-4 md:grid-cols-2 p-6">
                   <div>
-                    <label className="text-sm font-medium mb-3 block text-gray-700">Summary Style</label>
+                    <label className="text-sm font-medium mb-2 block text-gray-700">Summary Style</label>
                     <Select value={summaryStyle} onValueChange={(value: any) => setSummaryStyle(value)}>
-                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-12">
+                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200">
                         <SelectItem value="academic" className="hover:bg-gray-50">
-                          Academic - Formal and structured
+                          Academic
                         </SelectItem>
                         <SelectItem value="executive" className="hover:bg-gray-50">
-                          Executive - Business-focused
+                          Executive
                         </SelectItem>
                         <SelectItem value="bullet-points" className="hover:bg-gray-50">
-                          Bullet Points - Easy to scan
+                          Bullet Points
                         </SelectItem>
                         <SelectItem value="detailed" className="hover:bg-gray-50">
-                          Detailed - Comprehensive analysis
+                          Detailed
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-3 block text-gray-700">Summary Length</label>
+                    <label className="text-sm font-medium mb-2 block text-gray-700">Summary Length</label>
                     <Select value={summaryLength} onValueChange={(value: any) => setSummaryLength(value)}>
-                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-12">
+                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200">
                         <SelectItem value="brief" className="hover:bg-gray-50">
-                          Brief - Quick overview
+                          Brief
                         </SelectItem>
                         <SelectItem value="medium" className="hover:bg-gray-50">
-                          Medium - Balanced detail
+                          Medium
                         </SelectItem>
                         <SelectItem value="comprehensive" className="hover:bg-gray-50">
-                          Comprehensive - Full analysis
+                          Comprehensive
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -851,170 +875,67 @@ export default function Summarizer() {
                 </CardContent>
               </Card>
 
-              {error && (
-                <ErrorDisplay 
-                  error={error} 
-                  onRetry={retryLastAction}
-                  onShowHelp={() => setShowSetupWizard(true)}
-                />
-              )}
+              {error && <ErrorDisplay error={error} onRetry={retryLastAction} onShowHelp={() => {}} />}
 
-              <div className="space-y-3">
-                <Button
-                  onClick={generateSummary}
-                  disabled={loading || !content.trim()}
-                  className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 h-auto transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                      Generating Summary...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-5 w-5 mr-3" />
-                      Generate Summary
-                    </>
-                  )}
-                </Button>
-                
-                {/* Quick test button for debugging */}
-                <div className="space-y-2">
-                  <Button
-                    onClick={async () => {
-                      try {
-                        const testResponse = await fetch('/api/ai/providers', {
-                          credentials: 'include'
-                        })
-                        const data = await testResponse.json()
-                        console.log('Provider test result:', data)
-                        toast({
-                          title: "Provider Test",
-                          description: `Found ${data.userProviders?.length || 0} user providers, ${data.envProviders?.length || 0} env providers`,
-                        })
-                      } catch (error) {
-                        console.error('Provider test failed:', error)
-                        toast({
-                          title: "Provider Test Failed",
-                          description: error instanceof Error ? error.message : "Unknown error",
-                          variant: "destructive"
-                        })
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                  >
-                    Test AI Providers
-                  </Button>
-                  
-                                     <Button
-                     onClick={async () => {
-                       try {
-                         console.log('Testing AI generation with simple prompt...')
-                         const testResponse = await fetch('/api/ai/generate', {
-                           method: 'POST',
-                           headers: {
-                             'Content-Type': 'application/json'
-                           },
-                           credentials: 'include',
-                           body: JSON.stringify({
-                             prompt: 'Say "Hello, this is a test response from the AI service."',
-                             maxTokens: 100
-                           })
-                         })
-                         
-                         console.log('AI generate response status:', testResponse.status)
-                         const data = await testResponse.json()
-                         console.log('AI generate response data:', data)
-                         
-                         if (data.success && data.content) {
-                           toast({
-                             title: "AI Test Success",
-                             description: `Response: ${data.content.substring(0, 50)}...`,
-                           })
-                         } else {
-                           toast({
-                             title: "AI Test Failed",
-                             description: data.error || "No content returned",
-                             variant: "destructive"
-                           })
-                         }
-                       } catch (error) {
-                         console.error('AI test failed:', error)
-                         toast({
-                           title: "AI Test Failed",
-                           description: error instanceof Error ? error.message : "Unknown error",
-                           variant: "destructive"
-                         })
-                       }
-                     }}
-                     variant="outline"
-                     size="sm"
-                     className="w-full"
-                   >
-                     Test AI Generation
-                   </Button>
-                   
-                   <Button
-                     onClick={() => {
-                       const testContent = "This is a test document for summarization. It contains multiple sentences to test the summarization functionality. The summarizer should be able to process this content and generate a meaningful summary with key points. This test will help us identify if there are any issues with the summarization process."
-                       setContent(testContent)
-                       toast({
-                         title: "Test Content Added",
-                         description: "Sample text has been loaded for testing",
-                       })
-                     }}
-                     variant="outline"
-                     size="sm"
-                     className="w-full"
-                   >
-                     Load Test Content
-                   </Button>
-                </div>
-              </div>
+              <Button
+                onClick={generateSummary}
+                disabled={loading || !content.trim()}
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 h-auto transition-colors rounded-md"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating Summary...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate Summary
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Results Section */}
-            <div className="space-y-8">
+            <div className="space-y-6">
               {result && (
                 <>
                   {/* Summary Stats */}
                   <Card className="border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100 pb-6">
-                      <CardTitle className="text-lg text-black font-medium">Summary Statistics</CardTitle>
+                    <CardHeader className="border-b border-gray-100 pb-4">
+                      <CardTitle className="text-lg font-medium text-gray-900">Summary Statistics</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-6 p-8">
+                    <CardContent className="space-y-3 p-6">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Reading Time</span>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-medium text-black">{result.readingTime} min</span>
+                          <span className="text-sm font-medium text-gray-900">{result.readingTime} min</span>
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                      <div className="flex justify-between items-center border-t border-gray-100 pt-3">
                         <span className="text-sm text-gray-600">Compression</span>
                         <div className="flex items-center gap-2">
                           <TrendingUp className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-medium text-black">{result.compressionRatio}</span>
+                          <span className="text-sm font-medium text-gray-900">{result.compressionRatio}</span>
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                      <div className="flex justify-between items-center border-t border-gray-100 pt-3">
                         <span className="text-sm text-gray-600">Word Count</span>
-                        <span className="text-sm font-medium text-black">{getWordCount(result.summary)} words</span>
+                        <span className="text-sm font-medium text-gray-900">{getWordCount(result.summary)} words</span>
                       </div>
 
                       {result.sentiment && (
-                        <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                        <div className="flex justify-between items-center border-t border-gray-100 pt-3">
                           <span className="text-sm text-gray-600">Sentiment</span>
                           <Badge className={getSentimentColor(result.sentiment)}>{result.sentiment}</Badge>
                         </div>
                       )}
 
                       {result.difficulty && (
-                        <div className="flex justify-between items-center border-t border-gray-100 pt-6">
+                        <div className="flex justify-between items-center border-t border-gray-100 pt-3">
                           <span className="text-sm text-gray-600">Difficulty</span>
                           <Badge className={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
                         </div>
@@ -1025,10 +946,10 @@ export default function Summarizer() {
                   {/* Topics */}
                   {result.topics && result.topics.length > 0 && (
                     <Card className="border-gray-200 shadow-sm bg-white">
-                      <CardHeader className="border-b border-gray-100 pb-6">
-                        <CardTitle className="text-lg text-black font-medium">Key Topics</CardTitle>
+                      <CardHeader className="border-b border-gray-100 pb-4">
+                        <CardTitle className="text-lg font-medium text-gray-900">Key Topics</CardTitle>
                       </CardHeader>
-                      <CardContent className="p-8">
+                      <CardContent className="p-6">
                         <div className="flex flex-wrap gap-2">
                           {result.topics.map((topic, index) => (
                             <Badge
@@ -1046,14 +967,14 @@ export default function Summarizer() {
 
                   {/* Key Points */}
                   <Card className="border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100 pb-6">
-                      <CardTitle className="text-lg text-black font-medium">Key Points</CardTitle>
+                    <CardHeader className="border-b border-gray-100 pb-4">
+                      <CardTitle className="text-lg font-medium text-gray-900">Key Points</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-8">
-                      <ul className="space-y-4">
+                    <CardContent className="p-6">
+                      <ul className="space-y-3">
                         {result.keyPoints.map((point, index) => (
                           <li key={index} className="flex items-start gap-4">
-                            <div className="w-2 h-2 bg-black rounde-full mt-2 flex-shrink-0"></div>
+                            <div className="w-2 h-2 bg-black rounded-full mt-2 flex-shrink-0" />
                             <span className="text-sm text-gray-800 leading-relaxed">{point}</span>
                           </li>
                         ))}
@@ -1061,17 +982,17 @@ export default function Summarizer() {
                     </CardContent>
                   </Card>
 
-                  {/* Summary */}
+                  {/* Summary Output */}
                   <Card className="border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100 pb-6">
+                    <CardHeader className="border-b border-gray-100 pb-4">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg text-black font-medium">Generated Summary</CardTitle>
+                        <CardTitle className="text-lg font-medium text-gray-900">Generated Summary</CardTitle>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => copyToClipboard(result.summary)}
-                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
+                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700"
                           >
                             {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                           </Button>
@@ -1094,10 +1015,10 @@ export default function Summarizer() {
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-8">
+                    <CardContent className="p-6">
                       <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
                         {result.summary.split("\n").map((paragraph, index) => (
-                          <p key={index} className="mb-4 last:mb-0">
+                          <p key={index} className="mb-3 last:mb-0">
                             {paragraph}
                           </p>
                         ))}

@@ -569,4 +569,4 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
       </Dialog>
     </div>
   )
-} 
+}

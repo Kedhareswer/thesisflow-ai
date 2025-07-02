@@ -122,4 +122,4 @@ export async function requireAuth(request: Request, source = "api") {
     throw new Error('Authentication required')
   }
   return user
-} 
+}

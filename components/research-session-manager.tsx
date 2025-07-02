@@ -400,4 +400,4 @@ export function ResearchSessionManager({ className }: ResearchSessionManagerProp
       </Card>
     </div>
   )
-} 
+}

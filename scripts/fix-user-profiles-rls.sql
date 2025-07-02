@@ -124,4 +124,4 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_display_name ON user_profiles(displ
 COMMENT ON POLICY "user_profiles_select_all" ON user_profiles IS 'Allow all authenticated users to view all profiles for collaboration';
 COMMENT ON POLICY "user_profiles_insert_own" ON user_profiles IS 'Users can only insert their own profile';
 COMMENT ON POLICY "user_profiles_update_own" ON user_profiles IS 'Users can only update their own profile';
-COMMENT ON POLICY "user_profiles_delete_own" ON user_profiles IS 'Users can only delete their own profile'; 
+COMMENT ON POLICY "user_profiles_delete_own" ON user_profiles IS 'Users can only delete their own profile';

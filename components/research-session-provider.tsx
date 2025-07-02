@@ -211,4 +211,4 @@ export function useResearchTopics(): {
     addTopic,
     updateTopic
   }), [session.topics, session.currentTopic, addTopic, updateTopic])
-} 
+}

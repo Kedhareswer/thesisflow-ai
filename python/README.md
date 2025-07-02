@@ -1,5 +1,5 @@
 ... This file was left out for brevity. Assume it is correct and does not need any modifications. ...
 \`\`\`
 
-```python file="python/app.py"
+\`\`\`python file="python/app.py"
 ... This file was left out for brevity. Assume it is correct and does not need any modifications. ...

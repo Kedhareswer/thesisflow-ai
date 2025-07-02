@@ -48,4 +48,4 @@ async function runMigration() {
   }
 }
 
-runMigration(); 
+runMigration();

@@ -109,59 +109,59 @@ Get expert guidance powered by multiple AI providers.
 ### Installation
 
 1. Clone the repository
-```bash
+\`\`\`bash
 git clone https://github.com/Kedhareswer/ai-project-planner.git
 cd ai-project-planner
-```
+\`\`\`
 
 2. Install frontend dependencies
-```bash
+\`\`\`bash
 pnpm install
-```
+\`\`\`
 
 3. Set up environment variables
-```bash
+\`\`\`bash
 cp env.template .env.local
-```
+\`\`\`
 Edit `.env.local` with your API keys and configuration.
 
 4. Set up the Python backend (for literature search functionality)
-```bash
+\`\`\`bash
 cd python
 ./setup.bat
-```
+\`\`\`
 
 ## 🔧 Usage
 
 ### Development Server
 
 1. Start the Next.js frontend and WebSocket server:
-```bash
+\`\`\`bash
 pnpm dev:all
-```
+\`\`\`
 
 This will start both the Next.js frontend on port 3000 and the WebSocket server for real-time features.
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 2. In a separate terminal, start the Python backend (if needed):
-```bash
+\`\`\`bash
 cd python
 python app.py
-```
+\`\`\`
 
 The Python backend will run on port 5000 and handle paper search functionality.
 
 ### Production Build
 
-```bash
+\`\`\`bash
 pnpm build
 pnpm start:all
-```
+\`\`\`
 
 ## 📊 System Architecture
 
-```mermaid
+\`\`\`mermaid
 flowchart TD
     Client[Client Browser] --> NextJS[Next.js Frontend]
     Client <--> WebSockets[WebSocket Server]
@@ -207,7 +207,7 @@ flowchart TD
         PythonBackend
         PyGetPapers
     end
-```
+\`\`\`
 
 ## 📊 Performance Metrics
 
@@ -243,7 +243,7 @@ flowchart TD
 
 ### Feature Usage Distribution
 
-```mermaid
+\`\`\`mermaid
 pie title Feature Usage Distribution
     "Research Explorer" : 35
     "Smart Summarizer" : 25
@@ -251,7 +251,7 @@ pie title Feature Usage Distribution
     "Collaboration Hub" : 12
     "Idea Workspace" : 5
     "AI Research Assistant" : 3
-```
+\`\`\`
 
 ## 🔒 Security & Permissions
 
@@ -310,7 +310,7 @@ pie title Feature Usage Distribution
 
 ## 📂 Project Structure
 
-```
+\`\`\`
 ai-project-planner/
 ├── app/                  # Next.js app directory
 │   ├── ai-assistant/     # AI assistant feature
@@ -327,7 +327,7 @@ ai-project-planner/
 ├── python/               # Python backend for literature review
 ├── scripts/              # Database setup and migration scripts
 └── public/               # Static assets
-```
+\`\`\`
 
 ## 🤝 Contributing
 

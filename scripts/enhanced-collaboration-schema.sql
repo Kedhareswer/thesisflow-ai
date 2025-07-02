@@ -377,4 +377,4 @@ COMMENT ON TABLE invitation_rate_limits IS 'Rate limiting for invitations (max 2
 
 COMMENT ON FUNCTION can_assign_role(UUID, UUID, TEXT) IS 'Check if user can assign specific role (owner assigns admin, owner/admin assign others)';
 COMMENT ON FUNCTION check_invitation_limit(UUID, UUID) IS 'Verify user can invite to team (max 2 teams per day)';
-COMMENT ON FUNCTION create_notification(UUID, TEXT, TEXT, TEXT, JSONB, TEXT) IS 'Create notification respecting user preferences'; 
+COMMENT ON FUNCTION create_notification(UUID, TEXT, TEXT, TEXT, JSONB, TEXT) IS 'Create notification respecting user preferences';

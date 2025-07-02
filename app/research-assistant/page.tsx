@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Lightbulb, Search, BookOpen, TrendingUp, AlertCircle, Loader2, Plus, Save, Trash2 } from "lucide-react"
+import { Lightbulb, BookOpen, AlertCircle, Loader2, Plus, Save, Trash2 } from "lucide-react"
 import { enhancedAIService, type ResearchResult } from "@/lib/enhanced-ai-service"
 import { projectService, type ResearchIdea } from "@/lib/services/project.service"
 import { useToast } from "@/hooks/use-toast"
@@ -15,6 +15,10 @@ import { supabase } from "@/integrations/supabase/client"
 import { RouteGuard } from "@/components/route-guard"
 import type { AIProvider } from "@/lib/ai-providers"
 import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
+
+const containerStyle = "container mx-auto p-8 max-w-4xl"
+const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
+const sectionDescriptionStyle = "text-gray-600"
 
 interface GeneratedIdea {
   title: string
@@ -180,58 +184,57 @@ export default function ResearchAssistant() {
 
   return (
     <RouteGuard requireAuth={true}>
-      <div className="min-h-screen bg-white">
-        <div className="container mx-auto p-8 space-y-8">
+      <div className="min-h-screen bg-white text-gray-900">
+        <div className={containerStyle}>
           {/* Header */}
-          <div className="border-b border-gray-200 pb-8">
+          <header className="mb-8">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-black rounded-xl">
-                <Lightbulb className="h-7 w-7 text-white" />
+              <div className="p-3 bg-gray-100 rounded-xl">
+                <Lightbulb className="h-7 w-7 text-gray-900" />
               </div>
               <div>
-                <h1 className="text-4xl font-light text-black tracking-tight">Research Ideas</h1>
-                <p className="text-gray-600 mt-2 text-lg">Generate innovative research concepts with AI assistance</p>
+                <h1 className="text-3xl font-bold text-gray-900">Research Ideas</h1>
+                <p className={sectionDescriptionStyle}>Generate innovative research concepts with AI assistance</p>
               </div>
             </div>
-          </div>
+          </header>
 
-          <CompactAIProviderSelector
-            selectedProvider={selectedProvider}
-            onProviderChange={(provider) => setSelectedProvider(provider)}
-            selectedModel={selectedModel}
-            onModelChange={(model) => setSelectedModel(model)}
-          />
+          <section className="mb-6">
+            <CompactAIProviderSelector
+              selectedProvider={selectedProvider}
+              onProviderChange={(provider) => setSelectedProvider(provider)}
+              selectedModel={selectedModel}
+              onModelChange={(model) => setSelectedModel(model)}
+            />
+          </section>
 
           <Tabs defaultValue="generate" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-xl h-12">
               <TabsTrigger
                 value="generate"
-                className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
               >
                 Generate Ideas
               </TabsTrigger>
               <TabsTrigger
                 value="saved"
-                className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm text-gray-600 font-medium rounded-lg"
+                className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
               >
                 Saved Ideas ({savedIdeas.length})
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="generate" className="space-y-8 mt-8">
+            <TabsContent value="generate" className="space-y-6 mt-6">
               <Card className="border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100 pb-6">
-                  <CardTitle className="flex items-center gap-3 text-black font-medium text-xl">
-                    <Search className="h-5 w-5" />
-                    Research Topic Input
-                  </CardTitle>
-                  <CardDescription className="text-gray-600 text-base">
+                <CardHeader className="border-b border-gray-100 pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900">Research Topic Input</CardTitle>
+                  <CardDescription className={sectionDescriptionStyle}>
                     Enter your research topic and optional context to generate innovative research ideas
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6 p-8">
+                <CardContent className="space-y-4 p-6">
                   <div>
-                    <label htmlFor="topic" className="text-sm font-medium mb-3 block text-gray-700">
+                    <label htmlFor="topic" className="text-sm font-medium mb-2 block text-gray-700">
                       Research Topic *
                     </label>
                     <Input
@@ -240,12 +243,12 @@ export default function ResearchAssistant() {
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && !loading && generateIdeas()}
-                      className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-12"
+                      className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-10"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="context" className="text-sm font-medium mb-3 block text-gray-700">
+                    <label htmlFor="context" className="text-sm font-medium mb-2 block text-gray-700">
                       Additional Context (Optional)
                     </label>
                     <Textarea
@@ -259,25 +262,25 @@ export default function ResearchAssistant() {
                   </div>
 
                   {error && (
-                    <Alert variant="destructive" className="border-gray-300 bg-gray-50">
-                      <AlertCircle className="h-4 w-4 text-gray-700" />
-                      <AlertDescription className="text-gray-700">{error}</AlertDescription>
+                    <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
+                      <AlertCircle className="h-4 w-4 text-red-700" />
+                      <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
 
                   <Button
                     onClick={generateIdeas}
                     disabled={loading || !topic.trim()}
-                    className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 h-auto transition-colors rounded-lg"
+                    className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 h-auto transition-colors rounded-md"
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                        Generating Research Ideas...
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating Ideas...
                       </>
                     ) : (
                       <>
-                        <Lightbulb className="h-5 w-5 mr-3" />
+                        <Lightbulb className="h-4 w-4 mr-2" />
                         Generate Research Ideas
                       </>
                     )}
@@ -286,19 +289,18 @@ export default function ResearchAssistant() {
               </Card>
 
               {ideas.length > 0 && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-light text-black flex items-center gap-3">
-                    <TrendingUp className="h-6 w-6" />
-                    Generated Research Ideas
-                  </h2>
+                <section className="space-y-6">
+                  <h2 className="text-xl font-medium text-gray-900">Generated Research Ideas</h2>
 
                   {ideas.map((idea, index) => (
                     <Card key={index} className="border-gray-200 shadow-sm bg-white">
-                      <CardHeader className="pb-4">
+                      <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
-                            <CardTitle className="text-xl font-medium text-black leading-tight">{idea.title}</CardTitle>
-                            <CardDescription className="mt-3 text-gray-600 text-base leading-relaxed">
+                            <CardTitle className="text-lg font-medium text-gray-900 leading-tight">
+                              {idea.title}
+                            </CardTitle>
+                            <CardDescription className="mt-2 text-gray-600 text-sm leading-relaxed">
                               {idea.description}
                             </CardDescription>
                           </div>
@@ -311,7 +313,7 @@ export default function ResearchAssistant() {
                               className={
                                 idea.saved
                                   ? "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                                  : "bg-black hover:bg-gray-800 text-white"
+                                  : "bg-gray-900 hover:bg-gray-800 text-white"
                               }
                             >
                               {saving === idea.title ? (
@@ -332,10 +334,10 @@ export default function ResearchAssistant() {
                         </div>
                       </CardHeader>
 
-                      <CardContent className="space-y-5 pt-0">
+                      <CardContent className="space-y-3 pt-0">
                         {idea.research_question && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Research Question
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.research_question}</p>
@@ -343,8 +345,8 @@ export default function ResearchAssistant() {
                         )}
 
                         {idea.methodology && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Methodology
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.methodology}</p>
@@ -352,8 +354,8 @@ export default function ResearchAssistant() {
                         )}
 
                         {idea.impact && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Potential Impact
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.impact}</p>
@@ -361,8 +363,8 @@ export default function ResearchAssistant() {
                         )}
 
                         {idea.challenges && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Challenges
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.challenges}</p>
@@ -371,24 +373,24 @@ export default function ResearchAssistant() {
                       </CardContent>
                     </Card>
                   ))}
-                </div>
+                </section>
               )}
             </TabsContent>
 
-            <TabsContent value="saved" className="space-y-8 mt-8">
+            <TabsContent value="saved" className="space-y-6 mt-6">
               {savedIdeas.length === 0 ? (
                 <Card className="border-gray-200 shadow-sm bg-white">
-                  <CardContent className="text-center py-16">
-                    <div className="p-4 bg-gray-50 rounded-full w-fit mx-auto mb-6">
-                      <BookOpen className="h-12 w-12 text-gray-400" />
+                  <CardContent className="text-center py-12">
+                    <div className="p-3 bg-gray-50 rounded-full w-fit mx-auto mb-4">
+                      <BookOpen className="h-8 w-8 text-gray-400" />
                     </div>
-                    <h3 className="text-xl font-medium mb-3 text-black">No saved research ideas</h3>
-                    <p className="text-gray-600 mb-8 text-base max-w-md mx-auto">
+                    <h3 className="text-xl font-medium mb-2 text-gray-900">No saved research ideas</h3>
+                    <p className="text-gray-600 mb-6 text-base max-w-md mx-auto">
                       Generate and save research ideas to build your collection and track your research interests
                     </p>
                     <Button
                       onClick={() => setTopic("")}
-                      className="bg-black hover:bg-gray-800 text-white font-medium px-6 py-3"
+                      className="bg-gray-900 hover:bg-gray-800 text-white font-medium px-5 py-2"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Generate New Ideas
@@ -396,19 +398,18 @@ export default function ResearchAssistant() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-light text-black flex items-center gap-3">
-                    <BookOpen className="h-6 w-6" />
-                    Your Research Ideas Collection
-                  </h2>
+                <section className="space-y-6">
+                  <h2 className="text-xl font-medium text-gray-900">Your Research Ideas Collection</h2>
 
                   {savedIdeas.map((idea) => (
                     <Card key={idea.id} className="border-gray-200 shadow-sm bg-white">
-                      <CardHeader className="pb-4">
+                      <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
-                            <CardTitle className="text-xl font-medium text-black leading-tight">{idea.title}</CardTitle>
-                            <CardDescription className="mt-3 text-gray-600 text-base leading-relaxed">
+                            <CardTitle className="text-lg font-medium text-gray-900 leading-tight">
+                              {idea.title}
+                            </CardTitle>
+                            <CardDescription className="mt-2 text-gray-600 text-sm leading-relaxed">
                               {idea.description}
                             </CardDescription>
                           </div>
@@ -424,10 +425,10 @@ export default function ResearchAssistant() {
                         </div>
                       </CardHeader>
 
-                      <CardContent className="space-y-5 pt-0">
+                      <CardContent className="space-y-3 pt-0">
                         {idea.research_question && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Research Question
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.research_question}</p>
@@ -435,8 +436,8 @@ export default function ResearchAssistant() {
                         )}
 
                         {idea.methodology && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Methodology
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.methodology}</p>
@@ -444,8 +445,8 @@ export default function ResearchAssistant() {
                         )}
 
                         {idea.impact && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Potential Impact
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.impact}</p>
@@ -453,8 +454,8 @@ export default function ResearchAssistant() {
                         )}
 
                         {idea.challenges && (
-                          <div className="border-t border-gray-100 pt-5">
-                            <h4 className="font-medium text-sm text-gray-500 mb-2 uppercase tracking-wide">
+                          <div className="border-t border-gray-100 pt-3">
+                            <h4 className="font-medium text-sm text-gray-500 mb-1 uppercase tracking-wide">
                               Challenges
                             </h4>
                             <p className="text-sm text-gray-800 leading-relaxed">{idea.challenges}</p>
@@ -463,7 +464,7 @@ export default function ResearchAssistant() {
                       </CardContent>
                     </Card>
                   ))}
-                </div>
+                </section>
               )}
             </TabsContent>
           </Tabs>

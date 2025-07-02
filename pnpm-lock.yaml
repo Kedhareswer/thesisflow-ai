@@ -132,7 +132,7 @@ importers:
         specifier: ^10.4.20
         version: 10.4.21(postcss@8.5.6)
       cheerio:
-        specifier: ^1.0.0
+        specifier: latest
         version: 1.1.0
       child_process:
         specifier: latest
@@ -157,13 +157,16 @@ importers:
         version: 4.1.0
       dotenv:
         specifier: latest
-        version: 17.0.0
+        version: 17.0.1
       embla-carousel-react:
         specifier: latest
         version: 8.6.0(react@19.0.0)
       file-saver:
         specifier: latest
         version: 2.0.5
+      fs:
+        specifier: latest
+        version: 0.0.1-security
       http:
         specifier: latest
         version: 0.0.1-security
@@ -189,16 +192,16 @@ importers:
         specifier: latest
         version: 0.12.7
       pdf-parse:
-        specifier: ^1.1.1
+        specifier: latest
         version: 1.1.1
       react:
-        specifier: 19.0.0
+        specifier: ^19
         version: 19.0.0
       react-day-picker:
         specifier: latest
         version: 9.7.0(react@19.0.0)
       react-dom:
-        specifier: 19.0.0
+        specifier: ^19
         version: 19.0.0(react@19.0.0)
       react-hook-form:
         specifier: latest
@@ -213,10 +216,10 @@ importers:
         specifier: latest
         version: 0.34.2
       socket.io:
-        specifier: ^4.8.1
+        specifier: latest
         version: 4.8.1
       socket.io-client:
-        specifier: ^4.8.1
+        specifier: latest
         version: 4.8.1
       sonner:
         specifier: latest
@@ -2494,8 +2497,8 @@ packages:
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
 
-  dotenv@17.0.0:
-    resolution: {integrity: sha512-A0BJ5lrpJVSfnMMXjmeO0xUnoxqsBHWCoqqTnGwGYVdnctqXXUEhJOO7LxmgxJon9tEZFGpe0xPRX0h2v3AANQ==}
+  dotenv@17.0.1:
+    resolution: {integrity: sha512-GLjkduuAL7IMJg/ZnOPm9AnWKJ82mSE2tzXLaJ/6hD6DhwGfZaXG77oB8qbReyiczNxnbxQKyh0OE5mXq0bAHA==}
     engines: {node: '>=12'}
 
   duck@0.1.12:
@@ -2607,6 +2610,9 @@ packages:
 
   fraction.js@4.3.7:
     resolution: {integrity: sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==}
+
+  fs@0.0.1-security:
+    resolution: {integrity: sha512-3XY9e1pP0CVEUCdj5BmfIZxRBTSDycnbqhIOGec9QYtmVH2fbLpj86CFWkrNOkt/Fvty4KZG5lTglL9j/gJ87w==}
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -5731,7 +5737,7 @@ snapshots:
       domelementtype: 2.3.0
       domhandler: 5.0.3
 
-  dotenv@17.0.0: {}
+  dotenv@17.0.1: {}
 
   duck@0.1.12:
     dependencies:
@@ -5870,6 +5876,8 @@ snapshots:
       signal-exit: 4.1.0
 
   fraction.js@4.3.7: {}
+
+  fs@0.0.1-security: {}
 
   fsevents@2.3.3:
     optional: true

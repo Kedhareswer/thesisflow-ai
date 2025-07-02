@@ -429,4 +429,4 @@ class ResearchSessionService {
   }
 }
 
-export const researchSessionService = ResearchSessionService.getInstance() 
+export const researchSessionService = ResearchSessionService.getInstance()

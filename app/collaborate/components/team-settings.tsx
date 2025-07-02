@@ -1021,4 +1021,4 @@ export function TeamSettings({
       </DialogContent>
     </Dialog>
   )
-} 
+}
