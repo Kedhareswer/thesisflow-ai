@@ -1,121 +1,216 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Bell, Check, CheckCheck, Settings, Trash2, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { useToast } from '@/components/ui/use-toast'
-import { formatDistanceToNow } from 'date-fns'
-import { useSocket } from '@/components/socket-provider'
-import Link from 'next/link'
-import type { Socket } from 'socket.io-client'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Bell, Loader2, Settings, Trash2, X, Check } from 'lucide-react'
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { useToast } from "@/hooks/use-toast"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 interface Notification {
   id: string
   type: string
   title: string
   message: string
-  data?: any
   is_read: boolean
   action_url?: string
+  data?: any
   created_at: string
+}
+
+interface NotificationPreferences {
+  team_invitations: boolean
+  member_added: boolean
+  new_messages: boolean
+  message_mentions: boolean
+  document_shared: boolean
+  role_changes: boolean
+  email_notifications: boolean
+  push_notifications: boolean
 }
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false)
+  const [preferences, setPreferences] = useState<NotificationPreferences>({
+    team_invitations: true,
+    member_added: true,
+    new_messages: true,
+    message_mentions: true,
+    document_shared: true,
+    role_changes: true,
+    email_notifications: false,
+    push_notifications: true,
+  })
+  const [isUpdatingPreferences, setIsUpdatingPreferences] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  const { user, session } = useSupabaseAuth()
   const { toast } = useToast()
-  const { socket } = useSocket()
 
-  // Fetch notifications
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const response = await fetch('/api/collaborate/notifications?limit=20')
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications')
-      }
-
-      const data = await response.json()
-      setNotifications(data.notifications || [])
-      setUnreadCount(data.unreadCount || 0)
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
-    } finally {
-      setLoading(false)
-    }
+  // Prevent hydration issues by only rendering after mount
+  useEffect(() => {
+    setMounted(true)
   }, [])
+
+  // API helper function with proper authentication
+  const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
+    if (!session?.access_token) {
+      throw new Error('Authentication required')
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Network error' }))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
+
+    return response.json()
+  }, [session])
+
+  // Load notifications
+  const loadNotifications = useCallback(async () => {
+    if (!user || !session) return
+
+    try {
+      setIsLoading(true)
+      
+      const data = await apiCall('/api/collaborate/notifications?limit=20')
+      
+      if (data.success) {
+        setNotifications(data.notifications || [])
+        setUnreadCount(data.unreadCount || 0)
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error)
+      // Only show toast if it's not an auth error and we have existing notifications
+      if (notifications.length > 0 && !(error instanceof Error && error.message?.includes('Authentication'))) {
+        toast({
+          title: "Error",
+          description: "Failed to load notifications",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, session, apiCall, toast, notifications.length])
+
+  // Load notification preferences
+  const loadPreferences = useCallback(async () => {
+    if (!user || !session) return
+
+    try {
+      const data = await apiCall('/api/collaborate/notification-preferences')
+      
+      if (data.success && data.preferences) {
+        setPreferences({
+          team_invitations: data.preferences.team_invitations,
+          member_added: data.preferences.member_added,
+          new_messages: data.preferences.new_messages,
+          message_mentions: data.preferences.message_mentions,
+          document_shared: data.preferences.document_shared,
+          role_changes: data.preferences.role_changes,
+          email_notifications: data.preferences.email_notifications,
+          push_notifications: data.preferences.push_notifications,
+        })
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error)
+      // Silently fail on preferences load to prevent UI issues
+    }
+  }, [user, session, apiCall])
+
+  // Initial load
+  useEffect(() => {
+    if (user && session) {
+      loadNotifications()
+      loadPreferences()
+    }
+  }, [user, session, loadNotifications, loadPreferences])
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch('/api/collaborate/notifications', {
+      await apiCall('/api/collaborate/notifications', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           notificationId,
-          markAsRead: true
-        })
+          markAsRead: true,
+        }),
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to mark notification as read')
-      }
 
       // Update local state
       setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+        prev.map(notif => 
+          notif.id === notificationId 
+            ? { ...notif, is_read: true }
+            : notif
+        )
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
-
-      // Notify server via WebSocket if available
-      if (socket && 'emit' in socket) {
-        (socket as Socket).emit('mark-notification-read', notificationId)
-      }
     } catch (error) {
       console.error('Error marking notification as read:', error)
+      toast({
+        title: "Error",
+        description: "Failed to mark notification as read",
+        variant: "destructive",
+      })
     }
   }
 
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('/api/collaborate/notifications', {
+      await apiCall('/api/collaborate/notifications', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          markAllAsRead: true
-        })
+          markAllAsRead: true,
+        }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to mark all notifications as read')
-      }
-
       // Update local state
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+      setNotifications(prev => 
+        prev.map(notif => ({ ...notif, is_read: true }))
+      )
       setUnreadCount(0)
-
+      
       toast({
-        title: 'Success',
-        description: 'All notifications marked as read'
+        title: "Success",
+        description: "All notifications marked as read",
       })
     } catch (error) {
       console.error('Error marking all as read:', error)
       toast({
-        title: 'Error',
-        description: 'Failed to mark notifications as read',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to mark all notifications as read",
+        variant: "destructive",
       })
     }
   }
@@ -123,233 +218,313 @@ export default function NotificationBell() {
   // Delete notification
   const deleteNotification = async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/collaborate/notifications?id=${notificationId}`, {
-        method: 'DELETE'
+      await apiCall(`/api/collaborate/notifications?id=${notificationId}`, {
+        method: 'DELETE',
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to delete notification')
-      }
-
       // Update local state
-      setNotifications(prev => prev.filter(n => n.id !== notificationId))
+      const deletedNotification = notifications.find(n => n.id === notificationId)
+      setNotifications(prev => prev.filter(notif => notif.id !== notificationId))
       
-      // Update unread count if necessary
-      const notification = notifications.find(n => n.id === notificationId)
-      if (notification && !notification.is_read) {
+      if (deletedNotification && !deletedNotification.is_read) {
         setUnreadCount(prev => Math.max(0, prev - 1))
       }
     } catch (error) {
       console.error('Error deleting notification:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete notification",
+        variant: "destructive",
+      })
     }
   }
 
   // Clear all read notifications
-  const clearAll = async () => {
+  const clearAllRead = async () => {
     try {
-      const response = await fetch('/api/collaborate/notifications?all=true', {
-        method: 'DELETE'
+      await apiCall('/api/collaborate/notifications?all=true', {
+        method: 'DELETE',
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to clear notifications')
-      }
-
-      // Update local state - keep only unread
-      setNotifications(prev => prev.filter(n => !n.is_read))
-
+      // Update local state - remove all read notifications
+      setNotifications(prev => prev.filter(notif => !notif.is_read))
+      
       toast({
-        title: 'Success',
-        description: 'Cleared all read notifications'
+        title: "Success",
+        description: "All read notifications cleared",
       })
     } catch (error) {
       console.error('Error clearing notifications:', error)
       toast({
-        title: 'Error',
-        description: 'Failed to clear notifications',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to clear notifications",
+        variant: "destructive",
       })
     }
   }
 
-  // Socket event handlers
-  useEffect(() => {
-    if (socket && 'on' in socket && 'off' in socket) {
-      const socketInstance = socket as Socket
+  // Update preferences
+  const updatePreferences = async (updates: Partial<NotificationPreferences>) => {
+    try {
+      setIsUpdatingPreferences(true)
       
-      // Handle new notifications
-      const handleNotification = (notification: Notification) => {
-        // Add to top of list
-        setNotifications(prev => [notification, ...prev])
-        setUnreadCount(prev => prev + 1)
+      await apiCall('/api/collaborate/notification-preferences', {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      })
 
-        // Show toast for important notifications
-        toast({
-          title: notification.title,
-          description: notification.message,
-          action: notification.action_url ? (
-            <Link href={notification.action_url}>
-              <Button size="sm" variant="outline">View</Button>
-            </Link>
-          ) : undefined
-        })
-      }
-
-      socketInstance.on('notification', handleNotification)
-
-      return () => {
-        socketInstance.off('notification', handleNotification)
-      }
+      setPreferences(prev => ({ ...prev, ...updates }))
+      
+      toast({
+        title: "Preferences updated",
+        description: "Your notification preferences have been saved",
+      })
+    } catch (error) {
+      console.error('Error updating preferences:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update preferences",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdatingPreferences(false)
     }
-  }, [socket, toast])
+  }
 
-  // Initial fetch
-  useEffect(() => {
-    fetchNotifications()
-  }, [fetchNotifications])
+  // Navigate to notification action
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if not already
+    if (!notification.is_read) {
+      await markAsRead(notification.id)
+    }
 
-  // Get icon for notification type
+    // Navigate to action URL if provided
+    if (notification.action_url) {
+      window.location.href = notification.action_url
+    }
+  }
+
+  // Format time helper
+  const formatTime = (timestamp: string) => {
+    const now = new Date()
+    const notifTime = new Date(timestamp)
+    const diffMs = now.getTime() - notifTime.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return notifTime.toLocaleDateString()
+  }
+
+  // Get notification icon based on type
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'team_invitation':
-        return '📨'
-      case 'join_request':
-        return '🤝'
-      case 'member_added':
         return '👥'
+      case 'join_request':
+        return '📨'
+      case 'member_added':
+        return '✅'
       case 'new_message':
         return '💬'
       case 'message_mention':
-        return '@'
+        return '📌'
       case 'document_shared':
         return '📄'
       case 'role_changed':
-        return '🛡️'
+        return '🔧'
+      case 'team_updated':
+        return '📝'
       default:
         return '🔔'
     }
   }
 
-  const notificationContent = (
-    <div className="w-80">
-      <DropdownMenuLabel className="flex items-center justify-between">
-        <span>Notifications</span>
-        <div className="flex gap-1">
-          {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault()
-                markAllAsRead()
-              }}
-            >
-              <CheckCheck className="h-4 w-4" />
-            </Button>
-          )}
-          <Link href="/settings#notifications">
-            <Button variant="ghost" size="sm">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </DropdownMenuLabel>
-      
-      <DropdownMenuSeparator />
-
-      <ScrollArea className="h-[400px]">
-        {loading ? (
-          <div className="p-4 text-center text-muted-foreground">
-            Loading notifications...
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <Bell className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p>No notifications yet</p>
-          </div>
-        ) : (
-          <div className="py-2">
-            {notifications.map((notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className={`p-3 cursor-pointer ${!notification.is_read ? 'bg-accent/50' : ''}`}
-                onClick={() => {
-                  if (!notification.is_read) {
-                    markAsRead(notification.id)
-                  }
-                  if (notification.action_url) {
-                    window.location.href = notification.action_url
-                  }
-                }}
-              >
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{getNotificationIcon(notification.type)}</span>
-                      <p className="text-sm font-medium leading-none">
-                        {notification.title}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        deleteNotification(notification.id)
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {notification.message}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                  </p>
-                </div>
-              </DropdownMenuItem>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-
-      {notifications.some(n => n.is_read) && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-center cursor-pointer"
-            onClick={clearAll}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear all read
-          </DropdownMenuItem>
-        </>
-      )}
-    </div>
-  )
+  // Don't render anything until mounted or if user is not authenticated
+  if (!mounted || !user || !session) {
+    return null
+  }
 
   return (
-    <DropdownMenu 
-      open={open} 
-      onOpenChange={setOpen}
-      trigger={
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center"
-            >
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </Badge>
+    <div className="relative">
+      <DropdownMenu
+        trigger={
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Badge>
+            )}
+          </Button>
+        }
+        className="w-80 right-0"
+      >
+          <DropdownMenuLabel className="flex items-center justify-between">
+            <span>Notifications</span>
+            <div className="flex items-center gap-2">
+              <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Notification Preferences</DialogTitle>
+                    <DialogDescription>
+                      Choose which notifications you'd like to receive
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-sm">Team Notifications</h4>
+                      {[
+                        { key: 'team_invitations', label: 'Team invitations' },
+                        { key: 'member_added', label: 'New team members' },
+                        { key: 'role_changes', label: 'Role changes' },
+                      ].map((item) => (
+                        <div key={item.key} className="flex items-center justify-between">
+                          <span className="text-sm">{item.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={preferences[item.key as keyof NotificationPreferences]}
+                            onChange={(e) => updatePreferences({ [item.key]: e.target.checked })}
+                            disabled={isUpdatingPreferences}
+                            className="rounded"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-sm">Chat Notifications</h4>
+                      {[
+                        { key: 'new_messages', label: 'New messages' },
+                        { key: 'message_mentions', label: 'When mentioned' },
+                      ].map((item) => (
+                        <div key={item.key} className="flex items-center justify-between">
+                          <span className="text-sm">{item.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={preferences[item.key as keyof NotificationPreferences]}
+                            onChange={(e) => updatePreferences({ [item.key]: e.target.checked })}
+                            disabled={isUpdatingPreferences}
+                            className="rounded"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-sm">File Notifications</h4>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Document sharing</span>
+                        <input
+                          type="checkbox"
+                          checked={preferences.document_shared}
+                          onChange={(e) => updatePreferences({ document_shared: e.target.checked })}
+                          disabled={isUpdatingPreferences}
+                          className="rounded"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              {unreadCount > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={markAllAsRead}
+                  className="text-xs h-6 px-2"
+                >
+                  Mark all read
+                </Button>
+              )}
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : notifications.length > 0 ? (
+            <div className="max-h-96 overflow-y-auto">
+              {notifications.map((notification) => (
+                <DropdownMenuItem
+                  key={notification.id}
+                  className={`p-0 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <div className="w-full p-3 flex items-start gap-3">
+                    <div className="text-lg">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-sm truncate">
+                          {notification.title}
+                        </p>
+                        <div className="flex items-center gap-1 ml-2">
+                          {!notification.is_read && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteNotification(notification.id)
+                            }}
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 truncate">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatTime(notification.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              
+              {notifications.some(n => n.is_read) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={clearAllRead} className="justify-center">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear read notifications
+                  </DropdownMenuItem>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-500">
+              <Bell className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No notifications yet</p>
+            </div>
           )}
-        </Button>
-      }
-    >
-      {notificationContent}
-    </DropdownMenu>
+      </DropdownMenu>
+    </div>
   )
-} 
+}
+
+ 

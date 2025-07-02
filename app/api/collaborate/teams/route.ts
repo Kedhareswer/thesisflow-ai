@@ -26,19 +26,7 @@ export async function GET(request: NextRequest) {
       .from('teams')
       .select(`
         *,
-        team_members!inner(user_id, role, joined_at),
-        members:team_members(
-          user_id,
-          role,
-          joined_at,
-          user_profile:user_profiles!team_members_user_id_fkey(
-            id,
-            full_name,
-            avatar_url,
-            status,
-            last_active
-          )
-        )
+        team_members!inner(user_id, role, joined_at)
       `)
       .eq('team_members.user_id', user.id)
       .order('created_at', { ascending: false });
@@ -65,27 +53,63 @@ export async function GET(request: NextRequest) {
 
     let allTeams = userTeams || [];
 
+    // Get all team members for these teams with their profiles
+    if (allTeams.length > 0) {
+      const teamIds = allTeams.map(team => team.id);
+      
+      const { data: teamMembersData, error: membersError } = await supabaseAdmin
+        .from('team_members')
+        .select(`
+          team_id,
+          user_id,
+          role,
+          joined_at
+        `)
+        .in('team_id', teamIds);
+
+      if (!membersError && teamMembersData) {
+        // Get user profiles for all members
+        const userIds = [...new Set(teamMembersData.map(member => member.user_id))];
+        
+        const { data: userProfiles, error: profilesError } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id, full_name, avatar_url, status, last_active')
+          .in('id', userIds);
+
+        if (!profilesError && userProfiles) {
+          // Create a map of user profiles for quick lookup
+          const profilesMap: { [key: string]: any } = userProfiles.reduce((acc: { [key: string]: any }, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {});
+
+          // Add members data to teams
+          allTeams = allTeams.map(team => {
+            const teamMembers = teamMembersData
+              .filter(member => member.team_id === team.id)
+              .map(member => ({
+                user_id: member.user_id,
+                role: member.role,
+                joined_at: member.joined_at,
+                user_profile: profilesMap[member.user_id] || null
+              }));
+
+            return {
+              ...team,
+              members: teamMembers
+            };
+          });
+        }
+      }
+    }
+
     // If includePublic is true, also fetch public teams user is not a member of
     if (includePublic) {
       const userTeamIds = allTeams.map(team => team.id);
       
       let publicQuery = supabaseAdmin
         .from('teams')
-        .select(`
-          *,
-          members:team_members(
-            user_id,
-            role,
-            joined_at,
-            user_profile:user_profiles!team_members_user_id_fkey(
-              id,
-              full_name,
-              avatar_url,
-              status,
-              last_active
-            )
-          )
-        `)
+        .select('*')
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
@@ -106,14 +130,57 @@ export async function GET(request: NextRequest) {
 
       const { data: publicTeams, error: publicTeamsError } = await publicQuery;
 
-      if (!publicTeamsError && publicTeams) {
-        // Mark public teams as discoverable
-        const discoverableTeams = publicTeams.map(team => ({
-          ...team,
-          isDiscoverable: true,
-          userRole: null
-        }));
-        allTeams = [...allTeams, ...discoverableTeams];
+      if (!publicTeamsError && publicTeams && publicTeams.length > 0) {
+        // Get members for public teams
+        const publicTeamIds = publicTeams.map(team => team.id);
+        
+        const { data: publicTeamMembersData, error: publicMembersError } = await supabaseAdmin
+          .from('team_members')
+          .select(`
+            team_id,
+            user_id,
+            role,
+            joined_at
+          `)
+          .in('team_id', publicTeamIds);
+
+        if (!publicMembersError && publicTeamMembersData) {
+          // Get user profiles for public team members
+          const publicUserIds = [...new Set(publicTeamMembersData.map(member => member.user_id))];
+          
+          const { data: publicUserProfiles, error: publicProfilesError } = await supabaseAdmin
+            .from('user_profiles')
+            .select('id, full_name, avatar_url, status, last_active')
+            .in('id', publicUserIds);
+
+          if (!publicProfilesError && publicUserProfiles) {
+            // Create a map of user profiles for quick lookup
+            const publicProfilesMap: { [key: string]: any } = publicUserProfiles.reduce((acc: { [key: string]: any }, profile) => {
+              acc[profile.id] = profile;
+              return acc;
+            }, {});
+
+            // Add members data to public teams and mark as discoverable
+            const discoverableTeams = publicTeams.map(team => {
+              const teamMembers = publicTeamMembersData
+                .filter(member => member.team_id === team.id)
+                .map(member => ({
+                  user_id: member.user_id,
+                  role: member.role,
+                  joined_at: member.joined_at,
+                  user_profile: publicProfilesMap[member.user_id] || null
+                }));
+
+              return {
+                ...team,
+                members: teamMembers,
+                isDiscoverable: true,
+                userRole: null
+              };
+            });
+            allTeams = [...allTeams, ...discoverableTeams];
+          }
+        }
       }
     }
 
@@ -249,21 +316,47 @@ export async function POST(request: NextRequest) {
     // Get the complete team data with member info
     const { data: completeTeam } = await supabaseAdmin
       .from('teams')
-      .select(`
-        *,
-        members:team_members(
-          user_id,
-          role,
-          joined_at,
-          user_profile:user_profiles!team_members_user_id_fkey(
-            id,
-            full_name,
-            avatar_url
-          )
-        )
-      `)
+      .select('*')
       .eq('id', team.id)
       .single();
+
+    // Get team members separately
+    const { data: teamMembers } = await supabaseAdmin
+      .from('team_members')
+      .select(`
+        user_id,
+        role,
+        joined_at
+      `)
+      .eq('team_id', team.id);
+
+    // Get user profiles for members
+    if (teamMembers && teamMembers.length > 0) {
+      const memberUserIds = teamMembers.map(member => member.user_id);
+      
+      const { data: memberProfiles } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', memberUserIds);
+
+      if (memberProfiles) {
+        const profilesMap: { [key: string]: any } = memberProfiles.reduce((acc: { [key: string]: any }, profile) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+
+        completeTeam.members = teamMembers.map(member => ({
+          user_id: member.user_id,
+          role: member.role,
+          joined_at: member.joined_at,
+          user_profile: profilesMap[member.user_id] || null
+        }));
+      } else {
+        completeTeam.members = teamMembers;
+      }
+    } else {
+      completeTeam.members = [];
+    }
 
     return NextResponse.json({
       success: true,

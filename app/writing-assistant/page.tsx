@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PenTool, CheckCircle, Lightbulb, BarChart, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { supabase } from "@/integrations/supabase/client"
+import { useUserAI } from "@/hooks/use-user-ai"
 
 // Tiptap Editor MenuBar (basic formatting)
 function MenuBar({ editor }: { editor: any }) {
@@ -98,6 +99,7 @@ export default function WritingAssistantPage() {
   const [shareOpen, setShareOpen] = React.useState(false);
   const { socket, activeUsers } = useSocket();
   const { toast } = useToast();
+  const { improveWriting } = useUserAI();
 
   // Handle invite from ShareModal
   const handleShareInvite = (email: string, permission: "viewer" | "editor") => {
@@ -245,7 +247,7 @@ export default function WritingAssistantPage() {
     setResult(null)
 
     try {
-      const writingResult = await enhancedAIService.improveWriting(originalText, task)
+      const writingResult = await improveWriting(originalText, task)
 
       setResult(writingResult)
 

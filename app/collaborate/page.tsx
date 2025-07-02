@@ -30,8 +30,10 @@ import {
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import { supabase } from "@/integrations/supabase/client"
 import { RouteGuard } from "@/components/route-guard"
+import { TeamSettings } from "./components/team-settings"
+import { TeamFiles } from "./components/team-files"
+import NotificationBell from "./components/notification-bell"
 
 // Type definitions
 interface User {
@@ -64,6 +66,7 @@ interface ChatMessage {
   timestamp: string
   teamId: string
   type: "text" | "system"
+  senderAvatar?: string
 }
 
 export default function CollaboratePage() {
@@ -75,361 +78,165 @@ export default function CollaboratePage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [newMessage, setNewMessage] = useState("")
-  const [inviteEmail, setInviteEmail] = useState("")
   const [newTeam, setNewTeam] = useState({
     name: "",
     description: "",
     category: "Research",
     isPublic: false,
   })
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
 
   const { toast } = useToast()
   const { socket } = useSocket()
-  const { user, isLoading: authLoading } = useSupabaseAuth()
+  const { user, isLoading: authLoading, session } = useSupabaseAuth()
 
-  // Initialize data from Supabase
-  useEffect(() => {
-    const initializeData = async () => {
-      if (!user || authLoading) return
+  // API helper functions with proper authentication
+  const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
+    if (!session?.access_token) {
+      throw new Error('Authentication required')
+    }
 
-      try {
-        setIsLoading(true)
-        setError(null)
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers,
+      },
+    })
 
-        // Fetch user's teams
-        const { data: teamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select(`
-            *,
-            team_members!inner(
-              user_id,
-              role,
-              joined_at
-            )
-          `)
-          .eq('team_members.user_id', user.id)
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Network error' }))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
 
-        // Handle the case where no teams are found (not an error)
-        if (teamsError && teamsError.code !== 'PGRST116') {
-          throw teamsError
+    return response.json()
+  }, [session])
+
+  // Load user's teams
+  const loadTeams = useCallback(async () => {
+    if (!user || !session) return
+    
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      const data = await apiCall('/api/collaborate/teams')
+      
+      if (data.success) {
+        setTeams(data.teams || [])
+        
+        // Auto-select first team if none selected
+        if (!selectedTeamId && data.teams?.length > 0) {
+          setSelectedTeamId(data.teams[0].id)
         }
-
-        // Transform the data to match our interface (handle null/empty results)
-        const transformedTeams: Team[] = (teamsData || []).map((team: any) => ({
-          id: team.id,
-          name: team.name,
-          description: team.description || "",
-          members: [], // Will be populated separately
-          createdAt: team.created_at,
-          isPublic: team.is_public || false,
-          category: team.category || "Research",
-          owner: team.owner_id,
-        }))
-
-        setTeams(transformedTeams)
-
-        // Select first team if available
-        if (transformedTeams.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(transformedTeams[0].id)
-        }
-
-        // Fetch team members for each team
-        for (const team of transformedTeams) {
-          await loadTeamMembers(team.id)
-        }
-
-        // Show appropriate message based on results
-        if (transformedTeams.length > 0) {
-          toast({
-            title: "Teams loaded",
-            description: `Found ${transformedTeams.length} team(s)`,
-          })
-        } else {
+        
+        if (data.teams?.length === 0) {
           toast({
             title: "Welcome to Collaboration",
             description: "Create your first team to get started!",
           })
         }
-      } catch (err) {
-        // Check if this is a configuration issue vs a policy/permission issue
-        const error = err as any
-        const errorMessage = error?.message || String(err)
-        
-        // Only go to demo mode for configuration issues, not policy errors
-        const isConfigurationError = errorMessage.includes('Invalid URL') || 
-                                      errorMessage.includes('placeholder') ||
-                                      errorMessage.includes('fetch')
-        
-        const isPolicyError = errorMessage.includes('infinite recursion') ||
-                             errorMessage.includes('policy') ||
-                             errorMessage.includes('permission denied')
-        
-        if (isPolicyError) {
-          // Show specific error for policy issues
-          console.error("Database policy error:", errorMessage)
-          toast({
-            title: "Database Policy Error",
-            description: "Please check database RLS policies. See console for details.",
-            variant: "destructive",
-          })
-          setError("Database policy configuration needs to be updated. Please check the RLS policies.")
-          return
-        }
-        
-        if (isConfigurationError) {
-          console.log("Database connection not available, using demo mode")
-          toast({
-            title: "Demo Mode",
-            description: "Using demo collaboration workspace. Database connection not available.",
-          })
-        } else {
-          // For other errors, show more helpful message
-          console.error("Database error:", errorMessage)
-          toast({
-            title: "Database Error",
-            description: isPolicyError ? "Database policy issue detected" : "Database query failed. Check configuration.",
-            variant: "destructive",
-          })
-          setError(errorMessage)
-          return
-        }
-        
-        // Create demo teams for demonstration
-        const demoTeams: Team[] = [
-          {
-            id: 'demo-team-1',
-            name: 'AI Research Lab',
-            description: 'Exploring cutting-edge machine learning techniques and neural networks.',
-              members: [
-                {
-                id: user.id,
-                name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
-                email: user.email || '',
-                status: 'online',
-                role: 'owner',
-                joinedAt: new Date().toISOString(),
-                lastActive: new Date().toISOString(),
-              }
-              ],
-            createdAt: new Date().toISOString(),
-              isPublic: false,
-            category: 'Research',
-            owner: user.id,
-            },
-            {
-            id: 'demo-team-2',
-            name: 'Data Science Team',
-            description: 'Working on predictive analytics and statistical modeling projects.',
-              members: [
-                {
-                id: user.id,
-                name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
-                email: user.email || '',
-                status: 'online',
-                role: 'owner',
-                joinedAt: new Date().toISOString(),
-                lastActive: new Date().toISOString(),
-              }
-              ],
-            createdAt: new Date().toISOString(),
-              isPublic: true,
-            category: 'Research',
-            owner: user.id,
-          }
-          ]
-        
-        setTeams(demoTeams)
-        setSelectedTeamId(demoTeams[0].id)
-      } finally {
-        setIsLoading(false)
       }
-    }
-
-    initializeData()
-  }, [user, authLoading, selectedTeamId, supabase, toast])
-
-  // Load team members
-  const loadTeamMembers = async (teamId: string) => {
-    try {
-      // First try to get the team to verify it exists
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .select('id, name')
-        .eq('id', teamId)
-        .single();
-
-      if (teamError) {
-        console.error("Error verifying team:", teamError);
-        throw new Error(`Team not found: ${teamError.message}`);
-      }
-
-      // Then get the members with a simpler query to avoid join issues
-      const { data: membersData, error: membersError } = await supabase
-        .from('team_members')
-        .select('user_id, role, joined_at')
-        .eq('team_id', teamId);
-
-      if (membersError) {
-        console.error("Error fetching team members:", membersError);
-        throw new Error(`Failed to load team members: ${membersError.message}`);
-      }
-
-      // Now get user profiles separately
-      const userIds = membersData.map(member => member.user_id);
-      
-      if (userIds.length === 0) {
-        // No members found, update team with empty members array
-        setTeams(prev => prev.map(team => 
-          team.id === teamId ? { ...team, members: [] } : team
-        ));
-        return;
-      }
-
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error("Error fetching user profiles:", profilesError);
-        throw new Error(`Failed to load user profiles: ${profilesError.message}`);
-      }
-
-      // Create a map of user profiles for easy lookup
-      const profilesMap = new Map();
-      profilesData.forEach(profile => {
-        profilesMap.set(profile.id, profile);
-      });
-
-      // Transform members data
-      const members: User[] = membersData.map(member => {
-        const profile = profilesMap.get(member.user_id);
-        return {
-        id: member.user_id,
-          name: profile?.display_name || profile?.email?.split('@')[0] || 'Unknown',
-          email: profile?.email || '',
-          avatar: profile?.avatar_url,
-          status: profile?.status || "offline",
-        role: member.role,
-        joinedAt: member.joined_at,
-          lastActive: profile?.last_active || new Date().toISOString(),
-        };
-      });
-
-      // Update the team with members
-      setTeams(prev => prev.map(team => 
-        team.id === teamId ? { ...team, members } : team
-      ));
     } catch (error) {
-      console.error("Error loading team members:", error);
-      
-      // Show user-friendly error message
+      console.error('Error loading teams:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load teams')
       toast({
-        title: "Failed to load team members",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        title: "Error",
+        description: "Failed to load teams. Please try refreshing the page.",
         variant: "destructive",
-      });
-      
-      // Check if we're in demo mode
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Invalid URL') || errorMessage.includes('placeholder')) {
-        console.log("Using demo team members");
-        // Keep existing members in demo mode
-        return;
-      }
+      })
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [user, session, selectedTeamId, apiCall, toast])
 
   // Load chat messages for selected team
-  useEffect(() => {
-    if (!selectedTeamId || !user) return
-
-    const loadMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('team_id', selectedTeamId)
-          .order('created_at', { ascending: true })
-          .limit(50)
-
-        if (error) throw error
-
-        const transformedMessages: ChatMessage[] = data.map((msg: any) => ({
+  const loadMessages = useCallback(async (teamId: string) => {
+    if (!teamId) return
+    
+    try {
+      const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
+      
+      if (data.success) {
+        const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
           id: msg.id,
           senderId: msg.sender_id,
-          senderName: msg.sender_name,
+          senderName: msg.sender?.full_name || 'Unknown User',
+          senderAvatar: msg.sender?.avatar_url,
           content: msg.content,
           timestamp: msg.created_at,
           teamId: msg.team_id,
           type: msg.message_type || "text",
         }))
+        
+        setMessages(formattedMessages)
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load chat messages",
+        variant: "destructive",
+      })
+    }
+  }, [apiCall, toast])
 
-        setMessages(transformedMessages)
-      } catch (error) {
-        let errorMessage = "Unknown error occurred"
-        if (error instanceof Error) {
-          errorMessage = error.message
-        } else if (typeof error === 'object' && error !== null && 'message' in error) {
-          errorMessage = String((error as any).message)
-        } else if (typeof error === 'string') {
-          errorMessage = error
-        } else {
-          errorMessage = JSON.stringify(error)
+  // Initialize data
+  useEffect(() => {
+    if (user && session && !authLoading) {
+      loadTeams()
+    }
+  }, [user, session, authLoading, loadTeams])
+
+  // Load messages when team changes
+  useEffect(() => {
+    if (selectedTeamId) {
+      loadMessages(selectedTeamId)
+    } else {
+      setMessages([])
+    }
+  }, [selectedTeamId, loadMessages])
+
+  // Socket event handlers for real-time updates
+  useEffect(() => {
+    if (!socket || !selectedTeamId) return
+
+    const handleNewMessage = (data: any) => {
+      if (data.teamId === selectedTeamId) {
+        const newMessage: ChatMessage = {
+          id: data.id,
+          senderId: data.senderId,
+          senderName: data.senderName,
+          senderAvatar: data.senderAvatar,
+          content: data.content,
+          timestamp: data.timestamp,
+          teamId: data.teamId,
+          type: data.type || "text",
         }
-        
-        console.error("Error loading messages:", errorMessage)
-        
-        // Provide user-friendly error message
-        let userMessage = "Unable to load chat history. Please try refreshing the page."
-        if (errorMessage.includes("auth") || errorMessage.includes("permission")) {
-          userMessage = "Authentication error. Please try logging out and back in."
-        } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
-          userMessage = "Network error. Please check your connection and try again."
-        } else if (errorMessage.includes("rate limit")) {
-          userMessage = "Too many requests. Please wait a moment and try again."
-        }
-        
-        toast({
-          title: "Failed to load messages",
-          description: userMessage,
-          variant: "destructive",
-        })
+        setMessages(prev => [...prev, newMessage])
       }
     }
 
-    loadMessages()
+    const handleTeamUpdate = () => {
+      loadTeams() // Reload teams when updates occur
+    }
 
-    // Subscribe to real-time messages
-    const messageSubscription = supabase
-      .channel(`chat:${selectedTeamId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `team_id=eq.${selectedTeamId}`,
-        },
-        (payload: any) => {
-          const newMessage: ChatMessage = {
-            id: payload.new.id,
-            senderId: payload.new.sender_id,
-            senderName: payload.new.sender_name,
-            content: payload.new.content,
-            timestamp: payload.new.created_at,
-            teamId: payload.new.team_id,
-            type: payload.new.message_type || "text",
-          }
-          setMessages(prev => [...prev, newMessage])
-        }
-      )
-      .subscribe()
+    socket.on('new-message', handleNewMessage)
+    socket.on('team-updated', handleTeamUpdate)
+    socket.on('member-joined', handleTeamUpdate)
+    socket.on('member-left', handleTeamUpdate)
 
     return () => {
-      messageSubscription.unsubscribe()
+      socket.off('new-message', handleNewMessage)
+      socket.off('team-updated', handleTeamUpdate)
+      socket.off('member-joined', handleTeamUpdate)
+      socket.off('member-left', handleTeamUpdate)
     }
-  }, [selectedTeamId, user, supabase, toast])
+  }, [socket, selectedTeamId, loadTeams])
 
   // Helper functions
   const getStatusColor = (status: User["status"]) => {
@@ -481,223 +288,49 @@ export default function CollaboratePage() {
     if (!newTeam.name.trim() || !user) {
       toast({
         title: "Missing information",
-        description: "Team name is required and you must be logged in",
+        description: "Team name is required",
         variant: "destructive",
       })
       return
     }
 
     try {
-      // Check if we're in demo mode by trying to create team in database
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .insert([
-          {
-      name: newTeam.name.trim(),
-      description: newTeam.description.trim(),
-            owner_id: user.id,
-            is_public: newTeam.isPublic,
-            category: newTeam.category,
-          }
-        ])
-        .select()
-        .single()
-
-      // If database connection fails, create demo team locally
-      if (teamError && (teamError.message?.includes('Invalid URL') || teamError.message?.includes('placeholder'))) {
-        // Demo mode - create team locally
-        const newTeamData: Team = {
-          id: `demo-team-${Date.now()}`,
+      setIsCreatingTeam(true)
+      
+      const data = await apiCall('/api/collaborate/teams', {
+        method: 'POST',
+        body: JSON.stringify({
           name: newTeam.name.trim(),
-          description: newTeam.description.trim() || "",
-          members: [{
-            id: user.id,
-            name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
-            email: user.email || '',
-            status: "online",
-            role: "owner",
-            joinedAt: new Date().toISOString(),
-            lastActive: new Date().toISOString(),
-          }],
-      createdAt: new Date().toISOString(),
-      isPublic: newTeam.isPublic,
-      category: newTeam.category,
-          owner: user.id,
-    }
-
-        setTeams(prev => [newTeamData, ...prev])
-        setSelectedTeamId(newTeamData.id)
-    setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
-
-        toast({
-          title: "Demo team created",
-          description: `"${newTeamData.name}" created in demo mode. Set up database for persistence.`,
-        })
-        return
-      }
-
-      if (teamError) throw teamError
-
-      // Add creator as team member
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert([
-          {
-            team_id: teamData.id,
-            user_id: user.id,
-            role: 'owner',
-          }
-        ])
-
-      if (memberError) throw memberError
-
-      // Transform to local format
-      const newTeamData: Team = {
-        id: teamData.id,
-        name: teamData.name,
-        description: teamData.description || "",
-        members: [{
-          id: user.id,
-          name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'You',
-          email: user.email || '',
-          status: "online",
-          role: "owner",
-          joinedAt: new Date().toISOString(),
-          lastActive: new Date().toISOString(),
-        }],
-        createdAt: teamData.created_at,
-        isPublic: teamData.is_public || false,
-        category: teamData.category || "Research",
-        owner: teamData.owner_id,
-      }
-
-      setTeams(prev => [newTeamData, ...prev])
-      setSelectedTeamId(newTeamData.id)
-      setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
-
-      toast({
-        title: "Team created",
-        description: `"${newTeamData.name}" has been created successfully!`,
+          description: newTeam.description.trim(),
+          category: newTeam.category,
+          isPublic: newTeam.isPublic,
+        }),
       })
 
-      // Emit socket event for real-time updates
-      if (socket) {
-        socket.emit("team_created", {
-          teamId: newTeamData.id,
-          name: newTeamData.name,
+      if (data.success) {
+        toast({
+          title: "Team created",
+          description: `"${newTeam.name}" has been created successfully!`,
         })
+        
+        // Reset form
+        setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
+        
+        // Reload teams and select the new one
+        await loadTeams()
+        if (data.team?.id) {
+          setSelectedTeamId(data.team.id)
+        }
       }
     } catch (error) {
       console.error("Error creating team:", error)
       toast({
         title: "Creation failed",
-        description: "Could not create team. Please try again.",
+        description: error instanceof Error ? error.message : "Could not create team. Please try again.",
         variant: "destructive",
       })
-    }
-  }
-
-  const handleInviteMember = async () => {
-    if (!inviteEmail.trim() || !selectedTeamId || !user) {
-      toast({
-        title: "Missing information",
-        description: "Email address and team selection are required",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(inviteEmail)) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      // Check if user exists in user_profiles
-      const { data: existingUser, error: userError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('email', inviteEmail)
-        .single()
-
-      if (userError && userError.code !== 'PGRST116') {
-        throw userError
-      }
-
-      if (!existingUser) {
-        toast({
-          title: "User not found",
-          description: "This user needs to sign up first before being invited",
-          variant: "destructive",
-        })
-      return
-    }
-
-      // Check if already a member
-      const { data: existingMember } = await supabase
-        .from('team_members')
-        .select('*')
-        .eq('team_id', selectedTeamId)
-        .eq('user_id', existingUser.user_id)
-        .single()
-
-      if (existingMember) {
-        toast({
-          title: "Already a member",
-          description: "This user is already a member of this team",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Add member to team
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert([
-          {
-            team_id: selectedTeamId,
-            user_id: existingUser.user_id,
-            role: 'viewer',
-          }
-        ])
-
-      if (memberError) throw memberError
-
-    // Add system message
-      const { error: messageError } = await supabase
-        .from('chat_messages')
-        .insert([
-          {
-            team_id: selectedTeamId,
-            sender_id: 'system',
-            sender_name: 'System',
-            content: `${existingUser.display_name || existingUser.email} joined the team`,
-            message_type: 'system',
-    }
-        ])
-
-      if (messageError) throw messageError
-
-      // Reload team members
-      await loadTeamMembers(selectedTeamId)
-    setInviteEmail("")
-
-      toast({
-        title: "Member invited",
-        description: `${inviteEmail} has been added to the team`,
-      })
-    } catch (error) {
-      console.error("Error inviting member:", error)
-      toast({
-        title: "Invitation failed",
-        description: "Could not invite member. Please try again.",
-        variant: "destructive",
-      })
+    } finally {
+      setIsCreatingTeam(false)
     }
   }
 
@@ -705,36 +338,30 @@ export default function CollaboratePage() {
     if (!newMessage.trim() || !selectedTeamId || !user) return
 
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert([
-          {
-            team_id: selectedTeamId,
-            sender_id: user.id,
-            sender_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-      content: newMessage.trim(),
-            message_type: 'text',
-    }
-        ])
-
-      if (error) throw error
-
-    setNewMessage("")
-
-      // Emit socket event
-      if (socket) {
-        socket.emit("message_sent", {
+      setIsSendingMessage(true)
+      
+      const data = await apiCall('/api/collaborate/messages', {
+        method: 'POST',
+        body: JSON.stringify({
           teamId: selectedTeamId,
           content: newMessage.trim(),
-        })
+          type: 'text',
+        }),
+      })
+
+      if (data.success) {
+        setNewMessage("")
+        // Message will be added via socket event
       }
     } catch (error) {
       console.error("Error sending message:", error)
       toast({
         title: "Message failed",
-        description: "Could not send message. Please try again.",
+        description: error instanceof Error ? error.message : "Could not send message. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -745,8 +372,23 @@ export default function CollaboratePage() {
     }
   }
 
+  // Handler for team updates from settings
+  const handleTeamUpdate = (updatedTeam: Team) => {
+    setTeams(prev => prev.map(team => 
+      team.id === updatedTeam.id ? updatedTeam : team
+    ))
+  }
+
+  // Handler for leaving/deleting team
+  const handleLeaveTeam = () => {
+    setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
+    setSelectedTeamId(null)
+    loadTeams() // Reload teams
+  }
+
   // Computed values
   const selectedTeam = teams.find((t) => t.id === selectedTeamId)
+  const currentUserRole = selectedTeam?.members.find(m => m.id === user?.id)?.role || 'viewer'
   const filteredTeams = teams.filter(
     (team) =>
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -809,364 +451,400 @@ export default function CollaboratePage() {
   return (
     <RouteGuard requireAuth={true}>
       <div className="min-h-screen bg-gray-50">
-      {/* Toast notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {/* Toast notifications from useToast */}
-      </div>
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="grid gap-6 lg:grid-cols-4">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Create Team Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Create Team
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input
-                  placeholder="Team name"
-                  value={newTeam.name}
-                  onChange={(e) => setNewTeam((prev) => ({ ...prev, name: e.target.value }))}
-                />
-                <Input
-                  placeholder="Description"
-                  value={newTeam.description}
-                  onChange={(e) => setNewTeam((prev) => ({ ...prev, description: e.target.value }))}
-                />
-                <select
-                  value={newTeam.category}
-                  onChange={(e) => setNewTeam((prev) => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Research">Research</option>
-                  <option value="Study Group">Study Group</option>
-                  <option value="Project">Project</option>
-                  <option value="Discussion">Discussion</option>
-                </select>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="public-team"
-                    checked={newTeam.isPublic}
-                    onChange={(e) => setNewTeam((prev) => ({ ...prev, isPublic: e.target.checked }))}
-                    className="rounded"
-                  />
-                  <label htmlFor="public-team" className="text-sm text-gray-700">
-                    Public team
-                  </label>
-                </div>
-                <Button onClick={handleCreateTeam} disabled={!newTeam.name.trim()} className="w-full">
-                  Create Team
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Search */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search teams..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Teams List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Teams ({teams.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {filteredTeams.map((team) => (
-                    <div
-                      key={team.id}
-                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                        selectedTeamId === team.id
-                          ? "bg-blue-100 border-2 border-blue-500"
-                          : "bg-gray-50 hover:bg-gray-100 border-2 border-transparent"
-                      }`}
-                      onClick={() => setSelectedTeamId(team.id)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-sm">{team.name}</h4>
-                        <div className="flex items-center gap-1">
-                          {team.isPublic && <Globe className="h-3 w-3 text-gray-500" />}
-                          <Badge variant="outline" className="text-xs">
-                            {team.category}
-                          </Badge>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">{team.description}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3 text-gray-500" />
-                          <span className="text-xs text-gray-600">{team.members.length}</span>
-                        </div>
-                        <div className="flex -space-x-1">
-                          {team.members.slice(0, 3).map((member) => (
-                            <div key={member.id} className="relative">
-                              <Avatar className="h-5 w-5 border border-white">
-                                <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                <AvatarFallback className="text-xs">{member.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div
-                                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {filteredTeams.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm">{searchTerm ? "No teams found" : "No teams yet"}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+        {/* Header with Notification Bell */}
+        <div className="bg-white border-b">
+          <div className="container mx-auto px-4 py-3 max-w-7xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h1 className="text-xl font-semibold">Collaborate</h1>
+                {selectedTeam && (
+                  <Badge variant="outline">{selectedTeam.name}</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <NotificationBell />
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user.user_metadata?.avatar_url} />
+                  <AvatarFallback>
+                    {user.user_metadata?.display_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </div>
           </div>
+        </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {selectedTeam ? (
-              <Card className="h-full">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="grid gap-6 lg:grid-cols-4">
+            {/* Sidebar */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Create Team Card */}
+              <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                          <Users className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            {selectedTeam.name}
-                            {selectedTeam.isPublic && <Globe className="h-4 w-4 text-gray-500" />}
-                            <Badge variant="outline">{selectedTeam.category}</Badge>
-                          </CardTitle>
-                          <p className="text-sm text-gray-600 mt-1">{selectedTeam.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Video className="h-4 w-4 mr-2" />
-                        Video Call
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Plus className="h-5 w-5" />
+                    Create Team
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input
+                    placeholder="Team name"
+                    value={newTeam.name}
+                    onChange={(e) => setNewTeam((prev) => ({ ...prev, name: e.target.value }))}
+                    disabled={isCreatingTeam}
+                  />
+                  <Input
+                    placeholder="Description"
+                    value={newTeam.description}
+                    onChange={(e) => setNewTeam((prev) => ({ ...prev, description: e.target.value }))}
+                    disabled={isCreatingTeam}
+                  />
+                  <select
+                    value={newTeam.category}
+                    onChange={(e) => setNewTeam((prev) => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isCreatingTeam}
+                  >
+                    <option value="Research">Research</option>
+                    <option value="Study Group">Study Group</option>
+                    <option value="Project">Project</option>
+                    <option value="Discussion">Discussion</option>
+                  </select>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="public-team"
+                      checked={newTeam.isPublic}
+                      onChange={(e) => setNewTeam((prev) => ({ ...prev, isPublic: e.target.checked }))}
+                      className="rounded"
+                      disabled={isCreatingTeam}
+                    />
+                    <label htmlFor="public-team" className="text-sm text-gray-700">
+                      Public team
+                    </label>
                   </div>
+                  <Button 
+                    onClick={handleCreateTeam} 
+                    disabled={!newTeam.name.trim() || isCreatingTeam} 
+                    className="w-full"
+                  >
+                    {isCreatingTeam ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Team'
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Search */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search teams..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Teams List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Your Teams ({teams.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="chat" className="h-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="chat">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Chat
-                      </TabsTrigger>
-                      <TabsTrigger value="members">
-                        <Users className="h-4 w-4 mr-2" />
-                        Members ({selectedTeam.members.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="files">
-                        <Share className="h-4 w-4 mr-2" />
-                        Files
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="chat" className="mt-6">
-                      <div className="border rounded-lg h-96 flex flex-col">
-                        <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                          {teamMessages.map((message) => (
-                            <div key={message.id}>
-                              {message.type === "system" ? (
-                                <div className="text-center">
-                                  <Badge variant="outline" className="text-xs">
-                                    {message.content}
-                                  </Badge>
-                                </div>
-                              ) : (
-                                <div className="flex gap-3">
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarFallback className="text-xs">{message.senderName.charAt(0)}</AvatarFallback>
-                                  </Avatar>
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className="font-medium text-sm">{message.senderName}</span>
-                                      <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-700">{message.content}</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                          {teamMessages.length === 0 && (
-                            <div className="text-center py-12 text-gray-500">
-                              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                              <p className="text-lg font-medium mb-2">No messages yet</p>
-                              <p className="text-sm">Start the conversation with your team</p>
-                            </div>
-                          )}
-                        </div>
-                        <Separator />
-                        <div className="p-4">
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Type your message..."
-                              value={newMessage}
-                              onChange={(e) => setNewMessage(e.target.value)}
-                              onKeyPress={handleKeyPress}
-                              className="flex-1"
-                            />
-                            <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                              <Send className="h-4 w-4" />
-                            </Button>
+                  <div className="space-y-3">
+                    {filteredTeams.map((team) => (
+                      <div
+                        key={team.id}
+                        className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                          selectedTeamId === team.id
+                            ? "bg-blue-100 border-2 border-blue-500"
+                            : "bg-gray-50 hover:bg-gray-100 border-2 border-transparent"
+                        }`}
+                        onClick={() => setSelectedTeamId(team.id)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm">{team.name}</h4>
+                          <div className="flex items-center gap-1">
+                            {team.isPublic && <Globe className="h-3 w-3 text-gray-500" />}
+                            <Badge variant="outline" className="text-xs">
+                              {team.category}
+                            </Badge>
                           </div>
                         </div>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="members" className="mt-6 space-y-6">
-
-                      {/* Members List */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Team Members</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {selectedTeam.members.map((member) => (
-                              <div
-                                key={member.id}
-                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="relative">
-                                    <Avatar className="h-10 w-10">
-                                      <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                      <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div
-                                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <p className="font-medium">{member.name}</p>
-                                      {getRoleIcon(member.role)}
-                                    </div>
-                                    <p className="text-sm text-gray-600">{member.email}</p>
-                                    <p className="text-xs text-gray-500">
-                                      Last active: {formatDate(member.lastActive)}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {member.role}
-                                  </Badge>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-xs ${
-                                      member.status === "online"
-                                        ? "border-green-500 text-green-700"
-                                        : member.status === "away"
-                                          ? "border-yellow-500 text-yellow-700"
-                                          : "border-gray-300 text-gray-600"
-                                    }`}
-                                  >
-                                    {member.status}
-                                  </Badge>
-                                </div>
+                        <p className="text-xs text-gray-600 mb-2 line-clamp-2">{team.description}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Users className="h-3 w-3 text-gray-500" />
+                            <span className="text-xs text-gray-600">{team.members.length}</span>
+                          </div>
+                          <div className="flex -space-x-1">
+                            {team.members.slice(0, 3).map((member) => (
+                              <div key={member.id} className="relative">
+                                <Avatar className="h-5 w-5 border border-white">
+                                  <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                                  <AvatarFallback className="text-xs">{member.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div
+                                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
+                                />
                               </div>
                             ))}
                           </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="files" className="mt-6">
-                      <Card>
-                        <CardContent className="pt-6">
-                          <div className="text-center py-12">
-                            <Share className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                            <h3 className="text-lg font-medium mb-2">Shared Files</h3>
-                            <p className="text-gray-600 mb-4">
-                              File sharing and collaborative document editing coming soon
-                            </p>
-                            <div className="flex justify-center gap-4">
-                              <div className="text-center">
-                                <div className="w-8 h-8 bg-blue-500 mb-2 mx-auto rounded"></div>
-                                <span className="text-xs text-gray-600">Document Sync</span>
-                              </div>
-                              <div className="text-center">
-                                <div className="w-8 h-8 bg-green-500 mb-2 mx-auto rounded"></div>
-                                <span className="text-xs text-gray-600">Version Control</span>
-                              </div>
-                              <div className="text-center">
-                                <div className="w-8 h-8 bg-purple-500 mb-2 mx-auto rounded"></div>
-                                <span className="text-xs text-gray-600">Real-time Edit</span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            ) : (
-              /* Welcome State */
-              <Card className="h-full">
-                <CardContent className="pt-6">
-                  <div className="text-center py-20">
-                    <Users className="h-16 w-16 mx-auto mb-6 text-gray-400" />
-                    <h3 className="text-2xl font-medium mb-4">Select a Team</h3>
-                    <p className="text-gray-600 max-w-md mx-auto mb-8">
-                      Choose a team from the sidebar to start collaborating, or create a new team to get started
-                    </p>
-                    <div className="flex justify-center gap-6">
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-blue-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
-                          <MessageSquare className="h-6 w-6 text-white" />
                         </div>
-                        <span className="text-sm text-gray-600">Team Chat</span>
                       </div>
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-green-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
-                          <Share className="h-6 w-6 text-white" />
-                        </div>
-                        <span className="text-sm text-gray-600">File Sharing</span>
+                    ))}
+                    {filteredTeams.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm">{searchTerm ? "No teams found" : "No teams yet"}</p>
                       </div>
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-purple-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
-                          <Video className="h-6 w-6 text-white" />
-                        </div>
-                        <span className="text-sm text-gray-600">Video Calls</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-            )}
+            </div>
+
+            {/* Main Content */}
+            <div className="lg:col-span-3">
+              {selectedTeam ? (
+                <Card className="h-full">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <Users className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              {selectedTeam.name}
+                              {selectedTeam.isPublic && <Globe className="h-4 w-4 text-gray-500" />}
+                              <Badge variant="outline">{selectedTeam.category}</Badge>
+                            </CardTitle>
+                            <p className="text-sm text-gray-600 mt-1">{selectedTeam.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Video className="h-4 w-4 mr-2" />
+                          Video Call
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setIsSettingsOpen(true)}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs defaultValue="chat" className="h-full">
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="chat">
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Chat
+                        </TabsTrigger>
+                        <TabsTrigger value="members">
+                          <Users className="h-4 w-4 mr-2" />
+                          Members ({selectedTeam.members.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="files">
+                          <Share className="h-4 w-4 mr-2" />
+                          Files
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="chat" className="mt-6">
+                        <div className="border rounded-lg h-96 flex flex-col">
+                          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                            {teamMessages.map((message) => (
+                              <div key={message.id}>
+                                {message.type === "system" ? (
+                                  <div className="text-center">
+                                    <Badge variant="outline" className="text-xs">
+                                      {message.content}
+                                    </Badge>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarImage src={message.senderAvatar} />
+                                      <AvatarFallback className="text-xs">{message.senderName.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-medium text-sm">{message.senderName}</span>
+                                        <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
+                                      </div>
+                                      <p className="text-sm text-gray-700">{message.content}</p>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {teamMessages.length === 0 && (
+                              <div className="text-center py-12 text-gray-500">
+                                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                <p className="text-lg font-medium mb-2">No messages yet</p>
+                                <p className="text-sm">Start the conversation with your team</p>
+                              </div>
+                            )}
+                          </div>
+                          <Separator />
+                          <div className="p-4">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Type your message..."
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                                className="flex-1"
+                                disabled={isSendingMessage}
+                              />
+                              <Button 
+                                onClick={handleSendMessage} 
+                                disabled={!newMessage.trim() || isSendingMessage}
+                              >
+                                {isSendingMessage ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Send className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="members" className="mt-6 space-y-6">
+                        {/* Members List */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Team Members</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              {selectedTeam.members.map((member) => (
+                                <div
+                                  key={member.id}
+                                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                      <Avatar className="h-10 w-10">
+                                        <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                                        <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                      <div
+                                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium">{member.name}</p>
+                                        {getRoleIcon(member.role)}
+                                      </div>
+                                      <p className="text-sm text-gray-600">{member.email}</p>
+                                      <p className="text-xs text-gray-500">
+                                        Last active: {formatDate(member.lastActive)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {member.role}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs ${
+                                        member.status === "online"
+                                          ? "border-green-500 text-green-700"
+                                          : member.status === "away"
+                                            ? "border-yellow-500 text-yellow-700"
+                                            : "border-gray-300 text-gray-600"
+                                      }`}
+                                    >
+                                      {member.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      <TabsContent value="files" className="mt-6">
+                        <TeamFiles 
+                          teamId={selectedTeam.id} 
+                          currentUserRole={currentUserRole} 
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Welcome State */
+                <Card className="h-full">
+                  <CardContent className="pt-6">
+                    <div className="text-center py-20">
+                      <Users className="h-16 w-16 mx-auto mb-6 text-gray-400" />
+                      <h3 className="text-2xl font-medium mb-4">Select a Team</h3>
+                      <p className="text-gray-600 max-w-md mx-auto mb-8">
+                        Choose a team from the sidebar to start collaborating, or create a new team to get started
+                      </p>
+                      <div className="flex justify-center gap-6">
+                        <div className="text-center">
+                          <div className="w-12 h-12 bg-blue-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
+                            <MessageSquare className="h-6 w-6 text-white" />
+                          </div>
+                          <span className="text-sm text-gray-600">Team Chat</span>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-12 h-12 bg-green-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
+                            <Share className="h-6 w-6 text-white" />
+                          </div>
+                          <span className="text-sm text-gray-600">File Sharing</span>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-12 h-12 bg-purple-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
+                            <Video className="h-6 w-6 text-white" />
+                          </div>
+                          <span className="text-sm text-gray-600">Video Calls</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+        
+        {/* Team Settings Modal */}
+        {selectedTeam && (
+          <TeamSettings
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            team={selectedTeam}
+            currentUserRole={currentUserRole}
+            onTeamUpdate={handleTeamUpdate}
+            onLeaveTeam={handleLeaveTeam}
+          />
+        )}
       </div>
     </RouteGuard>
   )

@@ -6,7 +6,7 @@ import { enhancedAIService } from '@/lib/enhanced-ai-service'
 // Using shared authentication utilities from lib/auth-utils.ts
 
 // Simple encryption/decryption for API keys (in production, use a proper key management service)
-const ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || 'fallback-key-for-development-only'
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
 const ALGORITHM = 'aes-256-cbc'
 
 function encrypt(text: string): string {

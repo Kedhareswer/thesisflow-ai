@@ -169,8 +169,18 @@ class EnhancedAIService {
       }
 
       // Determine model to use
-      const selectedModel = options.model || providerConfig.models[0]
-      console.log("Enhanced AI Service: Using model:", selectedModel)
+      let selectedModel = options.model || providerConfig.models[0]
+      console.log("Enhanced AI Service: Requested model:", options.model)
+      console.log("Enhanced AI Service: Available models for provider:", providerConfig.models)
+      
+      // Validate model exists for provider
+      if (options.model && !providerConfig.models.includes(options.model)) {
+        console.warn(`Enhanced AI Service: Model ${options.model} not in available models for ${selectedProvider}, using default`)
+        selectedModel = providerConfig.models[0]
+        console.log("Enhanced AI Service: Using default model instead:", selectedModel)
+      }
+      
+      console.log("Enhanced AI Service: Final selected model:", selectedModel)
 
       // Generate the response using the provider's API
       const result = await this.callProviderAPI(
@@ -207,6 +217,8 @@ class EnhancedAIService {
   ): Promise<GenerateTextResult> {
     try {
       console.log(`Enhanced AI Service: Calling ${provider} API...`)
+      console.log(`Enhanced AI Service: API Key length:`, apiKey.length)
+      console.log(`Enhanced AI Service: API Key starts with:`, apiKey.substring(0, 10) + '...')
 
       const providerConfig = AI_PROVIDERS[provider]
       const maxTokens = Math.min(options.maxTokens || 1000, providerConfig.maxTokens)
@@ -219,12 +231,14 @@ class EnhancedAIService {
         case 'openai':
           return await this.callOpenAIAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
         
-        // Anthropic not currently in AI_PROVIDERS, skip for now
-        // case 'anthropic':
-        //   return await this.callAnthropicAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
         case 'gemini':
           return await this.callGeminiAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        case 'aiml':
+          return await this.callAIMLAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        case 'deepinfra':
+          return await this.callDeepInfraAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
         
         default:
           return {
@@ -248,6 +262,13 @@ class EnhancedAIService {
     maxTokens: number,
     temperature: number
   ): Promise<GenerateTextResult> {
+    console.log("Enhanced AI Service: Calling Groq API with:", {
+      model,
+      maxTokens,
+      temperature,
+      promptLength: prompt.length
+    })
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -262,16 +283,33 @@ class EnhancedAIService {
       }),
     })
 
+    console.log("Enhanced AI Service: Groq API response status:", response.status)
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      console.error("Enhanced AI Service: Groq API error data:", errorData)
       throw new Error(`Groq API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
+    console.log("Enhanced AI Service: Groq API response data:", {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
+      usage: data.usage,
+      fullResponse: data
+    })
+    
+    const content = data.choices?.[0]?.message?.content || ''
+    
+    if (!content) {
+      console.error("Enhanced AI Service: Groq API returned no content!", data)
+      throw new Error("Groq API returned no content")
+    }
     
     return {
       success: true,
-      content: data.choices?.[0]?.message?.content || '',
+      content,
       provider: 'groq',
       model,
       usage: {
@@ -372,6 +410,13 @@ class EnhancedAIService {
     maxTokens: number,
     temperature: number
   ): Promise<GenerateTextResult> {
+    console.log("Enhanced AI Service: Calling Gemini API with:", {
+      model,
+      maxTokens,
+      temperature,
+      promptLength: prompt.length
+    })
+
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
@@ -388,22 +433,166 @@ class EnhancedAIService {
       }),
     })
 
+    console.log("Enhanced AI Service: Gemini API response status:", response.status)
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      console.error("Enhanced AI Service: Gemini API error data:", errorData)
       throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
+    console.log("Enhanced AI Service: Gemini API response data:", {
+      hasCandidates: !!data.candidates,
+      candidatesLength: data.candidates?.length,
+      firstCandidateContent: data.candidates?.[0]?.content?.parts?.[0]?.text?.substring(0, 100),
+      fullResponse: data
+    })
+    
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    if (!content) {
+      console.error("Enhanced AI Service: Gemini API returned no content!", data)
+      throw new Error("Gemini API returned no content")
+    }
     
     return {
       success: true,
-      content: data.candidates?.[0]?.content?.parts?.[0]?.text || '',
+      content,
       provider: 'gemini',
       model,
       usage: {
         promptTokens: data.usageMetadata?.promptTokenCount,
         completionTokens: data.usageMetadata?.candidatesTokenCount,
         totalTokens: data.usageMetadata?.totalTokenCount,
+      }
+    }
+  }
+
+  private async callAIMLAPI(
+    apiKey: string,
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    console.log("Enhanced AI Service: Calling AIML API with:", {
+      model,
+      maxTokens,
+      temperature,
+      promptLength: prompt.length
+    })
+
+    const response = await fetch('https://api.aimlapi.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    })
+
+    console.log("Enhanced AI Service: AIML API response status:", response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Enhanced AI Service: AIML API error data:", errorData)
+      throw new Error(`AIML API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+    }
+
+    const data = await response.json()
+    console.log("Enhanced AI Service: AIML API response data:", {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
+      usage: data.usage
+    })
+    
+    const content = data.choices?.[0]?.message?.content || ''
+    
+    if (!content) {
+      console.error("Enhanced AI Service: AIML API returned no content!", data)
+      throw new Error("AIML API returned no content")
+    }
+    
+    return {
+      success: true,
+      content,
+      provider: 'aiml',
+      model,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+        totalTokens: data.usage?.total_tokens,
+      }
+    }
+  }
+
+  private async callDeepInfraAPI(
+    apiKey: string,
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    console.log("Enhanced AI Service: Calling DeepInfra API with:", {
+      model,
+      maxTokens,
+      temperature,
+      promptLength: prompt.length
+    })
+
+    const response = await fetch('https://api.deepinfra.com/v1/openai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    })
+
+    console.log("Enhanced AI Service: DeepInfra API response status:", response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Enhanced AI Service: DeepInfra API error data:", errorData)
+      throw new Error(`DeepInfra API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+    }
+
+    const data = await response.json()
+    console.log("Enhanced AI Service: DeepInfra API response data:", {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
+      usage: data.usage
+    })
+    
+    const content = data.choices?.[0]?.message?.content || ''
+    
+    if (!content) {
+      console.error("Enhanced AI Service: DeepInfra API returned no content!", data)
+      throw new Error("DeepInfra API returned no content")
+    }
+    
+    return {
+      success: true,
+      content,
+      provider: 'deepinfra',
+      model,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+        totalTokens: data.usage?.total_tokens,
       }
     }
   }
@@ -557,6 +746,12 @@ Each idea: title + 3 key aspects separated by "|"`
     readingTime: number
     sentiment?: 'positive' | 'neutral' | 'negative'
   }> {
+    console.log("Enhanced AI Service: Starting summarizeContent...")
+    console.log("Enhanced AI Service: Content length:", content.length)
+    console.log("Enhanced AI Service: Options:", options)
+    console.log("Enhanced AI Service: Provider:", provider)
+    console.log("Enhanced AI Service: Model:", model)
+
     const { style = 'academic', length = 'medium' } = options
     
     const prompt = `Summarize content | Style: ${style} | Length: ${length}
@@ -577,19 +772,48 @@ Requirements:
 - Estimate reading time (200 words/min)
 - Assess overall sentiment`
 
-    const result = await this.generateText({
-      prompt,
-      provider,
-      model,
-      maxTokens: length === 'comprehensive' ? 2000 : length === 'medium' ? 1000 : 500,
-      temperature: 0.3
-    })
+    console.log("Enhanced AI Service: Generated prompt length:", prompt.length)
 
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to summarize content')
+    try {
+      const result = await this.generateText({
+        prompt,
+        provider,
+        model,
+        maxTokens: length === 'comprehensive' ? 2000 : length === 'medium' ? 1000 : 500,
+        temperature: 0.3
+      })
+
+      console.log("Enhanced AI Service: Generate text result:", {
+        success: result.success,
+        hasContent: !!result.content,
+        contentLength: result.content?.length || 0,
+        error: result.error
+      })
+
+      if (!result.success) {
+        console.error("Enhanced AI Service: Generation failed:", result.error)
+        throw new Error(result.error || 'Failed to summarize content')
+      }
+
+      if (!result.content) {
+        console.error("Enhanced AI Service: No content returned")
+        throw new Error('No content returned from AI service')
+      }
+
+      const parsedResult = this.parseSummaryResult(result.content, content)
+      console.log("Enhanced AI Service: Parsed result:", {
+        summaryLength: parsedResult.summary.length,
+        keyPointsCount: parsedResult.keyPoints.length,
+        readingTime: parsedResult.readingTime,
+        sentiment: parsedResult.sentiment
+      })
+
+      return parsedResult
+
+    } catch (error) {
+      console.error("Enhanced AI Service: Summarization error:", error)
+      throw error
     }
-
-    return this.parseSummaryResult(result.content || '', content)
   }
 
   private parseSummaryResult(content: string, originalContent: string): {

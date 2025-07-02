@@ -1,14 +1,36 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Loader2, Plus, Users } from "lucide-react"
+import { Loader2, Plus, Users, Crown, Shield, Eye } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
-import { collaborateService } from '@/lib/services/collaborate.service'
-import { Team } from '@/lib/supabase'
+import { useToast } from "@/hooks/use-toast"
+
+interface User {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  status: "online" | "offline" | "away"
+  role: "owner" | "admin" | "editor" | "viewer"
+  joinedAt: string
+  lastActive: string
+}
+
+interface Team {
+  id: string
+  name: string
+  description: string
+  members: User[]
+  createdAt: string
+  isPublic: boolean
+  category: string
+  owner: string
+}
 
 interface TeamManagementProps {
   teams: Team[]
@@ -18,41 +40,86 @@ interface TeamManagementProps {
 
 export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManagementProps) {
   const { user } = useSupabaseAuth()
+  const { toast } = useToast()
+  
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
-  const [newTeamName, setNewTeamName] = useState('')
+  const [newTeam, setNewTeam] = useState({
+    name: '',
+    description: '',
+    category: 'Research',
+    isPublic: false
+  })
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'viewer' | 'editor' | 'admin'>('viewer')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // API helper function
+  const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Network error' }))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
+
+    return response.json()
+  }, [])
   
   // Handle team creation
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!user || !newTeamName.trim()) return
+    if (!user || !newTeam.name.trim()) {
+      setError('Team name is required')
+      return
+    }
     
     try {
       setIsLoading(true)
       setError(null)
       
-      await collaborateService.createTeam(
-        newTeamName,
-        'Team for collaboration', // description
-        'general', // category  
-        false, // isPublic
-        user.id // userId
-      )
+      const data = await apiCall('/api/collaborate/teams', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newTeam.name.trim(),
+          description: newTeam.description.trim(),
+          category: newTeam.category,
+          isPublic: newTeam.isPublic,
+        }),
+      })
       
-      // Reset form and close dialog
-      setNewTeamName('')
-      setIsCreateDialogOpen(false)
-      
-      // Refresh teams list
-      onTeamsUpdate()
+      if (data.success) {
+        // Reset form and close dialog
+        setNewTeam({ name: '', description: '', category: 'Research', isPublic: false })
+        setIsCreateDialogOpen(false)
+        
+        toast({
+          title: "Team created",
+          description: `"${newTeam.name}" has been created successfully!`,
+        })
+        
+        // Refresh teams list
+        onTeamsUpdate()
+      }
     } catch (error) {
       console.error('Error creating team:', error)
-      setError('Failed to create team')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create team'
+      setError(errorMessage)
+      toast({
+        title: "Creation failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -62,24 +129,55 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!user || !selectedTeam || !inviteEmail.trim()) return
+    if (!user || !selectedTeam || !inviteEmail.trim()) {
+      setError('Email address is required')
+      return
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(inviteEmail)) {
+      setError('Please enter a valid email address')
+      return
+    }
     
     try {
       setIsLoading(true)
       setError(null)
       
-      await collaborateService.inviteMember(selectedTeam.id, inviteEmail)
+      const data = await apiCall('/api/collaborate/invitations', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: selectedTeam.id,
+          inviteeEmail: inviteEmail.trim(),
+          role: inviteRole,
+          personalMessage: `Join our team "${selectedTeam.name}" to collaborate!`,
+        }),
+      })
       
-      // Reset form and close dialog
-      setInviteEmail('')
-      setIsInviteDialogOpen(false)
-      setSelectedTeam(null)
-      
-      // Refresh teams list
-      onTeamsUpdate()
+      if (data.success) {
+        // Reset form and close dialog
+        setInviteEmail('')
+        setInviteRole('viewer')
+        setIsInviteDialogOpen(false)
+        setSelectedTeam(null)
+        
+        toast({
+          title: "Invitation sent",
+          description: `Invitation sent to ${inviteEmail}`,
+        })
+        
+        // Refresh teams list
+        onTeamsUpdate()
+      }
     } catch (error) {
       console.error('Error inviting member:', error)
-      setError('Failed to invite member')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to invite member'
+      setError(errorMessage)
+      toast({
+        title: "Invitation failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -88,13 +186,39 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
   // Open invite dialog for a team
   const openInviteDialog = (team: Team) => {
     setSelectedTeam(team)
+    setError(null)
     setIsInviteDialogOpen(true)
+  }
+  
+  // Get role icon
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "owner":
+        return <Crown className="h-3 w-3 text-yellow-600" />
+      case "admin":
+        return <Shield className="h-3 w-3 text-blue-600" />
+      case "editor":
+        return <Shield className="h-3 w-3 text-green-600" />
+      case "viewer":
+        return <Eye className="h-3 w-3 text-gray-600" />
+      default:
+        return null
+    }
+  }
+  
+  // Get user role in team
+  const getUserRole = (team: Team): string => {
+    const member = team.members.find(m => m.id === user?.id)
+    return member?.role || 'viewer'
   }
   
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Your Teams</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Your Teams</h2>
+          <p className="text-sm text-gray-600">{teams.length} team{teams.length !== 1 ? 's' : ''}</p>
+        </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -109,14 +233,44 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
             <form onSubmit={handleCreateTeam} className="space-y-4 mt-4">
               <Input
                 placeholder="Team Name"
-                value={newTeamName}
-                onChange={(e) => setNewTeamName(e.target.value)}
+                value={newTeam.name}
+                onChange={(e) => setNewTeam(prev => ({ ...prev, name: e.target.value }))}
                 disabled={isLoading}
               />
+              <Input
+                placeholder="Description (optional)"
+                value={newTeam.description}
+                onChange={(e) => setNewTeam(prev => ({ ...prev, description: e.target.value }))}
+                disabled={isLoading}
+              />
+              <select
+                value={newTeam.category}
+                onChange={(e) => setNewTeam(prev => ({ ...prev, category: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              >
+                <option value="Research">Research</option>
+                <option value="Study Group">Study Group</option>
+                <option value="Project">Project</option>
+                <option value="Discussion">Discussion</option>
+              </select>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="public-team-dialog"
+                  checked={newTeam.isPublic}
+                  onChange={(e) => setNewTeam(prev => ({ ...prev, isPublic: e.target.checked }))}
+                  className="rounded"
+                  disabled={isLoading}
+                />
+                <label htmlFor="public-team-dialog" className="text-sm text-gray-700">
+                  Public team (anyone can join)
+                </label>
+              </div>
               {error && (
-                <div className="text-sm text-red-500">{error}</div>
+                <div className="text-sm text-red-500 bg-red-50 p-2 rounded">{error}</div>
               )}
-              <Button type="submit" className="w-full" disabled={isLoading || !newTeamName.trim()}>
+              <Button type="submit" className="w-full" disabled={isLoading || !newTeam.name.trim()}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -135,12 +289,11 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center p-6">
             <Users className="h-12 w-12 text-gray-400 mb-2" />
-            <p className="text-gray-500 text-center">
+            <p className="text-gray-500 text-center mb-4">
               You don't have any teams yet. Create your first team to start collaborating.
             </p>
             <Button
               variant="outline"
-              className="mt-4"
               onClick={() => setIsCreateDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -149,36 +302,71 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {teams.map((team) => (
-            <Card key={team.id} className="overflow-hidden">
-              <CardHeader className="p-4">
-                <CardTitle className="text-base">{team.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <p className="text-sm text-gray-500 mb-4">
-                  0 members
-                </p>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => onTeamSelect(team)}
-                  >
-                    Open Chat
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openInviteDialog(team)}
-                  >
-                    Invite
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {teams.map((team) => {
+            const userRole = getUserRole(team)
+            const canInvite = ['owner', 'admin'].includes(userRole)
+            
+            return (
+              <Card key={team.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardHeader className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CardTitle className="text-base">{team.name}</CardTitle>
+                        {getRoleIcon(userRole)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {team.category}
+                        </Badge>
+                        {team.isPublic && (
+                          <Badge variant="secondary" className="text-xs">
+                            Public
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                    {team.description || 'No description provided'}
+                  </p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-1">
+                      <Users className="h-3 w-3 text-gray-500" />
+                      <span className="text-sm text-gray-600">
+                        {team.members.length} member{team.members.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {userRole}
+                    </Badge>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => onTeamSelect(team)}
+                    >
+                      Open Team
+                    </Button>
+                    {canInvite && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openInviteDialog(team)}
+                      >
+                        Invite
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
       
@@ -198,14 +386,27 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
               onChange={(e) => setInviteEmail(e.target.value)}
               disabled={isLoading}
             />
+            <div>
+              <label className="text-sm font-medium mb-2 block">Role</label>
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as 'viewer' | 'editor' | 'admin')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              >
+                <option value="viewer">Viewer - Can view and comment</option>
+                <option value="editor">Editor - Can edit and create content</option>
+                <option value="admin">Admin - Can manage team and members</option>
+              </select>
+            </div>
             {error && (
-              <div className="text-sm text-red-500">{error}</div>
+              <div className="text-sm text-red-500 bg-red-50 p-2 rounded">{error}</div>
             )}
             <Button type="submit" className="w-full" disabled={isLoading || !inviteEmail.trim()}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Inviting...
+                  Sending...
                 </>
               ) : (
                 'Send Invitation'

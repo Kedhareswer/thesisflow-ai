@@ -1,16 +1,47 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Send } from "lucide-react"
+import { Loader2, Send, Users, Minimize2 } from "lucide-react"
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
-import { collaborateService } from '@/lib/services/collaborate.service'
-import { socketService, SocketEvent } from '@/lib/services/socket.service'
-import { usePresence } from '@/lib/services/presence.service'
-import { ChatMessage, Team, TeamMember } from '@/lib/supabase'
+import { useSocket } from '@/components/socket-provider'
+import { useToast } from "@/hooks/use-toast"
+
+interface User {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  status: "online" | "offline" | "away"
+  role: "owner" | "admin" | "editor" | "viewer"
+  joinedAt: string
+  lastActive: string
+}
+
+interface Team {
+  id: string
+  name: string
+  description: string
+  members: User[]
+  createdAt: string
+  isPublic: boolean
+  category: string
+  owner: string
+}
+
+interface ChatMessage {
+  id: string
+  senderId: string
+  senderName: string
+  content: string
+  timestamp: string
+  teamId: string
+  type: "text" | "system"
+  senderAvatar?: string
+}
 
 interface TeamChatProps {
   team: Team
@@ -19,69 +50,106 @@ interface TeamChatProps {
 
 export function TeamChat({ team, onClose }: TeamChatProps) {
   const { user } = useSupabaseAuth()
+  const { socket } = useSocket()
+  const { toast } = useToast()
+  
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
-  const [members, setMembers] = useState<any[]>([])
   const [isTyping, setIsTyping] = useState<Record<string, boolean>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
-  const userPresences = usePresence(user?.id || null)
   
-  // Fetch messages and members on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user || !team) return
+  // API helper function
+  const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Network error' }))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
+
+    return response.json()
+  }, [])
+  
+  // Load chat messages
+  const loadMessages = useCallback(async () => {
+    if (!team?.id) return
+    
+    try {
+      setIsLoading(true)
       
-      try {
-        setIsLoading(true)
+      const data = await apiCall(`/api/collaborate/messages?teamId=${team.id}&limit=50`)
+      
+      if (data.success) {
+        const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
+          id: msg.id,
+          senderId: msg.sender_id,
+          senderName: msg.sender?.full_name || 'Unknown User',
+          senderAvatar: msg.sender?.avatar_url,
+          content: msg.content,
+          timestamp: msg.created_at,
+          teamId: msg.team_id,
+          type: msg.message_type || "text",
+        }))
         
-        // Fetch messages
-        const fetchedMessages = await collaborateService.getMessages(team.id)
-        setMessages(fetchedMessages)
-        
-        // Fetch members
-        const fetchedMembers = await collaborateService.getTeamMembers(team.id)
-        setMembers(fetchedMembers)
-        
-        // Join team room
-        socketService.joinTeam(team.id)
-      } catch (error) {
-        console.error('Error fetching team data:', error)
-      } finally {
-        setIsLoading(false)
+        setMessages(formattedMessages)
       }
+    } catch (error) {
+      console.error('Error loading messages:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load chat messages",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-    
-    fetchData()
-    
-    // Cleanup: leave team room
-    return () => {
-      socketService.leaveTeam(team.id)
-    }
-  }, [team, user])
+  }, [team?.id, apiCall, toast])
   
-  // Subscribe to socket events
+  // Initialize data
   useEffect(() => {
-    if (!user || !team) return
-    
-    // Handle new messages
-    const handleNewMessage = (message: ChatMessage) => {
-      if (message.team_id === team.id) {
-        setMessages(prev => [...prev, message])
+    if (team?.id) {
+      loadMessages()
+    }
+  }, [team?.id, loadMessages])
+  
+  // Socket event handlers
+  useEffect(() => {
+    if (!socket || !team?.id) return
+
+    const handleNewMessage = (data: any) => {
+      if (data.teamId === team.id) {
+        const newMessage: ChatMessage = {
+          id: data.id,
+          senderId: data.senderId,
+          senderName: data.senderName,
+          senderAvatar: data.senderAvatar,
+          content: data.content,
+          timestamp: data.timestamp,
+          teamId: data.teamId,
+          type: data.type || "text",
+        }
+        setMessages(prev => [...prev, newMessage])
         
         // Clear typing indicator for the sender
-        if (typingTimeoutsRef.current[message.sender_id]) {
-          clearTimeout(typingTimeoutsRef.current[message.sender_id])
-          setIsTyping(prev => ({ ...prev, [message.sender_id]: false }))
+        if (typingTimeoutsRef.current[data.senderId]) {
+          clearTimeout(typingTimeoutsRef.current[data.senderId])
+          setIsTyping(prev => ({ ...prev, [data.senderId]: false }))
         }
       }
     }
-    
-    // Handle typing indicator
-    const handleTyping = (data: { userId: string; teamId: string; isTyping: boolean }) => {
-      if (data.teamId === team.id && data.userId !== user.id) {
+
+    const handleTyping = (data: { userId: string; teamId: string; isTyping: boolean; userName: string }) => {
+      if (data.teamId === team.id && data.userId !== user?.id) {
         setIsTyping(prev => ({ ...prev, [data.userId]: data.isTyping }))
         
         // Clear previous timeout
@@ -97,34 +165,35 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
         }
       }
     }
-    
-    // Handle member join/leave
-    const handleMemberUpdate = async () => {
-      try {
-        const fetchedMembers = await collaborateService.getTeamMembers(team.id)
-        setMembers(fetchedMembers)
-      } catch (error) {
-        console.error('Error updating members:', error)
-      }
+
+    const handleMemberUpdate = () => {
+      // Refresh messages to get latest member info
+      loadMessages()
     }
-    
+
+    // Join team room
+    socket.emit('join-team', { teamId: team.id, userId: user?.id })
+
     // Subscribe to events
-    socketService.on(SocketEvent.NEW_MESSAGE, handleNewMessage)
-    socketService.on(SocketEvent.TYPING, handleTyping)
-    socketService.on(SocketEvent.MEMBER_JOINED, handleMemberUpdate)
-    socketService.on(SocketEvent.MEMBER_LEFT, handleMemberUpdate)
-    
+    socket.on('new-message', handleNewMessage)
+    socket.on('user-typing', handleTyping)
+    socket.on('member-joined', handleMemberUpdate)
+    socket.on('member-left', handleMemberUpdate)
+
     return () => {
+      // Leave team room
+      socket.emit('leave-team', { teamId: team.id, userId: user?.id })
+      
       // Unsubscribe from events
-      socketService.off(SocketEvent.NEW_MESSAGE, handleNewMessage)
-      socketService.off(SocketEvent.TYPING, handleTyping)
-      socketService.off(SocketEvent.MEMBER_JOINED, handleMemberUpdate)
-      socketService.off(SocketEvent.MEMBER_LEFT, handleMemberUpdate)
+      socket.off('new-message', handleNewMessage)
+      socket.off('user-typing', handleTyping)
+      socket.off('member-joined', handleMemberUpdate)
+      socket.off('member-left', handleMemberUpdate)
       
       // Clear all typing timeouts
       Object.values(typingTimeoutsRef.current).forEach(timeout => clearTimeout(timeout))
     }
-  }, [team, user])
+  }, [socket, team?.id, user?.id, loadMessages])
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -135,21 +204,42 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!user || !team || !newMessage.trim()) return
+    if (!user || !team?.id || !newMessage.trim()) return
     
     try {
       setIsSending(true)
       
       // Send typing indicator (stopped typing)
-      socketService.sendTypingStatus(team.id, false)
+      if (socket) {
+        socket.emit('typing', {
+          teamId: team.id,
+          userId: user.id,
+          userName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+          isTyping: false
+        })
+      }
       
-      // Send message
-      await collaborateService.sendMessage(team.id, user.id, newMessage)
+      // Send message via API
+      const data = await apiCall('/api/collaborate/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: team.id,
+          content: newMessage.trim(),
+          type: 'text',
+        }),
+      })
       
-      // Clear input
-      setNewMessage('')
+      if (data.success) {
+        setNewMessage('')
+        // Message will be added via socket event
+      }
     } catch (error) {
       console.error('Error sending message:', error)
+      toast({
+        title: "Message failed",
+        description: error instanceof Error ? error.message : "Could not send message. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSending(false)
     }
@@ -157,27 +247,47 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   
   // Handle typing indicator
   const handleTypingIndicator = () => {
-    if (!user || !team) return
+    if (!user || !team?.id || !socket) return
     
-    socketService.sendTypingStatus(team.id, true)
+    socket.emit('typing', {
+      teamId: team.id,
+      userId: user.id,
+      userName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+      isTyping: true
+    })
   }
   
-  // Get user status
-  const getUserStatus = (userId: string) => {
-    const presence = userPresences.get(userId)
-    return presence?.status || 'offline'
+  // Get user status based on team members
+  const getUserStatus = (userId: string): "online" | "offline" | "away" => {
+    const member = team.members.find(m => m.id === userId)
+    return member?.status || 'offline'
   }
   
-  // Get member name by ID
-  const getMemberName = (userId: string) => {
-    const member = members.find(m => m.id === userId || m.user_id === userId)
-    return member?.name || member?.full_name || 'Unknown User'
-  }
-  
-  // Get member avatar by ID
-  const getMemberAvatar = (userId: string) => {
-    const member = members.find(m => m.id === userId || m.user_id === userId)
-    return member?.avatar || member?.avatar_url
+  // Get member info by ID
+  const getMemberInfo = (userId: string) => {
+    const member = team.members.find(m => m.id === userId)
+    if (member) {
+      return {
+        name: member.name,
+        avatar: member.avatar,
+        status: member.status
+      }
+    }
+    
+    // Fallback for system messages or unknown users
+    if (userId === 'system') {
+      return {
+        name: 'System',
+        avatar: undefined,
+        status: 'online' as const
+      }
+    }
+    
+    return {
+      name: 'Unknown User',
+      avatar: undefined,
+      status: 'offline' as const
+    }
   }
   
   // Get initials for avatar fallback
@@ -192,215 +302,198 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   
   // Format message timestamp
   const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    try {
+      const date = new Date(timestamp)
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return 'Invalid time'
+    }
   }
   
   // Format message date
   const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-    
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today'
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday'
-    } else {
+    try {
+      const date = new Date(timestamp)
+      const now = new Date()
+      const isToday = date.toDateString() === now.toDateString()
+      const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString()
+      
+      if (isToday) return 'Today'
+      if (isYesterday) return 'Yesterday'
       return date.toLocaleDateString()
+    } catch {
+      return 'Invalid date'
     }
   }
   
   // Group messages by date
-  const groupedMessages = messages.reduce((groups: Record<string, ChatMessage[]>, message) => {
-    const date = formatDate(message.created_at)
-    if (!groups[date]) {
-      groups[date] = []
-    }
-    groups[date].push(message)
+  const groupMessagesByDate = (messages: ChatMessage[]) => {
+    const groups: { [key: string]: ChatMessage[] } = {}
+    
+    messages.forEach(message => {
+      const dateKey = formatDate(message.timestamp)
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(message)
+    })
+    
     return groups
-  }, {})
+  }
+  
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'bg-green-500'
+      case 'away':
+        return 'bg-yellow-500'
+      case 'offline':
+        return 'bg-gray-400'
+      default:
+        return 'bg-gray-400'
+    }
+  }
   
   // Get typing users
-  const typingUsers = Object.entries(isTyping)
-    .filter(([userId, isTyping]) => isTyping && userId !== user?.id)
-    .map(([userId]) => getMemberName(userId))
+  const getTypingUsers = () => {
+    return Object.entries(isTyping)
+      .filter(([userId, typing]) => typing && userId !== user?.id)
+      .map(([userId]) => {
+        const memberInfo = getMemberInfo(userId)
+        return memberInfo.name
+      })
+  }
+  
+  const typingUsers = getTypingUsers()
+  const groupedMessages = groupMessagesByDate(messages)
   
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white rounded-lg border shadow-sm">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div>
-          <h2 className="text-lg font-semibold">{team.name}</h2>
-          <p className="text-sm text-gray-500">{members.length} members</p>
+      <div className="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <Users className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold">{team.name}</h3>
+            <p className="text-sm text-gray-600">{team.members.length} members</p>
+          </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose}>
-          Close
+          <Minimize2 className="h-4 w-4" />
         </Button>
       </div>
       
-      {/* Chat area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
-          ) : (
-            <>
-              {Object.entries(groupedMessages).map(([date, dateMessages]) => (
-                <div key={date} className="mb-6">
-                  <div className="flex items-center justify-center mb-4">
-                    <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-xs">
-                      {date}
-                    </div>
-                  </div>
-                  
-                  {dateMessages.map((message, index) => {
-                    const isCurrentUser = message.sender_id === user?.id
-                                         const isSystem = message.message_type === 'system'
-                    
-                    if (isSystem) {
-                      return (
-                        <div key={message.id} className="flex justify-center my-2">
-                          <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-xs text-gray-500">
-                            {message.content}
-                          </div>
-                        </div>
-                      )
-                    }
-                    
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex mb-4 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-                      >
-                        {!isCurrentUser && (
-                          <Avatar className="h-8 w-8 mr-2">
-                            <AvatarImage src={getMemberAvatar(message.sender_id)} />
-                            <AvatarFallback>
-                              {getInitials(getMemberName(message.sender_id))}
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="ml-2 text-sm text-gray-600">Loading messages...</span>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-lg font-medium mb-2">No messages yet</p>
+            <p className="text-sm">Start the conversation with your team</p>
+          </div>
+        ) : (
+          Object.entries(groupedMessages).map(([date, dateMessages]) => (
+            <div key={date}>
+              {/* Date divider */}
+              <div className="flex items-center my-4">
+                <div className="flex-1 border-t border-gray-200" />
+                <Badge variant="outline" className="mx-4 text-xs">
+                  {date}
+                </Badge>
+                <div className="flex-1 border-t border-gray-200" />
+              </div>
+              
+              {/* Messages for this date */}
+              {dateMessages.map((message) => {
+                const memberInfo = getMemberInfo(message.senderId)
+                
+                return (
+                  <div key={message.id}>
+                    {message.type === "system" ? (
+                      <div className="text-center">
+                        <Badge variant="outline" className="text-xs">
+                          {message.content}
+                        </Badge>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3 hover:bg-gray-50 p-2 rounded">
+                        <div className="relative">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={message.senderAvatar || memberInfo.avatar} />
+                            <AvatarFallback className="text-xs">
+                              {getInitials(message.senderName)}
                             </AvatarFallback>
                           </Avatar>
-                        )}
-                        
-                        <div className={`max-w-[70%]`}>
-                          {!isCurrentUser && (
-                            <div className="text-xs text-gray-500 mb-1">
-                              {getMemberName(message.sender_id)}
-                            </div>
-                          )}
-                          
-                          <div className="flex items-end gap-2">
-                            <div
-                              className={`p-3 rounded-lg ${
-                                isCurrentUser
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-gray-100 dark:bg-gray-800'
-                              }`}
-                            >
-                              {message.content}
-                              <div
-                                className={`text-xs mt-1 ${
-                                  isCurrentUser ? 'text-blue-100' : 'text-gray-500'
-                                }`}
-                              >
-                                {formatTime(message.created_at)}
-                              </div>
-                            </div>
-                            
-                            {isCurrentUser && (
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={user?.avatar} />
-                                <AvatarFallback>
-                                  {getInitials(user?.name || '')}
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(memberInfo.status)}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">{message.senderName}</span>
+                            <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
                           </div>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                            {message.content}
+                          </p>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              ))}
-              
-              {/* Typing indicator */}
-              {typingUsers.length > 0 && (
-                <div className="text-xs text-gray-500 italic mb-2">
-                  {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
-                </div>
-              )}
-              
-              {/* Scroll anchor */}
-              <div ref={messagesEndRef} />
-            </>
-          )}
-        </div>
-        
-        {/* Member list */}
-        <div className="w-64 border-l p-4 hidden md:block overflow-y-auto">
-          <h3 className="font-medium mb-4">Members</h3>
-          <div className="space-y-3">
-            {members.map(member => {
-              const userId = member.id || member.user_id
-              const status = getUserStatus(userId)
-              const statusColor = {
-                online: 'bg-green-500',
-                away: 'bg-yellow-500',
-                offline: 'bg-gray-500',
-              }[status]
-              
-              return (
-                <div key={member.id || member.user_id} className="flex items-center gap-2">
-                  <div className="relative">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={member.avatar || member.avatar_url} />
-                      <AvatarFallback>
-                        {getInitials(member.name || member.full_name || '')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span
-                      className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ${statusColor} ring-1 ring-white`}
-                    />
-                  </div>
-                  <div className="text-sm">
-                    {member.name || member.full_name}
-                    {member.role === 'owner' && (
-                      <Badge variant="outline" className="ml-1 text-xs">
-                        Owner
-                      </Badge>
                     )}
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
+          ))
+        )}
+        
+        {/* Typing indicator */}
+        {typingUsers.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>
+              {typingUsers.length === 1
+                ? `${typingUsers[0]} is typing...`
+                : `${typingUsers.slice(0, -1).join(', ')} and ${typingUsers[typingUsers.length - 1]} are typing...`
+              }
+            </span>
           </div>
-        </div>
+        )}
+        
+        <div ref={messagesEndRef} />
       </div>
       
       {/* Message input */}
-      <form onSubmit={handleSendMessage} className="p-4 border-t">
-        <div className="flex gap-2">
+      <div className="p-4 border-t bg-gray-50 rounded-b-lg">
+        <form onSubmit={handleSendMessage} className="flex gap-2">
           <Input
-            placeholder="Type a message..."
+            placeholder="Type your message..."
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleTypingIndicator}
-            disabled={isSending}
+            onChange={(e) => {
+              setNewMessage(e.target.value)
+              handleTypingIndicator()
+            }}
             className="flex-1"
+            disabled={isSending}
           />
-          <Button type="submit" size="icon" disabled={isSending || !newMessage.trim()}>
+          <Button 
+            type="submit" 
+            disabled={!newMessage.trim() || isSending}
+            size="sm"
+          >
             {isSending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
             )}
           </Button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   )
 }

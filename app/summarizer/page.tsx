@@ -25,6 +25,7 @@ import {
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { useToast } from "@/hooks/use-toast"
 import { FileUploader } from "./components/FileUploader"
+import { SummarizerDebug } from "./components/summarizer-debug"
 import { RouteGuard } from "@/components/route-guard"
 import type { AIProvider } from "@/lib/ai-providers"
 import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
@@ -385,12 +386,20 @@ export default function Summarizer() {
       return
     }
 
+    console.log("Starting summary generation...")
+    console.log("Content length:", content.length)
+    console.log("Selected provider:", selectedProvider)
+    console.log("Selected model:", selectedModel)
+    console.log("Summary style:", summaryStyle)
+    console.log("Summary length:", summaryLength)
+
     setLoading(true)
     setError(null)
     setResult(null)
 
     try {
       // Enhanced summary generation with additional features
+      console.log("Calling enhancedAIService.summarizeContent...")
       const summaryResult = await enhancedAIService.summarizeContent(
         content,
         {
@@ -400,6 +409,8 @@ export default function Summarizer() {
         selectedProvider,
         selectedModel,
       )
+      
+      console.log("Summary result received:", summaryResult)
 
       const originalLength = content.length
       const summaryTextLength = summaryResult.summary.length
@@ -425,13 +436,20 @@ export default function Summarizer() {
     } catch (error) {
       console.error("Summarization error:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to generate summary"
+      console.error("Detailed error:", {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        type: typeof error,
+        error
+      })
+      
       setError(errorMessage)
 
       // Don't show toast for API key errors - the error display will handle it
-      if (!errorMessage.includes("No AI providers available")) {
+      if (!errorMessage.includes("No AI providers available") && !errorMessage.includes("No valid API keys")) {
         toast({
           title: "Summary generation failed",
-          description: "See error details below for help",
+          description: "Check the debug panel for detailed information",
           variant: "destructive",
         })
       }
@@ -841,23 +859,120 @@ export default function Summarizer() {
                 />
               )}
 
-              <Button
-                onClick={generateSummary}
-                disabled={loading || !content.trim()}
-                className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 h-auto transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                    Generating Summary...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-5 w-5 mr-3" />
-                    Generate Summary
-                  </>
-                )}
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={generateSummary}
+                  disabled={loading || !content.trim()}
+                  className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 h-auto transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                      Generating Summary...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-5 w-5 mr-3" />
+                      Generate Summary
+                    </>
+                  )}
+                </Button>
+                
+                {/* Quick test button for debugging */}
+                <div className="space-y-2">
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const testResponse = await fetch('/api/ai/providers', {
+                          credentials: 'include'
+                        })
+                        const data = await testResponse.json()
+                        console.log('Provider test result:', data)
+                        toast({
+                          title: "Provider Test",
+                          description: `Found ${data.userProviders?.length || 0} user providers, ${data.envProviders?.length || 0} env providers`,
+                        })
+                      } catch (error) {
+                        console.error('Provider test failed:', error)
+                        toast({
+                          title: "Provider Test Failed",
+                          description: error instanceof Error ? error.message : "Unknown error",
+                          variant: "destructive"
+                        })
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Test AI Providers
+                  </Button>
+                  
+                                     <Button
+                     onClick={async () => {
+                       try {
+                         console.log('Testing AI generation with simple prompt...')
+                         const testResponse = await fetch('/api/ai/generate', {
+                           method: 'POST',
+                           headers: {
+                             'Content-Type': 'application/json'
+                           },
+                           credentials: 'include',
+                           body: JSON.stringify({
+                             prompt: 'Say "Hello, this is a test response from the AI service."',
+                             maxTokens: 100
+                           })
+                         })
+                         
+                         console.log('AI generate response status:', testResponse.status)
+                         const data = await testResponse.json()
+                         console.log('AI generate response data:', data)
+                         
+                         if (data.success && data.content) {
+                           toast({
+                             title: "AI Test Success",
+                             description: `Response: ${data.content.substring(0, 50)}...`,
+                           })
+                         } else {
+                           toast({
+                             title: "AI Test Failed",
+                             description: data.error || "No content returned",
+                             variant: "destructive"
+                           })
+                         }
+                       } catch (error) {
+                         console.error('AI test failed:', error)
+                         toast({
+                           title: "AI Test Failed",
+                           description: error instanceof Error ? error.message : "Unknown error",
+                           variant: "destructive"
+                         })
+                       }
+                     }}
+                     variant="outline"
+                     size="sm"
+                     className="w-full"
+                   >
+                     Test AI Generation
+                   </Button>
+                   
+                   <Button
+                     onClick={() => {
+                       const testContent = "This is a test document for summarization. It contains multiple sentences to test the summarization functionality. The summarizer should be able to process this content and generate a meaningful summary with key points. This test will help us identify if there are any issues with the summarization process."
+                       setContent(testContent)
+                       toast({
+                         title: "Test Content Added",
+                         description: "Sample text has been loaded for testing",
+                       })
+                     }}
+                     variant="outline"
+                     size="sm"
+                     className="w-full"
+                   >
+                     Load Test Content
+                   </Button>
+                </div>
+              </div>
             </div>
 
             {/* Results Section */}
@@ -995,6 +1110,7 @@ export default function Summarizer() {
           </div>
         </div>
       </div>
+      <SummarizerDebug />
     </RouteGuard>
   )
 }
