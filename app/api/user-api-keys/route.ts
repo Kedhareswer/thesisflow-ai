@@ -18,13 +18,27 @@ function encrypt(text: string): string {
 }
 
 function decrypt(text: string): string {
-  const textParts = text.split(':')
-  const iv = Buffer.from(textParts.shift()!, 'hex')
-  const encryptedText = textParts.join(':')
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
-  decrypted += decipher.final('utf8')
-  return decrypted
+  const parts = text.split(':')
+  if (parts.length < 2) {
+    throw new Error('Invalid encrypted text format')
+  }
+
+  const iv = Buffer.from(parts.shift()!, 'hex')
+  const cipherText = parts.join(':')
+  const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
+
+  const tryDecrypt = (encoding: BufferEncoding) => {
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
+    let decrypted = decipher.update(cipherText, encoding, 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  }
+
+  try {
+    return tryDecrypt('hex')
+  } catch {
+    return tryDecrypt('base64')
+  }
 }
 
 // Validate API key format for different providers
@@ -51,13 +65,25 @@ function encryptApiKey(apiKey: string): string {
 
 function decryptApiKey(encryptedKey: string): string {
   try {
-    const textParts = encryptedKey.split(':')
-    const iv = Buffer.from(textParts.shift()!, 'hex')
-    const encryptedText = textParts.join(':')
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
+    const parts = encryptedKey.split(':')
+    if (parts.length < 2) return ''
+
+    const iv = Buffer.from(parts.shift()!, 'hex')
+    const cipherText = parts.join(':')
+    const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
+
+    const tryDecrypt = (encoding: BufferEncoding) => {
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+      let decrypted = decipher.update(cipherText, encoding, 'utf8')
+      decrypted += decipher.final('utf8')
+      return decrypted
+    }
+
+    try {
+      return tryDecrypt('hex')
+    } catch {
+      return tryDecrypt('base64')
+    }
   } catch (error) {
     console.error('Error decrypting API key:', error)
     return ''

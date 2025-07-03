@@ -24,13 +24,29 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-he
 const ALGORITHM = 'aes-256-cbc'
 
 function decrypt(text: string): string {
-  const textParts = text.split(':')
-  const iv = Buffer.from(textParts.shift()!, 'hex')
-  const encryptedText = textParts.join(':')
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
-  decrypted += decipher.final('utf8')
-  return decrypted
+  // Expect <iv>:<cipherText>
+  const parts = text.split(':')
+  if (parts.length < 2) {
+    throw new Error('Invalid encrypted text format')
+  }
+
+  const iv = Buffer.from(parts.shift()!, 'hex')
+  const cipherText = parts.join(':')
+  const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
+
+  const tryDecrypt = (encoding: BufferEncoding) => {
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
+    let decrypted = decipher.update(cipherText, encoding, 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  }
+
+  try {
+    return tryDecrypt('hex')
+  } catch {
+    // Fallback to base64 (legacy)
+    return tryDecrypt('base64')
+  }
 }
 
 // AI Provider configurations

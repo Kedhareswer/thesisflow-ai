@@ -857,11 +857,58 @@ Requirements:
       readingTime = Math.ceil(originalContent.split(/\s+/).length / 200)
     }
 
-        return { 
+    return { 
       summary,
       keyPoints,
       readingTime,
       sentiment
+    }
+  }
+
+  /**
+   * Lightweight validation of an API key. For now, we only verify the format.
+   * You can extend this method to hit a cheap provider endpoint for deeper checks.
+   */
+  async testApiKey(
+    provider: string,
+    apiKey: string
+  ): Promise<{ valid: boolean; model?: string; error?: string }> {
+    try {
+      // Basic length sanity check
+      if (!apiKey || apiKey.length < 10) {
+        return { valid: false, error: 'API key too short' }
+      }
+
+      // Provider-specific regex patterns
+      const regexMap: Record<string, RegExp> = {
+        openai: /^sk-[A-Za-z0-9]{48,}$/,
+        groq: /^gsk_[A-Za-z0-9]{50,}$/,
+        gemini: /^AIza[A-Za-z0-9_\-]{35,}$/,
+        anthropic: /^sk-ant-[A-Za-z0-9]{40,}$/,
+        mistral: /^[A-Za-z0-9]{32,}$/,
+        aiml: /.{10,}/,
+        deepinfra: /.{10,}/
+      }
+
+      const pattern = regexMap[provider]
+      if (pattern && !pattern.test(apiKey)) {
+        return { valid: false, error: 'API key format looks invalid' }
+      }
+
+      // Mapping of default models per provider for UI feedback
+      const defaultModelMap: Record<string, string> = {
+        openai: 'gpt-4o',
+        groq: 'llama-3.1-70b-versatile',
+        gemini: 'gemini-1.5-pro',
+        anthropic: 'claude-3-sonnet',
+        mistral: 'mistral-small',
+        aiml: 'claude-3-sonnet',
+        deepinfra: 'Meta-Llama-3.1-70B-Instruct'
+      }
+
+      return { valid: true, model: defaultModelMap[provider] }
+    } catch (error) {
+      return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
 }

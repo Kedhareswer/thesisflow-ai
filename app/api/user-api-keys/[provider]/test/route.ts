@@ -15,18 +15,43 @@ const supabaseAdmin = createClient(
   }
 )
 
-// Decryption function
+// Enhanced decryption helper that tries both hex and base64 encodings to maintain backwards-compatibility
 function decrypt(text: string): string {
   const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
   const ALGORITHM = 'aes-256-cbc'
-  
-  const textParts = text.split(':')
-  const iv = Buffer.from(textParts.shift()!, 'hex')
-  const encryptedText = textParts.join(':')
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
-  decrypted += decipher.final('utf8')
-  return decrypted
+
+  // Expect the stored value to be in the form <iv>:<cipherText>
+  const parts = text.split(':')
+  if (parts.length < 2) {
+    throw new Error('Invalid encrypted text format')
+  }
+
+  const iv = Buffer.from(parts.shift()!, 'hex')
+  const cipherText = parts.join(':')
+  const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
+
+  // Helper to perform the low-level decryption with a given input encoding
+  const tryDecrypt = (encoding: BufferEncoding) => {
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
+    let decrypted = decipher.update(cipherText, encoding, 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  }
+
+  // First attempt using hex (current format). If it fails, fall back to base64 (legacy format).
+  try {
+    return tryDecrypt('hex')
+  } catch (hexError) {
+    try {
+      return tryDecrypt('base64')
+    } catch (base64Error) {
+      console.error('Decryption failed for both hex and base64 encodings', {
+        hexError,
+        base64Error
+      })
+      throw hexError // Propagate the original error so callers know decryption failed
+    }
+  }
 }
 
 export async function POST(
