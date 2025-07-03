@@ -115,7 +115,70 @@ export async function GET(request: NextRequest) {
         }
       }) || []
 
-      allFiles = [...allFiles, ...formattedFiles]
+      // Fetch files from documents table for this team
+      const { data: docFiles, error: docFilesError } = await supabaseAdmin
+        .from('documents')
+        .select(`
+          id,
+          title,
+          file_url,
+          mime_type,
+          file_size,
+          owner_id,
+          team_id,
+          is_public,
+          created_at,
+          updated_at
+        `)
+        .eq('team_id', teamId)
+        .eq('document_type', 'file')
+
+      if (docFilesError) {
+        console.error("Documents query error:", docFilesError)
+      }
+
+      // Get owner details for documents
+      const docOwnerIds = docFiles?.map(f => f.owner_id).filter(Boolean) || []
+      let docOwnerMap: Record<string, any> = {}
+      if (docOwnerIds.length > 0) {
+        const { data: docOwners } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id, display_name, full_name, email, avatar_url')
+          .in('id', docOwnerIds)
+        docOwnerMap = Object.fromEntries(
+          docOwners?.map(u => [u.id, u]) || []
+        )
+      }
+
+      const formattedDocFiles = docFiles?.map(file => {
+        const owner = docOwnerMap[file.owner_id]
+        return {
+          id: file.id,
+          name: file.title,
+          type: 'file',
+          mime_type: file.mime_type,
+          size: file.file_size,
+          url: file.file_url,
+          uploaded_by: file.owner_id,
+          uploaded_by_name: owner?.display_name || owner?.full_name || owner?.email || 'Unknown',
+          uploaded_by_avatar: owner?.avatar_url,
+          created_at: file.created_at,
+          updated_at: file.updated_at,
+          description: '',
+          tags: [],
+          is_public: file.is_public,
+          download_count: 0,
+          version: null,
+          team_id: file.team_id
+        }
+      }) || []
+
+      // Merge and deduplicate by file url
+      const allFilesMap = new Map()
+      for (const f of [...formattedFiles, ...formattedDocFiles]) {
+        if (f.url) allFilesMap.set(f.url, f)
+      }
+      allFiles = [...allFilesMap.values()]
     }
 
     // Fetch shared links if requested
@@ -289,6 +352,26 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Insert into documents table (best effort)
+      try {
+        await supabaseAdmin
+          .from('documents')
+          .insert({
+            title: name,
+            file_url: url || '',
+            mime_type: fileType || 'application/octet-stream',
+            file_size: fileSize || 0,
+            owner_id: user.id,
+            team_id: teamId,
+            is_public: isPublic || false,
+            document_type: 'file',
+            created_at: file.created_at,
+            updated_at: file.updated_at
+          })
+      } catch (docError) {
+        console.error('Failed to insert into documents:', docError)
+      }
+
       newItem = {
         id: file.id,
         name: file.file_name,
@@ -419,45 +502,36 @@ export async function DELETE(request: NextRequest) {
     const canDeleteAsAdmin = ['owner', 'admin'].includes(membership.role)
     
     if (type === 'file') {
-      // Check if user is the uploader or admin
-      const { data: file } = await supabaseAdmin
-        .from('team_files')
-        .select('uploader_id')
-        .eq('id', fileId)
-        .eq('team_id', teamId)
-        .single()
-
-      if (!file) {
-        return NextResponse.json(
-          { error: "File not found" },
-          { status: 404 }
-        )
-      }
-
-      const canDelete = canDeleteAsAdmin || file.uploader_id === user.id
-
-      if (!canDelete) {
-        return NextResponse.json(
-          { error: "Permission denied. You can only delete your own files or need admin permissions." },
-          { status: 403 }
-        )
-      }
-
       // Delete from team_files
-      const { error: deleteError } = await supabaseAdmin
+      const { error: fileError, data: deletedFile } = await supabaseAdmin
         .from('team_files')
         .delete()
         .eq('id', fileId)
         .eq('team_id', teamId)
+        .select('file_url')
+        .single()
 
-      if (deleteError) {
-        console.error("File delete error:", deleteError)
+      if (fileError) {
+        console.error('File delete error:', fileError)
         return NextResponse.json(
-          { error: "Failed to delete file" },
+          { error: 'Failed to delete file' },
           { status: 500 }
         )
       }
-    } else {
+
+      // Also delete from documents (best effort)
+      try {
+        if (deletedFile?.file_url) {
+          await supabaseAdmin
+            .from('documents')
+            .delete()
+            .eq('file_url', deletedFile.file_url)
+            .eq('team_id', teamId)
+        }
+      } catch (docDelError) {
+        console.error('Failed to delete from documents:', docDelError)
+      }
+    } else if (type === 'link') {
       // Check if user is the sharer or admin
       const { data: link } = await supabaseAdmin
         .from('team_shared_links')

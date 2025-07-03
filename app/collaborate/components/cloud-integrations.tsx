@@ -53,9 +53,10 @@ interface CloudFolder {
 interface CloudIntegrationsProps {
   teamId: string
   currentUserRole: string
+  apiCall?: (url: string, options?: RequestInit) => Promise<any>
 }
 
-export function CloudIntegrations({ teamId, currentUserRole }: CloudIntegrationsProps) {
+export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedApiCall }: CloudIntegrationsProps) {
   const { toast } = useToast()
   
   const [services, setServices] = useState<CloudService[]>([])
@@ -76,11 +77,11 @@ export function CloudIntegrations({ teamId, currentUserRole }: CloudIntegrations
       setIsLoading(true)
       
       // Load existing integrations from API
-      const response = await fetch(`/api/collaborate/cloud-integrations?teamId=${teamId}`, {
-        credentials: 'include'
-      })
-      
-      const data = await response.json()
+      const data = providedApiCall 
+        ? await providedApiCall(`/api/collaborate/cloud-integrations?teamId=${teamId}`)
+        : await fetch(`/api/collaborate/cloud-integrations?teamId=${teamId}`, {
+            credentials: 'include'
+          }).then(r => r.json())
       
       // Define available services
       const availableServices: CloudService[] = [
@@ -170,23 +171,36 @@ export function CloudIntegrations({ teamId, currentUserRole }: CloudIntegrations
       await new Promise(resolve => setTimeout(resolve, 1500))
       
       // Call API to create integration
-      const response = await fetch('/api/collaborate/cloud-integrations', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          teamId,
-          serviceName: serviceType,
-          serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
-          permissions: { read: true, write: true, share: true },
-          syncEnabled: true,
-          autoSync: false
-        }),
-      })
-
-      const data = await response.json()
+      const data = providedApiCall 
+        ? await providedApiCall('/api/collaborate/cloud-integrations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              teamId,
+              serviceName: serviceType,
+              serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
+              permissions: { read: true, write: true, share: true },
+              syncEnabled: true,
+              autoSync: false
+            }),
+          })
+        : await fetch('/api/collaborate/cloud-integrations', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              teamId,
+              serviceName: serviceType,
+              serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
+              permissions: { read: true, write: true, share: true },
+              syncEnabled: true,
+              autoSync: false
+            }),
+          }).then(r => r.json())
 
       if (data.success) {
         setServices(prev => prev.map(service => 
@@ -226,12 +240,14 @@ export function CloudIntegrations({ teamId, currentUserRole }: CloudIntegrations
 
     try {
       // Call API to delete integration
-      const response = await fetch(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-
-      const data = await response.json()
+      const data = providedApiCall 
+        ? await providedApiCall(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
+            method: 'DELETE',
+          })
+        : await fetch(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          }).then(r => r.json())
 
       if (data.success) {
         setServices(prev => prev.map(service => 

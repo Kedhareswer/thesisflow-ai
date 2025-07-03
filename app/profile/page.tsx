@@ -12,6 +12,7 @@ import { User, Mail, Calendar, MapPin, LinkIcon, Save, Edit, BookOpen, Lightbulb
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
+import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload"
 
 interface UserProfile {
   display_name: string
@@ -21,6 +22,7 @@ interface UserProfile {
   research_interests: string[]
   institution: string
   position: string
+  avatar_url: string
 }
 
 export default function ProfilePage() {
@@ -36,12 +38,22 @@ export default function ProfilePage() {
     research_interests: [],
     institution: "",
     position: "",
+    avatar_url: "",
   })
   const [newInterest, setNewInterest] = useState("")
+
+  // Activity overview state
+  const [activity, setActivity] = useState({
+    papersExplored: null as number | null,
+    ideasGenerated: null as number | null,
+    collaborations: null as number | null,
+  })
+  const [activityLoading, setActivityLoading] = useState(false)
 
   useEffect(() => {
     if (user) {
       loadProfile()
+      loadActivity()
     }
   }, [user])
 
@@ -65,6 +77,7 @@ export default function ProfilePage() {
           research_interests: data.research_interests || [],
           institution: data.institution || "",
           position: data.position || "",
+          avatar_url: data.avatar_url || "",
         })
       } else {
         // Set default values from user metadata
@@ -75,6 +88,37 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Error loading profile:", error)
+    }
+  }
+
+  const loadActivity = async () => {
+    if (!user) return;
+    setActivityLoading(true)
+    try {
+      const [papersRes, ideasRes, collabRes] = await Promise.all([
+        supabase
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('owner_id', user.id)
+          .eq('document_type', 'paper'),
+        supabase
+          .from('research_ideas')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('team_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+      ])
+      setActivity({
+        papersExplored: papersRes.count ?? 0,
+        ideasGenerated: ideasRes.count ?? 0,
+        collaborations: collabRes.count ?? 0,
+      })
+    } catch (e) {
+      setActivity({ papersExplored: 0, ideasGenerated: 0, collaborations: 0 })
+    } finally {
+      setActivityLoading(false)
     }
   }
 
@@ -107,6 +151,7 @@ export default function ProfilePage() {
         research_interests: profile.research_interests || [],
         institution: profile.institution || null,
         position: profile.position || null,
+        avatar_url: profile.avatar_url || null,
         updated_at: new Date().toISOString(),
       }
 
@@ -247,12 +292,21 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center space-y-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src="/placeholder.svg" alt={profile.display_name} />
-                  <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                    {getInitials()}
-                  </AvatarFallback>
-                </Avatar>
+                {editing ? (
+                  <ProfilePictureUpload
+                    currentAvatarUrl={profile.avatar_url}
+                    userId={user.id}
+                    onUploadComplete={(avatarUrl) => setProfile({ ...profile, avatar_url: avatarUrl })}
+                    size="lg"
+                  />
+                ) : (
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={profile.display_name} />
+                    <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
 
                 <div className="space-y-1">
                   <h2 className="text-xl font-semibold">{profile.display_name || "Anonymous User"}</h2>
@@ -306,21 +360,27 @@ export default function ProfilePage() {
                   <BookOpen className="h-4 w-4 text-blue-600" />
                   <span className="text-sm">Papers Explored</span>
                 </div>
-                <Badge variant="secondary">0</Badge>
+                <Badge variant="secondary">
+                  {activityLoading ? '...' : activity.papersExplored ?? 0}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-4 w-4 text-yellow-600" />
                   <span className="text-sm">Ideas Generated</span>
                 </div>
-                <Badge variant="secondary">0</Badge>
+                <Badge variant="secondary">
+                  {activityLoading ? '...' : activity.ideasGenerated ?? 0}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-green-600" />
                   <span className="text-sm">Collaborations</span>
                 </div>
-                <Badge variant="secondary">0</Badge>
+                <Badge variant="secondary">
+                  {activityLoading ? '...' : activity.collaborations ?? 0}
+                </Badge>
               </div>
             </CardContent>
           </Card>

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       .from('chat_messages')
       .select(`
         *,
-        sender:user_profiles!chat_messages_sender_id_fkey(
+        sender:user_profiles!chat_messages_sender_id_fkey_user_profiles(
           id,
           full_name,
           avatar_url
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        sender:user_profiles!chat_messages_sender_id_fkey(
+        sender:user_profiles!chat_messages_sender_id_fkey_user_profiles(
           id,
           full_name,
           avatar_url

@@ -64,6 +64,7 @@ interface TeamSettingsProps {
   currentUserRole: string
   onTeamUpdate: (team: Team) => void
   onLeaveTeam: () => void
+  apiCall?: (url: string, options?: RequestInit) => Promise<any>
 }
 
 export function TeamSettings({ 
@@ -72,7 +73,8 @@ export function TeamSettings({
   team, 
   currentUserRole,
   onTeamUpdate,
-  onLeaveTeam 
+  onLeaveTeam,
+  apiCall
 }: TeamSettingsProps) {
   const { user } = useSupabaseAuth()
   const { toast } = useToast()
@@ -789,7 +791,7 @@ export function TeamSettings({
                       <div className="flex items-center gap-3">
                         <Avatar>
                           <AvatarImage src={member.avatar} />
-                          <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                          <AvatarFallback>{member.name?.charAt(0) || 'U'}</AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="flex items-center gap-2">

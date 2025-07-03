@@ -592,7 +592,7 @@ export default function CollaboratePage() {
                               <div key={member.id} className="relative">
                                 <Avatar className="h-5 w-5 border border-white">
                                   <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                  <AvatarFallback className="text-xs">{member.name.charAt(0)}</AvatarFallback>
+                                  <AvatarFallback className="text-xs">{member.name?.charAt(0) || 'U'}</AvatarFallback>
                                 </Avatar>
                                 <div
                                   className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
@@ -682,7 +682,7 @@ export default function CollaboratePage() {
                                   <div className="flex gap-3">
                                     <Avatar className="h-8 w-8">
                                       <AvatarImage src={message.senderAvatar} />
-                                      <AvatarFallback className="text-xs">{message.senderName.charAt(0)}</AvatarFallback>
+                                      <AvatarFallback className="text-xs">{message.senderName?.charAt(0) || 'U'}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-1">
@@ -746,7 +746,7 @@ export default function CollaboratePage() {
                                     <div className="relative">
                                       <Avatar className="h-10 w-10">
                                         <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                        <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback>{member.name?.charAt(0) || 'U'}</AvatarFallback>
                                       </Avatar>
                                       <div
                                         className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
@@ -790,7 +790,8 @@ export default function CollaboratePage() {
                       <TabsContent value="files" className="mt-6">
                         <TeamFiles 
                           teamId={selectedTeam.id} 
-                          currentUserRole={currentUserRole} 
+                          currentUserRole={currentUserRole}
+                          apiCall={apiCall}
                         />
                       </TabsContent>
                     </Tabs>
@@ -807,24 +808,18 @@ export default function CollaboratePage() {
                         Choose a team from the sidebar to start collaborating, or create a new team to get started
                       </p>
                       <div className="flex justify-center gap-6">
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-blue-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
-                            <MessageSquare className="h-6 w-6 text-white" />
+                        {[
+                          { id: 'chat', icon: MessageSquare, label: 'Team Chat', color: 'bg-blue-500' },
+                          { id: 'files', icon: Share, label: 'File Sharing', color: 'bg-green-500' },
+                          { id: 'video', icon: Video, label: 'Video Calls', color: 'bg-purple-500' }
+                        ].map((feature) => (
+                          <div key={feature.id} className="text-center">
+                            <div className={`w-12 h-12 ${feature.color} mb-3 mx-auto rounded-lg flex items-center justify-center`}>
+                              <feature.icon className="h-6 w-6 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-600">{feature.label}</span>
                           </div>
-                          <span className="text-sm text-gray-600">Team Chat</span>
-                        </div>
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-green-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
-                            <Share className="h-6 w-6 text-white" />
-                          </div>
-                          <span className="text-sm text-gray-600">File Sharing</span>
-                        </div>
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-purple-500 mb-3 mx-auto rounded-lg flex items-center justify-center">
-                            <Video className="h-6 w-6 text-white" />
-                          </div>
-                          <span className="text-sm text-gray-600">Video Calls</span>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </CardContent>
@@ -843,6 +838,7 @@ export default function CollaboratePage() {
             currentUserRole={currentUserRole}
             onTeamUpdate={handleTeamUpdate}
             onLeaveTeam={handleLeaveTeam}
+            apiCall={apiCall}
           />
         )}
       </div>

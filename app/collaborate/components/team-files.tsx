@@ -73,9 +73,10 @@ interface TeamFile {
 interface TeamFilesProps {
   teamId: string
   currentUserRole: string
+  apiCall?: (url: string, options?: RequestInit) => Promise<any>
 }
 
-export function TeamFiles({ teamId, currentUserRole }: TeamFilesProps) {
+export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }: TeamFilesProps) {
   const { user } = useSupabaseAuth()
   const { toast } = useToast()
   
@@ -104,8 +105,13 @@ export function TeamFiles({ teamId, currentUserRole }: TeamFilesProps) {
   const canUpload = ['owner', 'admin', 'editor'].includes(currentUserRole)
   const canDelete = ['owner', 'admin'].includes(currentUserRole)
 
-  // API helper function
+  // API helper function - use provided apiCall or fallback to basic fetch
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
+    if (providedApiCall) {
+      return providedApiCall(url, options)
+    }
+    
+    // Fallback to basic fetch (should not be used in production)
     const response = await fetch(url, {
       ...options,
       credentials: 'include',
@@ -121,7 +127,7 @@ export function TeamFiles({ teamId, currentUserRole }: TeamFilesProps) {
     }
 
     return response.json()
-  }, [])
+  }, [providedApiCall])
 
   // Load files and links
   const loadData = useCallback(async () => {
@@ -553,7 +559,7 @@ export function TeamFiles({ teamId, currentUserRole }: TeamFilesProps) {
                             {file.tags && file.tags.length > 0 && (
                               <div className="flex gap-1 mt-2">
                                 {file.tags.map((tag, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs">
+                                  <Badge key={`${tag}-${index}`} variant="secondary" className="text-xs">
                                     {tag}
                                   </Badge>
                                 ))}
