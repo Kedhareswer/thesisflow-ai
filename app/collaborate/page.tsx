@@ -790,7 +790,7 @@ export default function CollaboratePage() {
                       <TabsContent value="files" className="mt-6">
                         <TeamFiles 
                           teamId={selectedTeam.id} 
-                          currentUserRole={currentUserRole}
+                          currentUserRole={currentUserRole} 
                           apiCall={apiCall}
                         />
                       </TabsContent>
@@ -816,9 +816,9 @@ export default function CollaboratePage() {
                           <div key={feature.id} className="text-center">
                             <div className={`w-12 h-12 ${feature.color} mb-3 mx-auto rounded-lg flex items-center justify-center`}>
                               <feature.icon className="h-6 w-6 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-600">{feature.label}</span>
                           </div>
+                            <span className="text-sm text-gray-600">{feature.label}</span>
+                        </div>
                         ))}
                       </div>
                     </div>

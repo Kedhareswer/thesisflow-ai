@@ -80,7 +80,7 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
       const data = providedApiCall 
         ? await providedApiCall(`/api/collaborate/cloud-integrations?teamId=${teamId}`)
         : await fetch(`/api/collaborate/cloud-integrations?teamId=${teamId}`, {
-            credentials: 'include'
+        credentials: 'include'
           }).then(r => r.json())
       
       // Define available services
@@ -187,19 +187,19 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
             }),
           })
         : await fetch('/api/collaborate/cloud-integrations', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              teamId,
-              serviceName: serviceType,
-              serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
-              permissions: { read: true, write: true, share: true },
-              syncEnabled: true,
-              autoSync: false
-            }),
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          teamId,
+          serviceName: serviceType,
+          serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
+          permissions: { read: true, write: true, share: true },
+          syncEnabled: true,
+          autoSync: false
+        }),
           }).then(r => r.json())
 
       if (data.success) {
@@ -245,8 +245,8 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
             method: 'DELETE',
           })
         : await fetch(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
-            method: 'DELETE',
-            credentials: 'include',
+        method: 'DELETE',
+        credentials: 'include',
           }).then(r => r.json())
 
       if (data.success) {
