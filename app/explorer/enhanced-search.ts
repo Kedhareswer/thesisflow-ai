@@ -1,6 +1,46 @@
 import { fetchOpenAlexWorks } from './openalex'
 import { searchSemanticScholar, transformSemanticScholarPaper, getCitationData } from './semantic-scholar'
 import type { ResearchPaper, SearchFilters } from '@/lib/types/common'
+import * as cheerio from 'cheerio'
+
+async function fetchAnnasArchivePapers(query: string, limit = 10): Promise<ResearchPaper[]> {
+  const url = `https://annas-archive.org/search?q=${encodeURIComponent(query)}&type=paper`
+  const res = await fetch(url)
+  const html = await res.text()
+  const $ = cheerio.load(html)
+  const papers: ResearchPaper[] = []
+  const now = new Date()
+  $('.search-result').each((i, el) => {
+    if (i >= limit) return false
+    const title = $(el).find('.search-result-title').text().trim()
+    const authors = $(el).find('.search-result-authors').text().split(',').map(a => a.trim()).filter(Boolean)
+    const year = parseInt($(el).find('.search-result-year').text().trim()) || now.getFullYear()
+    const journal = $(el).find('.search-result-journal').text().trim() || undefined
+    const doi = $(el).find('.search-result-doi').text().trim() || undefined
+    const url = 'https://annas-archive.org' + ($(el).find('.search-result-title a').attr('href') || '')
+    const pdf_url = $(el).find('.search-result-download a').attr('href') || undefined
+    papers.push({
+      id: `annas-${doi || title.replace(/\s+/g, '-')}-${i}`,
+      createdAt: now,
+      updatedAt: now,
+      title,
+      authors,
+      abstract: '', // Anna's Archive does not provide abstracts
+      year,
+      url,
+      journal,
+      doi,
+      pdf_url,
+      source: 'annas_archive',
+    })
+  })
+  return papers
+}
+
+function getSciHubPdfUrl(doi?: string): string | undefined {
+  if (!doi) return undefined
+  return `https://sci-hub.se/${encodeURIComponent(doi)}`
+}
 
 interface EnhancedSearchResult {
   papers: ResearchPaper[]

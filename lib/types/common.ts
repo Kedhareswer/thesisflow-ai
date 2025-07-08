@@ -70,7 +70,7 @@ export interface ResearchPaper extends BaseEntity {
   }
   language?: string
   type?: string
-  source?: 'openalex' | 'semantic_scholar' | 'arxiv' | 'pubmed'
+  source?: 'openalex' | 'semantic_scholar' | 'arxiv' | 'pubmed' | 'annas_archive'
   field_of_study?: string[]
   tldr?: string
 }
