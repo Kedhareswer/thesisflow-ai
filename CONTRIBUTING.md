@@ -1,6 +1,6 @@
 # Contributing to AI Project Planner
 
-Thank you for your interest in contributing to **AI Project Planner**! 🎉  
+Thank you for your interest in contributing to **Bolt Research Hub**! 🎉  
 We welcome contributions from everyone—whether you're a seasoned developer, researcher, or new to open source.
 
 Please read this guide to make your contribution process smooth and effective.
