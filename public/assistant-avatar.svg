@@ -1,0 +1,17 @@
+<svg width="320" height="240" viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="60" y="40" width="200" height="160" rx="60" stroke="#18191C" stroke-width="8"/>
+  <rect x="80" y="60" width="160" height="120" rx="40" stroke="#18191C" stroke-width="4"/>
+  <circle cx="120" cy="120" r="40" stroke="#18191C" stroke-width="6"/>
+  <circle cx="200" cy="120" r="40" stroke="#18191C" stroke-width="6"/>
+  <circle cx="120" cy="120" r="24" fill="#18191C"/>
+  <circle cx="200" cy="120" r="24" fill="#18191C"/>
+  <ellipse cx="160" cy="40" rx="40" ry="36" stroke="#18191C" stroke-width="8"/>
+  <rect x="120" y="60" width="80" height="24" rx="12" fill="#18191C"/>
+  <rect x="40" y="100" width="16" height="80" rx="8" stroke="#18191C" stroke-width="6"/>
+  <rect x="264" y="100" width="16" height="80" rx="8" stroke="#18191C" stroke-width="6"/>
+  <path d="M160 140c-2 0-4 0-6 1-2 0-4 1-6 2" stroke="#18191C" stroke-width="6" stroke-linecap="round"/>
+  <path d="M160 140c2 0 4 0 6 1 2 0 4 1 6 2" stroke="#18191C" stroke-width="6" stroke-linecap="round"/>
+  <path d="M160 140c0 8-8 16-24 16" stroke="#18191C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M160 140c0 8 8 16 24 16" stroke="#18191C" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="160,120 170,140 150,140" stroke="#18191C" stroke-width="6" fill="none"/>
+</svg> 

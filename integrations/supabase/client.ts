@@ -89,6 +89,8 @@ try {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+export { createClient }
+
 export const supabase = supabaseClient;
 
 // Utility functions for better error handling

@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@base-ui-components/react": "1.0.0-beta.1",
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "latest",
@@ -64,6 +65,7 @@
     "input-otp": "latest",
     "lucide-react": "^0.454.0",
     "mammoth": "latest",
+    "motion": "^12.23.0",
     "next": "15.2.4",
     "next-themes": "latest",
     "path": "latest",
@@ -72,8 +74,10 @@
     "react-day-picker": "latest",
     "react-dom": "^19",
     "react-hook-form": "latest",
+    "react-markdown": "^10.1.0",
     "react-resizable-panels": "latest",
     "recharts": "latest",
+    "remark-gfm": "^4.0.1",
     "socket.io": "latest",
     "socket.io-client": "latest",
     "sonner": "latest",

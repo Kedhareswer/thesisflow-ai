@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client"
 import type { RealtimeChannel } from "@supabase/supabase-js"
+import type { Database } from "@/integrations/supabase/types"
 
 // Types matching our database schema
 export interface Project {
@@ -73,6 +74,23 @@ export interface ResearchIdea {
   project_id?: string
   created_at: string
   updated_at: string
+}
+
+export interface Subtask {
+  id: string
+  task_id: string
+  title: string
+  is_completed: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskComment {
+  id: string
+  task_id: string
+  user_id: string
+  content: string
+  created_at: string
 }
 
 interface CreateProjectData {
@@ -333,6 +351,149 @@ class ProjectService {
     } catch (error) {
       console.error("Unexpected error deleting task:", error)
       return { success: false, error: "Failed to delete task" }
+    }
+  }
+
+  async assignTaskAndNotify(taskId: string, assigneeId: string, assignerName: string) {
+    // Fetch the task
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single()
+    if (taskError || !task) return { error: taskError?.message || 'Task not found' }
+
+    // Call the create_notification RPC
+    const { error: notifError } = await supabase.rpc('create_notification', {
+      target_user_id: assigneeId,
+      notification_type: 'task_assignment',
+      notification_title: `Task Assigned: ${task.title}`,
+      notification_message: `${assignerName} assigned you a task: "${task.title}". Would you like to add it to your calendar?`,
+      notification_data: { task_id: taskId, project_id: task.project_id },
+      action_url: `/planner?task=${taskId}`
+    })
+    if (notifError) return { error: notifError.message }
+    return { success: true }
+  }
+
+  // Accept assigned task (assignee action)
+  async acceptAssignedTask(taskId: string, userId: string) {
+    // Optionally, mark notification as read/accepted (if you track this)
+    // For now, just ensure the task is in the user's calendar (if you have a user-task mapping)
+    // If not, this can be a no-op or log the acceptance
+    return { success: true }
+  }
+
+  // ====================
+  // SUBTASKS
+  // ====================
+  async getSubtasks(taskId: string): Promise<{ subtasks: Subtask[]; error?: string }> {
+    try {
+      const { data: subtasks, error } = await supabase
+        .from("subtasks")
+        .select("*")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: true })
+      if (error) {
+        return { subtasks: [], error: error.message }
+      }
+      return { subtasks: subtasks || [] }
+    } catch (error) {
+      return { subtasks: [], error: "Failed to load subtasks" }
+    }
+  }
+
+  async createSubtask(taskId: string, title: string): Promise<{ subtask?: Subtask; error?: string }> {
+    try {
+      const { data: subtask, error } = await supabase
+        .from("subtasks")
+        .insert({ task_id: taskId, title })
+        .select()
+        .single()
+      if (error) {
+        return { error: error.message }
+      }
+      return { subtask }
+    } catch (error) {
+      return { error: "Failed to create subtask" }
+    }
+  }
+
+  async updateSubtask(id: string, updates: Partial<Subtask>): Promise<{ subtask?: Subtask; error?: string }> {
+    try {
+      const { data: subtask, error } = await supabase
+        .from("subtasks")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single()
+      if (error) {
+        return { error: error.message }
+      }
+      return { subtask }
+    } catch (error) {
+      return { error: "Failed to update subtask" }
+    }
+  }
+
+  async deleteSubtask(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.from("subtasks").delete().eq("id", id)
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: "Failed to delete subtask" }
+    }
+  }
+
+  // ====================
+  // TASK COMMENTS
+  // ====================
+  async getTaskComments(taskId: string): Promise<{ comments: TaskComment[]; error?: string }> {
+    try {
+      const { data: comments, error } = await supabase
+        .from("task_comments")
+        .select("*")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: true })
+      if (error) {
+        return { comments: [], error: error.message }
+      }
+      return { comments: comments || [] }
+    } catch (error) {
+      return { comments: [], error: "Failed to load comments" }
+    }
+  }
+
+  async createTaskComment(taskId: string, content: string): Promise<{ comment?: TaskComment; error?: string }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return { error: "Not authenticated" }
+      const { data: comment, error } = await supabase
+        .from("task_comments")
+        .insert({ task_id: taskId, user_id: user.id, content })
+        .select()
+        .single()
+      if (error) {
+        return { error: error.message }
+      }
+      return { comment }
+    } catch (error) {
+      return { error: "Failed to add comment" }
+    }
+  }
+
+  async deleteTaskComment(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.from("task_comments").delete().eq("id", id)
+      if (error) {
+        return { success: false, error: error.message }
+      }
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: "Failed to delete comment" }
     }
   }
 

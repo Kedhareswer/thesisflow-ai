@@ -30,89 +30,17 @@ import {
   subMonths,
 } from "date-fns"
 
-// Mock data - replace with actual data from your project management system
-const mockProjects = [
-  {
-    id: "1",
-    name: "AI Research Platform",
-    startDate: new Date(2024, 0, 15),
-    endDate: new Date(2024, 2, 30),
-    status: "active",
-    color: "#3B82F6",
-  },
-  {
-    id: "2",
-    name: "Data Analysis Tool",
-    startDate: new Date(2024, 1, 1),
-    endDate: new Date(2024, 3, 15),
-    status: "active",
-    color: "#10B981",
-  },
-]
+type EventType = 'project-start' | 'project-end' | 'task-due' | 'milestone'
+type FilterType = 'all' | 'projects' | 'tasks' | 'overdue'
+type ViewMode = 'month' | 'timeline'
 
-const mockTasks = [
-  {
-    id: "1",
-    title: "Complete literature review",
-    dueDate: new Date(2024, 1, 20),
-    priority: "high",
-    status: "pending",
-    projectId: "1",
-  },
-  {
-    id: "2",
-    title: "Implement user authentication",
-    dueDate: new Date(2024, 1, 25),
-    priority: "medium",
-    status: "in-progress",
-    projectId: "1",
-  },
-  {
-    id: "3",
-    title: "Design database schema",
-    dueDate: new Date(2024, 1, 18),
-    priority: "high",
-    status: "completed",
-    projectId: "2",
-  },
-  {
-    id: "4",
-    title: "Create API endpoints",
-    dueDate: new Date(2024, 1, 28),
-    priority: "medium",
-    status: "pending",
-    projectId: "2",
-  },
-  {
-    id: "5",
-    title: "Write documentation",
-    dueDate: new Date(2024, 1, 10),
-    priority: "low",
-    status: "overdue",
-    projectId: "1",
-  },
-]
-
-const mockMilestones = [
-  {
-    id: "1",
-    title: "MVP Release",
-    date: new Date(2024, 2, 1),
-    projectId: "1",
-    status: "upcoming",
-  },
-  {
-    id: "2",
-    title: "Beta Testing",
-    date: new Date(2024, 2, 15),
-    projectId: "2",
-    status: "upcoming",
-  },
-]
-
-type EventType = "project-start" | "project-end" | "task-due" | "milestone"
-type FilterType = "all" | "projects" | "tasks" | "overdue"
-type ViewMode = "month" | "week" | "timeline"
+interface ProjectCalendarProps {
+  projects: any[]
+  tasks: any[]
+  onEditTask: (task: any) => void
+  onDeleteTask: (task: any) => void
+  onCreateTask: (project: any) => void
+}
 
 interface CalendarEvent {
   id: string
@@ -125,64 +53,49 @@ interface CalendarEvent {
   projectId?: string
 }
 
-export function ProjectCalendar() {
+export function ProjectCalendar({ projects, tasks, onEditTask, onDeleteTask, onCreateTask }: ProjectCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [filter, setFilter] = useState<FilterType>("all")
   const [viewMode, setViewMode] = useState<ViewMode>("month")
 
-  // Generate calendar events from mock data
+  // Generate calendar events from real data
   const events = useMemo(() => {
     const allEvents: CalendarEvent[] = []
-
     // Add project events
-    mockProjects.forEach((project) => {
+    projects.forEach((project) => {
       allEvents.push({
         id: `project-start-${project.id}`,
-        title: `${project.name} (Start)`,
-        date: project.startDate,
+        title: `${project.title} (Start)`,
+        date: new Date(project.start_date),
         type: "project-start",
-        color: project.color,
+        color: "#3B82F6",
         projectId: project.id,
       })
-
       allEvents.push({
         id: `project-end-${project.id}`,
-        title: `${project.name} (End)`,
-        date: project.endDate,
+        title: `${project.title} (End)`,
+        date: new Date(project.end_date),
         type: "project-end",
-        color: project.color,
+        color: "#3B82F6",
         projectId: project.id,
       })
     })
-
     // Add task events
-    mockTasks.forEach((task) => {
+    tasks.forEach((task) => {
       allEvents.push({
         id: `task-${task.id}`,
         title: task.title,
-        date: task.dueDate,
+        date: new Date(task.due_date),
         type: "task-due",
-        priority: task.priority as "low" | "medium" | "high",
+        priority: task.priority,
         status: task.status,
-        projectId: task.projectId,
+        projectId: task.project_id,
       })
     })
-
-    // Add milestone events
-    mockMilestones.forEach((milestone) => {
-      allEvents.push({
-        id: `milestone-${milestone.id}`,
-        title: milestone.title,
-        date: milestone.date,
-        type: "milestone",
-        status: milestone.status,
-        projectId: milestone.projectId,
-      })
-    })
-
+    // (Optional) Add milestone events if you have them in the future
     return allEvents
-  }, [])
+  }, [projects, tasks])
 
   // Filter events based on selected filter
   const filteredEvents = useMemo(() => {

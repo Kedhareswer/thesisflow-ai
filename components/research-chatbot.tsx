@@ -6,10 +6,26 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Send, Bot, User, Info, Brain, BookOpen, Lightbulb, Settings } from 'lucide-react'
 import { useResearchSession, useResearchContext } from '@/components/research-session-provider'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { UserProfileAvatar } from '@/components/user-profile-avatar'
+import { ToggleGroup, ToggleGroupItem } from '@/components/animate-ui/base/toggle-group'
+import { IconButton } from '@/components/animate-ui/buttons/icon'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/base/tooltip'
+import { Smile, User as UserIcon, Zap, MessageCircle } from 'lucide-react'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+}
+
+interface Personality {
+  key: string;
+  name: string;
+  description: string;
+  icon: any;
+  color: [number, number, number];
+  systemPrompt: string;
 }
 
 interface ResearchChatbotProps {
@@ -17,9 +33,54 @@ interface ResearchChatbotProps {
   papers?: any[]
   ideas?: string
   context?: string
+  personality?: Personality
 }
 
-export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatbotProps) {
+// Personalities definition
+const PERSONALITIES: Personality[] = [
+  {
+    key: 'friendly',
+    name: 'Friendly',
+    description: 'Warm, supportive, and encouraging.',
+    icon: Smile,
+    color: [34,197,94],
+    systemPrompt: 'You are a warm, supportive, and encouraging assistant. Use friendly language and positive reinforcement.'
+  },
+  {
+    key: 'formal',
+    name: 'Formal',
+    description: 'Professional, precise, and neutral.',
+    icon: UserIcon,
+    color: [59,130,246],
+    systemPrompt: 'You are a professional, precise, and neutral assistant. Use formal language and maintain objectivity.'
+  },
+  {
+    key: 'motivational',
+    name: 'Motivational',
+    description: 'Energetic, inspiring, and positive.',
+    icon: Zap,
+    color: [245,158,11],
+    systemPrompt: 'You are an energetic, inspiring, and positive assistant. Motivate the user and encourage progress.'
+  },
+  {
+    key: 'critical',
+    name: 'Critical',
+    description: 'Analytical, direct, and honest.',
+    icon: Brain,
+    color: [239,68,68],
+    systemPrompt: 'You are an analytical, direct, and honest assistant. Provide critical feedback and point out flaws constructively.'
+  },
+  {
+    key: 'playful',
+    name: 'Playful',
+    description: 'Fun, witty, and creative.',
+    icon: MessageCircle,
+    color: [168,85,247],
+    systemPrompt: 'You are a fun, witty, and creative assistant. Use playful language and humor when appropriate.'
+  },
+]
+
+export function ResearchChatbot({ topic, papers, ideas, context, personality: initialPersonality }: ResearchChatbotProps) {
   const { 
     session, 
     addChatMessage, 
@@ -44,6 +105,10 @@ export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatb
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [useFullContext, setUseFullContext] = useState(hasContext)
+  const [selectedPersonality, setSelectedPersonality] = useState<string>(
+    initialPersonality?.key || PERSONALITIES[0].key
+  )
+  const personality = PERSONALITIES.find(p => p.key === selectedPersonality) || PERSONALITIES[0]
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when messages change
@@ -89,6 +154,12 @@ export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatb
     return contextStr
   }
 
+  // Add a helper to detect if user wants details
+  function wantsDetails(message: string) {
+    const keywords = ['details', 'explain', 'table', 'chart', 'expand', 'why', 'how', 'step', 'list', 'show', 'compare']
+    return keywords.some(k => message.toLowerCase().includes(k))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
@@ -119,20 +190,12 @@ export function ResearchChatbot({ topic, papers, ideas, context }: ResearchChatb
         if (session.searchSessions.length > 0) contextSources.push('searches')
       }
       
-      // Enhanced prompt with better context awareness
-      const enhancedPrompt = `Research Assistant | Context-aware response
-
-${sessionContext ? `CONTEXT:\n${sessionContext}\n` : ''}CONVERSATION:\n${messageHistory}\n
-QUERY: ${userMessage}
-
-RESPONSE GUIDELINES:
-- Reference user's papers/ideas/topics when relevant
-- Suggest research connections
-- Concise, actionable insights
-- Acknowledge limitations honestly
-- Guide research direction
-
-Response:`
+      const isDetail = wantsDetails(userMessage)
+      const shortStyle = 'Respond in a short, WhatsApp-style message (1-2 sentences, friendly, concise).'
+      const detailStyle = 'If the user requests details, provide a longer, structured answer. Use markdown tables or code blocks for data/charts if helpful.'
+      const systemPersonality = personality?.systemPrompt || ''
+      const systemPrompt = `${systemPersonality}\n${shortStyle}\n${detailStyle}`
+      const enhancedPrompt = `${systemPrompt}\n\nResearch Assistant | Context-aware response\n\n${sessionContext ? `CONTEXT:\n${sessionContext}\n` : ''}CONVERSATION:\n${messageHistory}\n\nQUERY: ${userMessage}\n\nRESPONSE GUIDELINES:\n- Reference user's papers/ideas/topics when relevant\n- Suggest research connections\n- Concise, actionable insights\n- Acknowledge limitations honestly\n- Guide research direction\n${isDetail ? '\n- Provide detailed, structured answer as requested.' : ''}\n\nResponse:`
 
       // Use enhanced AI service directly for better performance and authentication
       const { enhancedAIService } = await import('@/lib/enhanced-ai-service')
@@ -179,6 +242,35 @@ Response:`
 
   return (
     <div>
+      {/* Personality Selector */}
+      <div className="flex items-center gap-2 mb-4 justify-center">
+        <ToggleGroup
+          value={[selectedPersonality]}
+          onValueChange={(val: string[]) => val && val[0] && setSelectedPersonality(val[0])}
+          variant="outline"
+          size="sm"
+        >
+          {PERSONALITIES.map(p => (
+            <ToggleGroupItem key={p.key} value={p.key}>
+              <Tooltip>
+                <TooltipTrigger>
+                  <IconButton
+                    icon={p.icon}
+                    color={p.color}
+                    size="sm"
+                    active={selectedPersonality === p.key}
+                    aria-label={p.name}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <div className="font-semibold">{p.name}</div>
+                  <div className="text-xs text-muted-foreground max-w-xs">{p.description}</div>
+                </TooltipContent>
+              </Tooltip>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
       {/* Research Context Status */}
       {hasContext && (
         <Alert className="mb-4 border-green-200 bg-green-50">
@@ -211,46 +303,24 @@ Response:`
         <CardContent className="p-4">
           <div className="flex flex-col h-[400px]">
           <div className="flex-1 overflow-y-auto mb-4 pr-2">
-            {messages.map((message, index) => (
-              <div 
-                key={index}
-                className={`mb-4 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div 
-                  className={`flex items-start gap-2 max-w-[80%] ${
-                    message.role === 'user' 
-                      ? 'bg-blue-100 text-gray-800' 
-                      : 'bg-white border border-gray-200'
-                  } p-3 rounded-lg shadow-sm`}
-                >
-                  <div className="flex-shrink-0 mt-1">
-                    {message.role === 'user' ? (
-                      <User className="h-5 w-5 text-blue-700" />
-                    ) : (
-                      <Bot className="h-5 w-5 text-emerald-600" />
-                    )}
-                  </div>
-                  <div>
-                    {message.role === 'assistant' ? (
-                      <div className="prose max-w-none text-sm">
-                        {message.content.split('\n').map((line, i) => {
-                          // Check if line is a heading
-                          if (line.startsWith('**') && line.endsWith('**')) {
-                            return <h4 key={i} className="font-semibold mt-3 mb-1">{line.replace(/\*\*/g, '')}</h4>
-                          }
-                          // Regular paragraph with content
-                          else if (line.trim()) {
-                            return <p key={i} className="mb-2">{line}</p>
-                          }
-                          // Empty line
-                          return <div key={i} className="h-1"></div>
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-sm">{message.content}</div>
-                    )}
-                  </div>
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex items-end mb-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.role === 'assistant' && (
+                  <img
+                    src="/assistant-avatar.svg"
+                    alt="Assistant"
+                    className="w-8 h-8 rounded-full mr-2 border border-gray-300 bg-white"
+                    style={{ minWidth: 32 }}
+                  />
+                )}
+                <div className={`rounded-lg px-3 py-2 max-w-[80%] whitespace-pre-wrap ${msg.role === 'user' ? 'bg-blue-100 text-right' : 'bg-gray-100 text-left'}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                 </div>
+                {msg.role === 'user' && (
+                  <div className="ml-2">
+                    <UserProfileAvatar size="sm" />
+                  </div>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
