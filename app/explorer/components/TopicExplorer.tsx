@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import Link from "next/link"
 import { useResearchTopics, useResearchContext } from "@/components/research-session-provider"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
@@ -31,7 +32,7 @@ class EnhancedResearchService {
     timestamp: string
   }> {
     try {
-      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
+      console.log("EnhancedResearchService: Starting topic exploration for:", topic)
       
       const prompt = `Research overview: "${topic}" | Depth: ${depth}/5
 
@@ -55,13 +56,13 @@ class EnhancedResearchService {
 
 ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
 
-      // Use the enhanced AI service to generate the response
+      // Use the enhanced AI service with fallback and retry logic
       const response = await enhancedAIService.generateText({
         prompt,
         provider: selectedProvider,
         model: selectedModel,
         temperature: 0.7,
-        maxTokens: 3000 // Increased for more comprehensive content
+        maxTokens: Math.min(depth * 600, 2000) // Adjust tokens based on depth, max 2000
       })
 
       if (!response.success) {
@@ -80,8 +81,10 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
       let errorMessage = "Failed to explore research topic"
       
       if (error instanceof Error) {
-        if (error.message.includes("No AI providers")) {
+        if (error.message.includes("No AI providers") || error.message.includes("No valid API keys")) {
           errorMessage = "No AI providers are configured. Please add at least one API key in Settings."
+        } else if (error.message.includes("All AI providers failed")) {
+          errorMessage = "All AI providers are currently unavailable. Please try again in a few minutes."
         } else if (error.message.includes("authentication") || error.message.includes("sign in")) {
           errorMessage = "Authentication error. Please sign in again to access AI features."
         } else if (error.message.includes("API key")) {
@@ -160,6 +163,7 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
         title: "Topic Explored",
         description: "AI-powered research overview generated and saved to your research session.",
       })
+      
     } catch (error) {
       toast({
         title: "Exploration Failed",

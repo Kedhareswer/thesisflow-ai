@@ -628,7 +628,7 @@ class EnhancedAIService {
     return { content: result.content || '' }
   }
 
-  // Research-specific methods
+  // Research-specific methods with enhanced resilience
   async generateResearchIdeas(
     topic: string,
     context: string = "",
@@ -640,36 +640,26 @@ class EnhancedAIService {
     count: number
     timestamp: string
   }> {
-    const prompt = `Generate ${count} innovative research ideas for "${topic}"${context ? `\nContext: ${context}` : ''}
+    // Implement chunked generation for better reliability
+    const chunkSize = Math.min(count, 3) // Generate max 3 ideas at a time
+    const chunks = Math.ceil(count / chunkSize)
+    const allIdeas: Array<{ title: string; description: string }> = []
 
-Format:
-1. **[Title]**
-   [Approach] | [Impact] | [Methodology]
+    console.log(`Enhanced AI Service: Generating ${count} ideas in ${chunks} chunks of ${chunkSize}`)
 
-Requirements:
-- Novel, feasible concepts
-- Clear research approach
-- Measurable outcomes
-- Practical implementation
-
-Each idea: title + 3 key aspects separated by "|"`
-
-    const result = await this.generateText({
-      prompt,
-      maxTokens: 3000, // Increased for more detailed ideas
-      temperature: 0.9
-    })
-
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to generate research ideas')
+    for (let i = 0; i < chunks; i++) {
+      const currentChunkSize = Math.min(chunkSize, count - allIdeas.length)
+      const chunkIdeas = await this.generateResearchIdeasChunk(topic, context, currentChunkSize, i + 1)
+      allIdeas.push(...chunkIdeas)
+      
+      // Add small delay between chunks to avoid overwhelming the API
+      if (i < chunks - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
     }
 
-    // Parse the response to extract ideas
-    const content = result.content || ''
-    const ideas = this.parseResearchIdeas(content)
-
     return {
-      ideas,
+      ideas: allIdeas.slice(0, count), // Ensure we don't exceed requested count
       topic,
       context,
       count,
@@ -677,52 +667,74 @@ Each idea: title + 3 key aspects separated by "|"`
     }
   }
 
+  private async generateResearchIdeasChunk(
+    topic: string,
+    context: string,
+    count: number,
+    chunkNumber: number
+  ): Promise<Array<{ title: string; description: string }>> {
+    // Optimized, concise prompt to reduce token usage
+    const prompt = `Generate ${count} research ideas for "${topic}"${context ? `\nContext: ${context.substring(0, 200)}` : ''}
+
+Format each idea as:
+${count === 1 ? '1' : '1-' + count}. **[Title]**
+[Brief description in 1-2 sentences]
+
+Requirements: Novel, feasible, practical research directions.`
+
+    console.log(`Enhanced AI Service: Generating chunk ${chunkNumber} with ${count} ideas`)
+    console.log(`Enhanced AI Service: Prompt length: ${prompt.length} characters`)
+
+    const result = await this.generateTextWithFallback({
+      prompt,
+      maxTokens: count * 200, // More conservative token limit
+      temperature: 0.8 // Slightly lower for more focused ideas
+    })
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate research ideas')
+    }
+
+    const content = result.content || ''
+    const ideas = this.parseResearchIdeas(content)
+    
+    console.log(`Enhanced AI Service: Chunk ${chunkNumber} generated ${ideas.length} ideas`)
+    return ideas
+  }
+
   private parseResearchIdeas(content: string): Array<{ title: string; description: string }> {
     const ideas: Array<{ title: string; description: string }> = []
     
-    // Parse optimized format: **Title** followed by Approach | Impact | Methodology
-    const optimizedPattern = /\d+\.\s*\*\*([^*]+)\*\*\s*([^|\n]+)\s*\|\s*([^|\n]+)\s*\|\s*([^\n]+)/g
+    // Parse standard numbered list with bold titles
+    const standardPattern = /\d+\.\s*\*\*([^*]+)\*\*[:\s]*([^\n]+(?:\n(?!\d+\.|\*\*)[^\n]*)*)?/g
     let match
     
-    while ((match = optimizedPattern.exec(content)) !== null) {
+    while ((match = standardPattern.exec(content)) !== null) {
       const title = match[1]?.trim()
-      const approach = match[2]?.trim()
-      const impact = match[3]?.trim()
-      const methodology = match[4]?.trim()
+      const description = match[2]?.trim().replace(/^Description:\s*/i, '')
       
       if (title) {
         ideas.push({
           title,
-          description: `${approach}. ${impact}. ${methodology}`
+          description: description || title
         })
       }
     }
     
-    // Fallback: Standard numbered list parsing
-    if (ideas.length === 0) {
-      const standardPattern = /\d+\.\s*\*\*([^*]+)\*\*[:\s]*([^\n]+(?:\n(?!\d+\.)[^\n]*)*)?/g
-      while ((match = standardPattern.exec(content)) !== null) {
-        const title = match[1]?.trim()
-        const description = match[2]?.trim().replace(/^Description:\s*/i, '')
-        
-        if (title) {
-          ideas.push({
-            title,
-            description: description || title
-          })
-        }
-      }
-    }
-    
-    // Final fallback: Extract any numbered items
+    // Fallback: Extract any numbered items
     if (ideas.length === 0) {
       const fallbackPattern = /\d+\.\s*([^\n]+)/g
-      while ((match = fallbackPattern.exec(content)) !== null && ideas.length < 5) {
+      while ((match = fallbackPattern.exec(content)) !== null && ideas.length < 10) {
         const line = match[1]?.trim()
         if (line && line.length > 10) {
+          // Try to split title and description
+          const parts = line.split(/[:.]\s/)
+          const title = parts[0]?.replace(/^\*\*|\*\*$/g, '').trim()
+          const description = parts.slice(1).join('. ').trim()
+          
           ideas.push({
-            title: `Research Idea ${ideas.length + 1}`,
-            description: line
+            title: title || `Research Idea ${ideas.length + 1}`,
+            description: description || title || line
           })
         }
       }
@@ -731,7 +743,76 @@ Each idea: title + 3 key aspects separated by "|"`
     return ideas.slice(0, 10)
   }
 
-  // Content summarization method
+  // Enhanced generateText with provider fallback and retry logic
+  private async generateTextWithFallback(options: GenerateTextOptions): Promise<GenerateTextResult> {
+    const maxRetries = 2
+    const baseDelay = 1000 // 1 second
+
+    // Get available providers in order of preference
+    const userApiKeys = await this.loadUserApiKeys()
+    const availableProviders = userApiKeys
+      .filter(key => key.is_active && key.test_status === 'valid' && key.decrypted_key)
+      .map(key => key.provider as AIProvider)
+
+    if (availableProviders.length === 0) {
+      return {
+        success: false,
+        error: "No valid API keys available. Please configure API keys in Settings."
+      }
+    }
+
+    console.log(`Enhanced AI Service: Available providers: ${availableProviders.join(', ')}`)
+
+    // Try each provider in order
+    for (let providerIndex = 0; providerIndex < availableProviders.length; providerIndex++) {
+      const provider = availableProviders[providerIndex]
+      console.log(`Enhanced AI Service: Trying provider ${provider} (${providerIndex + 1}/${availableProviders.length})`)
+
+      // Try each provider with retries for transient errors
+      for (let retry = 0; retry <= maxRetries; retry++) {
+        try {
+          const result = await this.generateText({
+            ...options,
+            provider
+          })
+
+          if (result.success) {
+            console.log(`Enhanced AI Service: Success with ${provider} on attempt ${retry + 1}`)
+            return result
+          } else {
+            console.log(`Enhanced AI Service: Failed with ${provider}: ${result.error}`)
+            break // Don't retry on non-transient errors
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          console.log(`Enhanced AI Service: Error with ${provider} (attempt ${retry + 1}): ${errorMessage}`)
+
+          // Check if it's a transient error worth retrying
+          const isTransientError = errorMessage.includes('503') || 
+                                 errorMessage.includes('overloaded') || 
+                                 errorMessage.includes('rate limit') ||
+                                 errorMessage.includes('timeout')
+
+          if (isTransientError && retry < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retry) // Exponential backoff
+            console.log(`Enhanced AI Service: Retrying ${provider} in ${delay}ms...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+            continue
+          } else {
+            console.log(`Enhanced AI Service: Giving up on ${provider} after ${retry + 1} attempts`)
+            break // Move to next provider
+          }
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: `All AI providers failed. Please try again later or check your API keys.`
+    }
+  }
+
+  // Simplified content summarization with chunking for large content
   async summarizeContent(
     content: string, 
     options: { 
@@ -748,39 +829,39 @@ Each idea: title + 3 key aspects separated by "|"`
   }> {
     console.log("Enhanced AI Service: Starting summarizeContent...")
     console.log("Enhanced AI Service: Content length:", content.length)
-    console.log("Enhanced AI Service: Options:", options)
-    console.log("Enhanced AI Service: Provider:", provider)
-    console.log("Enhanced AI Service: Model:", model)
 
     const { style = 'academic', length = 'medium' } = options
     
-    const prompt = `Summarize content | Style: ${style} | Length: ${length}
+    // Chunk large content to avoid overwhelming the API
+    const maxContentLength = 3000 // Conservative limit
+    let processedContent = content
 
-CONTENT:
-${content.substring(0, 4000)}${content.length > 4000 ? '...[truncated]' : ''}
+    if (content.length > maxContentLength) {
+      console.log("Enhanced AI Service: Content too long, chunking...")
+      // Take beginning and end of content for context
+      const beginningChunk = content.substring(0, maxContentLength / 2)
+      const endChunk = content.substring(content.length - maxContentLength / 2)
+      processedContent = beginningChunk + "\n\n[... content truncated ...]\n\n" + endChunk
+    }
 
-OUTPUT FORMAT:
-SUMMARY: [${style} summary in ${length} detail]
-KEY_POINTS: [point1] | [point2] | [point3]
-READING_TIME: [minutes]
-SENTIMENT: [positive/neutral/negative]
+    const prompt = `Summarize in ${style} style (${length} detail):
 
-Requirements:
-- ${style} writing style
-- ${length} level of detail
-- Extract 3-5 key points
-- Estimate reading time (200 words/min)
-- Assess overall sentiment`
+${processedContent}
+
+Output:
+SUMMARY: [clear, concise summary]
+POINTS: [point1]|[point2]|[point3]
+TIME: [reading minutes]
+TONE: [positive/neutral/negative]`
 
     console.log("Enhanced AI Service: Generated prompt length:", prompt.length)
 
     try {
-      const result = await this.generateText({
+      const result = await this.generateTextWithFallback({
         prompt,
-        provider,
-        model,
-        maxTokens: length === 'comprehensive' ? 2000 : length === 'medium' ? 1000 : 500,
-        temperature: 0.3
+        maxTokens: length === 'comprehensive' ? 1000 : length === 'medium' ? 600 : 300,
+        temperature: 0.3,
+        provider
       })
 
       console.log("Enhanced AI Service: Generate text result:", {
