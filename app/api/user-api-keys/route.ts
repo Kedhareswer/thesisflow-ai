@@ -70,12 +70,12 @@ export async function GET(request: NextRequest) {
 
       // Return the API keys with the actual key values
       const formattedKeys = (apiKeys || []).map((key: any) => ({
-        provider: key.provider,
+            provider: key.provider,
         decrypted_key: key.api_key, // No decryption needed - it's already plain text
-        is_active: key.is_active,
-        test_status: key.test_status,
-        created_at: key.created_at,
-        updated_at: key.updated_at
+            is_active: key.is_active,
+            test_status: key.test_status,
+            created_at: key.created_at,
+            updated_at: key.updated_at
       }))
 
       return NextResponse.json({ success: true, apiKeys: formattedKeys })
@@ -159,19 +159,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert or update the API key (stored as plain text)
-    const { error: upsertError } = await supabaseAdmin
-      .from('user_api_keys')
-      .upsert({
-        user_id: user.id,
-        provider,
+        const { error: upsertError } = await supabaseAdmin
+          .from('user_api_keys')
+          .upsert({
+            user_id: user.id,
+            provider,
         api_key: apiKey, // Store as plain text
-        is_active: true,
-        last_tested_at: null,
-        test_status: 'valid', // Set as valid for new keys
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id,provider'
-      })
+            is_active: true,
+            last_tested_at: null,
+            test_status: 'valid', // Set as valid for new keys
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id,provider'
+          })
 
     if (upsertError) {
       console.error('Error saving API key:', upsertError)

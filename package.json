@@ -1,15 +1,12 @@
 {
-  "name": "ai-research-hub",
-  "version": "1.0.0",
+  "name": "my-v0-project",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "dev:all": "concurrently \"npm run dev\" \"npm run ws\"",
     "lint": "next lint",
-    "start": "next start",
-    "start:all": "concurrently \"npm run start\" \"npm run ws\"",
-    "ws": "node server/websocket-server.js"
+    "start": "next start"
   },
   "dependencies": {
     "@google/generative-ai": "latest",
@@ -42,7 +39,6 @@
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@remix-run/react": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/supabase-js": "latest",
     "@sveltejs/kit": "latest",
     "@tiptap/core": "latest",
@@ -58,8 +54,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "latest",
-    "concurrently": "^8.2.2",
-    "crypto": "latest",
     "date-fns": "latest",
     "dotenv": "latest",
     "embla-carousel-react": "latest",
@@ -80,7 +74,6 @@
     "react-hook-form": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
-    "sharp": "latest",
     "socket.io": "latest",
     "socket.io-client": "latest",
     "sonner": "latest",
@@ -98,9 +91,7 @@
     "zustand": "latest"
   },
   "devDependencies": {
-    "@types/file-saver": "^2.0.7",
     "@types/node": "^22",
-    "@types/pdf-parse": "^1.1.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",

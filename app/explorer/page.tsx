@@ -44,15 +44,6 @@ export default function ResearchExplorer() {
                 </p>
               </header>
 
-              <section className="mb-8">
-                <CompactAIProviderSelector
-                  selectedProvider={selectedProvider}
-                  onProviderChange={(provider) => setSelectedProvider(provider)}
-                  selectedModel={selectedModel}
-                  onModelChange={(model) => setSelectedModel(model)}
-                />
-              </section>
-
               <Tabs defaultValue="search" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-5 bg-gray-100 rounded-md">
                   <TabsTrigger value="search" className="data-[state=active]:bg-gray-200">

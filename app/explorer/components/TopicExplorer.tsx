@@ -1,12 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Search, Brain, Info, Save } from "lucide-react"
+import { Search, Brain, Info } from "lucide-react"
 import { FormField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { SkeletonCard } from "@/components/common/SkeletonCard"
@@ -17,6 +17,7 @@ import type { AIProvider } from "@/lib/ai-providers"
 import Link from "next/link"
 import { useResearchTopics, useResearchContext } from "@/components/research-session-provider"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
+import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
@@ -33,7 +34,7 @@ class EnhancedResearchService {
   }> {
     try {
       console.log("EnhancedResearchService: Starting topic exploration for:", topic)
-      
+
       const prompt = `Research overview: "${topic}" | Depth: ${depth}/5
 
 ## Key Concepts
@@ -62,24 +63,24 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
         provider: selectedProvider,
         model: selectedModel,
         temperature: 0.7,
-        maxTokens: Math.min(depth * 600, 2000) // Adjust tokens based on depth, max 2000
+        maxTokens: Math.min(depth * 600, 2000), // Adjust tokens based on depth, max 2000
       })
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to generate research overview')
+        throw new Error(response.error || "Failed to generate research overview")
       }
 
       return {
-        content: response.content || '',
+        content: response.content || "",
         topic,
         depth,
         timestamp: new Date().toISOString(),
       }
     } catch (error) {
       console.error("Error exploring topic:", error)
-      
+
       let errorMessage = "Failed to explore research topic"
-      
+
       if (error instanceof Error) {
         if (error.message.includes("No AI providers") || error.message.includes("No valid API keys")) {
           errorMessage = "No AI providers are configured. Please add at least one API key in Settings."
@@ -99,7 +100,7 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
           errorMessage = error.message
         }
       }
-      
+
       throw new Error(errorMessage)
     }
   }
@@ -115,9 +116,11 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
   const { toast } = useToast()
   const { topics, currentTopic, addTopic, updateTopic } = useResearchTopics()
   const { hasContext, contextSummary } = useResearchContext()
-  
+
   const [topic, setTopic] = useState(() => currentTopic || "")
   const [depth, setDepth] = useState(3)
+  const [localProvider, setLocalProvider] = useState<AIProvider | undefined>(selectedProvider)
+  const [localModel, setLocalModel] = useState<string | undefined>(selectedModel)
 
   // Memoize the slider callback to prevent re-renders
   const handleDepthChange = useCallback((value: number[]) => {
@@ -130,7 +133,7 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
       setTopic(currentTopic)
     }
   }, [currentTopic])
-  
+
   const topicExploration = useAsync<{
     content: string
     topic: string
@@ -149,21 +152,20 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
     }
 
     try {
-      await topicExploration.execute(topic, depth, selectedProvider, selectedModel)
-      
+      await topicExploration.execute(topic, depth, localProvider, localModel)
+
       // Add topic to research session after successful execution
       // The insights will be added separately when the data is available
       addTopic({
         name: topic,
         description: `Explored at depth ${depth}/5`,
-        confidence: depth / 5 // Convert depth to confidence score
+        confidence: depth / 5, // Convert depth to confidence score
       })
-      
+
       toast({
         title: "Topic Explored",
         description: "AI-powered research overview generated and saved to your research session.",
       })
-      
     } catch (error) {
       toast({
         title: "Exploration Failed",
@@ -178,9 +180,9 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
     if (topicExploration.data && topic) {
       const topicData = topicExploration.data
       const insights = extractContent(topicData)
-      
+
       // Find and update the topic with insights
-      const existingTopic = topics.find(t => t.name === topic)
+      const existingTopic = topics.find((t) => t.name === topic)
       if (existingTopic && insights && !existingTopic.insights) {
         // Only update if insights don't already exist to prevent loops
         updateTopic(existingTopic.id, { insights })
@@ -215,7 +217,21 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
           </AlertDescription>
         </Alert>
       )}
-      
+
+      {/* AI Provider Selector - Inline variant for Explorer */}
+      <div className="mb-6">
+        <MinimalAIProviderSelector
+          selectedProvider={localProvider}
+          onProviderChange={setLocalProvider}
+          selectedModel={localModel}
+          onModelChange={setLocalModel}
+          variant="inline"
+          showModelSelector={true}
+          showConfigLink={true}
+          className="justify-center"
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -223,8 +239,8 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
             Research Topic Explorer
           </CardTitle>
           <CardDescription>
-            Get comprehensive insights into any research topic including key concepts, trends, and leading
-            researchers. Explorations are automatically saved to your research session.
+            Get comprehensive insights into any research topic including key concepts, trends, and leading researchers.
+            Explorations are automatically saved to your research session.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -238,14 +254,7 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
 
           <div className="space-y-3">
             <Label>Exploration Depth</Label>
-            <Slider
-              value={[depth]}
-              onValueChange={handleDepthChange}
-              max={5}
-              min={1}
-              step={1}
-              className="w-full"
-            />
+            <Slider value={[depth]} onValueChange={handleDepthChange} max={5} min={1} step={1} className="w-full" />
             <div className="flex justify-between text-sm text-gray-500">
               <span>Basic</span>
               <span>Comprehensive</span>

@@ -76,13 +76,13 @@ async function generateWithAI(
   for (const provider of providerOrder) {
     if (provider !== preferredProvider && userApiKeys.has(provider)) {
       providersToTry.push(provider)
+      }
     }
-  }
   
   if (providersToTry.length === 0) {
     throw new Error('No API keys available. Please configure API keys in Settings.')
-  }
-  
+}
+
   // Since we're using the enhanced AI service directly, we can use its generateText method
   // But we need to work around the fact that it loads keys internally
   // For now, let's use a simpler approach and make direct API calls
@@ -199,12 +199,12 @@ async function callGeminiAPI(apiKey: string, prompt: string): Promise<string> {
 
 async function callAIMLAPI(apiKey: string, prompt: string): Promise<string> {
   const response = await fetch('https://api.aimlapi.com/v1/chat/completions', {
-    method: 'POST',
+      method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+      body: JSON.stringify({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 2000,
@@ -265,19 +265,19 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
     }
-    
+
     // Get user's API keys
     const userApiKeys = await getUserApiKeys(user.id, supabaseAdmin)
     
     // Generate text with AI
     const generatedText = await generateWithAI(prompt, preferredProvider, userApiKeys)
-    
+
     return NextResponse.json({
       success: true,
       result: generatedText,
       provider: preferredProvider
     })
-    
+
   } catch (error) {
     console.error('AI User Generation Error:', error)
     

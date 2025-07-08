@@ -12,6 +12,8 @@ import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useResearchIdeas, useResearchContext, useResearchTopics } from "@/components/research-session-provider"
+import type { AIProvider } from "@/lib/ai-providers"
+import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 
 // Enhanced research service for idea generation
 class IdeaGenerationService {
@@ -19,6 +21,8 @@ class IdeaGenerationService {
     topic: string,
     context = "",
     count = 5,
+    provider?: AIProvider,
+    model?: string,
   ): Promise<{
     content: string
     ideas: string[]
@@ -30,7 +34,7 @@ class IdeaGenerationService {
     try {
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
       
-      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count)
+      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count, provider, model)
       const ideaObjects = researchResults.ideas
 
       // Convert idea objects to strings
@@ -71,6 +75,8 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
   const [useSessionContext, setUseSessionContext] = useState(hasContext)
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   
   // Update topic field when currentTopic changes, but only if different and not currently generating
   useEffect(() => {
@@ -104,7 +110,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
         ideaContext
 
-      await ideaGeneration.execute(ideaTopic, enhancedContext, ideaCount)
+      await ideaGeneration.execute(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
       
       // Ideas will be added to session via useEffect when data is available
       
@@ -179,6 +185,16 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           </AlertDescription>
         </Alert>
       )}
+      {/* AI Provider/Model Selector (now below Research Context) */}
+      <div className="mb-4 flex justify-center">
+        <MinimalAIProviderSelector
+          selectedProvider={selectedProvider}
+          onProviderChange={setSelectedProvider}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          variant="inline"
+        />
+      </div>
       
       <Card>
         <CardHeader>
@@ -235,15 +251,14 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
             </div>
           )}
 
-          <Button onClick={handleIdeaGeneration} disabled={ideaGeneration.loading} className="w-full">
-            {ideaGeneration.loading ? (
-              <LoadingSpinner size="sm" text="Generating..." />
-            ) : (
-              <>
-                <Lightbulb className="mr-2 h-4 w-4" />
-                Generate Ideas
-              </>
-            )}
+          <Button
+            type="button"
+            onClick={handleIdeaGeneration}
+            disabled={ideaGeneration.loading}
+            className="w-full"
+          >
+            {ideaGeneration.loading ? <LoadingSpinner className="mr-2" /> : <TrendingUp className="h-4 w-4 mr-2" />}
+            Generate Ideas
           </Button>
 
           {ideaGeneration.error && (

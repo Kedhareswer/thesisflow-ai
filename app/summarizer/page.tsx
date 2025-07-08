@@ -1,34 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  FileText,
-  Link,
-  Clock,
-  TrendingUp,
-  AlertCircle,
-  Loader2,
-  Copy,
-  CheckCircle,
-  Download,
-  Share2,
-  X,
-} from "lucide-react"
-import { enhancedAIService } from "@/lib/enhanced-ai-service"
-import { SummarizerService } from "@/lib/services/summarizer.service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, Sparkles, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { FileUploader } from "./components/FileUploader"
-import { SummarizerDebug } from "./components/summarizer-debug"
-import { RouteGuard } from "@/components/route-guard"
+import { supabase } from "@/integrations/supabase/client"
 import type { AIProvider } from "@/lib/ai-providers"
-import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
+import { ContextInputPanel } from "./components/context-input-panel"
+import { ConfigurationPanel } from "./components/configuration-panel"
+import { SummaryOutputPanel } from "./components/summary-output-panel"
 
 interface SummaryResult {
   summary: string
@@ -40,317 +21,46 @@ interface SummaryResult {
   compressionRatio: string
   topics?: string[]
   difficulty?: "beginner" | "intermediate" | "advanced"
+  tables?: any[]
+  graphs?: any[]
 }
 
-interface SetupWizardProps {
-  onClose: () => void
-}
-
-function SetupWizard({ onClose }: SetupWizardProps) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-medium text-black">Welcome to AI Summarizer</h2>
-            <Button variant="ghost" onClick={onClose} className="text-gray-500 hover:text-gray-700">
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="space-y-6">
-            <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-lg font-medium text-blue-900 mb-3">🚀 Get Started in 3 Steps</h3>
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    1
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-blue-900">Configure AI Provider</h4>
-                    <p className="text-blue-700 text-sm">
-                      Add your API keys in Settings to enable AI-powered summarization
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    2
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-blue-900">Add Content</h4>
-                    <p className="text-blue-700 text-sm">
-                      Paste text, upload a document, or provide a URL to extract content
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    3
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-blue-900">Generate Summary</h4>
-                    <p className="text-blue-700 text-sm">
-                      Customize the style and length, then generate your intelligent summary
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 bg-amber-50 border border-amber-200 rounded-lg">
-              <h3 className="text-lg font-medium text-amber-900 mb-3">🔑 Supported AI Providers</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="text-sm">
-                  <div className="font-medium text-amber-900">OpenAI</div>
-                  <div className="text-amber-700">GPT-4, GPT-3.5 Turbo</div>
-                </div>
-                <div className="text-sm">
-                  <div className="font-medium text-amber-900">Google Gemini</div>
-                  <div className="text-amber-700">Gemini Pro, Gemini Flash</div>
-                </div>
-                <div className="text-sm">
-                  <div className="font-medium text-amber-900">Groq</div>
-                  <div className="text-amber-700">Llama, Mixtral models</div>
-                </div>
-                <div className="text-sm">
-                  <div className="font-medium text-amber-900">AIML API</div>
-                  <div className="text-amber-700">Multiple model access</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="text-lg font-medium text-green-900 mb-3">💡 Pro Tips</h3>
-              <ul className="space-y-2 text-sm text-green-700">
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  For best results, provide content with at least 100 words
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  PDFs work best when they contain selectable text (not scanned images)
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  URLs work better with article pages rather than dynamic web apps
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  Try different summary styles based on your use case
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={() => window.open("/settings", "_blank")}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Configure AI Settings
-              </Button>
-              <Button variant="outline" onClick={onClose}>
-                Continue Without Setup
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface ErrorDisplayProps {
-  error: string
-  onRetry?: () => void
-  onShowHelp?: () => void
-}
-
-function ErrorDisplay({ error, onRetry, onShowHelp }: ErrorDisplayProps) {
-  const getErrorInfo = (errorMessage: string) => {
-    if (errorMessage.includes("No AI providers available") || errorMessage.includes("API keys")) {
-      return {
-        type: "setup",
-        title: "AI Configuration Required",
-        message: "You need to configure at least one AI provider to use the summarizer.",
-        actions: [
-          { label: "Configure AI Settings", action: () => window.open("/settings", "_blank"), primary: true },
-          { label: "View Setup Guide", action: onShowHelp },
-        ],
-      }
-    }
-
-    if (errorMessage.includes("No content could be extracted")) {
-      return {
-        type: "content",
-        title: "Content Extraction Failed",
-        message: "We couldn't extract readable content from this source.",
-        actions: [
-          { label: "Try Different URL", action: onRetry },
-          {
-            label: "Upload File Instead",
-            action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click(),
-          },
-          {
-            label: "Paste Text Manually",
-            action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click(),
-          },
-        ],
-      }
-    }
-
-    if (errorMessage.includes("Failed to fetch URL") || errorMessage.includes("timeout")) {
-      return {
-        type: "network",
-        title: "Network or Access Issue",
-        message: "The URL couldn't be accessed. This might be due to network issues or website restrictions.",
-        actions: [
-          { label: "Try Again", action: onRetry, primary: true },
-          { label: "Check URL", action: () => {} },
-          {
-            label: "Use Different Method",
-            action: () => (document.querySelector('[value="file"]') as HTMLElement)?.click(),
-          },
-        ],
-      }
-    }
-
-    if (errorMessage.includes("PDF")) {
-      return {
-        type: "pdf",
-        title: "PDF Processing Issue",
-        message: "There was an issue processing your PDF file.",
-        actions: [
-          { label: "Try Different PDF", action: onRetry },
-          { label: "Convert to Text", action: () => {} },
-          { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() },
-        ],
-      }
-    }
-
-    if (errorMessage.includes("File size") || errorMessage.includes("too large")) {
-      return {
-        type: "size",
-        title: "File Too Large",
-        message: "Your file exceeds the 10MB limit.",
-        actions: [
-          { label: "Try Smaller File", action: onRetry, primary: true },
-          { label: "Use URL Instead", action: () => (document.querySelector('[value="url"]') as HTMLElement)?.click() },
-          {
-            label: "Copy Text Manually",
-            action: () => (document.querySelector('[value="text"]') as HTMLElement)?.click(),
-          },
-        ],
-      }
-    }
-
-    return {
-      type: "general",
-      title: "Something Went Wrong",
-      message: errorMessage,
-      actions: [
-        { label: "Try Again", action: onRetry, primary: true },
-        { label: "Get Help", action: onShowHelp },
-      ],
-    }
-  }
-
-  const errorInfo = getErrorInfo(error)
-
-  return (
-    <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
-      <div className="flex items-start gap-4">
-        <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-1" />
-        <div className="flex-1">
-          <h3 className="text-lg font-medium text-red-900 mb-2">{errorInfo.title}</h3>
-          <p className="text-red-700 mb-4">{errorInfo.message}</p>
-
-          <div className="flex flex-wrap gap-2">
-            {errorInfo.actions.map((action, index) => (
-              <Button
-                key={index}
-                onClick={action.action}
-                variant={action.primary ? "default" : "outline"}
-                size="sm"
-                className={
-                  action.primary
-                    ? "bg-red-600 hover:bg-red-700 text-white"
-                    : "border-red-300 text-red-700 hover:bg-red-50"
-                }
-              >
-                {action.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const containerStyle = "container mx-auto p-8 max-w-4xl"
-const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
-const sectionDescriptionStyle = "text-gray-600"
-
-export default function Summarizer() {
-  const [content, setContent] = useState("")
-  const [url, setUrl] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [result, setResult] = useState<SummaryResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [summaryStyle, setSummaryStyle] = useState<"academic" | "executive" | "bullet-points" | "detailed">("academic")
-  const [summaryLength, setSummaryLength] = useState<"brief" | "medium" | "comprehensive">("medium")
-  const [copied, setCopied] = useState(false)
-  const [urlFetching, setUrlFetching] = useState(false)
-  const [showSetupWizard, setShowSetupWizard] = useState(false)
-  const [isFirstVisit, setIsFirstVisit] = useState(false)
+export default function SummarizerPage() {
   const { toast } = useToast()
 
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
+  // State management
+  const [content, setContent] = useState("")
+  const [url, setUrl] = useState("")
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>()
+  const [selectedModel, setSelectedModel] = useState<string>()
+  const [summaryStyle, setSummaryStyle] = useState<"academic" | "executive" | "bullet-points" | "detailed">("academic")
+  const [summaryLength, setSummaryLength] = useState<"brief" | "medium" | "comprehensive">("medium")
+  const [result, setResult] = useState<SummaryResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [urlFetching, setUrlFetching] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Check if this is the user's first visit
-  useEffect(() => {
-    const hasVisited = localStorage.getItem("summarizer-visited")
-    if (!hasVisited) {
-      setIsFirstVisit(true)
-      setShowSetupWizard(true)
-      localStorage.setItem("summarizer-visited", "true")
-    }
+  // Utility functions
+  const getWordCount = useCallback((text: string) => {
+    return text
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length
   }, [])
 
-  const handleFileProcessed = (content: string, metadata: any) => {
-    setContent(content)
-    setFile(null)
-    setError(null)
+  const getReadingTime = useCallback(
+    (text: string) => {
+      const wordsPerMinute = 200
+      const wordCount = getWordCount(text)
+      return Math.ceil(wordCount / wordsPerMinute)
+    },
+    [getWordCount],
+  )
 
-    toast({
-      title: "File processed successfully",
-      description: `Content loaded with ${metadata.wordCount} words${metadata.pages ? ` from ${metadata.pages} pages` : ""}`,
-    })
-  }
-
-  const handleFileError = (error: string) => {
-    setError(error)
-    setFile(null)
-  }
-
+  // Handle URL fetching
   const handleUrlFetch = async () => {
-    if (!url.trim()) {
-      setError("Please enter a valid URL")
-      return
-    }
-
-    // Basic URL validation
-    try {
-      new URL(url)
-    } catch {
-      setError("Please enter a valid URL format (e.g., https://example.com/article)")
-      return
-    }
+    if (!url.trim()) return
 
     setUrlFetching(true)
     setError(null)
@@ -362,34 +72,27 @@ export default function Summarizer() {
         body: JSON.stringify({ url }),
       })
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch URL: ${response.statusText}`)
+      }
+
       const data = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.action ? `${data.error}: ${data.action}` : data.error || "Failed to fetch URL content")
+      if (data.error) {
+        throw new Error(data.error)
       }
 
-      const fetchedContent = data.content || ""
-
-      if (!fetchedContent.trim()) {
-        throw new Error(
-          "No content could be extracted from the URL. The page might be dynamically generated or protected.",
-        )
-      }
-
-      setContent(fetchedContent)
-
+      setContent(data.content || "")
       toast({
-        title: "Content fetched successfully",
-        description: `Extracted ${data.wordCount || getWordCount(fetchedContent)} words${data.title ? ` from "${data.title}"` : " from URL"}`,
+        title: "URL Content Extracted",
+        description: `Successfully extracted ${getWordCount(data.content || "")} words from the URL.`,
       })
     } catch (error) {
-      console.error("URL fetch error:", error)
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch content from URL"
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch URL content"
       setError(errorMessage)
-
       toast({
-        title: "URL fetch failed",
-        description: "See error details below for help",
+        title: "URL Fetch Failed",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -397,672 +100,305 @@ export default function Summarizer() {
     }
   }
 
-  const generateSummary = async () => {
+  // Handle file processing
+  const handleFileProcessed = useCallback(
+    (fileContent: string, metadata: any) => {
+      setContent(fileContent)
+      toast({
+        title: "File Processed",
+        description: `Successfully extracted ${getWordCount(fileContent)} words from ${metadata?.name || "the file"}.`,
+      })
+    },
+    [getWordCount],
+  )
+
+  const handleFileError = useCallback(
+    (error: string) => {
+      setError(error)
+      toast({
+        title: "File Processing Failed",
+        description: error,
+        variant: "destructive",
+      })
+    },
+    [toast],
+  )
+
+  // Handle summarization
+  const handleSummarize = async () => {
     if (!content.trim()) {
-      setError("Please provide content to summarize using one of the input methods above")
+      toast({
+        title: "No Content",
+        description: "Please provide content to summarize.",
+        variant: "destructive",
+      })
       return
     }
 
-    if (content.length < 100) {
-      setError(
-        "Content is too short to summarize effectively. Please provide at least 100 characters for better results.",
-      )
+    if (!selectedProvider) {
+      toast({
+        title: "No AI Provider",
+        description: "Please select an AI provider to generate summaries.",
+        variant: "destructive",
+      })
       return
     }
-
-    console.log("Starting summary generation...")
-    console.log("Content length:", content.length)
-    console.log("Selected provider:", selectedProvider)
-    console.log("Selected model:", selectedModel)
-    console.log("Summary style:", summaryStyle)
-    console.log("Summary length:", summaryLength)
 
     setLoading(true)
     setError(null)
-    setResult(null)
 
     try {
-      // Enhanced summary generation with additional features
-      console.log("Calling enhancedAIService.summarizeContent...")
-      let summaryResult = await enhancedAIService.summarizeContent(
-        content,
-        {
-          style: summaryStyle,
-          length: summaryLength,
-        },
-        selectedProvider,
-        selectedModel,
-      )
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-      console.log("Summary result received:", summaryResult)
-
-      const originalLength = content.length
-      const summaryTextLength = summaryResult.summary.length
-      const compressionRatio = (((originalLength - summaryTextLength) / originalLength) * 100).toFixed(1)
-
-      // Generate additional insights
-      const topics = await extractTopics(content)
-      const difficulty = assessDifficulty(content)
-
-      // Attempt to persist the summary in Supabase
-      try {
-        const sourceType = file ? "file" : url ? "url" : "text"
-        let title = "Untitled"
-        if (file) {
-          title = file.name
-        } else if (url) {
-          try {
-            const u = new URL(url)
-            title = u.hostname.replace(/^www\./, "") + u.pathname.split("/").pop()
-          } catch {
-            title = "URL Summary"
-          }
-        } else {
-          title = content.length > 50 ? content.substring(0, 50) + "..." : content
-        }
-
-        await SummarizerService.saveSummary(
-          title,
-          content,
-          summaryResult.summary,
-          summaryResult.keyPoints,
-          sourceType as "text" | "file" | "url",
-          url || undefined,
-          summaryResult.readingTime,
-        )
-      } catch (saveErr) {
-        console.warn("Failed to save summary:", saveErr)
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
       }
 
-      setResult({
-        ...summaryResult,
-        originalLength,
-        summaryLength: summaryTextLength,
-        compressionRatio: `${compressionRatio}%`,
-        topics,
-        difficulty,
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`
+      }
+
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          prompt: `Please provide a ${summaryLength} ${summaryStyle} summary of the following content. Also extract key points and analyze the sentiment.
+
+Content to summarize:
+${content}
+
+Please format your response as JSON with the following structure. If relevant, include tables (with title, headers, rows) and graphs (with title, type, data):
+{
+  "summary": "The main summary text",
+  "keyPoints": ["point 1", "point 2", "point 3"],
+  "sentiment": "positive|neutral|negative",
+  "topics": ["topic 1", "topic 2"],
+  "difficulty": "beginner|intermediate|advanced",
+  "tables": [
+    {
+      "title": "Table Title",
+      "headers": ["Column 1", "Column 2"],
+      "rows": [["Row1Col1", "Row1Col2"], ["Row2Col1", "Row2Col2"]]
+    }
+  ],
+  "graphs": [
+    {
+      "title": "Graph Title",
+      "type": "bar|line|pie|scatter",
+      "data": { "labels": ["A", "B"], "values": [10, 20] }
+    }
+  ]
+}`,
+          provider: selectedProvider,
+          model: selectedModel,
+          temperature: 0.3,
+          maxTokens: summaryLength === "brief" ? 500 : summaryLength === "medium" ? 1000 : 1500,
+        }),
       })
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Try to parse JSON response, fallback to plain text
+      let parsedResult
+      try {
+        parsedResult = JSON.parse(data.content)
+      } catch {
+        // Fallback for non-JSON responses
+        parsedResult = {
+          summary: data.content,
+          keyPoints: [],
+          sentiment: "neutral",
+          topics: [],
+          difficulty: "intermediate",
+          tables: [],
+          graphs: [],
+        }
+      }
+
+      const originalLength = getWordCount(content)
+      const summaryWordCount = getWordCount(parsedResult.summary)
+      const compressionRatio = `${Math.round((1 - summaryWordCount / originalLength) * 100)}%`
+
+      const summaryResult: SummaryResult = {
+        summary: parsedResult.summary || data.content,
+        keyPoints: parsedResult.keyPoints || [],
+        readingTime: getReadingTime(parsedResult.summary || data.content),
+        sentiment: parsedResult.sentiment,
+        originalLength,
+        summaryLength: summaryWordCount,
+        compressionRatio,
+        topics: parsedResult.topics,
+        difficulty: parsedResult.difficulty,
+        tables: parsedResult.tables || [],
+        graphs: parsedResult.graphs || [],
+      }
+
+      setResult(summaryResult)
       toast({
-        title: "Summary generated successfully!",
-        description: `Content summarized with ${compressionRatio}% compression`,
+        title: "Summary Generated",
+        description: `Successfully created a ${summaryLength} ${summaryStyle} summary.`,
       })
     } catch (error) {
-      console.error("Summarization error:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to generate summary"
-      console.error("Detailed error:", {
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-        type: typeof error,
-        error,
-      })
-
       setError(errorMessage)
-
-      // Don't show toast for API key errors - the error display will handle it
-      if (!errorMessage.includes("No AI providers available") && !errorMessage.includes("No valid API keys")) {
         toast({
-          title: "Summary generation failed",
-          description: "Check the debug panel for detailed information",
+        title: "Summarization Failed",
+        description: errorMessage,
           variant: "destructive",
         })
-      }
     } finally {
       setLoading(false)
     }
   }
 
-  const extractTopics = async (text: string): Promise<string[]> => {
-    // Simple topic extraction based on word frequency and common patterns
-    const words = text.toLowerCase().match(/\b\w{4,}\b/g) || []
-    const wordCount: { [key: string]: number } = {}
-
-    words.forEach((word) => {
-      if (!isStopWord(word)) {
-        wordCount[word] = (wordCount[word] || 0) + 1
-      }
-    })
-
-    return Object.entries(wordCount)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([word]) => word.charAt(0).toUpperCase() + word.slice(1))
-  }
-
-  const isStopWord = (word: string): boolean => {
-    const stopWords = [
-      "the",
-      "and",
-      "or",
-      "but",
-      "in",
-      "on",
-      "at",
-      "to",
-      "for",
-      "of",
-      "with",
-      "by",
-      "this",
-      "that",
-      "these",
-      "those",
-      "is",
-      "are",
-      "was",
-      "were",
-      "be",
-      "been",
-      "being",
-      "have",
-      "has",
-      "had",
-      "do",
-      "does",
-      "did",
-      "will",
-      "would",
-      "could",
-      "should",
-      "may",
-      "might",
-      "must",
-      "can",
-      "shall",
-    ]
-    return stopWords.includes(word)
-  }
-
-  const assessDifficulty = (text: string): "beginner" | "intermediate" | "advanced" => {
-    const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0)
-    const avgWordsPerSentence = text.split(/\s+/).length / sentences.length
-    const complexWords = text.match(/\b\w{7,}\b/g)?.length || 0
-    const totalWords = text.split(/\s+/).length
-    const complexWordRatio = complexWords / totalWords
-
-    if (avgWordsPerSentence > 20 || complexWordRatio > 0.3) {
-      return "advanced"
-    } else if (avgWordsPerSentence > 15 || complexWordRatio > 0.2) {
-      return "intermediate"
-    }
-    return "beginner"
-  }
-
-  const copyToClipboard = async (text: string) => {
+  // Handle copy to clipboard
+  const handleCopyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
       toast({
-        title: "Copied to clipboard",
-        description: "Summary has been copied to your clipboard",
+        title: "Copied to Clipboard",
+        description: "Summary has been copied to your clipboard.",
       })
     } catch (error) {
       toast({
-        title: "Copy failed",
-        description: "Failed to copy to clipboard",
+        title: "Copy Failed",
+        description: "Failed to copy to clipboard.",
         variant: "destructive",
       })
     }
   }
 
-  const downloadSummary = () => {
+  // Handle download
+  const handleDownloadSummary = () => {
     if (!result) return
 
-    const summaryData = {
-      originalContent: content,
-      summary: result.summary,
-      keyPoints: result.keyPoints,
-      statistics: {
-        readingTime: result.readingTime,
-        compressionRatio: result.compressionRatio,
-        wordCount: getWordCount(result.summary),
-        sentiment: result.sentiment,
-        difficulty: result.difficulty,
-        topics: result.topics,
-      },
-      generatedAt: new Date().toISOString(),
-      settings: {
-        style: summaryStyle,
-        length: summaryLength,
-      },
-    }
+    const summaryText = `# Summary\n\n${result.summary}\n\n## Key Points\n\n${result.keyPoints.map((point) => `• ${point}`).join("\n")}\n\n## Statistics\n\n• Reading Time: ${result.readingTime} minutes\n• Compression: ${result.compressionRatio}\n• Word Count: ${result.summaryLength} words`
 
-    const blob = new Blob([JSON.stringify(summaryData, null, 2)], { type: "application/json" })
+    const blob = new Blob([summaryText], { type: "text/markdown" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `summary-${new Date().toISOString().split("T")[0]}.json`
+    a.download = "summary.md"
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
     toast({
-      title: "Summary downloaded",
-      description: "Summary data has been saved to your device",
+      title: "Download Started",
+      description: "Summary has been downloaded as a Markdown file.",
     })
   }
 
-  const shareSummary = async () => {
+  // Handle share
+  const handleShareSummary = async () => {
     if (!result) return
 
-    const shareData = {
+    if (navigator.share) {
+      try {
+        await navigator.share({
       title: "AI Generated Summary",
       text: result.summary,
-    }
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData)
-        toast({
-          title: "Summary shared",
-          description: "Summary has been shared successfully",
         })
-      } else {
-        // Fallback to copying to clipboard
-        await copyToClipboard(result.summary)
+      } catch (error) {
+        // User cancelled sharing
       }
-    } catch (error) {
-      console.error("Error sharing:", error)
-      // Fallback to copying to clipboard
-      await copyToClipboard(result.summary)
-    }
-  }
-
-  const getSentimentColor = (sentiment?: string) => {
-    switch (sentiment) {
-      case "positive":
-        return "bg-green-100 text-green-800 border border-green-300"
-      case "negative":
-        return "bg-red-100 text-red-800 border border-red-300"
-      default:
-        return "bg-gray-100 text-gray-800 border border-gray-300"
-    }
-  }
-
-  const getDifficultyColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case "beginner":
-        return "bg-green-100 text-green-800 border border-green-300"
-      case "intermediate":
-        return "bg-yellow-100 text-yellow-800 border border-yellow-300"
-      case "advanced":
-        return "bg-red-100 text-red-800 border border-red-300"
-      default:
-        return "bg-gray-100 text-gray-800 border border-gray-300"
-    }
-  }
-
-  const getWordCount = (text: string) => {
-    return text
-      .trim()
-      .split(/\s+/)
-      .filter((word) => word.length > 0).length
-  }
-
-  const clearContent = () => {
-    setContent("")
-    setUrl("")
-    setResult(null)
-    setError(null)
-    setFile(null)
-
-    toast({
-      title: "Content cleared",
-      description: "All content and results have been cleared",
-    })
-  }
-
-  const retryLastAction = () => {
-    if (url && !content) {
-      handleUrlFetch()
     } else {
-      setError(null)
+      // Fallback to copying to clipboard
+      handleCopyToClipboard(result.summary)
     }
   }
 
   return (
-    <RouteGuard requireAuth={true}>
-      {showSetupWizard && <SetupWizard onClose={() => setShowSetupWizard(false)} />}
-
-      <div className="min-h-screen bg-white text-gray-900">
-        <div className={containerStyle}>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
           {/* Header */}
-          <header className="mb-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <FileText className="h-7 w-7 text-gray-900" />
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Summarizer</h1>
+        <p className="text-gray-600">Transform lengthy content into concise, intelligent summaries using advanced AI</p>
                 </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">AI Summarizer</h1>
-                  <p className={sectionDescriptionStyle}>
-                    Transform lengthy content into concise, intelligent summaries
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                {isFirstVisit && (
-                  <Button
-                    onClick={() => setShowSetupWizard(true)}
-                    variant="outline"
-                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                  >
-                    Show Setup Guide
-                  </Button>
-                )}
-                {(content || result) && (
-                  <Button
-                    onClick={clearContent}
-                    variant="outline"
-                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                  >
-                    Clear All
-                  </Button>
-                )}
-              </div>
-            </div>
-          </header>
 
-          <section className="mb-6">
-            <CompactAIProviderSelector
+      {/* Error Alert */}
+      {error && (
+        <Alert className="mb-6 border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-red-800">{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Main Layout */}
+      <div className="grid gap-8 xl:grid-cols-3">
+        {/* Left Panel - Input and Configuration */}
+        <div className="xl:col-span-1 space-y-6">
+          <ContextInputPanel
+            content={content}
+            url={url}
+            onContentChange={setContent}
+            onUrlChange={setUrl}
+            onUrlFetch={handleUrlFetch}
+            onFileProcessed={handleFileProcessed}
+            onFileError={handleFileError}
+            urlFetching={urlFetching}
+            getWordCount={getWordCount}
+          />
+
+          <ConfigurationPanel
               selectedProvider={selectedProvider}
-              onProviderChange={(provider) => setSelectedProvider(provider)}
+            onProviderChange={setSelectedProvider}
               selectedModel={selectedModel}
-              onModelChange={(model) => setSelectedModel(model)}
-            />
-          </section>
+            onModelChange={setSelectedModel}
+            summaryStyle={summaryStyle}
+            onSummaryStyleChange={setSummaryStyle}
+            summaryLength={summaryLength}
+            onSummaryLengthChange={setSummaryLength}
+          />
 
-          <div className="grid gap-8 lg:grid-cols-3">
-            {/* Input Section */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card className="border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100 pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900">Content Input</CardTitle>
-                  <CardDescription className={sectionDescriptionStyle}>
-                    Provide content through text input, file upload, or URL extraction
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <Tabs defaultValue="text" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-xl h-12">
-                      <TabsTrigger
-                        value="text"
-                        className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
-                      >
-                        Text
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="file"
-                        className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
-                      >
-                        File
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="url"
-                        className="data-[state=active]:bg-gray-200 text-gray-700 font-medium rounded-lg"
-                      >
-                        URL
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="text" className="space-y-4 mt-4">
-                      <Textarea
-                        placeholder="Paste your content here for intelligent summarization..."
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        rows={8}
-                        className="resize-none border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400"
-                      />
-                      <div className="flex justify-between text-sm border-t border-gray-100 pt-2">
-                        <span className="text-gray-500 font-medium">{getWordCount(content)} words</span>
-                        <span className="text-gray-500 font-medium">{content.length} characters</span>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="file" className="space-y-4 mt-4">
-                      <FileUploader onFileProcessed={handleFileProcessed} onError={handleFileError} />
-                    </TabsContent>
-
-                    <TabsContent value="url" className="space-y-4 mt-4">
-                      <div className="flex gap-3">
-                        <Input
-                          placeholder="https://example.com/article"
-                          value={url}
-                          onChange={(e) => setUrl(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && !urlFetching && handleUrlFetch()}
-                          className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black text-gray-900 placeholder:text-gray-400 h-10"
-                        />
+          {/* Generate Button */}
                         <Button
-                          onClick={handleUrlFetch}
-                          disabled={urlFetching || !url.trim()}
-                          variant="outline"
-                          className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 px-5 bg-transparent h-10"
-                        >
-                          {urlFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        Enter a URL to automatically extract and summarize its content. Works best with article pages
-                        and blog posts.
-                      </p>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-
-              {/* Configuration */}
-              <Card className="border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100 pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900">Summary Configuration</CardTitle>
-                  <CardDescription className={sectionDescriptionStyle}>
-                    Customize the style and length of your summary
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 p-6">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block text-gray-700">Summary Style</label>
-                    <Select value={summaryStyle} onValueChange={(value: any) => setSummaryStyle(value)}>
-                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 bg-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="academic" className="hover:bg-gray-50">
-                          Academic
-                        </SelectItem>
-                        <SelectItem value="executive" className="hover:bg-gray-50">
-                          Executive
-                        </SelectItem>
-                        <SelectItem value="bullet-points" className="hover:bg-gray-50">
-                          Bullet Points
-                        </SelectItem>
-                        <SelectItem value="detailed" className="hover:bg-gray-50">
-                          Detailed
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block text-gray-700">Summary Length</label>
-                    <Select value={summaryLength} onValueChange={(value: any) => setSummaryLength(value)}>
-                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 bg-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="brief" className="hover:bg-gray-50">
-                          Brief
-                        </SelectItem>
-                        <SelectItem value="medium" className="hover:bg-gray-50">
-                          Medium
-                        </SelectItem>
-                        <SelectItem value="comprehensive" className="hover:bg-gray-50">
-                          Comprehensive
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {error && <ErrorDisplay error={error} onRetry={retryLastAction} onShowHelp={() => {}} />}
-
-              <Button
-                onClick={generateSummary}
-                disabled={loading || !content.trim()}
-                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 h-auto transition-colors rounded-md"
+            onClick={handleSummarize}
+            disabled={loading || !content.trim() || !selectedProvider}
+            className="w-full h-12 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white"
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Generating Summary...
                   </>
                 ) : (
                   <>
-                    <FileText className="h-4 w-4 mr-2" />
+                <Sparkles className="mr-2 h-5 w-5" />
                     Generate Summary
                   </>
                 )}
               </Button>
             </div>
 
-            {/* Results Section */}
-            <div className="space-y-6">
-              {result && (
-                <>
-                  {/* Summary Stats */}
-                  <Card className="border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100 pb-4">
-                      <CardTitle className="text-lg font-medium text-gray-900">Summary Statistics</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 p-6">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Reading Time</span>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">{result.readingTime} min</span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-3">
-                        <span className="text-sm text-gray-600">Compression</span>
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">{result.compressionRatio}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center border-t border-gray-100 pt-3">
-                        <span className="text-sm text-gray-600">Word Count</span>
-                        <span className="text-sm font-medium text-gray-900">{getWordCount(result.summary)} words</span>
-                      </div>
-
-                      {result.sentiment && (
-                        <div className="flex justify-between items-center border-t border-gray-100 pt-3">
-                          <span className="text-sm text-gray-600">Sentiment</span>
-                          <Badge className={getSentimentColor(result.sentiment)}>{result.sentiment}</Badge>
-                        </div>
-                      )}
-
-                      {result.difficulty && (
-                        <div className="flex justify-between items-center border-t border-gray-100 pt-3">
-                          <span className="text-sm text-gray-600">Difficulty</span>
-                          <Badge className={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Topics */}
-                  {result.topics && result.topics.length > 0 && (
-                    <Card className="border-gray-200 shadow-sm bg-white">
-                      <CardHeader className="border-b border-gray-100 pb-4">
-                        <CardTitle className="text-lg font-medium text-gray-900">Key Topics</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-6">
-                        <div className="flex flex-wrap gap-2">
-                          {result.topics.map((topic, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="bg-gray-100 text-gray-800 border border-gray-300"
-                            >
-                              {topic}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Key Points */}
-                  <Card className="border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100 pb-4">
-                      <CardTitle className="text-lg font-medium text-gray-900">Key Points</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <ul className="space-y-3">
-                        {result.keyPoints.map((point, index) => (
-                          <li key={index} className="flex items-start gap-4">
-                            <div className="w-2 h-2 bg-black rounded-full mt-2 flex-shrink-0" />
-                            <span className="text-sm text-gray-800 leading-relaxed">{point}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-
-                  {/* Summary Output */}
-                  <Card className="border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100 pb-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg font-medium text-gray-900">Generated Summary</CardTitle>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => copyToClipboard(result.summary)}
-                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700"
-                          >
-                            {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={downloadSummary}
-                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={shareSummary}
-                            className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-transparent"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
-                        {result.summary.split("\n").map((paragraph, index) => (
-                          <p key={index} className="mb-3 last:mb-0">
-                            {paragraph}
-                          </p>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </div>
+        {/* Right Panel - Summary Output */}
+        <div className="xl:col-span-2">
+          <div className="xl:sticky xl:top-8">
+            <SummaryOutputPanel
+              result={result}
+              loading={loading}
+              copied={copied}
+              onCopyToClipboard={handleCopyToClipboard}
+              onDownloadSummary={handleDownloadSummary}
+              onShareSummary={handleShareSummary}
+              getWordCount={getWordCount}
+            />
           </div>
         </div>
       </div>
-      <SummarizerDebug />
-    </RouteGuard>
+    </div>
   )
 }

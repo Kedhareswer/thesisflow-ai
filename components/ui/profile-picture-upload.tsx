@@ -316,4 +316,4 @@ export function ProfilePictureUpload({
       />
     </div>
   )
-} 
+}

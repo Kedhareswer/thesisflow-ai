@@ -42,9 +42,35 @@ class EnhancedAIService {
     }
   )
 
-  async loadUserApiKeys(): Promise<UserApiKey[]> {
+  async loadUserApiKeys(userId?: string): Promise<UserApiKey[]> {
+    // If userId is provided, use admin client (server-side)
+    if (userId) {
+      try {
+        console.log("Enhanced AI Service: [SERVER] Loading user API keys for userId:", userId)
+        const { createSupabaseAdmin } = await import("@/lib/auth-utils")
+        const supabaseAdmin = createSupabaseAdmin()
+        if (!supabaseAdmin) {
+          console.error("Enhanced AI Service: Supabase admin client not configured")
+          return []
+        }
+        const { data: apiKeys, error } = await supabaseAdmin
+          .from('user_api_keys')
+          .select('provider, decrypted_key:api_key, is_active, test_status')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .eq('test_status', 'valid')
+        if (error) {
+          console.error('Enhanced AI Service: Error fetching user API keys (server):', error)
+          return []
+        }
+        return apiKeys || []
+      } catch (error) {
+        console.error('Enhanced AI Service: Exception loading user API keys (server):', error)
+        return []
+      }
+    }
     try {
-      console.log("Enhanced AI Service: Loading user API keys...")
+      console.log("Enhanced AI Service: [CLIENT] Loading user API keys...")
       
       // Get current session for authentication
       const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
@@ -114,11 +140,12 @@ class EnhancedAIService {
         model: options.model,
         maxTokens: options.maxTokens,
         temperature: options.temperature,
-        promptLength: options.prompt?.length
+        promptLength: options.prompt?.length,
+        userId: options.userId
       })
 
-      // Load user API keys
-      const userApiKeys = await this.loadUserApiKeys()
+      // Load user API keys (pass userId for server-side)
+      const userApiKeys = await this.loadUserApiKeys(options.userId)
       console.log("Enhanced AI Service: Loaded user API keys:", userApiKeys.map(k => ({ provider: k.provider, active: k.is_active, status: k.test_status })))
 
       // Find available providers
