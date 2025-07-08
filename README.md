@@ -246,42 +246,6 @@ ai-project-planner/
 
 ---
 
-## API Reference
-
-### Authentication Endpoints
-
-- `POST /api/auth/register` - User registration
-- `GET /api/debug-auth` - Authentication debugging
-
-### AI Integration
-
-- `POST /api/ai/generate` - Text generation
-- `POST /api/ai/compare` - Model comparison
-- `GET /api/ai/providers` - Available providers
-- `POST /api/ai/user-generate` - User-specific generation
-
-### Collaboration
-
-- `GET /api/collaborate/teams` - List user teams
-- `POST /api/collaborate/teams` - Create new team
-- `GET /api/collaborate/messages` - Get chat messages
-- `POST /api/collaborate/messages` - Send message
-- `POST /api/collaborate/invitations` - Send invitation
-
-### File Processing
-
-- `POST /api/upload` - File upload
-- `POST /api/fetch-url` - URL content extraction
-- `POST /api/extract-file` - File content extraction
-
-### Research Tools
-
-- `GET /api/explore` - Research exploration
-- `GET /api/search/papers` - Academic paper search
-- `POST /api/summarize` - Content summarization
-
----
-
 ## Security
 
 ### Authentication
@@ -334,13 +298,6 @@ We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for
 - [Radix UI](https://www.radix-ui.com/) - Low-level UI Primitives
 - [TailwindCSS](https://tailwindcss.com/) - Utility-First CSS Framework
 - [Socket.io](https://socket.io/) - Real-time Communication Engine
-
-### AI & Research Tools
-
-- [Google Gemini](https://ai.google.dev/) - Advanced AI Capabilities
-- [pygetpapers](https://github.com/contentmine/pygetpapers) - Academic Paper Retrieval
-- [Mammoth](https://github.com/mwilliamson/mammoth.js) - DOCX Processing
-- [pdf-parse](https://gitlab.com/autokent/pdf-parse) - PDF Text Extraction
 
 ### Special Thanks
 
