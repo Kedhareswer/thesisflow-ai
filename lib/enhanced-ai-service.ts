@@ -850,9 +850,9 @@ ${processedContent}
 
 Output:
 SUMMARY: [clear, concise summary]
-POINTS: [point1]|[point2]|[point3]
-TIME: [reading minutes]
-TONE: [positive/neutral/negative]`
+KEY_POINTS: [point1]|[point2]|[point3]|[point4]|[point5]
+READING_TIME: [reading minutes]
+SENTIMENT: [positive/neutral/negative]`
 
     console.log("Enhanced AI Service: Generated prompt length:", prompt.length)
 

@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
+import { SummarizerService } from "@/lib/services/summarizer.service"
 import { useToast } from "@/hooks/use-toast"
 import { FileUploader } from "./components/FileUploader"
 import { SummarizerDebug } from "./components/summarizer-debug"
@@ -423,7 +424,7 @@ export default function Summarizer() {
     try {
       // Enhanced summary generation with additional features
       console.log("Calling enhancedAIService.summarizeContent...")
-      const summaryResult = await enhancedAIService.summarizeContent(
+      let summaryResult = await enhancedAIService.summarizeContent(
         content,
         {
           style: summaryStyle,
@@ -442,6 +443,36 @@ export default function Summarizer() {
       // Generate additional insights
       const topics = await extractTopics(content)
       const difficulty = assessDifficulty(content)
+
+      // Attempt to persist the summary in Supabase
+      try {
+        const sourceType = file ? "file" : url ? "url" : "text"
+        let title = "Untitled"
+        if (file) {
+          title = file.name
+        } else if (url) {
+          try {
+            const u = new URL(url)
+            title = u.hostname.replace(/^www\./, "") + u.pathname.split("/").pop()
+          } catch {
+            title = "URL Summary"
+          }
+        } else {
+          title = content.length > 50 ? content.substring(0, 50) + "..." : content
+        }
+
+        await SummarizerService.saveSummary(
+          title,
+          content,
+          summaryResult.summary,
+          summaryResult.keyPoints,
+          sourceType as "text" | "file" | "url",
+          url || undefined,
+          summaryResult.readingTime,
+        )
+      } catch (saveErr) {
+        console.warn("Failed to save summary:", saveErr)
+      }
 
       setResult({
         ...summaryResult,
