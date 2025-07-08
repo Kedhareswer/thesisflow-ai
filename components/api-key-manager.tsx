@@ -204,7 +204,7 @@ export function ApiKeyManager() {
       await loadApiKeys()
 
       // Force reload AI service configuration
-      await enhancedAIService.loadUserApiKeys(true)
+      await enhancedAIService.loadUserApiKeys()
 
       toast({
         title: "API key saved",
@@ -488,8 +488,8 @@ export function ApiKeyManager() {
             <div className="space-y-1">
               <h4 className="text-sm font-medium">Security & Privacy</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Your API keys are encrypted using AES-256 encryption and stored securely. They are only used for your AI
-                requests and never shared with third parties.
+                Your API keys are stored securely in the database and only used for your AI
+                requests. They are never shared with third parties. Please keep your API keys confidential.
               </p>
             </div>
           </div>

@@ -1,4 +1,3 @@
-const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
@@ -6,46 +5,27 @@ const path = require('path');
 require('dotenv').config({ path: '.env.local' });
 
 async function runMigration() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('Missing required environment variables:');
-    console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Present' : 'Missing');
-    console.error('SUPABASE_SERVICE_ROLE_KEY:', serviceRoleKey ? 'Present' : 'Missing');
-    console.error('\nPlease ensure your .env.local file is properly configured.');
-    process.exit(1);
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-
+  console.log('='.repeat(60));
+  console.log('API Keys Migration - Manual Setup Required');
+  console.log('='.repeat(60));
+  
   // Read the migration file
-  const migrationPath = path.join(__dirname, 'fix-team-members-foreign-key.sql');
+  const migrationPath = path.join(__dirname, 'user-api-keys-migration.sql');
   const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
 
-  console.log('Running database migration...');
-  console.log('Supabase URL:', supabaseUrl);
-
-  try {
-    // Execute the migration
-    const { data, error } = await supabase.rpc('exec_sql', { sql: migrationSQL });
-
-    if (error) {
-      console.error('Migration failed:', error);
-      process.exit(1);
-    }
-
-    console.log('Migration completed successfully!');
-    console.log('Result:', data);
-  } catch (err) {
-    console.error('Error running migration:', err);
-    process.exit(1);
-  }
+  console.log('\nTo update your database to store API keys in plain text:');
+  console.log('\n1. Go to your Supabase dashboard');
+  console.log('2. Open the SQL Editor');
+  console.log('3. Copy and paste the following SQL:');
+  console.log('\n' + '='.repeat(60));
+  console.log(migrationSQL);
+  console.log('='.repeat(60));
+  console.log('\n4. Click "Run" to execute the migration');
+  console.log('\nThis will:');
+  console.log('- Rename the api_key_encrypted column to api_key');
+  console.log('- Update all functions to work with plain text keys');
+  console.log('- Preserve existing data (you may need to re-enter your API keys)');
+  console.log('\nNote: Existing encrypted keys will need to be re-entered as plain text.');
 }
 
 runMigration();

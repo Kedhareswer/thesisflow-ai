@@ -1,92 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, requireAuth, createSupabaseAdmin } from '@/lib/auth-utils'
-import crypto from 'crypto'
 import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
 // Using shared authentication utilities from lib/auth-utils.ts
 
-// Simple encryption/decryption for API keys (in production, use a proper key management service)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
-const ALGORITHM = 'aes-256-cbc'
-
-function encrypt(text: string): string {
-  const iv = crypto.randomBytes(16)
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
-  let encrypted = cipher.update(text, 'utf8', 'hex')
-  encrypted += cipher.final('hex')
-  return iv.toString('hex') + ':' + encrypted
-}
-
-function decrypt(text: string): string {
-  const parts = text.split(':')
-  if (parts.length < 2) {
-    throw new Error('Invalid encrypted text format')
-  }
-
-  const iv = Buffer.from(parts.shift()!, 'hex')
-  const cipherText = parts.join(':')
-  const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
-
-  const tryDecrypt = (encoding: BufferEncoding) => {
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
-    let decrypted = decipher.update(cipherText, encoding, 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
-  }
-
-  try {
-    return tryDecrypt('hex')
-  } catch {
-    return tryDecrypt('base64')
-  }
-}
-
-// Validate API key format for different providers
+// API key validation functions
 function validateApiKey(provider: string, apiKey: string): boolean {
-  const patterns = {
-    openai: /^sk-[a-zA-Z0-9]{48,}$/,
-    groq: /^gsk_[a-zA-Z0-9]{50,}$/,
-    gemini: /^AIza[a-zA-Z0-9_-]{35,}$/,
-    anthropic: /^sk-ant-[a-zA-Z0-9]{40,}$/,
-    mistral: /^[a-zA-Z0-9]{32,}$/,
-  }
-  
-  const pattern = patterns[provider as keyof typeof patterns]
-  return pattern ? pattern.test(apiKey) : apiKey.length > 10
-}
-
-function encryptApiKey(apiKey: string): string {
-  const iv = crypto.randomBytes(16)
-  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv)
-  let encrypted = cipher.update(apiKey, 'utf8', 'hex')
-  encrypted += cipher.final('hex')
-  return iv.toString('hex') + ':' + encrypted
-}
-
-function decryptApiKey(encryptedKey: string): string {
-  try {
-    const parts = encryptedKey.split(':')
-    if (parts.length < 2) return ''
-
-    const iv = Buffer.from(parts.shift()!, 'hex')
-    const cipherText = parts.join(':')
-    const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
-
-    const tryDecrypt = (encoding: BufferEncoding) => {
-      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
-      let decrypted = decipher.update(cipherText, encoding, 'utf8')
-      decrypted += decipher.final('utf8')
-      return decrypted
-    }
-
-    try {
-      return tryDecrypt('hex')
-    } catch {
-      return tryDecrypt('base64')
-    }
-  } catch (error) {
-    console.error('Error decrypting API key:', error)
-    return ''
+  switch (provider) {
+    case 'openai':
+      return apiKey.startsWith('sk-') && apiKey.length >= 20
+    case 'groq':
+      return apiKey.startsWith('gsk_') && apiKey.length >= 20
+    case 'gemini':
+      return apiKey.length >= 20 && !apiKey.includes(' ')
+    case 'anthropic':
+      return apiKey.startsWith('sk-ant-') && apiKey.length >= 20
+    case 'mistral':
+      return apiKey.length >= 20 && !apiKey.includes(' ')
+    case 'aiml':
+      return apiKey.length >= 20 && !apiKey.includes(' ')
+    case 'deepinfra':
+      return apiKey.length >= 20 && !apiKey.includes(' ')
+    default:
+      return apiKey.length >= 10 && !apiKey.includes(' ')
   }
 }
 
@@ -118,10 +54,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (includeKeys) {
-      // Get user's API keys WITH decryption for AI service use
+      // Get user's API keys WITH the actual keys for AI service use
       const { data: apiKeys, error } = await supabaseAdmin
         .from('user_api_keys')
-        .select('id, provider, api_key_encrypted, is_active, last_tested_at, test_status, created_at, updated_at')
+        .select('id, provider, api_key, is_active, last_tested_at, test_status, created_at, updated_at')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .eq('test_status', 'valid')
@@ -132,45 +68,20 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Database error' }, { status: 500 })
       }
 
-      // Decrypt the API keys for internal use
-      const decryptedKeys = (apiKeys || []).map((key: any) => {
-        try {
-          // Try both old and new decryption methods
-          let decryptedKey = ''
-          try {
-            decryptedKey = decrypt(key.api_key_encrypted)
-          } catch (error) {
-            console.log(`Failed with decrypt(), trying decryptApiKey() for ${key.provider}`)
-            try {
-              decryptedKey = decryptApiKey(key.api_key_encrypted)
-            } catch (error2) {
-              console.error(`Both decryption methods failed for ${key.provider}:`, error2)
-              throw error2
-            }
-          }
-          
-          if (!decryptedKey) {
-            console.error(`Empty decrypted key for ${key.provider}`)
-            return null
-          }
-          
-          return {
-            provider: key.provider,
-            decrypted_key: decryptedKey,
-            is_active: key.is_active,
-            test_status: key.test_status,
-            created_at: key.created_at,
-            updated_at: key.updated_at
-          }
-        } catch (decryptError) {
-          console.error(`Failed to decrypt API key for ${key.provider}:`, decryptError)
-          return null
-        }
-      }).filter(Boolean)
+      // Return the API keys with the actual key values
+      const formattedKeys = (apiKeys || []).map((key: any) => ({
+        provider: key.provider,
+        decrypted_key: key.api_key, // No decryption needed - it's already plain text
+        is_active: key.is_active,
+        test_status: key.test_status,
+        created_at: key.created_at,
+        updated_at: key.updated_at
+      }))
 
-      return NextResponse.json({ success: true, apiKeys: decryptedKeys })
-    } else {
-    // Get user's API keys (without decrypting for list view)
+      return NextResponse.json({ success: true, apiKeys: formattedKeys })
+    }
+    
+    // Get user's API keys (without the actual keys for list view)
     const { data: apiKeys, error } = await supabaseAdmin
       .from('user_api_keys')
       .select('id, provider, is_active, last_tested_at, test_status, created_at, updated_at')
@@ -183,7 +94,6 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ apiKeys: apiKeys || [] })
-    }
   } catch (error) {
     console.error("User API Keys GET: Error:", error)
     return NextResponse.json(
@@ -248,23 +158,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Encrypt the API key
-    const encryptedKey = encryptApiKey(apiKey)
-
-            // Insert or update the API key
-        const { error: upsertError } = await supabaseAdmin
-          .from('user_api_keys')
-          .upsert({
-            user_id: user.id,
-            provider,
-            api_key_encrypted: encryptedKey,
-            is_active: true,
-            last_tested_at: null,
-            test_status: 'valid', // Set as valid for new keys
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'user_id,provider'
-          })
+    // Insert or update the API key (stored as plain text)
+    const { error: upsertError } = await supabaseAdmin
+      .from('user_api_keys')
+      .upsert({
+        user_id: user.id,
+        provider,
+        api_key: apiKey, // Store as plain text
+        is_active: true,
+        last_tested_at: null,
+        test_status: 'valid', // Set as valid for new keys
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,provider'
+      })
 
     if (upsertError) {
       console.error('Error saving API key:', upsertError)
@@ -294,11 +201,13 @@ export async function DELETE(request: NextRequest) {
     const user = await requireAuth(request, "user-api-keys")
     console.log("User API Keys DELETE: Authenticated user:", user.id)
 
-    const { searchParams } = new URL(request.url)
-    const provider = searchParams.get('provider')
+    const { provider } = await request.json()
 
     if (!provider) {
-      return NextResponse.json({ error: 'Provider is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: "Provider is required", success: false },
+        { status: 400 }
+      )
     }
 
     const supabaseAdmin = createSupabaseAdmin()
@@ -310,18 +219,22 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const { error } = await supabaseAdmin
+    // Delete the API key
+    const { error: deleteError } = await supabaseAdmin
       .from('user_api_keys')
       .delete()
       .eq('user_id', user.id)
       .eq('provider', provider)
 
-    if (error) {
-      console.error('Error deleting API key:', error)
+    if (deleteError) {
+      console.error('Error deleting API key:', deleteError)
       return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, message: `${provider} API key deleted successfully` })
+    return NextResponse.json({ 
+      success: true, 
+      message: `${provider} API key deleted successfully` 
+    })
   } catch (error) {
     console.error("User API Keys DELETE: Error:", error)
     return NextResponse.json(

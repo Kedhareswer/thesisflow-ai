@@ -1,120 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
-import crypto from 'crypto'
+import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
-// Import AI providers and interfaces
-interface AIMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
-
-interface AIResponse {
-  content: string
-  provider: string
-  model: string
-  usage?: {
-    tokens: number
-    cost?: number
-  }
-}
-
-// Encryption settings
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-char-secret-key-here-123456'
-const ALGORITHM = 'aes-256-cbc'
-
-function decrypt(text: string): string {
-  // Expect <iv>:<cipherText>
-  const parts = text.split(':')
-  if (parts.length < 2) {
-    throw new Error('Invalid encrypted text format')
-  }
-
-  const iv = Buffer.from(parts.shift()!, 'hex')
-  const cipherText = parts.join(':')
-  const key = Buffer.from(ENCRYPTION_KEY.slice(0, 32))
-
-  const tryDecrypt = (encoding: BufferEncoding) => {
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
-    let decrypted = decipher.update(cipherText, encoding, 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
-  }
-
-  try {
-    return tryDecrypt('hex')
-  } catch {
-    // Fallback to base64 (legacy)
-    return tryDecrypt('base64')
-  }
-}
-
-// AI Provider configurations
-const AI_PROVIDERS = [
+// Create admin client for secure server-side operations
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
-    id: 'groq',
-    name: 'Groq',
-    baseURL: 'https://api.groq.com/openai/v1',
-    models: ['llama-3.1-70b-versatile', 'mixtral-8x7b-32768'],
-    priority: 1,
-    costPer1kTokens: 0.59
-  },
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    baseURL: 'https://api.openai.com/v1',
-    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
-    priority: 2,
-    costPer1kTokens: 2.50
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-    models: ['gemini-2.0-flash', 'gemini-1.5-pro'],
-    priority: 3,
-    costPer1kTokens: 0.35
-  },
-  {
-    id: 'aiml',
-    name: 'AI/ML API',
-    baseURL: 'https://api.aimlapi.com/v1',
-    models: ['gpt-4o', 'claude-3-sonnet'],
-    priority: 4,
-    costPer1kTokens: 1.00
-  },
-  {
-    id: 'deepinfra',
-    name: 'DeepInfra',
-    baseURL: 'https://api.deepinfra.com/v1/openai',
-    models: ['Meta-Llama-3.1-70B-Instruct'],
-    priority: 5,
-    costPer1kTokens: 0.35
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
   }
-]
+)
 
 // Get user's API keys with fallback to environment
 async function getUserApiKeys(userId: string, supabase: any): Promise<Map<string, string>> {
   const apiKeys = new Map<string, string>()
   
   try {
-    // Get user's encrypted API keys
+    // Get user's API keys (already in plain text)
     const { data: userKeys, error } = await supabase
       .from('user_api_keys')
-      .select('provider, api_key_encrypted')
+      .select('provider, api_key')
       .eq('user_id', userId)
       .eq('is_active', true)
       .eq('test_status', 'valid')
 
     if (!error && userKeys) {
-      // Decrypt user keys
+      // Add user keys (no decryption needed)
       for (const keyData of userKeys) {
-        try {
-          const decryptedKey = decrypt(keyData.api_key_encrypted)
-          apiKeys.set(keyData.provider, decryptedKey)
-        } catch (decryptError) {
-          console.error(`Failed to decrypt ${keyData.provider} key:`, decryptError)
-        }
+        apiKeys.set(keyData.provider, keyData.api_key)
       }
     }
   } catch (error) {
@@ -141,226 +57,236 @@ async function getUserApiKeys(userId: string, supabase: any): Promise<Map<string
   return apiKeys
 }
 
-// Get best available provider
-function getBestProvider(apiKeys: Map<string, string>) {
-  const sortedProviders = AI_PROVIDERS.sort((a, b) => a.priority - b.priority)
+async function generateWithAI(
+  prompt: string,
+  preferredProvider: string,
+  userApiKeys: Map<string, string>
+): Promise<string> {
+  // Define provider priority order
+  const providerOrder = ['openai', 'groq', 'gemini', 'aiml', 'deepinfra']
   
-  for (const provider of sortedProviders) {
-    if (apiKeys.has(provider.id)) {
-      return {
-        provider,
-        apiKey: apiKeys.get(provider.id)!,
-        isUserKey: !isEnvironmentKey(provider.id, apiKeys.get(provider.id)!)
-      }
+  let providersToTry = []
+  
+  // If user has a preferred provider and key, try it first
+  if (preferredProvider && userApiKeys.has(preferredProvider)) {
+    providersToTry.push(preferredProvider)
+  }
+  
+  // Add other available providers
+  for (const provider of providerOrder) {
+    if (provider !== preferredProvider && userApiKeys.has(provider)) {
+      providersToTry.push(provider)
     }
   }
   
-  return null
-}
-
-// Check if key is from environment (for tracking purposes)
-function isEnvironmentKey(provider: string, key: string): boolean {
-  const envKeys = {
-    groq: process.env.GROQ_API_KEY,
-    openai: process.env.OPENAI_API_KEY,
-    gemini: process.env.GEMINI_API_KEY,
-    aiml: process.env.AIML_API_KEY,
-    deepinfra: process.env.DEEPINFRA_API_KEY
+  if (providersToTry.length === 0) {
+    throw new Error('No API keys available. Please configure API keys in Settings.')
   }
-  return envKeys[provider as keyof typeof envKeys] === key
-}
-
-// OpenAI-compatible API call
-async function callOpenAICompatible(
-  provider: any,
-  apiKey: string,
-  messages: AIMessage[],
-  options: any = {}
-): Promise<AIResponse> {
-  const model = options.model || provider.models[0]
   
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${apiKey}`
+  // Since we're using the enhanced AI service directly, we can use its generateText method
+  // But we need to work around the fact that it loads keys internally
+  // For now, let's use a simpler approach and make direct API calls
+  
+  // Try each provider in order
+  for (const provider of providersToTry) {
+    try {
+      const apiKey = userApiKeys.get(provider)
+      if (!apiKey) continue
+      
+      console.log(`Trying ${provider} for AI generation...`)
+      
+      // Make direct API call based on provider
+      let result: string = ''
+      
+      if (provider === 'openai') {
+        result = await callOpenAIAPI(apiKey, prompt)
+      } else if (provider === 'groq') {
+        result = await callGroqAPI(apiKey, prompt)
+      } else if (provider === 'gemini') {
+        result = await callGeminiAPI(apiKey, prompt)
+      } else if (provider === 'aiml') {
+        result = await callAIMLAPI(apiKey, prompt)
+      } else if (provider === 'deepinfra') {
+        result = await callDeepInfraAPI(apiKey, prompt)
+      }
+      
+      if (result && result.trim()) {
+        console.log(`Successfully generated text with ${provider}`)
+        return result
+      }
+    } catch (error) {
+      console.error(`Error with ${provider}:`, error)
+      continue
+    }
   }
+  
+  throw new Error('All AI providers failed to generate text')
+}
 
-  const body = {
-    model,
-    messages,
-    temperature: options.temperature || 0.7,
-    max_tokens: options.maxTokens || 2000,
-    stream: false
-  }
-
-  const response = await fetch(`${provider.baseURL}/chat/completions`, {
+async function callOpenAIAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers,
-    body: JSON.stringify(body)
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`${provider.name} API error: ${error}`)
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
   }
 
   const data = await response.json()
-  
-  return {
-    content: data.choices[0]?.message?.content || '',
-    provider: provider.name,
-    model,
-    usage: data.usage ? {
-      tokens: data.usage.total_tokens,
-      cost: (data.usage.total_tokens / 1000) * provider.costPer1kTokens
-    } : undefined
-  }
+  return data.choices?.[0]?.message?.content || ''
 }
 
-// Gemini API call
-async function callGemini(
-  apiKey: string,
-  messages: AIMessage[],
-  options: any = {}
-): Promise<AIResponse> {
-  const model = options.model || 'gemini-2.0-flash'
-  
-  // Convert messages to Gemini format
-  const contents = messages
-    .filter(msg => msg.role !== 'system')
-    .map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }))
-
-  const systemMessage = messages.find(msg => msg.role === 'system')
-  const generationConfig: any = {
-    temperature: options.temperature || 0.7,
-    maxOutputTokens: options.maxTokens || 2000,
-  }
-
-  if (systemMessage) {
-    generationConfig.systemInstruction = {
-      role: 'system',
-      parts: [{ text: systemMessage.content }]
-    }
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig
-      })
-    }
-  )
+async function callGroqAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+  })
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Gemini API error: ${error}`)
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Groq API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
   }
 
   const data = await response.json()
-  
-  return {
-    content: data.candidates[0]?.content?.parts[0]?.text || '',
-    provider: 'Google Gemini',
-    model,
-    usage: data.usageMetadata ? {
-      tokens: data.usageMetadata.totalTokenCount,
-      cost: (data.usageMetadata.totalTokenCount / 1000) * 0.35
-    } : undefined
-  }
+  return data.choices?.[0]?.message?.content || ''
 }
 
-// Track usage
-async function trackUsage(userId: string, provider: string, supabase: any, isUserKey: boolean) {
-  if (isUserKey) {
-    try {
-      await supabase.rpc('increment_api_key_usage', {
-        key_user_id: userId,
-        key_provider: provider
-      })
-    } catch (error) {
-      console.error('Error tracking usage:', error)
-    }
+async function callGeminiAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: {
+        maxOutputTokens: 2000,
+        temperature: 0.7,
+      }
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
   }
+
+  const data = await response.json()
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+}
+
+async function callAIMLAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.aimlapi.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`AIML API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || ''
+}
+
+async function callDeepInfraAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.deepinfra.com/v1/openai/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'Meta-Llama-3.1-70B-Instruct',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`DeepInfra API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || ''
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    // Get request body
+    const { prompt, provider: preferredProvider = 'openai' } = await request.json()
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    
-    // Get authorization header
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!prompt || typeof prompt !== 'string') {
+      return NextResponse.json({ error: 'Prompt is required and must be a string' }, { status: 400 })
     }
     
-    const token = authHeader.substring(7)
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-
+    // Get auth token
+    const authToken = request.headers.get('Authorization')?.replace('Bearer ', '')
+    if (!authToken) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
+    // Verify token and get user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(authToken)
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
     }
-
-    const { messages, options = {} } = await request.json()
-
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
-    }
-
+    
     // Get user's API keys
-    const apiKeys = await getUserApiKeys(user.id, supabase)
+    const userApiKeys = await getUserApiKeys(user.id, supabaseAdmin)
     
-    if (apiKeys.size === 0) {
-      return NextResponse.json({ 
-        error: 'No AI providers available. Please configure API keys in Settings.' 
-      }, { status: 400 })
-    }
-
-    // Get best provider
-    const bestProvider = getBestProvider(apiKeys)
+    // Generate text with AI
+    const generatedText = await generateWithAI(prompt, preferredProvider, userApiKeys)
     
-    if (!bestProvider) {
-      return NextResponse.json({ 
-        error: 'No available AI providers found' 
-      }, { status: 500 })
-    }
-
-    const { provider, apiKey, isUserKey } = bestProvider
-
-    // Make AI request
-    let response: AIResponse
-    if (provider.id === 'gemini') {
-      response = await callGemini(apiKey, messages, options)
-    } else {
-      response = await callOpenAICompatible(provider, apiKey, messages, options)
-    }
-
-    // Track usage
-    await trackUsage(user.id, provider.id, supabase, isUserKey)
-
     return NextResponse.json({
-      response,
-      meta: {
-        provider: provider.name,
-        model: response.model,
-        isUserKey,
-        usage: response.usage
-      }
+      success: true,
+      result: generatedText,
+      provider: preferredProvider
     })
-
+    
   } catch (error) {
-    console.error('AI Generation Error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'AI request failed' },
-      { status: 500 }
-    )
+    console.error('AI User Generation Error:', error)
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    const statusCode = errorMessage.includes('No API keys available') ? 400 : 500
+    
+    return NextResponse.json({
+      error: errorMessage,
+      success: false
+    }, { status: statusCode })
   }
 }
