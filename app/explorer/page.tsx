@@ -16,6 +16,7 @@ import CompactAIProviderSelector from "@/components/compact-ai-provider-selector
 import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { ResearchSessionManager } from "@/components/research-session-manager"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { GeneratedIdeas } from "./components/GeneratedIdeas"
 
 const containerStyle = "container mx-auto px-4 py-8 max-w-6xl"
 const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
@@ -120,6 +121,9 @@ export default function ResearchExplorer() {
                 </TabsContent>
                 <TabsContent value="ideas">
                   <IdeaGenerator />
+                  <div className="mt-8">
+                    <GeneratedIdeas />
+                  </div>
                 </TabsContent>
                 <TabsContent value="assistant">
                   <Card>

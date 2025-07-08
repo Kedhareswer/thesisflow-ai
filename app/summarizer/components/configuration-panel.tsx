@@ -60,51 +60,51 @@ export function ConfigurationPanel({
           </AccordionTrigger>
           <AccordionPanel className="px-0 pb-0">
             <Card className="border-gray-200 shadow-sm bg-white border-0">
-              <CardContent className="grid gap-4 md:grid-cols-2 p-6">
-                <div>
-                  <Label className="text-sm font-medium mb-2 block text-gray-700">Summary Style</Label>
-                  <Select value={summaryStyle} onValueChange={onSummaryStyleChange}>
-                    <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-10 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200">
-                      <SelectItem value="academic" className="hover:bg-gray-50">
-                        Academic
-                      </SelectItem>
-                      <SelectItem value="executive" className="hover:bg-gray-50">
-                        Executive
-                      </SelectItem>
-                      <SelectItem value="bullet-points" className="hover:bg-gray-50">
-                        Bullet Points
-                      </SelectItem>
-                      <SelectItem value="detailed" className="hover:bg-gray-50">
-                        Detailed
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+        <CardContent className="grid gap-4 md:grid-cols-2 p-6">
+          <div>
+            <Label className="text-sm font-medium mb-2 block text-gray-700">Summary Style</Label>
+            <Select value={summaryStyle} onValueChange={onSummaryStyleChange}>
+              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-10 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200">
+                <SelectItem value="academic" className="hover:bg-gray-50">
+                  Academic
+                </SelectItem>
+                <SelectItem value="executive" className="hover:bg-gray-50">
+                  Executive
+                </SelectItem>
+                <SelectItem value="bullet-points" className="hover:bg-gray-50">
+                  Bullet Points
+                </SelectItem>
+                <SelectItem value="detailed" className="hover:bg-gray-50">
+                  Detailed
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-                <div>
-                  <Label className="text-sm font-medium mb-2 block text-gray-700">Summary Length</Label>
-                  <Select value={summaryLength} onValueChange={onSummaryLengthChange}>
-                    <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-10 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200">
-                      <SelectItem value="brief" className="hover:bg-gray-50">
-                        Brief
-                      </SelectItem>
-                      <SelectItem value="medium" className="hover:bg-gray-50">
-                        Medium
-                      </SelectItem>
-                      <SelectItem value="comprehensive" className="hover:bg-gray-50">
-                        Comprehensive
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+          <div>
+            <Label className="text-sm font-medium mb-2 block text-gray-700">Summary Length</Label>
+            <Select value={summaryLength} onValueChange={onSummaryLengthChange}>
+              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-10 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200">
+                <SelectItem value="brief" className="hover:bg-gray-50">
+                  Brief
+                </SelectItem>
+                <SelectItem value="medium" className="hover:bg-gray-50">
+                  Medium
+                </SelectItem>
+                <SelectItem value="comprehensive" className="hover:bg-gray-50">
+                  Comprehensive
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
           </AccordionPanel>
         </AccordionItem>
       </Accordion>

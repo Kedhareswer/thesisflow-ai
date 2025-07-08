@@ -9,6 +9,10 @@ import { Loader2, Plus, Users, Crown, Shield, Eye } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from "@/hooks/use-toast"
+import { AvatarGroup } from '@/components/animate-ui/components/avatar-group'
+import { ToggleGroup, ToggleGroupItem } from '@/components/animate-ui/base/toggle-group'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/base/tooltip'
+import { IconButton } from '@/components/animate-ui/buttons/icon'
 
 interface User {
   id: string
@@ -334,17 +338,58 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
                     {team.description || 'No description provided'}
                   </p>
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3 text-gray-500" />
-                      <span className="text-sm text-gray-600">
-                        {team.members.length} member{team.members.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    <Badge variant="outline" className="text-xs capitalize">
+                    <AvatarGroup>
+                      {team.members.slice(0, 5).map(m => (
+                        <img key={m.id} src={m.avatar} alt={m.name} />
+                      ))}
+                    </AvatarGroup>
+                    <Badge variant="outline" className="text-xs capitalize animate-pulse">
                       {userRole}
                     </Badge>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="space-y-2">
+                    {team.members.map(member => {
+                      const canChangeRole = (userRole === 'owner' && member.role !== 'owner' && member.id !== user?.id) ||
+                        (userRole === 'admin' && member.role !== 'owner' && member.role !== 'admin' && member.id !== user?.id)
+                      return (
+                        <div key={member.id} className="flex items-center gap-2">
+                          <img src={member.avatar} alt={member.name} className="rounded-full w-8 h-8 object-cover" />
+                          <span className="truncate text-sm font-medium">{member.name}</span>
+                          <ToggleGroup toggleMultiple={false} value={[member.role]} disabled={!canChangeRole} onValueChange={role => {/* call API to update role */}}>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <ToggleGroupItem value="viewer">👁️</ToggleGroupItem>
+                              </TooltipTrigger>
+                              <TooltipContent>Viewer - Can view and comment</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <ToggleGroupItem value="editor">✏️</ToggleGroupItem>
+                              </TooltipTrigger>
+                              <TooltipContent>Editor - Can edit and create content</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <ToggleGroupItem value="admin">🛡️</ToggleGroupItem>
+                              </TooltipTrigger>
+                              <TooltipContent>Admin - Can manage team and members</TooltipContent>
+                            </Tooltip>
+                          </ToggleGroup>
+                          {!canChangeRole && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <IconButton icon={Shield} size="sm" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {member.role === 'owner' ? 'Owner role cannot be changed' : member.id === user?.id ? 'You cannot change your own role' : 'Insufficient permissions'}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex space-x-2 mt-4">
                     <Button
                       variant="default"
                       size="sm"

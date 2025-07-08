@@ -26,6 +26,7 @@ import {
   Plus,
   Loader2,
   AlertCircle,
+  X,
 } from "lucide-react"
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -34,6 +35,9 @@ import { RouteGuard } from "@/components/route-guard"
 import { TeamSettings } from "./components/team-settings"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Type definitions
 interface User {
@@ -87,6 +91,10 @@ export default function CollaboratePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
+  const [isInviting, setIsInviting] = useState(false)
 
   const { toast } = useToast()
   const { socket } = useSocket()
@@ -127,14 +135,35 @@ export default function CollaboratePage() {
       const data = await apiCall('/api/collaborate/teams')
       
       if (data.success) {
-        setTeams(data.teams || [])
+        // Transform teams data to match expected format
+        const transformedTeams = data.teams.map((team: any) => ({
+          id: team.id,
+          name: team.name,
+          description: team.description,
+          category: team.category,
+          isPublic: team.is_public,
+          createdAt: team.created_at,
+          owner: team.owner_id,
+          members: team.members?.map((member: any) => ({
+            id: member.user_id,
+            name: member.user_profile?.full_name || 'Unknown User',
+            email: member.user_profile?.email || '',
+            avatar: member.user_profile?.avatar_url,
+            status: member.user_profile?.status || 'offline',
+            role: member.role,
+            joinedAt: member.joined_at,
+            lastActive: member.user_profile?.last_active || member.joined_at
+          })) || []
+        }))
+        
+        setTeams(transformedTeams)
         
         // Auto-select first team if none selected
-        if (!selectedTeamId && data.teams?.length > 0) {
-          setSelectedTeamId(data.teams[0].id)
+        if (!selectedTeamId && transformedTeams?.length > 0) {
+          setSelectedTeamId(transformedTeams[0].id)
         }
         
-        if (data.teams?.length === 0) {
+        if (transformedTeams?.length === 0) {
           toast({
             title: "Welcome to Collaboration",
             description: "Create your first team to get started!",
@@ -384,6 +413,66 @@ export default function CollaboratePage() {
     setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
     setSelectedTeamId(null)
     loadTeams() // Reload teams
+  }
+
+  // Handler for inviting members
+  const handleInviteMember = async () => {
+    if (!inviteEmail.trim() || !selectedTeamId) {
+      toast({
+        title: "Missing information",
+        description: "Please enter an email address",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(inviteEmail)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsInviting(true)
+      
+      const data = await apiCall('/api/collaborate/invitations', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: selectedTeamId,
+          inviteeEmail: inviteEmail.trim(),
+          role: inviteRole,
+          personalMessage: `Join our team "${selectedTeam?.name}" to collaborate!`,
+        }),
+      })
+
+      if (data.success) {
+        toast({
+          title: "Invitation sent",
+          description: `Invitation sent to ${inviteEmail}`,
+        })
+        
+        // Reset and close
+        setInviteEmail("")
+        setInviteRole("viewer")
+        setIsInviteDialogOpen(false)
+        
+        // Reload teams to reflect any changes
+        loadTeams()
+      }
+    } catch (error) {
+      console.error("Error inviting member:", error)
+      toast({
+        title: "Invitation failed",
+        description: error instanceof Error ? error.message : "Failed to send invitation",
+        variant: "destructive",
+      })
+    } finally {
+      setIsInviting(false)
+    }
   }
 
   // Computed values
@@ -733,7 +822,23 @@ export default function CollaboratePage() {
                         {/* Members List */}
                         <Card>
                           <CardHeader>
-                            <CardTitle>Team Members</CardTitle>
+                            <div className="flex items-center justify-between">
+                              <CardTitle>Team Members</CardTitle>
+                              {/* Add Invite Button for owners/admins */}
+                              {['owner', 'admin'].includes(currentUserRole) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Open invite dialog/modal
+                                    setIsInviteDialogOpen(true)
+                                  }}
+                                >
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Invite Member
+                                </Button>
+                              )}
+                            </div>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-4">
@@ -746,7 +851,7 @@ export default function CollaboratePage() {
                                     <div className="relative">
                                       <Avatar className="h-10 w-10">
                                         <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                        <AvatarFallback>{member.name?.charAt(0) || 'U'}</AvatarFallback>
+                                        <AvatarFallback>{member.name?.charAt(0) || member.email?.charAt(0) || 'U'}</AvatarFallback>
                                       </Avatar>
                                       <div
                                         className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
@@ -754,35 +859,79 @@ export default function CollaboratePage() {
                                     </div>
                                     <div>
                                       <div className="flex items-center gap-2">
-                                        <p className="font-medium">{member.name}</p>
+                                        <p className="font-medium">{member.name || member.email}</p>
                                         {getRoleIcon(member.role)}
                                       </div>
                                       <p className="text-sm text-gray-600">{member.email}</p>
                                       <p className="text-xs text-gray-500">
-                                        Last active: {formatDate(member.lastActive)}
+                                        Joined: {member.joinedAt ? formatDate(member.joinedAt) : 'Unknown'}
                                       </p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      {member.role}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
+                                    <Badge 
+                                      variant={member.role === 'owner' ? 'default' : 'outline'} 
                                       className={`text-xs ${
-                                        member.status === "online"
-                                          ? "border-green-500 text-green-700"
-                                          : member.status === "away"
-                                            ? "border-yellow-500 text-yellow-700"
-                                            : "border-gray-300 text-gray-600"
+                                        member.role === 'owner' ? 'bg-yellow-500 text-white' : ''
                                       }`}
                                     >
-                                      {member.status}
+                                      {member.role}
                                     </Badge>
+                                    {/* Role management dropdown for owners/admins */}
+                                    {currentUserRole === 'owner' && member.role !== 'owner' && member.id !== user?.id && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          toast({
+                                            title: "Change Role",
+                                            description: "Role management coming soon!",
+                                          })
+                                        }}
+                                      >
+                                        <Settings className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {/* Remove member button for owners/admins */}
+                                    {['owner', 'admin'].includes(currentUserRole) && 
+                                     member.role !== 'owner' && 
+                                     member.id !== user?.id && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600 hover:text-red-700"
+                                        onClick={() => {
+                                          toast({
+                                            title: "Remove Member",
+                                            description: "Remove functionality coming soon!",
+                                          })
+                                        }}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               ))}
                             </div>
+                            {/* Empty state */}
+                            {selectedTeam.members.length === 0 && (
+                              <div className="text-center py-12">
+                                <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                <p className="text-gray-600 mb-4">No members yet</p>
+                                {['owner', 'admin'].includes(currentUserRole) && (
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      setIsInviteDialogOpen(true)
+                                    }}
+                                  >
+                                    <UserPlus className="h-4 w-4 mr-2" />
+                                    Invite First Member
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       </TabsContent>
@@ -841,6 +990,58 @@ export default function CollaboratePage() {
             apiCall={apiCall}
           />
         )}
+
+        {/* Invite Member Dialog */}
+        <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Invite Member to {selectedTeam?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="colleague@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  disabled={isInviting}
+                />
+              </div>
+              <div>
+                <Label htmlFor="role">Role</Label>
+                <Select value={inviteRole} onValueChange={(value: any) => setInviteRole(value)}>
+                  <SelectTrigger id="role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="viewer">Viewer - Can view and comment</SelectItem>
+                    <SelectItem value="editor">Editor - Can edit and create content</SelectItem>
+                    <SelectItem value="admin">Admin - Can manage team and members</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)} disabled={isInviting}>
+                  Cancel
+                </Button>
+                <Button onClick={handleInviteMember} disabled={!inviteEmail.trim() || isInviting}>
+                  {isInviting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Invitation'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </RouteGuard>
   )

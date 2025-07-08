@@ -76,6 +76,7 @@
     "react-hook-form": "latest",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "latest",
+    "react-use-measure": "^2.1.7",
     "recharts": "latest",
     "remark-gfm": "^4.0.1",
     "socket.io": "latest",

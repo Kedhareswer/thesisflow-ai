@@ -53,6 +53,20 @@ export async function GET(request: NextRequest) {
 
     let allTeams = userTeams || [];
 
+    // Get emails from auth.users for all users
+    const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000
+    });
+
+    // Create a map of auth users for email lookup
+    const authUsersMap: { [key: string]: any } = {};
+    if (!authError && authUsers) {
+      authUsers.forEach(user => {
+        authUsersMap[user.id] = user;
+      });
+    }
+
     // Get all team members for these teams with their profiles
     if (allTeams.length > 0) {
       const teamIds = allTeams.map(team => team.id);
@@ -87,12 +101,19 @@ export async function GET(request: NextRequest) {
           allTeams = allTeams.map(team => {
             const teamMembers = teamMembersData
               .filter(member => member.team_id === team.id)
-              .map(member => ({
-                user_id: member.user_id,
-                role: member.role,
-                joined_at: member.joined_at,
-                user_profile: profilesMap[member.user_id] || null
-              }));
+              .map(member => {
+                const profile = profilesMap[member.user_id] || {};
+                const authUser = authUsersMap[member.user_id] || {};
+                return {
+                  user_id: member.user_id,
+                  role: member.role,
+                  joined_at: member.joined_at,
+                  user_profile: {
+                    ...profile,
+                    email: authUser.email || profile.email || ''
+                  }
+                };
+              });
 
             return {
               ...team,
@@ -164,12 +185,19 @@ export async function GET(request: NextRequest) {
             const discoverableTeams = publicTeams.map(team => {
               const teamMembers = publicTeamMembersData
                 .filter(member => member.team_id === team.id)
-                .map(member => ({
-                  user_id: member.user_id,
-                  role: member.role,
-                  joined_at: member.joined_at,
-                  user_profile: publicProfilesMap[member.user_id] || null
-                }));
+                .map(member => {
+                  const profile = publicProfilesMap[member.user_id] || {};
+                  const authUser = authUsersMap[member.user_id] || {};
+                  return {
+                    user_id: member.user_id,
+                    role: member.role,
+                    joined_at: member.joined_at,
+                    user_profile: {
+                      ...profile,
+                      email: authUser.email || profile.email || ''
+                    }
+                  };
+                });
 
               return {
                 ...team,
