@@ -10,6 +10,8 @@ import type { AIProvider } from "@/lib/ai-providers"
 import { ContextInputPanel } from "./components/context-input-panel"
 import { ConfigurationPanel } from "./components/configuration-panel"
 import { SummaryOutputPanel } from "./components/summary-output-panel"
+import { Progress } from '@/components/animate-ui/base/progress'
+import { Switch } from '@/components/animate-ui/base/switch'
 
 interface SummaryResult {
   summary: string
@@ -40,6 +42,7 @@ export default function SummarizerPage() {
   const [urlFetching, setUrlFetching] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showAdvancedStats, setShowAdvancedStats] = useState(true)
 
   // Utility functions
   const getWordCount = useCallback((text: string) => {
@@ -322,7 +325,21 @@ Please format your response as JSON with the following structure. If relevant, i
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="max-w-4xl mx-auto py-8 px-4">
+      <div className="flex items-center justify-end mb-2">
+        <Switch
+          checked={showAdvancedStats}
+          onCheckedChange={setShowAdvancedStats}
+          className="mr-2"
+        />
+        <span className="text-sm text-gray-700 select-none">Show advanced stats</span>
+      </div>
+      {/* Progress bar for summarization */}
+      {loading && (
+        <div className="mb-4">
+          <Progress value={100} className="h-1 bg-black/10" />
+        </div>
+      )}
           {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Summarizer</h1>
@@ -395,6 +412,7 @@ Please format your response as JSON with the following structure. If relevant, i
               onDownloadSummary={handleDownloadSummary}
               onShareSummary={handleShareSummary}
               getWordCount={getWordCount}
+              showAdvancedStats={showAdvancedStats}
             />
           </div>
         </div>

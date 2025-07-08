@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, TrendingUp, Copy, CheckCircle, Download, Share2, FileText, BarChart3 } from "lucide-react"
 import { SkeletonCard } from "@/components/common/SkeletonCard"
+import { CopyButton } from '@/components/animate-ui/buttons/copy'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/base/tooltip'
 
 interface SummaryResult {
   summary: string
@@ -26,6 +28,7 @@ interface SummaryOutputPanelProps {
   onDownloadSummary: () => void
   onShareSummary: () => void
   getWordCount: (text: string) => number
+  showAdvancedStats?: boolean
 }
 
 export function SummaryOutputPanel({
@@ -36,6 +39,7 @@ export function SummaryOutputPanel({
   onDownloadSummary,
   onShareSummary,
   getWordCount,
+  showAdvancedStats = true,
 }: SummaryOutputPanelProps) {
   const getSentimentColor = (sentiment?: string) => {
     switch (sentiment) {
@@ -86,52 +90,54 @@ export function SummaryOutputPanel({
   return (
     <div className="space-y-6">
       {/* Summary Statistics */}
-      <Card className="border-gray-200 shadow-sm bg-white">
-        <CardHeader className="border-b border-gray-100 pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg font-medium text-gray-900">
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-            Summary Statistics
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 p-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Reading Time</span>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-900">{result.readingTime} min</span>
+      {showAdvancedStats && (
+        <Card className="border-gray-200 shadow-sm bg-white">
+          <CardHeader className="border-b border-gray-100 pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-medium text-gray-900">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              Summary Statistics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Reading Time</span>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900">{result.readingTime} min</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Compression</span>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900">{result.compressionRatio}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Word Count</span>
+                <span className="text-sm font-medium text-gray-900">{getWordCount(result.summary)} words</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Difficulty</span>
+                {result.difficulty && (
+                  <Badge className={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
+                )}
               </div>
             </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Compression</span>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-900">{result.compressionRatio}</span>
+            {result.sentiment && (
+              <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                <span className="text-sm text-gray-600">Sentiment</span>
+                <Badge className={getSentimentColor(result.sentiment)}>{result.sentiment}</Badge>
               </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Word Count</span>
-              <span className="text-sm font-medium text-gray-900">{getWordCount(result.summary)} words</span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Difficulty</span>
-              {result.difficulty && (
-                <Badge className={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
-              )}
-            </div>
-          </div>
-
-          {result.sentiment && (
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-              <span className="text-sm text-gray-600">Sentiment</span>
-              <Badge className={getSentimentColor(result.sentiment)}>{result.sentiment}</Badge>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Topics */}
       {result.topics && result.topics.length > 0 && (
@@ -232,30 +238,48 @@ export function SummaryOutputPanel({
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-medium text-gray-900">Generated Summary</CardTitle>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onCopyToClipboard(result.summary)}
-                className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700"
-              >
-                {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onDownloadSummary}
-                className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-white"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onShareSummary}
-                className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-white"
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger>
+                  <CopyButton
+                    content={result.summary}
+                    isCopied={copied}
+                    onCopy={() => onCopyToClipboard(result.summary)}
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-300 text-gray-700 bg-white"
+                    aria-label="Copy summary"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Copy summary</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onDownloadSummary}
+                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-white"
+                    aria-label="Download summary"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Download summary</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onShareSummary}
+                    className="border-gray-300 hover:bg-gray-50 hover:border-gray-400 text-gray-700 bg-white"
+                    aria-label="Share summary"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Share summary</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </CardHeader>
