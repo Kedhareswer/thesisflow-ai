@@ -582,20 +582,6 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* System Provider Status */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Database className="h-5 w-5" />
-                System Provider Status
-              </CardTitle>
-              <CardDescription>Fallback providers available when personal keys are not configured</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AIProviderStatus showActions={false} />
-            </CardContent>
-          </Card>
-
           {/* Benefits */}
           <Card className="border">
             <CardContent className="p-6">

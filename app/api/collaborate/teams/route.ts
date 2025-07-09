@@ -105,9 +105,9 @@ export async function GET(request: NextRequest) {
                 const profile = profilesMap[member.user_id] || {};
                 const authUser = authUsersMap[member.user_id] || {};
                 return {
-                  user_id: member.user_id,
-                  role: member.role,
-                  joined_at: member.joined_at,
+                user_id: member.user_id,
+                role: member.role,
+                joined_at: member.joined_at,
                   user_profile: {
                     ...profile,
                     email: authUser.email || profile.email || ''
@@ -189,9 +189,9 @@ export async function GET(request: NextRequest) {
                   const profile = publicProfilesMap[member.user_id] || {};
                   const authUser = authUsersMap[member.user_id] || {};
                   return {
-                    user_id: member.user_id,
-                    role: member.role,
-                    joined_at: member.joined_at,
+                  user_id: member.user_id,
+                  role: member.role,
+                  joined_at: member.joined_at,
                     user_profile: {
                       ...profile,
                       email: authUser.email || profile.email || ''

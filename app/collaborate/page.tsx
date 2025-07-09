@@ -9,6 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Users,
   MessageSquare,
@@ -22,12 +27,17 @@ import {
   Eye,
   Send,
   Video,
-  ArrowRight,
   Plus,
   Loader2,
   AlertCircle,
   X,
+  MoreHorizontal,
+  Bell,
+  FileText,
+  Zap,
+  Lock,
 } from "lucide-react"
+
 import { useSocket } from "@/components/socket-provider"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
@@ -35,9 +45,6 @@ import { RouteGuard } from "@/components/route-guard"
 import { TeamSettings } from "./components/team-settings"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Type definitions
 interface User {
@@ -82,25 +89,26 @@ export default function CollaboratePage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [newMessage, setNewMessage] = useState("")
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
+  const [isInviting, setIsInviting] = useState(false)
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false)
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
   const [newTeam, setNewTeam] = useState({
     name: "",
     description: "",
     category: "Research",
     isPublic: false,
   })
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
-  const [isInviting, setIsInviting] = useState(false)
 
   const { toast } = useToast()
   const { socket } = useSocket()
   const { user, isLoading: authLoading, session } = useSupabaseAuth()
 
-  // API helper functions with proper authentication
+  // API helper functions
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
     if (!session?.access_token) {
       throw new Error('Authentication required')
@@ -124,7 +132,7 @@ export default function CollaboratePage() {
     return response.json()
   }, [session])
 
-  // Load user's teams
+  // Load teams
   const loadTeams = useCallback(async () => {
     if (!user || !session) return
     
@@ -135,7 +143,6 @@ export default function CollaboratePage() {
       const data = await apiCall('/api/collaborate/teams')
       
       if (data.success) {
-        // Transform teams data to match expected format
         const transformedTeams = data.teams.map((team: any) => ({
           id: team.id,
           name: team.name,
@@ -146,8 +153,8 @@ export default function CollaboratePage() {
           owner: team.owner_id,
           members: team.members?.map((member: any) => ({
             id: member.user_id,
-            name: member.user_profile?.full_name || 'Unknown User',
-            email: member.user_profile?.email || '',
+            name: member.user_profile?.full_name || member.email || 'Unknown User',
+            email: member.email || member.user_profile?.email || '',
             avatar: member.user_profile?.avatar_url,
             status: member.user_profile?.status || 'offline',
             role: member.role,
@@ -158,32 +165,19 @@ export default function CollaboratePage() {
         
         setTeams(transformedTeams)
         
-        // Auto-select first team if none selected
         if (!selectedTeamId && transformedTeams?.length > 0) {
           setSelectedTeamId(transformedTeams[0].id)
-        }
-        
-        if (transformedTeams?.length === 0) {
-          toast({
-            title: "Welcome to Collaboration",
-            description: "Create your first team to get started!",
-          })
         }
       }
     } catch (error) {
       console.error('Error loading teams:', error)
       setError(error instanceof Error ? error.message : 'Failed to load teams')
-      toast({
-        title: "Error",
-        description: "Failed to load teams. Please try refreshing the page.",
-        variant: "destructive",
-      })
     } finally {
       setIsLoading(false)
     }
-  }, [user, session, selectedTeamId, apiCall, toast])
+  }, [user, session, selectedTeamId, apiCall])
 
-  // Load chat messages for selected team
+  // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
     if (!teamId) return
     
@@ -199,129 +193,32 @@ export default function CollaboratePage() {
           content: msg.content,
           timestamp: msg.created_at,
           teamId: msg.team_id,
-          type: msg.message_type || "text",
+          type: msg.type || 'text'
         }))
         
         setMessages(formattedMessages)
       }
     } catch (error) {
       console.error('Error loading messages:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load chat messages",
-        variant: "destructive",
-      })
     }
-  }, [apiCall, toast])
+  }, [apiCall])
 
-  // Initialize data
+  // Effects
   useEffect(() => {
-    if (user && session && !authLoading) {
+    if (!authLoading && session) {
       loadTeams()
     }
-  }, [user, session, authLoading, loadTeams])
+  }, [authLoading, session, loadTeams])
 
-  // Load messages when team changes
   useEffect(() => {
     if (selectedTeamId) {
       loadMessages(selectedTeamId)
-    } else {
-      setMessages([])
     }
   }, [selectedTeamId, loadMessages])
 
-  // Socket event handlers for real-time updates
-  useEffect(() => {
-    if (!socket || !selectedTeamId) return
-
-    const handleNewMessage = (data: any) => {
-      if (data.teamId === selectedTeamId) {
-        const newMessage: ChatMessage = {
-          id: data.id,
-          senderId: data.senderId,
-          senderName: data.senderName,
-          senderAvatar: data.senderAvatar,
-          content: data.content,
-          timestamp: data.timestamp,
-          teamId: data.teamId,
-          type: data.type || "text",
-        }
-        setMessages(prev => [...prev, newMessage])
-      }
-    }
-
-    const handleTeamUpdate = () => {
-      loadTeams() // Reload teams when updates occur
-    }
-
-    socket.on('new-message', handleNewMessage)
-    socket.on('team-updated', handleTeamUpdate)
-    socket.on('member-joined', handleTeamUpdate)
-    socket.on('member-left', handleTeamUpdate)
-
-    return () => {
-      socket.off('new-message', handleNewMessage)
-      socket.off('team-updated', handleTeamUpdate)
-      socket.off('member-joined', handleTeamUpdate)
-      socket.off('member-left', handleTeamUpdate)
-    }
-  }, [socket, selectedTeamId, loadTeams])
-
-  // Helper functions
-  const getStatusColor = (status: User["status"]) => {
-    switch (status) {
-      case "online":
-        return "bg-green-500"
-      case "away":
-        return "bg-yellow-500"
-      case "offline":
-        return "bg-gray-400"
-      default:
-        return "bg-gray-400"
-    }
-  }
-
-  const getRoleIcon = (role: User["role"]) => {
-    switch (role) {
-      case "owner":
-        return <Crown className="h-3 w-3 text-yellow-600" />
-      case "admin":
-        return <Shield className="h-3 w-3 text-blue-600" />
-      case "editor":
-        return <Shield className="h-3 w-3 text-green-600" />
-      case "viewer":
-        return <Eye className="h-3 w-3 text-gray-600" />
-      default:
-        return null
-    }
-  }
-
-  const formatTime = (timestamp: string) => {
-    try {
-      return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    } catch {
-      return "Invalid time"
-    }
-  }
-
-  const formatDate = (timestamp: string) => {
-    try {
-      return new Date(timestamp).toLocaleDateString()
-    } catch {
-      return "Invalid date"
-    }
-  }
-
-  // Event handlers
+  // Handlers
   const handleCreateTeam = async () => {
-    if (!newTeam.name.trim() || !user) {
-      toast({
-        title: "Missing information",
-        description: "Team name is required",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!newTeam.name.trim()) return
 
     try {
       setIsCreatingTeam(true)
@@ -329,8 +226,8 @@ export default function CollaboratePage() {
       const data = await apiCall('/api/collaborate/teams', {
         method: 'POST',
         body: JSON.stringify({
-          name: newTeam.name.trim(),
-          description: newTeam.description.trim(),
+          name: newTeam.name,
+          description: newTeam.description,
           category: newTeam.category,
           isPublic: newTeam.isPublic,
         }),
@@ -339,23 +236,17 @@ export default function CollaboratePage() {
       if (data.success) {
         toast({
           title: "Team created",
-          description: `"${newTeam.name}" has been created successfully!`,
+          description: `${newTeam.name} has been created successfully.`,
         })
         
-        // Reset form
         setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
-        
-        // Reload teams and select the new one
-        await loadTeams()
-        if (data.team?.id) {
-          setSelectedTeamId(data.team.id)
-        }
+        setIsCreateTeamOpen(false)
+        loadTeams()
       }
     } catch (error) {
-      console.error("Error creating team:", error)
       toast({
-        title: "Creation failed",
-        description: error instanceof Error ? error.message : "Could not create team. Please try again.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create team",
         variant: "destructive",
       })
     } finally {
@@ -364,7 +255,7 @@ export default function CollaboratePage() {
   }
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedTeamId || !user) return
+    if (!newMessage.trim() || !selectedTeamId) return
 
     try {
       setIsSendingMessage(true)
@@ -380,13 +271,12 @@ export default function CollaboratePage() {
 
       if (data.success) {
         setNewMessage("")
-        // Message will be added via socket event
+        loadMessages(selectedTeamId)
       }
     } catch (error) {
-      console.error("Error sending message:", error)
       toast({
-        title: "Message failed",
-        description: error instanceof Error ? error.message : "Could not send message. Please try again.",
+        title: "Error",
+        description: "Failed to send message",
         variant: "destructive",
       })
     } finally {
@@ -394,47 +284,8 @@ export default function CollaboratePage() {
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
-  // Handler for team updates from settings
-  const handleTeamUpdate = (updatedTeam: Team) => {
-    setTeams(prev => prev.map(team => 
-      team.id === updatedTeam.id ? updatedTeam : team
-    ))
-  }
-
-  // Handler for leaving/deleting team
-  const handleLeaveTeam = () => {
-    setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
-    setSelectedTeamId(null)
-    loadTeams() // Reload teams
-  }
-
-  // Handler for inviting members
   const handleInviteMember = async () => {
-    if (!inviteEmail.trim() || !selectedTeamId) {
-      toast({
-        title: "Missing information",
-        description: "Please enter an email address",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(inviteEmail)) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!inviteEmail.trim() || !selectedTeamId) return
 
     try {
       setIsInviting(true)
@@ -455,16 +306,12 @@ export default function CollaboratePage() {
           description: `Invitation sent to ${inviteEmail}`,
         })
         
-        // Reset and close
         setInviteEmail("")
         setInviteRole("viewer")
         setIsInviteDialogOpen(false)
-        
-        // Reload teams to reflect any changes
         loadTeams()
       }
     } catch (error) {
-      console.error("Error inviting member:", error)
       toast({
         title: "Invitation failed",
         description: error instanceof Error ? error.message : "Failed to send invitation",
@@ -485,72 +332,111 @@ export default function CollaboratePage() {
   )
   const teamMessages = messages.filter((m) => m.teamId === selectedTeamId)
 
-  // Loading state
+  // Utility functions
+  const getStatusColor = (status: User["status"]) => {
+    switch (status) {
+      case "online": return "bg-green-500"
+      case "away": return "bg-yellow-500"
+      default: return "bg-gray-400"
+    }
+  }
+
+  const getRoleIcon = (role: User["role"]) => {
+    switch (role) {
+      case "owner": return <Crown className="h-4 w-4 text-yellow-600" />
+      case "admin": return <Shield className="h-4 w-4 text-blue-600" />
+      case "editor": return <FileText className="h-4 w-4 text-green-600" />
+      default: return <Eye className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  // Loading and error states
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading collaboration workspace...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-fade-in">
+          <Card className="w-full max-w-md p-8 border-none shadow-lg">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent mx-auto" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium tracking-tight">Loading Collaboration</h3>
+                <p className="text-sm text-muted-foreground">Preparing your workspace...</p>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
     )
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Something went wrong</h3>
-              <p className="text-gray-600 mb-4">{error}</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-fade-in">
+          <Card className="w-full max-w-md p-8 border-none shadow-lg">
+            <div className="text-center space-y-4">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium tracking-tight">Something went wrong</h3>
+                <p className="text-sm text-muted-foreground">{error}</p>
+              </div>
               <Button onClick={() => window.location.reload()} className="w-full">
                 Try Again
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
     )
   }
 
-  // Auth check
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
-              <p className="text-gray-600 mb-4">Please sign in to access collaboration features</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-fade-in">
+          <Card className="w-full max-w-md p-8 border-none shadow-lg">
+            <div className="text-center space-y-4">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium tracking-tight">Authentication Required</h3>
+                <p className="text-sm text-muted-foreground">Please sign in to access collaboration features</p>
+              </div>
               <Button onClick={() => window.location.href = '/login'} className="w-full">
                 Sign In
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
     )
   }
 
   return (
     <RouteGuard requireAuth={true}>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header with Notification Bell */}
-        <div className="bg-white border-b">
-          <div className="container mx-auto px-4 py-3 max-w-7xl">
+      <div className="min-h-screen bg-background">
+        {/* Modern Header */}
+        <header className="border-b bg-card/50 backdrop-blur-sm">
+          <div className="container mx-auto px-6 py-4 max-w-7xl">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h1 className="text-xl font-semibold">Collaborate</h1>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-medium tracking-tight">Collaborate</h1>
+                    {selectedTeam && (
+                      <p className="text-sm text-muted-foreground">{selectedTeam.name}</p>
+                    )}
+                  </div>
+                </div>
                 {selectedTeam && (
-                  <Badge variant="outline">{selectedTeam.name}</Badge>
+                  <Badge variant="outline" className="font-normal">
+                    {selectedTeam.members.length} members
+                  </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <NotificationBell />
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.user_metadata?.avatar_url} />
@@ -561,176 +447,163 @@ export default function CollaboratePage() {
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          <div className="grid gap-6 lg:grid-cols-4">
+        <div className="container mx-auto px-6 py-8 max-w-7xl">
+          <div className="grid gap-8 lg:grid-cols-12">
             {/* Sidebar */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Create Team Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Create Team
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Input
-                    placeholder="Team name"
-                    value={newTeam.name}
-                    onChange={(e) => setNewTeam((prev) => ({ ...prev, name: e.target.value }))}
-                    disabled={isCreatingTeam}
-                  />
-                  <Input
-                    placeholder="Description"
-                    value={newTeam.description}
-                    onChange={(e) => setNewTeam((prev) => ({ ...prev, description: e.target.value }))}
-                    disabled={isCreatingTeam}
-                  />
-                  <select
-                    value={newTeam.category}
-                    onChange={(e) => setNewTeam((prev) => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={isCreatingTeam}
-                  >
-                    <option value="Research">Research</option>
-                    <option value="Study Group">Study Group</option>
-                    <option value="Project">Project</option>
-                    <option value="Discussion">Discussion</option>
-                  </select>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="public-team"
-                      checked={newTeam.isPublic}
-                      onChange={(e) => setNewTeam((prev) => ({ ...prev, isPublic: e.target.checked }))}
-                      className="rounded"
-                      disabled={isCreatingTeam}
-                    />
-                    <label htmlFor="public-team" className="text-sm text-gray-700">
-                      Public team
-                    </label>
-                  </div>
-                  <Button 
-                    onClick={handleCreateTeam} 
-                    disabled={!newTeam.name.trim() || isCreatingTeam} 
-                    className="w-full"
-                  >
-                    {isCreatingTeam ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Creating...
-                      </>
-                    ) : (
-                      'Create Team'
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="lg:col-span-4 xl:col-span-3 animate-fade-in">
+              <div className="space-y-6">
+                {/* Quick Actions */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-primary" />
+                      Quick Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button
+                      onClick={() => setIsCreateTeamOpen(true)}
+                      className="w-full justify-start gap-3 h-12"
+                      variant="outline"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create Team
+                    </Button>
+                    <Button
+                      onClick={() => setIsInviteDialogOpen(true)}
+                      className="w-full justify-start gap-3 h-12"
+                      variant="outline"
+                      disabled={!selectedTeam}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Invite Member
+                    </Button>
+                    <Button
+                      className="w-full justify-start gap-3 h-12"
+                      variant="outline"
+                      disabled={!selectedTeam}
+                    >
+                      <Video className="h-4 w-4" />
+                      Video Call
+                    </Button>
+                  </CardContent>
+                </Card>
 
-              {/* Search */}
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search teams..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                {/* Search */}
+                <Card className="border-none shadow-sm">
+                  <CardContent className="pt-6">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search teams..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 border-none bg-muted/50 focus:bg-muted/80 transition-colors"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* Teams List */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Teams ({teams.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {filteredTeams.map((team) => (
-                      <div
-                        key={team.id}
-                        className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                          selectedTeamId === team.id
-                            ? "bg-blue-100 border-2 border-blue-500"
-                            : "bg-gray-50 hover:bg-gray-100 border-2 border-transparent"
-                        }`}
-                        onClick={() => setSelectedTeamId(team.id)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm">{team.name}</h4>
-                          <div className="flex items-center gap-1">
-                            {team.isPublic && <Globe className="h-3 w-3 text-gray-500" />}
-                            <Badge variant="outline" className="text-xs">
-                              {team.category}
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-2 line-clamp-2">{team.description}</p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1">
-                            <Users className="h-3 w-3 text-gray-500" />
-                            <span className="text-xs text-gray-600">{team.members.length}</span>
-                          </div>
-                          <div className="flex -space-x-1">
-                            {team.members.slice(0, 3).map((member) => (
-                              <div key={member.id} className="relative">
-                                <Avatar className="h-5 w-5 border border-white">
-                                  <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                  <AvatarFallback className="text-xs">{member.name?.charAt(0) || 'U'}</AvatarFallback>
-                                </Avatar>
-                                <div
-                                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
-                                />
+                {/* Teams List */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Your Teams</CardTitle>
+                      <Badge variant="secondary" className="font-normal">
+                        {teams.length}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {filteredTeams.map((team) => (
+                        <div
+                          key={team.id}
+                          className={`group p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
+                            selectedTeamId === team.id
+                              ? "bg-primary/10 border-2 border-primary/20"
+                              : "bg-muted/30 hover:bg-muted/50 border-2 border-transparent"
+                          }`}
+                          onClick={() => setSelectedTeamId(team.id)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`p-1.5 rounded-md ${selectedTeamId === team.id ? 'bg-primary/20' : 'bg-muted'}`}>
+                                <Users className="h-3 w-3" />
                               </div>
-                            ))}
+                              <h4 className="font-medium text-sm">{team.name}</h4>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {team.isPublic && <Globe className="h-3 w-3 text-muted-foreground" />}
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {team.category}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{team.description}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {team.members.length} members
+                              </span>
+                            </div>
+                            <div className="flex -space-x-1">
+                              {team.members.slice(0, 3).map((member) => (
+                                <div key={member.id} className="relative">
+                                  <Avatar className="h-5 w-5 border border-white">
+                                    <AvatarImage src={member.avatar || ""} />
+                                    <AvatarFallback className="text-xs">{member.name?.charAt(0) || 'U'}</AvatarFallback>
+                                  </Avatar>
+                                  <div
+                                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
+                                  />
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                    {filteredTeams.length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm">{searchTerm ? "No teams found" : "No teams yet"}</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      ))}
+                      {filteredTeams.length === 0 && (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <Users className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm">{searchTerm ? "No teams found" : "No teams yet"}</p>
+                          <p className="text-xs mt-1">Create your first team to get started</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
             {/* Main Content */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-8 xl:col-span-9 animate-fade-in">
               {selectedTeam ? (
-                <Card className="h-full">
-                  <CardHeader>
+                <Card className="border-none shadow-sm h-full">
+                  <CardHeader className="border-b bg-muted/30">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Users className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              {selectedTeam.name}
-                              {selectedTeam.isPublic && <Globe className="h-4 w-4 text-gray-500" />}
-                              <Badge variant="outline">{selectedTeam.category}</Badge>
-                            </CardTitle>
-                            <p className="text-sm text-gray-600 mt-1">{selectedTeam.description}</p>
-                          </div>
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-xl">
+                          <Users className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="flex items-center gap-3 text-xl">
+                            {selectedTeam.name}
+                            {selectedTeam.isPublic && <Globe className="h-4 w-4 text-muted-foreground" />}
+                            <Badge variant="outline" className="font-normal">{selectedTeam.category}</Badge>
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">{selectedTeam.description}</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Video className="h-4 w-4 mr-2" />
-                          Video Call
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Video className="h-4 w-4" />
+                          <span className="hidden sm:inline">Video Call</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => setIsSettingsOpen(true)}
                         >
@@ -739,73 +612,79 @@ export default function CollaboratePage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-0">
                     <Tabs defaultValue="chat" className="h-full">
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="chat">
-                          <MessageSquare className="h-4 w-4 mr-2" />
+                      <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-12">
+                        <TabsTrigger value="chat" className="gap-2 data-[state=active]:bg-background">
+                          <MessageSquare className="h-4 w-4" />
                           Chat
                         </TabsTrigger>
-                        <TabsTrigger value="members">
-                          <Users className="h-4 w-4 mr-2" />
+                        <TabsTrigger value="members" className="gap-2 data-[state=active]:bg-background">
+                          <Users className="h-4 w-4" />
                           Members ({selectedTeam.members.length})
                         </TabsTrigger>
-                        <TabsTrigger value="files">
-                          <Share className="h-4 w-4 mr-2" />
+                        <TabsTrigger value="files" className="gap-2 data-[state=active]:bg-background">
+                          <Share className="h-4 w-4" />
                           Files
                         </TabsTrigger>
                       </TabsList>
 
-                      <TabsContent value="chat" className="mt-6">
-                        <div className="border rounded-lg h-96 flex flex-col">
+                      <TabsContent value="chat" className="mt-0 p-6">
+                        <div className="border rounded-xl h-96 flex flex-col bg-muted/20">
                           <div className="flex-1 p-4 overflow-y-auto space-y-4">
                             {teamMessages.map((message) => (
-                              <div key={message.id}>
+                              <div key={message.id} className="animate-fade-in">
                                 {message.type === "system" ? (
                                   <div className="text-center">
-                                    <Badge variant="outline" className="text-xs">
+                                    <Badge variant="outline" className="text-xs font-normal">
                                       {message.content}
                                     </Badge>
                                   </div>
                                 ) : (
                                   <div className="flex gap-3">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarImage src={message.senderAvatar} />
-                                      <AvatarFallback className="text-xs">{message.senderName?.charAt(0) || 'U'}</AvatarFallback>
-                                    </Avatar>
+                                    <div className="relative">
+                                      <Avatar className="h-8 w-8">
+                                        <AvatarImage src={message.senderAvatar || ""} />
+                                        <AvatarFallback className="text-xs">{message.senderName?.charAt(0) || 'U'}</AvatarFallback>
+                                      </Avatar>
+                                    </div>
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-1">
                                         <span className="font-medium text-sm">{message.senderName}</span>
-                                        <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
                                       </div>
-                                      <p className="text-sm text-gray-700">{message.content}</p>
+                                      <p className="text-sm text-foreground/90">{message.content}</p>
                                     </div>
                                   </div>
                                 )}
                               </div>
                             ))}
                             {teamMessages.length === 0 && (
-                              <div className="text-center py-12 text-gray-500">
-                                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                <p className="text-lg font-medium mb-2">No messages yet</p>
+                              <div className="text-center py-16 text-muted-foreground">
+                                <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-lg font-medium mb-2">No messages yet</h3>
                                 <p className="text-sm">Start the conversation with your team</p>
                               </div>
                             )}
                           </div>
                           <Separator />
                           <div className="p-4">
-                            <div className="flex gap-2">
+                            <div className="flex gap-3">
                               <Input
                                 placeholder="Type your message..."
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                className="flex-1"
+                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                className="flex-1 border-none bg-background focus:ring-0"
                                 disabled={isSendingMessage}
                               />
                               <Button 
                                 onClick={handleSendMessage} 
                                 disabled={!newMessage.trim() || isSendingMessage}
+                                size="sm"
+                                className="px-4"
                               >
                                 {isSendingMessage ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -818,125 +697,103 @@ export default function CollaboratePage() {
                         </div>
                       </TabsContent>
 
-                      <TabsContent value="members" className="mt-6 space-y-6">
-                        {/* Members List */}
-                        <Card>
-                          <CardHeader>
-                            <div className="flex items-center justify-between">
-                              <CardTitle>Team Members</CardTitle>
-                              {/* Add Invite Button for owners/admins */}
+                      <TabsContent value="members" className="mt-0 p-6">
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-medium">Team Members</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Manage your team collaboration
+                              </p>
+                            </div>
+                            {['owner', 'admin'].includes(currentUserRole) && (
+                              <Button
+                                variant="outline"
+                                onClick={() => setIsInviteDialogOpen(true)}
+                                className="gap-2"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                                Invite Member
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="grid gap-3">
+                            {selectedTeam.members.map((member) => (
+                              <div
+                                key={member.id}
+                                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors animate-fade-in"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="relative">
+                                    <Avatar className="h-10 w-10">
+                                      <AvatarImage src={member.avatar || ""} />
+                                      <AvatarFallback>{member.name?.charAt(0) || member.email?.charAt(0) || 'U'}</AvatarFallback>
+                                    </Avatar>
+                                    <div
+                                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-medium">{member.name || member.email}</p>
+                                      {getRoleIcon(member.role)}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{member.email}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Joined: {new Date(member.joinedAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Badge 
+                                    variant={member.role === 'owner' ? 'default' : 'outline'} 
+                                    className={`font-normal ${
+                                      member.role === 'owner' ? 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20' : ''
+                                    }`}
+                                  >
+                                    {member.role}
+                                  </Badge>
+                                  {currentUserRole === 'owner' && member.role !== 'owner' && member.id !== user?.id && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        toast({
+                                          title: "Coming Soon",
+                                          description: "Role management will be available soon!",
+                                        })
+                                      }}
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {selectedTeam.members.length === 0 && (
+                            <div className="text-center py-16">
+                              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                              <h3 className="text-lg font-medium mb-2">No members yet</h3>
+                              <p className="text-sm text-muted-foreground mb-6">Invite team members to start collaborating</p>
                               {['owner', 'admin'].includes(currentUserRole) && (
                                 <Button
                                   variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    // Open invite dialog/modal
-                                    setIsInviteDialogOpen(true)
-                                  }}
+                                  onClick={() => setIsInviteDialogOpen(true)}
+                                  className="gap-2"
                                 >
-                                  <UserPlus className="h-4 w-4 mr-2" />
-                                  Invite Member
+                                  <UserPlus className="h-4 w-4" />
+                                  Invite First Member
                                 </Button>
                               )}
                             </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              {selectedTeam.members.map((member) => (
-                                <div
-                                  key={member.id}
-                                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                      <Avatar className="h-10 w-10">
-                                        <AvatarImage src={member.avatar || "/placeholder.svg"} />
-                                        <AvatarFallback>{member.name?.charAt(0) || member.email?.charAt(0) || 'U'}</AvatarFallback>
-                                      </Avatar>
-                                      <div
-                                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(member.status)}`}
-                                      />
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <p className="font-medium">{member.name || member.email}</p>
-                                        {getRoleIcon(member.role)}
-                                      </div>
-                                      <p className="text-sm text-gray-600">{member.email}</p>
-                                      <p className="text-xs text-gray-500">
-                                        Joined: {member.joinedAt ? formatDate(member.joinedAt) : 'Unknown'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge 
-                                      variant={member.role === 'owner' ? 'default' : 'outline'} 
-                                      className={`text-xs ${
-                                        member.role === 'owner' ? 'bg-yellow-500 text-white' : ''
-                                      }`}
-                                    >
-                                      {member.role}
-                                    </Badge>
-                                    {/* Role management dropdown for owners/admins */}
-                                    {currentUserRole === 'owner' && member.role !== 'owner' && member.id !== user?.id && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          toast({
-                                            title: "Change Role",
-                                            description: "Role management coming soon!",
-                                          })
-                                        }}
-                                      >
-                                        <Settings className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                    {/* Remove member button for owners/admins */}
-                                    {['owner', 'admin'].includes(currentUserRole) && 
-                                     member.role !== 'owner' && 
-                                     member.id !== user?.id && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-red-600 hover:text-red-700"
-                                        onClick={() => {
-                                          toast({
-                                            title: "Remove Member",
-                                            description: "Remove functionality coming soon!",
-                                          })
-                                        }}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            {/* Empty state */}
-                            {selectedTeam.members.length === 0 && (
-                              <div className="text-center py-12">
-                                <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                <p className="text-gray-600 mb-4">No members yet</p>
-                                {['owner', 'admin'].includes(currentUserRole) && (
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                      setIsInviteDialogOpen(true)
-                                    }}
-                                  >
-                                    <UserPlus className="h-4 w-4 mr-2" />
-                                    Invite First Member
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
+                          )}
+                        </div>
                       </TabsContent>
 
-                      <TabsContent value="files" className="mt-6">
+                      <TabsContent value="files" className="mt-0 p-6">
                         <TeamFiles 
                           teamId={selectedTeam.id} 
                           currentUserRole={currentUserRole} 
@@ -948,26 +805,32 @@ export default function CollaboratePage() {
                 </Card>
               ) : (
                 /* Welcome State */
-                <Card className="h-full">
-                  <CardContent className="pt-6">
-                    <div className="text-center py-20">
-                      <Users className="h-16 w-16 mx-auto mb-6 text-gray-400" />
-                      <h3 className="text-2xl font-medium mb-4">Select a Team</h3>
-                      <p className="text-gray-600 max-w-md mx-auto mb-8">
-                        Choose a team from the sidebar to start collaborating, or create a new team to get started
-                      </p>
-                      <div className="flex justify-center gap-6">
-                        {[
-                          { id: 'chat', icon: MessageSquare, label: 'Team Chat', color: 'bg-blue-500' },
-                          { id: 'files', icon: Share, label: 'File Sharing', color: 'bg-green-500' },
-                          { id: 'video', icon: Video, label: 'Video Calls', color: 'bg-purple-500' }
-                        ].map((feature) => (
-                          <div key={feature.id} className="text-center">
-                            <div className={`w-12 h-12 ${feature.color} mb-3 mx-auto rounded-lg flex items-center justify-center`}>
-                              <feature.icon className="h-6 w-6 text-white" />
-                          </div>
-                            <span className="text-sm text-gray-600">{feature.label}</span>
+                <Card className="border-none shadow-sm h-full">
+                  <CardContent className="pt-16">
+                    <div className="text-center py-20 animate-fade-in">
+                      <div className="mb-8">
+                        <div className="p-6 bg-primary/10 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+                          <Users className="h-12 w-12 text-primary" />
                         </div>
+                        <h3 className="text-2xl font-medium mb-4 tracking-tight">Welcome to Collaboration</h3>
+                        <p className="text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
+                          Select a team from the sidebar to start collaborating, or create a new team to begin your journey
+                        </p>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto">
+                        {[
+                          { id: 'chat', icon: MessageSquare, label: 'Team Chat', description: 'Real-time messaging', color: 'bg-blue-500' },
+                          { id: 'files', icon: Share, label: 'File Sharing', description: 'Secure collaboration', color: 'bg-green-500' },
+                          { id: 'video', icon: Video, label: 'Video Calls', description: 'Face-to-face meetings', color: 'bg-purple-500' }
+                        ].map((feature) => (
+                          <div key={feature.id} className="p-6 border rounded-xl hover:bg-muted/50 transition-colors">
+                            <div className={`w-12 h-12 ${feature.color} mb-4 mx-auto rounded-lg flex items-center justify-center`}>
+                              <feature.icon className="h-6 w-6 text-white" />
+                            </div>
+                            <h4 className="font-medium mb-2">{feature.label}</h4>
+                            <p className="text-sm text-muted-foreground">{feature.description}</p>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -985,23 +848,156 @@ export default function CollaboratePage() {
             onClose={() => setIsSettingsOpen(false)}
             team={selectedTeam}
             currentUserRole={currentUserRole}
-            onTeamUpdate={handleTeamUpdate}
-            onLeaveTeam={handleLeaveTeam}
+            onTeamUpdate={(updatedTeam) => {
+              setTeams(prev => prev.map(team => 
+                team.id === updatedTeam.id ? updatedTeam : team
+              ))
+            }}
+            onLeaveTeam={() => {
+              setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
+              setSelectedTeamId(null)
+              loadTeams()
+            }}
             apiCall={apiCall}
           />
         )}
 
+        {/* Create Team Modal */}
+        <Dialog open={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Plus className="h-5 w-5 text-primary" />
+                </div>
+                Create New Team
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6 mt-6">
+              <div className="space-y-2">
+                <Label htmlFor="team-name" className="text-sm font-medium">
+                  Team Name
+                </Label>
+                <Input
+                  id="team-name"
+                  placeholder="Enter team name..."
+                  value={newTeam.name}
+                  onChange={(e) => setNewTeam(prev => ({ ...prev, name: e.target.value }))}
+                  disabled={isCreatingTeam}
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="What's this team about?"
+                  value={newTeam.description}
+                  onChange={(e) => setNewTeam(prev => ({ ...prev, description: e.target.value }))}
+                  disabled={isCreatingTeam}
+                  className="min-h-[80px] resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category" className="text-sm font-medium">
+                  Category
+                </Label>
+                <Select 
+                  value={newTeam.category} 
+                  onValueChange={(value) => setNewTeam(prev => ({ ...prev, category: value }))}
+                  disabled={isCreatingTeam}
+                >
+                  <SelectTrigger id="category" className="h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Research">🔬 Research</SelectItem>
+                    <SelectItem value="Study Group">📚 Study Group</SelectItem>
+                    <SelectItem value="Project">🚀 Project</SelectItem>
+                    <SelectItem value="Discussion">💬 Discussion</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-sm font-medium">Privacy & Access</Label>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${newTeam.isPublic ? 'bg-green-100' : 'bg-gray-100'}`}>
+                      {newTeam.isPublic ? (
+                        <Globe className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Lock className="h-4 w-4 text-gray-600" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm">
+                        {newTeam.isPublic ? "Public Team" : "Private Team"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {newTeam.isPublic 
+                          ? "Anyone can discover and join this team"
+                          : "Only invited members can access this team"
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={newTeam.isPublic}
+                    onCheckedChange={(checked) => setNewTeam(prev => ({ ...prev, isPublic: checked }))}
+                    disabled={isCreatingTeam}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => setIsCreateTeamOpen(false)} 
+                  disabled={isCreatingTeam}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateTeam}
+                  disabled={!newTeam.name.trim() || isCreatingTeam}
+                  className="gap-2"
+                >
+                  {isCreatingTeam ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-4 w-4" />
+                      Create Team
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Invite Member Dialog */}
         <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
                 Invite Member to {selectedTeam?.name}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 mt-4">
+            <div className="space-y-6 mt-6">
               <div>
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
@@ -1009,22 +1005,47 @@ export default function CollaboratePage() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   disabled={isInviting}
+                  className="mt-1.5"
                 />
               </div>
               <div>
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role" className="text-sm font-medium">Role & Permissions</Label>
                 <Select value={inviteRole} onValueChange={(value: any) => setInviteRole(value)}>
-                  <SelectTrigger id="role">
+                  <SelectTrigger id="role" className="mt-1.5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="viewer">Viewer - Can view and comment</SelectItem>
-                    <SelectItem value="editor">Editor - Can edit and create content</SelectItem>
-                    <SelectItem value="admin">Admin - Can manage team and members</SelectItem>
+                    <SelectItem value="viewer">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Viewer</div>
+                          <div className="text-xs text-muted-foreground">Can view and comment</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="editor">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Editor</div>
+                          <div className="text-xs text-muted-foreground">Can edit and create content</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Admin</div>
+                          <div className="text-xs text-muted-foreground">Can manage team and members</div>
+                        </div>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-3 pt-4">
                 <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)} disabled={isInviting}>
                   Cancel
                 </Button>

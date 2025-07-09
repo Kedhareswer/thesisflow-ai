@@ -6,18 +6,20 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, CheckCircle2, Clock, Target, TrendingUp, Plus, Filter, BarChart3 } from "lucide-react"
+import { Calendar, CheckCircle2, Clock, Target, TrendingUp, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare } from "lucide-react"
 import { ProjectCalendar } from "./components/project-calendar"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { useForm } from "react-hook-form"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
 
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -165,11 +167,11 @@ export default function PlannerPage() {
       fetchData()
     }
   }
-  // Task form logic (similar pattern)
-  const taskForm = useForm({ defaultValues: { title: "", description: "", due_date: "", priority: "medium", status: "todo", assignee_id: "" } })
+  // Task form logic
+  const taskForm = useForm({ defaultValues: { title: "", description: "", due_date: "", priority: "medium", status: "todo", assignee_id: "unassigned" } })
   const openCreateTask = (project: Project) => {
     setEditingTask({ project } as any)
-    taskForm.reset({ title: "", description: "", due_date: "", priority: "medium", status: "todo" })
+    taskForm.reset({ title: "", description: "", due_date: "", priority: "medium", status: "todo", assignee_id: "unassigned" })
     setShowTaskModal(true)
   }
   const openEditTask = (task: Task) => {
@@ -180,6 +182,7 @@ export default function PlannerPage() {
       due_date: task.due_date,
       priority: task.priority,
       status: task.status,
+      assignee_id: task.assignee_id || "unassigned", // Convert empty string to "unassigned" for form
     })
     setShowTaskModal(true)
   }
@@ -187,10 +190,13 @@ export default function PlannerPage() {
     let result
     const priority = values.priority as "low" | "medium" | "high"
     const status = values.status as "todo" | "in-progress" | "completed"
+    // Convert "unassigned" to empty string for database
+    const assignee_id = values.assignee_id === "unassigned" ? "" : values.assignee_id
+    
     if (editingTask && (editingTask as Task).id) {
-      result = await projectService.updateTask((editingTask as Task).id, { ...values, priority, status })
+      result = await projectService.updateTask((editingTask as Task).id, { ...values, priority, status, assignee_id })
     } else {
-      result = await projectService.createTask({ ...values, project_id: (editingTask as any).project.id, priority, status })
+      result = await projectService.createTask({ ...values, project_id: (editingTask as any).project.id, priority, status, assignee_id })
     }
     if (result.error) {
       toast({ title: "Error", description: result.error, variant: "destructive" })
@@ -198,8 +204,8 @@ export default function PlannerPage() {
       toast({ title: editingTask && (editingTask as Task).id ? "Task updated" : "Task created" })
       setShowTaskModal(false)
       fetchData()
-      if (values.assignee_id && values.assignee_id !== userId) {
-        await projectService.assignTaskAndNotify(result.task?.id || '', values.assignee_id, userDisplayName)
+      if (assignee_id && assignee_id !== userId) {
+        await projectService.assignTaskAndNotify(result.task?.id || '', assignee_id, userDisplayName)
       }
     }
   }
@@ -344,38 +350,112 @@ export default function PlannerPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {projects.map((project) => (
-              <div key={project.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">{project.title}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{project.description}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                  </div>
-                </div>
+            {projects.map((project) => {
+              const projectTasks = tasks.filter((t) => t.project_id === project.id)
+              const completedTasks = projectTasks.filter((t) => t.status === "completed")
+              const dueSoonTasks = projectTasks.filter((t) => 
+                t.due_date && new Date(t.due_date) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) && t.status !== "completed"
+              )
 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{project.progress}%</span>
-                  </div>
-                  <Progress value={project.progress} className="h-2" />
-                </div>
+              return (
+                <Card key={project.id} className="hover:shadow-md transition-shadow duration-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-semibold text-gray-900 text-lg">{project.title}</h3>
+                          <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
+                          {dueSoonTasks.length > 0 && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              {dueSoonTasks.length} due soon
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">{project.description}</p>
+                        
+                        {/* Progress Section */}
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium">Progress</span>
+                            <span className="text-gray-600">{project.progress}%</span>
+                          </div>
+                          <Progress value={project.progress} className="h-2" />
+                        </div>
 
-                <div className="flex justify-between items-center mt-3 text-sm text-gray-600">
-                  <span>Due: {project.end_date}</span>
-                  <span>
-                    {tasks.filter((t) => t.project_id === project.id && t.status === "completed").length}/{tasks.filter((t) => t.project_id === project.id).length} tasks completed
-                  </span>
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <Button variant="outline" onClick={() => openEditProject(project)}>Edit</Button>
-                  <Button variant="outline" onClick={() => handleDeleteProject(project)}>Delete</Button>
-                </div>
-              </div>
-            ))}
+                        {/* Project Stats */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <span>{completedTasks.length}/{projectTasks.length} tasks completed</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CalendarIcon className="h-4 w-4 text-blue-600" />
+                            <span>Due: {project.end_date || 'No deadline'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator className="mb-4" />
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openEditProject(project)}>
+                          Edit Project
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDeleteProject(project)}>
+                          Delete
+                        </Button>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => openCreateTask(project)}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Task
+                      </Button>
+                    </div>
+
+                    {/* Recent Tasks Preview */}
+                    {projectTasks.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Recent Tasks</h4>
+                        <div className="space-y-2">
+                          {projectTasks.slice(0, 3).map((task) => (
+                            <div key={task.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  task.status === "completed"
+                                    ? "bg-green-500"
+                                    : task.status === "in-progress"
+                                      ? "bg-yellow-500"
+                                      : "bg-gray-400"
+                                }`}
+                              />
+                              <span className="text-sm flex-1 truncate">{task.title}</span>
+                              <Badge className={getPriorityColor(task.priority)} variant="outline">
+                                {task.priority}
+                              </Badge>
+                              <Button variant="ghost" size="sm" onClick={() => openEditTask(task)}>
+                                Edit
+                              </Button>
+                            </div>
+                          ))}
+                          {projectTasks.length > 3 && (
+                            <div className="text-xs text-gray-500 text-center">
+                              +{projectTasks.length - 3} more tasks
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </CardContent>
       </Card>
@@ -396,7 +476,7 @@ export default function PlannerPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {tasks.map((task) => (
+            {tasks.slice(0, 10).map((task) => (
               <div key={task.id} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg">
                 <div className="flex-1">
                   <h4 className="font-medium text-gray-900">{task.title}</h4>
@@ -416,8 +496,8 @@ export default function PlannerPage() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => openEditTask(task)}>Edit</Button>
-                  <Button variant="outline" onClick={() => handleDeleteTask(task)}>Delete</Button>
+                  <Button variant="outline" size="sm" onClick={() => openEditTask(task)}>Edit</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDeleteTask(task)}>Delete</Button>
                 </div>
               </div>
             ))}
@@ -483,6 +563,7 @@ export default function PlannerPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Project Creation Modal */}
       <Dialog open={showProjectModal} onOpenChange={setShowProjectModal}>
         <DialogContent>
           <DialogHeader>
@@ -558,207 +639,364 @@ export default function PlannerPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Enhanced Task Creation/Edit Modal */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
-        <DialogContent className="max-w-xl w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {editingTask && (editingTask as Task).id ? (
+                <>
+                  <Target className="h-5 w-5" />
+                  Edit Task
+                </>
+              ) : (
+                <>
+                  <Plus className="h-5 w-5" />
+                  Create New Task
+                </>
+              )}
+            </DialogTitle>
             <DialogDescription>
-              {editingTask ? "Edit your existing task details." : "Add a new task to your project."}
+              {editingTask && (editingTask as Task).id 
+                ? "Edit your existing task details and manage subtasks." 
+                : `Add a new task to ${(editingTask as any)?.project?.title || 'your project'}.`}
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-6">
-            {/* Task Details Section */}
-            <div className="bg-gray-50 rounded p-4 space-y-3">
-              <Form {...taskForm}>
-                <form onSubmit={taskForm.handleSubmit(handleTaskSubmit)} className="space-y-3">
-                  <FormField
-                    control={taskForm.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={taskForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex gap-3">
+            {/* Main Task Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Task Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...taskForm}>
+                  <form onSubmit={taskForm.handleSubmit(handleTaskSubmit)} className="space-y-4">
                     <FormField
                       control={taskForm.control}
-                      name="due_date"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Due Date</FormLabel>
-                          <FormControl>
-                            <div className="flex items-center gap-2">
-                              <Input type="date" {...field} />
-                              {field.value && (
-                                <span className={`text-xs px-2 py-1 rounded ${
-                                  new Date(field.value) < new Date() ? 'bg-red-100 text-red-700' :
-                                  (new Date(field.value) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700')
-                                }`}>
-                                  {new Date(field.value) < new Date() ? 'Overdue' :
-                                    (new Date(field.value) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) ? 'Due Soon' : 'On Track')}
-                                </span>
-                              )}
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={taskForm.control}
-                      name="priority"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Priority</FormLabel>
-                          <FormControl>
-                            <select {...field} className="w-full border rounded px-2 py-1">
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={taskForm.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Status</FormLabel>
-                          <FormControl>
-                            <select {...field} className="w-full border rounded px-2 py-1">
-                              <option value="todo">To Do</option>
-                              <option value="in-progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={taskForm.control}
-                      name="assignee_id"
+                      name="title"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Assign To</FormLabel>
+                          <FormLabel>Task Title</FormLabel>
                           <FormControl>
-                            <select {...field} className="w-full border rounded px-2 py-1">
-                              <option value="">Unassigned</option>
-                              {users.map(u => <option key={u.id} value={u.id}>{u.display_name || u.email}</option>)}
-                            </select>
+                            <Input placeholder="Enter task title..." {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  </div>
-                </form>
-              </Form>
-            </div>
-            <hr />
-            {/* Subtasks Section */}
-            <div className="bg-white rounded p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold">Subtasks</h4>
-                {subtasks.length > 0 && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span>Progress:</span>
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full"
-                        style={{ width: `${Math.round((subtasks.filter(s => s.is_completed).length / subtasks.length) * 100)}%` }}
+                    
+                    <FormField
+                      control={taskForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Describe the task..." 
+                              className="min-h-[80px]"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={taskForm.control}
+                        name="due_date"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <CalendarIcon className="h-4 w-4" />
+                              Due Date
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={taskForm.control}
+                        name="priority"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Flag className="h-4 w-4" />
+                              Priority
+                            </FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select priority" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="high">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    High Priority
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="medium">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                    Medium Priority
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="low">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    Low Priority
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
                     </div>
-                    <span>{subtasks.filter(s => s.is_completed).length}/{subtasks.length}</span>
-                  </div>
-                )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={taskForm.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="todo">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-gray-400" />
+                                    To Do
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="in-progress">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                    In Progress
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="completed">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                                    Completed
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={taskForm.control}
+                        name="assignee_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              Assign To
+                            </FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select assignee" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="unassigned">
+                                  <span className="text-gray-500">Unassigned</span>
+                                </SelectItem>
+                                {users.map(u => (
+                                  <SelectItem key={u.id} value={u.id}>
+                                    <div className="flex items-center gap-2">
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarFallback className="text-xs">
+                                          {(u.display_name || u.email || 'U').slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {u.display_name || u.email}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                      <DialogClose asChild>
+                        <Button variant="outline">Cancel</Button>
+                      </DialogClose>
+                      <Button type="submit">
+                        {editingTask && (editingTask as Task).id ? "Update Task" : "Create Task"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Subtasks and Comments - Only for existing tasks */}
+            {editingTask && (editingTask as Task).id && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Subtasks Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Subtasks ({subtasks.filter(s => s.is_completed).length}/{subtasks.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {subtasks.length > 0 && (
+                      <Progress 
+                        value={Math.round((subtasks.filter(s => s.is_completed).length / subtasks.length) * 100)} 
+                        className="h-2"
+                      />
+                    )}
+                    
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {subtasks.map((subtask) => (
+                        <div key={subtask.id} className="flex items-center gap-2 p-2 border rounded">
+                          <input 
+                            type="checkbox" 
+                            checked={subtask.is_completed} 
+                            onChange={() => handleToggleSubtask(subtask)}
+                            className="rounded"
+                          />
+                          <span className={`flex-1 text-sm ${subtask.is_completed ? "line-through text-gray-400" : ""}`}>
+                            {subtask.title}
+                          </span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteSubtask(subtask)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add subtask..."
+                        value={newSubtask}
+                        onChange={(e) => setNewSubtask(e.target.value)}
+                        onKeyDown={(e) => { 
+                          if (e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            handleAddSubtask(); 
+                          } 
+                        }}
+                        className="text-sm"
+                      />
+                      <Button onClick={handleAddSubtask} size="sm">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Comments Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Comments ({comments.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-2 p-2 bg-gray-50 rounded">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {(userDisplayName || 'U').slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <p className="text-sm">{comment.content}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(comment.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteComment(comment)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => { 
+                          if (e.key === 'Enter') { 
+                            e.preventDefault(); 
+                            handleAddComment(); 
+                          } 
+                        }}
+                        className="text-sm"
+                      />
+                      <Button onClick={handleAddComment} size="sm">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              {subtasksLoading ? <div>Loading subtasks...</div> : null}
-              {subtasksError ? <div className="text-red-500">{subtasksError}</div> : null}
-              <ul className="mb-2">
-                {subtasks.map((subtask) => (
-                  <li key={subtask.id} className="flex items-center gap-2 mb-1">
-                    <input type="checkbox" checked={subtask.is_completed} onChange={() => handleToggleSubtask(subtask)} />
-                    <span className={subtask.is_completed ? "line-through text-gray-400" : ""}>{subtask.title}</span>
-                    <button className="text-xs text-red-500 ml-2" onClick={() => handleDeleteSubtask(subtask)}>Delete</button>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex gap-2">
-                <input
-                  className="border rounded px-2 py-1 text-sm flex-1"
-                  value={newSubtask}
-                  onChange={(e) => setNewSubtask(e.target.value)}
-                  placeholder="Add subtask..."
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
-                />
-                <button className="text-xs px-2 py-1 bg-blue-500 text-white rounded" onClick={handleAddSubtask}>Add</button>
-              </div>
-            </div>
-            <hr />
-            {/* Comments Section */}
-            <div className="bg-white rounded p-4 shadow-sm">
-              <h4 className="font-semibold mb-2">Comments</h4>
-              {commentsLoading ? <div>Loading comments...</div> : null}
-              {commentsError ? <div className="text-red-500">{commentsError}</div> : null}
-              <ul className="mb-2 max-h-40 overflow-y-auto">
-                {comments.map((comment) => (
-                  <li key={comment.id} className="flex items-start gap-2 mb-2">
-                    {/* Optionally show avatar/name if available */}
-                    <span className="flex-1 bg-gray-100 rounded px-2 py-1">{comment.content}</span>
-                    <button className="text-xs text-red-500 ml-2" onClick={() => handleDeleteComment(comment)}>Delete</button>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex gap-2">
-                <input
-                  className="border rounded px-2 py-1 text-sm flex-1"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Add comment..."
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddComment(); } }}
-                />
-                <button className="text-xs px-2 py-1 bg-blue-500 text-white rounded" onClick={handleAddComment}>Add</button>
-              </div>
-            </div>
-            <hr />
-            {/* Actions */}
-            <div className="flex justify-between items-center mt-4">
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <div className="flex gap-2">
-                {editingTask && <Button variant="destructive" onClick={() => handleDeleteTask(editingTask)}>Delete Task</Button>}
-                <Button type="submit">
-                  {editingTask ? "Update Task" : "Create Task"}
+            )}
+
+            {/* Delete Button for existing tasks */}
+            {editingTask && (editingTask as Task).id && (
+              <div className="flex justify-center pt-4 border-t">
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    handleDeleteTask(editingTask as Task);
+                    setShowTaskModal(false);
+                  }}
+                >
+                  Delete Task
                 </Button>
               </div>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Task Assignment Notifications */}
       {notifications.filter(n => n.type === 'task_assignment' && !n.is_read).map(n => (
         <Card key={n.id} className="mb-4 border-blue-300 bg-blue-50">
           <div className="flex items-center gap-3 p-3">
@@ -777,7 +1015,6 @@ export default function PlannerPage() {
             <div className="flex flex-col gap-2">
               <Button size="sm" onClick={async () => {
                 await projectService.acceptAssignedTask(n.data.task_id, userId)
-                // Mark notification as read (update in DB and UI)
                 await supabase.from('notifications').update({ is_read: true }).eq('id', n.id)
                 setNotifications((prev) => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
               }}>Accept & Add</Button>

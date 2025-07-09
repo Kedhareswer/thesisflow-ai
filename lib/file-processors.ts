@@ -63,12 +63,39 @@ export class FileProcessor {
     return await file.text()
   }
 
-  private static async processPDFFile(file: File): Promise<{ content: string; pages: number }> {
+  private static async processPDFFile(file: File): Promise<{ content: string; pages: number | undefined }> {
+    // If running in the browser, we cannot rely on the Node-only pdf-parse package.
+    // Instead, send the file to the built-in /api/extract-file endpoint for processing.
+    if (typeof window !== 'undefined') {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch('/api/extract-file', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) {
+          throw new Error(`Server extraction failed (${response.status})`)
+        }
+
+        const data = await response.json()
+        return {
+          content: data.text as string,
+          pages: undefined
+        }
+      } catch (error) {
+        throw new Error(`Failed to extract PDF in browser: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
+    }
+
+    // Server-side extraction using pdf-parse (works in Node.js runtime)
     try {
       const pdfParse = await getPdfParse()
       const arrayBuffer = await file.arrayBuffer()
       const data = await pdfParse(Buffer.from(arrayBuffer))
-      
+
       return {
         content: data.text,
         pages: data.numpages
@@ -77,7 +104,9 @@ export class FileProcessor {
       if (error instanceof Error && error.message.includes('PDF parsing library not available')) {
         throw error
       }
-      throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the PDF is not password protected and contains readable text.`)
+      throw new Error(
+        `Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the PDF is not password protected and contains readable text.`,
+      )
     }
   }
 

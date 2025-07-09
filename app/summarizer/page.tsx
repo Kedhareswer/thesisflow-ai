@@ -3,15 +3,13 @@
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Sparkles, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import type { AIProvider } from "@/lib/ai-providers"
 import { ContextInputPanel } from "./components/context-input-panel"
 import { ConfigurationPanel } from "./components/configuration-panel"
 import { SummaryOutputPanel } from "./components/summary-output-panel"
-import { Progress } from '@/components/animate-ui/base/progress'
-import { Switch } from '@/components/animate-ui/base/switch'
 
 interface SummaryResult {
   summary: string
@@ -42,7 +40,6 @@ export default function SummarizerPage() {
   const [urlFetching, setUrlFetching] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showAdvancedStats, setShowAdvancedStats] = useState(true)
 
   // Utility functions
   const getWordCount = useCallback((text: string) => {
@@ -60,6 +57,94 @@ export default function SummarizerPage() {
     },
     [getWordCount],
   )
+
+  // Helper to estimate tokens (rough approximation)
+  const estimateTokens = (text: string) => Math.ceil(text.length / 4)
+
+  // Chunked summarization when content too large
+  const summarizeInChunks = async (): Promise<SummaryResult | null> => {
+    const maxTokensPerChunk = 8000 // safe margin (≈32k chars)
+    const maxCharsPerChunk = maxTokensPerChunk * 4
+
+    // Split content into manageable chunks
+    const chunks: string[] = []
+    for (let i = 0; i < content.length; i += maxCharsPerChunk) {
+      chunks.push(content.substring(i, i + maxCharsPerChunk))
+    }
+
+    // Summarize each chunk briefly to keep token usage low
+    const chunkSummaries: string[] = []
+    for (let idx = 0; idx < chunks.length; idx++) {
+      const chunk = chunks[idx]
+      const chunkPrompt = `Provide a concise summary (executive, bullet points) of the following content (part ${idx + 1} of ${chunks.length}). Limit to 150 words.\n\n${chunk}`
+
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: chunkPrompt,
+          provider: selectedProvider,
+          model: selectedModel,
+          temperature: 0.3,
+          maxTokens: 512,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Chunk ${idx + 1} summarization failed (${response.status})`)
+      }
+      const data = await response.json()
+      if (data.error) throw new Error(data.error)
+      chunkSummaries.push(data.content)
+    }
+
+    // Aggregate summaries
+    const aggregatePrompt = `Combine the following chunk summaries into a single ${summaryLength} ${summaryStyle} summary with key points and sentiment analysis.\n\nChunk Summaries:\n${chunkSummaries
+      .map((s, i) => `Part ${i + 1}: ${s}`)
+      .join("\n\n")}\n\nReturn JSON with the structure previously provided.`
+
+    const aggregateResponse = await fetch("/api/ai/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: aggregatePrompt,
+        provider: selectedProvider,
+        model: selectedModel,
+        temperature: 0.3,
+        maxTokens: summaryLength === "brief" ? 600 : summaryLength === "medium" ? 1000 : 1500,
+      }),
+    })
+
+    if (!aggregateResponse.ok) {
+      throw new Error(`Aggregation failed (${aggregateResponse.status})`)
+    }
+    const aggregateData = await aggregateResponse.json()
+    if (aggregateData.error) throw new Error(aggregateData.error)
+
+    let parsed
+    try {
+      parsed = JSON.parse(aggregateData.content)
+    } catch {
+      parsed = { summary: aggregateData.content, keyPoints: [] }
+    }
+
+    const originalLength = getWordCount(content)
+    const summaryWordCount = getWordCount(parsed.summary || aggregateData.content)
+    const compressionRatio = `${Math.round((1 - summaryWordCount / originalLength) * 100)}%`
+
+    const finalResult: SummaryResult = {
+      summary: parsed.summary || aggregateData.content,
+      keyPoints: parsed.keyPoints || [],
+      readingTime: getReadingTime(parsed.summary || aggregateData.content),
+      sentiment: parsed.sentiment,
+      originalLength,
+      summaryLength: summaryWordCount,
+      compressionRatio,
+      topics: parsed.topics,
+      difficulty: parsed.difficulty,
+    }
+    return finalResult
+  }
 
   // Handle URL fetching
   const handleUrlFetch = async () => {
@@ -151,6 +236,18 @@ export default function SummarizerPage() {
     setError(null)
 
     try {
+      const totalTokens = estimateTokens(content)
+      const tokenThreshold = 11000 // Groq safe limit
+      if (totalTokens > tokenThreshold) {
+        console.log("Using chunked summarization due to large content")
+        const chunkedResult = await summarizeInChunks()
+        if (chunkedResult) {
+          setResult(chunkedResult)
+          toast({ title: "Summary Generated", description: `Successfully summarized large document in chunks.` })
+          return
+        }
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -325,85 +422,52 @@ Please format your response as JSON with the following structure. If relevant, i
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-end mb-2">
-        <Switch
-          checked={showAdvancedStats}
-          onCheckedChange={setShowAdvancedStats}
-          className="mr-2"
-        />
-        <span className="text-sm text-gray-700 select-none">Show advanced stats</span>
-      </div>
-      {/* Progress bar for summarization */}
-      {loading && (
-        <div className="mb-4">
-          <Progress value={100} className="h-1 bg-black/10" />
+    <div className="min-h-screen bg-white text-black">
+      {/* Header */}
+      <div className="border-b border-gray-200 bg-white">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-light tracking-tight text-black mb-3">
+              Summarizer
+            </h1>
+            <p className="text-gray-600 text-lg font-light max-w-2xl mx-auto">
+              Transform lengthy content into concise, intelligent summaries
+            </p>
+          </div>
         </div>
-      )}
-          {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Summarizer</h1>
-        <p className="text-gray-600">Transform lengthy content into concise, intelligent summaries using advanced AI</p>
-                </div>
+      </div>
 
       {/* Error Alert */}
       {error && (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-red-800">{error}</AlertDescription>
-        </Alert>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <Alert className="border-gray-300 bg-gray-50">
+            <AlertCircle className="h-4 w-4 text-gray-700" />
+            <AlertDescription className="text-gray-800">
+              {error}
+              {error.toLowerCase().includes('token') || error.toLowerCase().includes('limit') || error.toLowerCase().includes('failed') ? (
+                <span className="block mt-2 text-sm">
+                  <strong>Note:</strong> For enhanced PDF processing, try{' '}
+                  <a 
+                    href="https://quantumn-pdf-chatapp.netlify.app/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="underline hover:text-black"
+                  >
+                    QuantumPDF
+                  </a>
+                </span>
+              ) : null}
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
-      {/* Main Layout */}
-      <div className="grid gap-8 xl:grid-cols-3">
-        {/* Left Panel - Input and Configuration */}
-        <div className="xl:col-span-1 space-y-6">
-          <ContextInputPanel
-            content={content}
-            url={url}
-            onContentChange={setContent}
-            onUrlChange={setUrl}
-            onUrlFetch={handleUrlFetch}
-            onFileProcessed={handleFileProcessed}
-            onFileError={handleFileError}
-            urlFetching={urlFetching}
-            getWordCount={getWordCount}
-          />
-
-          <ConfigurationPanel
-              selectedProvider={selectedProvider}
-            onProviderChange={setSelectedProvider}
-              selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
-            summaryStyle={summaryStyle}
-            onSummaryStyleChange={setSummaryStyle}
-            summaryLength={summaryLength}
-            onSummaryLengthChange={setSummaryLength}
-          />
-
-          {/* Generate Button */}
-                        <Button
-            onClick={handleSummarize}
-            disabled={loading || !content.trim() || !selectedProvider}
-            className="w-full h-12 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {loading ? (
-                  <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Generating Summary...
-                  </>
-                ) : (
-                  <>
-                <Sparkles className="mr-2 h-5 w-5" />
-                    Generate Summary
-                  </>
-                )}
-              </Button>
-            </div>
-
-        {/* Right Panel - Summary Output */}
-        <div className="xl:col-span-2">
-          <div className="xl:sticky xl:top-8">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {result ? (
+          // Summary View - Full width when summary exists
+          <div className="space-y-8">
+            {/* Summary Output - Primary Focus */}
             <SummaryOutputPanel
               result={result}
               loading={loading}
@@ -412,10 +476,127 @@ Please format your response as JSON with the following structure. If relevant, i
               onDownloadSummary={handleDownloadSummary}
               onShareSummary={handleShareSummary}
               getWordCount={getWordCount}
-              showAdvancedStats={showAdvancedStats}
+              showAdvancedStats={false}
             />
+            
+            {/* Input Controls - Minimized when summary exists */}
+            <div className="border-t border-gray-200 pt-8">
+              <div className="grid gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <ContextInputPanel
+                    content={content}
+                    url={url}
+                    onContentChange={setContent}
+                    onUrlChange={setUrl}
+                    onUrlFetch={handleUrlFetch}
+                    onFileProcessed={handleFileProcessed}
+                    onFileError={handleFileError}
+                    urlFetching={urlFetching}
+                    getWordCount={getWordCount}
+                  />
+                </div>
+                
+                <div className="space-y-6">
+                  <ConfigurationPanel
+                    selectedProvider={selectedProvider}
+                    onProviderChange={setSelectedProvider}
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                    summaryStyle={summaryStyle}
+                    onSummaryStyleChange={setSummaryStyle}
+                    summaryLength={summaryLength}
+                    onSummaryLengthChange={setSummaryLength}
+                  />
+                  
+                  <Button
+                    onClick={handleSummarize}
+                    disabled={loading || !content.trim() || !selectedProvider}
+                    className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate New Summary"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          // Input View - Centered when no summary
+          <div className="max-w-4xl mx-auto">
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                <ContextInputPanel
+                  content={content}
+                  url={url}
+                  onContentChange={setContent}
+                  onUrlChange={setUrl}
+                  onUrlFetch={handleUrlFetch}
+                  onFileProcessed={handleFileProcessed}
+                  onFileError={handleFileError}
+                  urlFetching={urlFetching}
+                  getWordCount={getWordCount}
+                />
+              </div>
+
+              <div className="space-y-6">
+                <ConfigurationPanel
+                  selectedProvider={selectedProvider}
+                  onProviderChange={setSelectedProvider}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  summaryStyle={summaryStyle}
+                  onSummaryStyleChange={setSummaryStyle}
+                  summaryLength={summaryLength}
+                  onSummaryLengthChange={setSummaryLength}
+                />
+
+                <Button
+                  onClick={handleSummarize}
+                  disabled={loading || !content.trim() || !selectedProvider}
+                  className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating Summary...
+                    </>
+                  ) : (
+                    "Generate Summary"
+                  )}
+                </Button>
+
+                {/* Subtle QuantumPDF Note */}
+                <p className="text-xs text-gray-500 text-center font-light">
+                  For advanced PDF analysis, visit{' '}
+                  <a 
+                    href="https://quantumn-pdf-chatapp.netlify.app/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="underline hover:text-gray-700"
+                  >
+                    QuantumPDF
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            {/* Loading State */}
+            {loading && (
+              <div className="mt-12 text-center">
+                <div className="inline-flex items-center gap-3 text-gray-600">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="font-light">Analyzing content and generating summary...</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

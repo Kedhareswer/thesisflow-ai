@@ -191,10 +191,10 @@ export function ResearchChatbot({ topic, papers, ideas, context, personality: in
       }
       
       const isDetail = wantsDetails(userMessage)
-      const shortStyle = 'Respond in a short, WhatsApp-style message (1-2 sentences, friendly, concise).'
-      const detailStyle = 'If the user requests details, provide a longer, structured answer. Use markdown tables or code blocks for data/charts if helpful.'
       const systemPersonality = personality?.systemPrompt || ''
-      const systemPrompt = `${systemPersonality}\n${shortStyle}\n${detailStyle}`
+      const baseStyle = 'Provide comprehensive, well-structured answers (3-6 sentences or more as needed). Use markdown formatting (headings, lists, tables) when helpful.'
+      const detailStyle = 'If the user explicitly requests additional detail, expand sections appropriately (up to several paragraphs) and include data tables, bullet lists, or code blocks as relevant.'
+      const systemPrompt = `${systemPersonality}\n${baseStyle}\n${detailStyle}`
       const enhancedPrompt = `${systemPrompt}\n\nResearch Assistant | Context-aware response\n\n${sessionContext ? `CONTEXT:\n${sessionContext}\n` : ''}CONVERSATION:\n${messageHistory}\n\nQUERY: ${userMessage}\n\nRESPONSE GUIDELINES:\n- Reference user's papers/ideas/topics when relevant\n- Suggest research connections\n- Concise, actionable insights\n- Acknowledge limitations honestly\n- Guide research direction\n${isDetail ? '\n- Provide detailed, structured answer as requested.' : ''}\n\nResponse:`
 
       // Use enhanced AI service directly for better performance and authentication

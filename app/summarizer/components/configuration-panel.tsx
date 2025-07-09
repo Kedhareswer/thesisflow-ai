@@ -1,14 +1,13 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { Settings } from "lucide-react"
 import type { AIProvider } from "@/lib/ai-providers"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
-import { Accordion, AccordionItem, AccordionTrigger, AccordionPanel } from '@/components/animate-ui/base/accordion'
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/animate-ui/base/popover'
-import { Info } from 'lucide-react'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronDown } from "lucide-react"
+import { useState } from "react"
 
 interface ConfigurationPanelProps {
   selectedProvider: AIProvider | undefined
@@ -31,83 +30,79 @@ export function ConfigurationPanel({
   summaryLength,
   onSummaryLengthChange,
 }: ConfigurationPanelProps) {
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
+
   return (
     <div className="space-y-6">
-      {/* AI Provider Selector - Compact variant for Summarizer */}
+      {/* AI Provider Selector */}
       <MinimalAIProviderSelector
         selectedProvider={selectedProvider}
         onProviderChange={onProviderChange}
         selectedModel={selectedModel}
         onModelChange={onModelChange}
-        variant="compact"
+        variant="inline"
         showModelSelector={true}
-        showConfigLink={true}
+        showConfigLink={false}
+        className="mb-4"
       />
 
-      {/* Advanced Options Accordion */}
-      <Accordion>
-        <AccordionItem value="advanced-options">
-          <AccordionTrigger className="text-lg font-medium text-gray-900 px-6 py-4 flex items-center gap-2">
-            <Settings className="h-5 w-5 text-blue-600 mr-2" /> Advanced Options
-            <Popover>
-              <PopoverTrigger>
-                <Info className="h-4 w-4 text-gray-400 hover:text-black transition" aria-label="About advanced options" />
-              </PopoverTrigger>
-              <PopoverContent side="top" className="text-xs max-w-xs bg-white border border-gray-200 shadow-md">
-                Advanced options let you customize the summary style and length. Most users can leave these as default for best results.
-              </PopoverContent>
-            </Popover>
-          </AccordionTrigger>
-          <AccordionPanel className="px-0 pb-0">
-            <Card className="border-gray-200 shadow-sm bg-white border-0">
-        <CardContent className="grid gap-4 md:grid-cols-2 p-6">
-          <div>
-            <Label className="text-sm font-medium mb-2 block text-gray-700">Summary Style</Label>
-            <Select value={summaryStyle} onValueChange={onSummaryStyleChange}>
-              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-10 bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-gray-200">
-                <SelectItem value="academic" className="hover:bg-gray-50">
-                  Academic
-                </SelectItem>
-                <SelectItem value="executive" className="hover:bg-gray-50">
-                  Executive
-                </SelectItem>
-                <SelectItem value="bullet-points" className="hover:bg-gray-50">
-                  Bullet Points
-                </SelectItem>
-                <SelectItem value="detailed" className="hover:bg-gray-50">
-                  Detailed
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Advanced Options */}
+      <div>
+        <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full text-left">
+            <h3 className="text-xl font-light text-black tracking-tight">Advanced Options</h3>
+            <ChevronDown className={`h-4 w-4 text-gray-600 transition-transform ${isAdvancedOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <Card className="border-gray-200 bg-white">
+              <CardContent className="p-6 space-y-4">
+                <div>
+                  <Label className="text-sm font-light text-gray-700 mb-2 block">Summary Style</Label>
+                  <Select value={summaryStyle} onValueChange={onSummaryStyleChange}>
+                    <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 bg-white font-light">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200">
+                      <SelectItem value="academic" className="hover:bg-gray-50 font-light">
+                        Academic
+                      </SelectItem>
+                      <SelectItem value="executive" className="hover:bg-gray-50 font-light">
+                        Executive
+                      </SelectItem>
+                      <SelectItem value="bullet-points" className="hover:bg-gray-50 font-light">
+                        Bullet Points
+                      </SelectItem>
+                      <SelectItem value="detailed" className="hover:bg-gray-50 font-light">
+                        Detailed
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div>
-            <Label className="text-sm font-medium mb-2 block text-gray-700">Summary Length</Label>
-            <Select value={summaryLength} onValueChange={onSummaryLengthChange}>
-              <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-10 bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-gray-200">
-                <SelectItem value="brief" className="hover:bg-gray-50">
-                  Brief
-                </SelectItem>
-                <SelectItem value="medium" className="hover:bg-gray-50">
-                  Medium
-                </SelectItem>
-                <SelectItem value="comprehensive" className="hover:bg-gray-50">
-                  Comprehensive
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-          </AccordionPanel>
-        </AccordionItem>
-      </Accordion>
+                <div>
+                  <Label className="text-sm font-light text-gray-700 mb-2 block">Summary Length</Label>
+                  <Select value={summaryLength} onValueChange={onSummaryLengthChange}>
+                    <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 bg-white font-light">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200">
+                      <SelectItem value="brief" className="hover:bg-gray-50 font-light">
+                        Brief
+                      </SelectItem>
+                      <SelectItem value="medium" className="hover:bg-gray-50 font-light">
+                        Medium
+                      </SelectItem>
+                      <SelectItem value="comprehensive" className="hover:bg-gray-50 font-light">
+                        Comprehensive
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
     </div>
   )
 }
