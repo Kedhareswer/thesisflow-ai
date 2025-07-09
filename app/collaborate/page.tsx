@@ -415,40 +415,7 @@ export default function CollaboratePage() {
     <RouteGuard requireAuth={true}>
       <div className="min-h-screen bg-background">
         {/* Modern Header */}
-        <header className="border-b bg-card/50 backdrop-blur-sm">
-          <div className="container mx-auto px-6 py-4 max-w-7xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-medium tracking-tight">Collaborate</h1>
-                    {selectedTeam && (
-                      <p className="text-sm text-muted-foreground">{selectedTeam.name}</p>
-                    )}
-                  </div>
-                </div>
-                {selectedTeam && (
-                  <Badge variant="outline" className="font-normal">
-                    {selectedTeam.members.length} members
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <NotificationBell />
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.user_metadata?.avatar_url} />
-                  <AvatarFallback>
-                    {user.user_metadata?.display_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-            </div>
-          </div>
-        </header>
-
+        {/* Removed duplicate header here */}
         <div className="container mx-auto px-6 py-8 max-w-7xl">
           <div className="grid gap-8 lg:grid-cols-12">
             {/* Sidebar */}
