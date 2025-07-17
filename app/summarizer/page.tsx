@@ -10,6 +10,7 @@ import type { AIProvider } from "@/lib/ai-providers"
 import { ContextInputPanel } from "./components/context-input-panel"
 import { ConfigurationPanel } from "./components/configuration-panel"
 import { SummaryOutputPanel } from "./components/summary-output-panel"
+import { WebSearchPanel } from "./components/web-search-panel"
 
 interface SummaryResult {
   summary: string
@@ -542,6 +543,12 @@ Please format your response as JSON with the following structure. If relevant, i
                   urlFetching={urlFetching}
                   getWordCount={getWordCount}
                 />
+                
+                {/* Web Search Panel - New Component */}
+                <WebSearchPanel onSelectUrl={(selectedUrl) => {
+                  setUrl(selectedUrl);
+                  handleUrlFetch();
+                }} />
               </div>
 
               <div className="space-y-6">

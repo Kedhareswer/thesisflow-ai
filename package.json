@@ -89,6 +89,7 @@
     "vaul": "latest",
     "vue": "latest",
     "vue-router": "latest",
+    "xmldom": "^0.6.0",
     "y-prosemirror": "latest",
     "y-websocket": "latest",
     "yjs": "latest",

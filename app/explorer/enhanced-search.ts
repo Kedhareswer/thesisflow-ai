@@ -42,6 +42,64 @@ function getSciHubPdfUrl(doi?: string): string | undefined {
   return `https://sci-hub.se/${encodeURIComponent(doi)}`
 }
 
+// --- NEW: Fetch arXiv papers ---
+async function fetchArxivPapers(query: string, limit = 10): Promise<ResearchPaper[]> {
+  const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${limit}`
+  const res = await fetch(url)
+  const xml = await res.text()
+  // Use DOMParser if available, otherwise fallback to a lightweight XML parser
+  let parser: any
+  let doc: any
+  if (typeof window !== 'undefined' && 'DOMParser' in window) {
+    parser = new window.DOMParser()
+    doc = parser.parseFromString(xml, 'text/xml')
+  } else {
+    // Use xmldom for Node.js
+    // @ts-expect-error: xmldom has no types
+    const { DOMParser } = await import('xmldom')
+    parser = new DOMParser()
+    doc = parser.parseFromString(xml, 'text/xml')
+  }
+  const entries = Array.from(doc.getElementsByTagName('entry'))
+  const now = new Date()
+  return entries.map((entry: any, i: number) => {
+    const getText = (tag: string) => {
+      const el = entry.getElementsByTagName(tag)[0]
+      return el ? el.textContent : ''
+    }
+    const title = getText('title').replace(/\s+/g, ' ').trim()
+    const authors = Array.from(entry.getElementsByTagName('author')).map((a: any) => getTextFromNode(a, 'name'))
+    const abstract = getText('summary').replace(/\s+/g, ' ').trim()
+    const year = parseInt(getText('published').slice(0, 4)) || now.getFullYear()
+    const url = getText('id')
+    // Fix: Check for getAttribute existence before calling
+    const pdfLink = Array.from(entry.getElementsByTagName('link')).find(
+      (l: any) => typeof l.getAttribute === 'function' && l.getAttribute('type') === 'application/pdf'
+    ) as Element | undefined
+    const pdf_url = pdfLink?.getAttribute('href') || url
+    const journal = getText('arxiv:journal_ref') || undefined
+    const doi = getText('arxiv:doi') || undefined
+    return {
+      id: `arxiv-${doi || title.replace(/\s+/g, '-')}-${i}`,
+      createdAt: now,
+      updatedAt: now,
+      title,
+      authors,
+      abstract,
+      year,
+      url,
+      journal,
+      doi,
+      pdf_url,
+      source: 'arxiv',
+    } as ResearchPaper
+  })
+  function getTextFromNode(node: any, tag: string) {
+    const el = node.getElementsByTagName(tag)[0]
+    return el ? el.textContent : ''
+  }
+}
+
 interface EnhancedSearchResult {
   papers: ResearchPaper[]
   total: number
