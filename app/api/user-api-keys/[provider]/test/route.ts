@@ -16,10 +16,10 @@ const supabaseAdmin = createClient(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
-    const provider = params.provider
+    const { provider } = await params
 
     // Get auth token
     const authToken = request.headers.get('Authorization')?.replace('Bearer ', '')

@@ -41,6 +41,7 @@ export default function SummarizerPage() {
   const [urlFetching, setUrlFetching] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentTab, setCurrentTab] = useState<"file" | "url">("file")
 
   // Utility functions
   const getWordCount = useCallback((text: string) => {
@@ -61,6 +62,79 @@ export default function SummarizerPage() {
 
   // Helper to estimate tokens (rough approximation)
   const estimateTokens = (text: string) => Math.ceil(text.length / 4)
+
+  // Helper to clean up JSON artifacts from summary text
+  const cleanSummaryText = (text: string): string => {
+    if (!text) return ""
+    
+    return text
+      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+      .replace(/\\n/g, '\n') // Convert escaped newlines
+      .replace(/\\"/g, '"') // Convert escaped quotes
+      .replace(/\\t/g, '\t') // Convert escaped tabs
+      .replace(/\\r/g, '\r') // Convert escaped carriage returns
+      .replace(/\\\\/g, '\\') // Convert double backslashes
+      .trim()
+  }
+
+  // Style and length instructions for dynamic prompts
+  const styleInstructions = {
+    academic: "Write in an academic, scholarly tone with formal language, citations where appropriate, and analytical depth. Focus on methodology, findings, and implications.",
+    executive: "Write in a business executive style - concise, action-oriented, with clear recommendations and strategic insights. Use bullet points for key takeaways.",
+    "bullet-points": "Present the information in a structured bullet-point format. Each point should be clear, concise, and actionable. Use sub-bullets for details.",
+    detailed: "Provide a comprehensive, detailed analysis with thorough explanations, context, and nuanced understanding. Include multiple perspectives and deep insights."
+  }
+
+  const lengthInstructions = {
+    brief: "Keep the summary very concise (150-200 words). Focus only on the most essential points and key insights.",
+    medium: "Provide a balanced summary (300-400 words) with main points and supporting details.",
+    comprehensive: "Create a thorough summary (500-700 words) with comprehensive coverage, detailed analysis, and extensive insights."
+  }
+
+  // Helper to generate dynamic prompts based on style and length
+  const generateSummaryPrompt = (content: string, style: string, length: string): string => {
+    return `Please provide a ${length} ${style} summary of the following content.
+
+${lengthInstructions[length as keyof typeof lengthInstructions]}
+
+Style Instructions: ${styleInstructions[style as keyof typeof styleInstructions]}
+
+Content to summarize:
+${content}
+
+Please format your response as JSON with the following structure. IMPORTANT: The "summary" field should contain clean, readable text (not JSON format). If relevant, include tables (with title, headers, rows) and graphs (with title, type, data):
+{
+  "summary": "The main summary text in clean, readable format with proper paragraphs and formatting",
+  "keyPoints": ["point 1", "point 2", "point 3"],
+  "sentiment": "positive|neutral|negative",
+  "topics": ["topic 1", "topic 2"],
+  "difficulty": "beginner|intermediate|advanced",
+  "tables": [
+    {
+      "title": "Table Title",
+      "headers": ["Column 1", "Column 2"],
+      "rows": [["Row1Col1", "Row1Col2"], ["Row2Col1", "Row2Col2"]]
+    }
+  ],
+  "graphs": [
+    {
+      "title": "Graph Title",
+      "type": "bar|line|pie|scatter",
+      "data": { "labels": ["A", "B"], "values": [10, 20] }
+    }
+  ]
+}`
+  }
+
+  // Helper to get max tokens based on summary length
+  const getMaxTokens = (length: string): number => {
+    switch (length) {
+      case "brief": return 800
+      case "medium": return 1200
+      case "comprehensive": return 1800
+      default: return 1000
+    }
+  }
 
   // Chunked summarization when content too large
   const summarizeInChunks = async (): Promise<SummaryResult | null> => {
@@ -100,9 +174,25 @@ export default function SummarizerPage() {
     }
 
     // Aggregate summaries
-    const aggregatePrompt = `Combine the following chunk summaries into a single ${summaryLength} ${summaryStyle} summary with key points and sentiment analysis.\n\nChunk Summaries:\n${chunkSummaries
-      .map((s, i) => `Part ${i + 1}: ${s}`)
-      .join("\n\n")}\n\nReturn JSON with the structure previously provided.`
+    const aggregatePrompt = `Combine the following chunk summaries into a single ${summaryLength} ${summaryStyle} summary.
+
+${lengthInstructions[summaryLength as keyof typeof lengthInstructions]}
+
+Style Instructions: ${styleInstructions[summaryStyle as keyof typeof styleInstructions]}
+
+Chunk Summaries:
+${chunkSummaries
+  .map((s, i) => `Part ${i + 1}: ${s}`)
+  .join("\n\n")}
+
+Return JSON with the following structure. IMPORTANT: The "summary" field should contain clean, readable text (not JSON format):
+{
+  "summary": "The combined summary text in clean, readable format with proper paragraphs",
+  "keyPoints": ["key point 1", "key point 2", "key point 3"],
+  "sentiment": "positive|neutral|negative",
+  "topics": ["topic 1", "topic 2"],
+  "difficulty": "beginner|intermediate|advanced"
+}`
 
     const aggregateResponse = await fetch("/api/ai/generate", {
       method: "POST",
@@ -112,7 +202,7 @@ export default function SummarizerPage() {
         provider: selectedProvider,
         model: selectedModel,
         temperature: 0.3,
-        maxTokens: summaryLength === "brief" ? 600 : summaryLength === "medium" ? 1000 : 1500,
+        maxTokens: getMaxTokens(summaryLength),
       }),
     })
 
@@ -124,9 +214,28 @@ export default function SummarizerPage() {
 
     let parsed
     try {
-      parsed = JSON.parse(aggregateData.content)
-    } catch {
-      parsed = { summary: aggregateData.content, keyPoints: [] }
+      // Clean the response content to extract JSON
+      let contentToParse = aggregateData.content.trim()
+      
+      // Try to find JSON object in the response
+      const jsonMatch = contentToParse.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        contentToParse = jsonMatch[0]
+      }
+      
+      parsed = JSON.parse(contentToParse)
+      
+      // Ensure summary is a string, not JSON
+      if (typeof parsed.summary === 'string') {
+        // Clean up any remaining JSON artifacts
+        parsed.summary = cleanSummaryText(parsed.summary)
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse JSON response in chunked summarization:', parseError)
+      parsed = { 
+        summary: cleanSummaryText(aggregateData.content), 
+        keyPoints: [] 
+      }
     }
 
     const originalLength = getWordCount(content)
@@ -265,37 +374,11 @@ export default function SummarizerPage() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          prompt: `Please provide a ${summaryLength} ${summaryStyle} summary of the following content. Also extract key points and analyze the sentiment.
-
-Content to summarize:
-${content}
-
-Please format your response as JSON with the following structure. If relevant, include tables (with title, headers, rows) and graphs (with title, type, data):
-{
-  "summary": "The main summary text",
-  "keyPoints": ["point 1", "point 2", "point 3"],
-  "sentiment": "positive|neutral|negative",
-  "topics": ["topic 1", "topic 2"],
-  "difficulty": "beginner|intermediate|advanced",
-  "tables": [
-    {
-      "title": "Table Title",
-      "headers": ["Column 1", "Column 2"],
-      "rows": [["Row1Col1", "Row1Col2"], ["Row2Col1", "Row2Col2"]]
-    }
-  ],
-  "graphs": [
-    {
-      "title": "Graph Title",
-      "type": "bar|line|pie|scatter",
-      "data": { "labels": ["A", "B"], "values": [10, 20] }
-    }
-  ]
-}`,
+          prompt: generateSummaryPrompt(content, summaryStyle, summaryLength),
           provider: selectedProvider,
           model: selectedModel,
           temperature: 0.3,
-          maxTokens: summaryLength === "brief" ? 500 : summaryLength === "medium" ? 1000 : 1500,
+          maxTokens: getMaxTokens(summaryLength),
         }),
       })
 
@@ -312,11 +395,27 @@ Please format your response as JSON with the following structure. If relevant, i
       // Try to parse JSON response, fallback to plain text
       let parsedResult
       try {
-        parsedResult = JSON.parse(data.content)
-      } catch {
+        // Clean the response content to extract JSON
+        let contentToParse = data.content.trim()
+        
+        // Try to find JSON object in the response
+        const jsonMatch = contentToParse.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          contentToParse = jsonMatch[0]
+        }
+        
+        parsedResult = JSON.parse(contentToParse)
+        
+        // Ensure summary is a string, not JSON
+        if (typeof parsedResult.summary === 'string') {
+          // Clean up any remaining JSON artifacts
+          parsedResult.summary = cleanSummaryText(parsedResult.summary)
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse JSON response:', parseError)
         // Fallback for non-JSON responses
         parsedResult = {
-          summary: data.content,
+          summary: cleanSummaryText(data.content),
           keyPoints: [],
           sentiment: "neutral",
           topics: [],
@@ -478,6 +577,8 @@ Please format your response as JSON with the following structure. If relevant, i
               onShareSummary={handleShareSummary}
               getWordCount={getWordCount}
               showAdvancedStats={false}
+              summaryStyle={summaryStyle}
+              summaryLength={summaryLength}
             />
             
             {/* Input Controls - Minimized when summary exists */}
@@ -494,6 +595,8 @@ Please format your response as JSON with the following structure. If relevant, i
                     onFileError={handleFileError}
                     urlFetching={urlFetching}
                     getWordCount={getWordCount}
+                    currentTab={currentTab}
+                    onTabChange={setCurrentTab}
                   />
                 </div>
                 
@@ -532,6 +635,14 @@ Please format your response as JSON with the following structure. If relevant, i
           <div className="max-w-4xl mx-auto">
             <div className="grid gap-8 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-6">
+                {/* Web Search Panel - Only show when URL tab is active */}
+                {currentTab === "url" && (
+                  <WebSearchPanel onSelectUrl={(selectedUrl) => {
+                    setUrl(selectedUrl);
+                    handleUrlFetch();
+                  }} />
+                )}
+                
                 <ContextInputPanel
                   content={content}
                   url={url}
@@ -542,13 +653,9 @@ Please format your response as JSON with the following structure. If relevant, i
                   onFileError={handleFileError}
                   urlFetching={urlFetching}
                   getWordCount={getWordCount}
+                  currentTab={currentTab}
+                  onTabChange={setCurrentTab}
                 />
-                
-                {/* Web Search Panel - New Component */}
-                <WebSearchPanel onSelectUrl={(selectedUrl) => {
-                  setUrl(selectedUrl);
-                  handleUrlFetch();
-                }} />
               </div>
 
               <div className="space-y-6">

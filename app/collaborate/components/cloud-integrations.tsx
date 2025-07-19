@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +28,7 @@ import {
   Download,
   Upload
 } from 'lucide-react'
+import { supabase } from '@/integrations/supabase/client'
 
 interface CloudService {
   id: string
@@ -68,6 +69,26 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
   // Permissions
   const canManageIntegrations = ['owner', 'admin'].includes(currentUserRole)
 
+  // Helper function to get authenticated fetch
+  const getAuthenticatedFetch = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      throw new Error('Authentication required')
+    }
+    
+    return (url: string, options: RequestInit = {}) => {
+      return fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          ...options.headers,
+        },
+      }).then(r => r.json())
+    }
+  }
+
   useEffect(() => {
     loadCloudServices()
   }, [])
@@ -79,9 +100,7 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
       // Load existing integrations from API
       const data = providedApiCall 
         ? await providedApiCall(`/api/collaborate/cloud-integrations?teamId=${teamId}`)
-        : await fetch(`/api/collaborate/cloud-integrations?teamId=${teamId}`, {
-        credentials: 'include'
-          }).then(r => r.json())
+        : await (await getAuthenticatedFetch())(`/api/collaborate/cloud-integrations?teamId=${teamId}`)
       
       // Define available services
       const availableServices: CloudService[] = [
@@ -186,21 +205,20 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
               autoSync: false
             }),
           })
-        : await fetch('/api/collaborate/cloud-integrations', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          teamId,
-          serviceName: serviceType,
-          serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
-          permissions: { read: true, write: true, share: true },
-          syncEnabled: true,
-          autoSync: false
-        }),
-          }).then(r => r.json())
+        : await (await getAuthenticatedFetch())('/api/collaborate/cloud-integrations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              teamId,
+              serviceName: serviceType,
+              serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
+              permissions: { read: true, write: true, share: true },
+              syncEnabled: true,
+              autoSync: false
+            }),
+          })
 
       if (data.success) {
         setServices(prev => prev.map(service => 
@@ -244,10 +262,9 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
         ? await providedApiCall(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
             method: 'DELETE',
           })
-        : await fetch(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-          }).then(r => r.json())
+        : await (await getAuthenticatedFetch())(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
+            method: 'DELETE',
+          })
 
       if (data.success) {
         setServices(prev => prev.map(service => 

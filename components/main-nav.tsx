@@ -48,6 +48,19 @@ export function MainNav() {
 
     const sizeClass = size === "sm" ? "h-8 w-8 text-sm" : "h-10 w-10 text-base"
 
+    // Try to get avatar URL from user metadata or profile
+    const avatarUrl = user?.user_metadata?.avatar_url
+
+    if (avatarUrl) {
+      return (
+        <img
+          src={`${avatarUrl}?v=${Date.now()}`}
+          alt="Profile"
+          className={`${sizeClass} rounded-full object-cover`}
+        />
+      )
+    }
+
     return (
       <div
         className={`${sizeClass} bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold rounded-full flex items-center justify-center`}

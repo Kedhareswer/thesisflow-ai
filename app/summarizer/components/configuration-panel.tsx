@@ -46,6 +46,20 @@ export function ConfigurationPanel({
         className="mb-4"
       />
 
+      {/* Provider Impact Indicator */}
+      {selectedProvider && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-sm border border-blue-200">
+          <p className="text-sm text-blue-800 font-light">
+            <span className="font-medium">Using {selectedProvider}:</span>
+            {selectedProvider === "groq" && " Fast, efficient summaries with high accuracy"}
+            {selectedProvider === "openai" && " Advanced reasoning and detailed analysis"}
+            {selectedProvider === "gemini" && " Balanced analysis with comprehensive coverage"}
+            {selectedProvider === "aiml" && " Specialized AI analysis and insights"}
+            {selectedProvider === "deepinfra" && " High-performance AI processing"}
+          </p>
+        </div>
+      )}
+
       {/* Advanced Options */}
       <div>
         <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
@@ -56,6 +70,19 @@ export function ConfigurationPanel({
           <CollapsibleContent className="mt-4">
             <Card className="border-gray-200 bg-white">
               <CardContent className="p-6 space-y-4">
+                {/* Current Settings Indicator */}
+                <div className="mb-4 p-3 bg-gray-50 rounded-sm">
+                  <p className="text-sm text-gray-600 font-light">
+                    <span className="font-medium text-black">Current Settings:</span> {summaryStyle} • {summaryLength}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {summaryStyle === "academic" && "Formal, scholarly analysis with citations"}
+                    {summaryStyle === "executive" && "Business-focused with strategic insights"}
+                    {summaryStyle === "bullet-points" && "Structured bullet-point format"}
+                    {summaryStyle === "detailed" && "Comprehensive analysis with deep insights"}
+                  </p>
+                </div>
+
                 <div>
                   <Label className="text-sm font-light text-gray-700 mb-2 block">Summary Style</Label>
                   <Select value={summaryStyle} onValueChange={onSummaryStyleChange}>

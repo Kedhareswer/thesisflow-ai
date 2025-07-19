@@ -296,12 +296,19 @@ export default function ProfilePage() {
                   <ProfilePictureUpload
                     currentAvatarUrl={profile.avatar_url}
                     userId={user.id}
-                    onUploadComplete={(avatarUrl) => setProfile({ ...profile, avatar_url: avatarUrl })}
+                    onUploadComplete={(avatarUrl) => {
+                      setProfile({ ...profile, avatar_url: avatarUrl })
+                      // Force a page refresh to update all avatar displays
+                      window.location.reload()
+                    }}
                     size="lg"
                   />
                 ) : (
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={profile.display_name} />
+                    <AvatarImage 
+                      src={profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : "/placeholder.svg"} 
+                      alt={profile.display_name} 
+                    />
                     <AvatarFallback className="text-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                       {getInitials()}
                     </AvatarFallback>

@@ -18,6 +18,8 @@ interface ContextInputPanelProps {
   onFileError: (error: string) => void
   urlFetching: boolean
   getWordCount: (text: string) => number
+  currentTab: "file" | "url"
+  onTabChange: (tab: "file" | "url") => void
 }
 
 export function ContextInputPanel({
@@ -30,13 +32,15 @@ export function ContextInputPanel({
   onFileError,
   urlFetching,
   getWordCount,
+  currentTab,
+  onTabChange,
 }: ContextInputPanelProps) {
   return (
     <div>
       <h3 className="text-xl font-light text-black mb-4 tracking-tight">Content Input</h3>
       <Card className="border-gray-200 bg-white">
         <CardContent className="p-6">
-          <Tabs defaultValue="file" className="w-full">
+          <Tabs value={currentTab} onValueChange={(value) => onTabChange(value as "file" | "url")} className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-0.5 rounded-sm h-10">
               <TabsTrigger
                 value="file"

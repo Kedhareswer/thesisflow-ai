@@ -201,7 +201,9 @@ export async function DELETE(request: NextRequest) {
     const user = await requireAuth(request, "user-api-keys")
     console.log("User API Keys DELETE: Authenticated user:", user.id)
 
-    const { provider } = await request.json()
+    // Get provider from query parameters instead of request body
+    const { searchParams } = new URL(request.url)
+    const provider = searchParams.get('provider')
 
     if (!provider) {
       return NextResponse.json(

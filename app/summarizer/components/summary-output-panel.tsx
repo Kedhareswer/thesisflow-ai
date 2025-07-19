@@ -26,6 +26,8 @@ interface SummaryOutputPanelProps {
   onShareSummary: () => void
   getWordCount: (text: string) => number
   showAdvancedStats?: boolean
+  summaryStyle?: "academic" | "executive" | "bullet-points" | "detailed"
+  summaryLength?: "brief" | "medium" | "comprehensive"
 }
 
 export function SummaryOutputPanel({
@@ -36,6 +38,8 @@ export function SummaryOutputPanel({
   onDownloadSummary,
   onShareSummary,
   getWordCount,
+  summaryStyle,
+  summaryLength,
 }: SummaryOutputPanelProps) {
   if (loading) {
     return (
@@ -63,12 +67,100 @@ export function SummaryOutputPanel({
     )
   }
 
+  // Helper to get style-specific formatting
+  const getStyleFormatting = (style: string, length: string) => {
+    const baseClasses = "prose prose-lg max-w-none leading-relaxed font-light"
+    
+    switch (style) {
+      case "academic":
+        return {
+          container: "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200",
+          header: "text-blue-900",
+          content: `${baseClasses} text-blue-800`,
+          badge: "bg-blue-100 text-blue-800 border-blue-300",
+          icon: "text-blue-600"
+        }
+      case "executive":
+        return {
+          container: "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200",
+          header: "text-green-900",
+          content: `${baseClasses} text-green-800`,
+          badge: "bg-green-100 text-green-800 border-green-300",
+          icon: "text-green-600"
+        }
+      case "bullet-points":
+        return {
+          container: "bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200",
+          header: "text-purple-900",
+          content: `${baseClasses} text-purple-800`,
+          badge: "bg-purple-100 text-purple-800 border-purple-300",
+          icon: "text-purple-600"
+        }
+      case "detailed":
+        return {
+          container: "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200",
+          header: "text-orange-900",
+          content: `${baseClasses} text-orange-800`,
+          badge: "bg-orange-100 text-orange-800 border-orange-300",
+          icon: "text-orange-600"
+        }
+      default:
+        return {
+          container: "bg-white border-gray-200",
+          header: "text-black",
+          content: `${baseClasses} text-gray-900`,
+          badge: "bg-gray-100 text-gray-800 border-gray-300",
+          icon: "text-gray-600"
+        }
+    }
+  }
+
+  // Helper to get length-specific styling
+  const getLengthStyling = (length: string) => {
+    switch (length) {
+      case "brief":
+        return {
+          padding: "p-6",
+          fontSize: "text-base",
+          spacing: "space-y-2"
+        }
+      case "medium":
+        return {
+          padding: "p-8",
+          fontSize: "text-lg",
+          spacing: "space-y-3"
+        }
+      case "comprehensive":
+        return {
+          padding: "p-10",
+          fontSize: "text-xl",
+          spacing: "space-y-4"
+        }
+      default:
+        return {
+          padding: "p-8",
+          fontSize: "text-lg",
+          spacing: "space-y-3"
+        }
+    }
+  }
+
+  const styleFormatting = getStyleFormatting(summaryStyle || "detailed", summaryLength || "medium")
+  const lengthStyling = getLengthStyling(summaryLength || "medium")
+
   return (
     <div className="space-y-8">
       {/* Primary Summary */}
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-light text-black tracking-tight">Summary</h2>
+          <div>
+            <h2 className="text-2xl font-light text-black tracking-tight">Summary</h2>
+            {summaryStyle && summaryLength && (
+              <p className="text-sm text-gray-600 font-light mt-1">
+                {summaryStyle.charAt(0).toUpperCase() + summaryStyle.slice(1)} • {summaryLength.charAt(0).toUpperCase() + summaryLength.slice(1)}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-light flex items-center gap-2">
               <Clock className="h-4 w-4" />
@@ -80,27 +172,55 @@ export function SummaryOutputPanel({
           </div>
         </div>
         
-        <div className="bg-white border border-gray-200 rounded-sm">
-          <div className="p-8">
-            <div className="prose prose-lg max-w-none text-gray-900 leading-relaxed font-light">
-              {result.summary.split('\n').map((paragraph, index) => (
-                paragraph.trim() && (
-                  <p key={index} className="mb-4 last:mb-0">
-                    {paragraph}
-                  </p>
-                )
-              ))}
+        <div className={`${styleFormatting.container} rounded-sm border`}>
+          <div className={`${lengthStyling.padding} ${styleFormatting.header}`}>
+            <h3 className="text-2xl font-light tracking-tight">Summary</h3>
+            {summaryStyle && summaryLength && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`text-sm font-light px-2 py-1 rounded ${styleFormatting.badge}`}>
+                  {summaryStyle.charAt(0).toUpperCase() + summaryStyle.slice(1)} • {summaryLength.charAt(0).toUpperCase() + summaryLength.slice(1)}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          <div className={`${lengthStyling.padding} pt-0`}>
+            <div className={`${styleFormatting.content} ${lengthStyling.fontSize}`}>
+              {summaryStyle === "bullet-points" ? (
+                // Special formatting for bullet points
+                <div className={lengthStyling.spacing}>
+                  {result.summary.split('\n').map((paragraph, index) => (
+                    paragraph.trim() && (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className={`w-1.5 h-1.5 rounded-full mt-2.5 flex-shrink-0 ${styleFormatting.icon.replace('text-', 'bg-')}`} />
+                        <span className="leading-relaxed">{paragraph}</span>
+                      </div>
+                    )
+                  ))}
+                </div>
+              ) : (
+                // Regular paragraph formatting for other styles
+                <div className={lengthStyling.spacing}>
+                  {result.summary.split('\n').map((paragraph, index) => (
+                    paragraph.trim() && (
+                      <p key={index} className="mb-4 last:mb-0">
+                        {paragraph}
+                      </p>
+                    )
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           
           {/* Action Buttons */}
-          <div className="border-t border-gray-200 px-8 py-4 bg-gray-50/50">
+          <div className={`border-t px-8 py-4 ${styleFormatting.container.replace('bg-gradient-to-br', 'bg-opacity-50')}`}>
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => onCopyToClipboard(result.summary)}
                 variant="outline"
                 size="sm"
-                className="border-gray-300 hover:bg-white text-gray-700 font-light"
+                className={`border ${styleFormatting.badge} hover:bg-white font-light`}
               >
                 <Copy className="h-4 w-4 mr-2" />
                 {copied ? "Copied" : "Copy"}
@@ -109,7 +229,7 @@ export function SummaryOutputPanel({
                 onClick={onDownloadSummary}
                 variant="outline"
                 size="sm"
-                className="border-gray-300 hover:bg-white text-gray-700 font-light"
+                className={`border ${styleFormatting.badge} hover:bg-white font-light`}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download
@@ -118,7 +238,7 @@ export function SummaryOutputPanel({
                 onClick={onShareSummary}
                 variant="outline"
                 size="sm"
-                className="border-gray-300 hover:bg-white text-gray-700 font-light"
+                className={`border ${styleFormatting.badge} hover:bg-white font-light`}
               >
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
@@ -131,14 +251,14 @@ export function SummaryOutputPanel({
       {/* Key Points */}
       {result.keyPoints && result.keyPoints.length > 0 && (
         <div>
-          <h3 className="text-xl font-light text-black mb-4 tracking-tight">Key Points</h3>
-          <Card className="border-gray-200 bg-white">
-            <CardContent className="p-6">
-              <ul className="space-y-3">
+          <h3 className={`text-xl font-light mb-4 tracking-tight ${styleFormatting.header}`}>Key Points</h3>
+          <Card className={`${styleFormatting.container} border`}>
+            <CardContent className={`${lengthStyling.padding}`}>
+              <ul className={lengthStyling.spacing}>
                 {result.keyPoints.map((point, index) => (
                   <li key={index} className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 bg-black rounded-full mt-2.5 flex-shrink-0" />
-                    <span className="text-gray-800 leading-relaxed font-light">{point}</span>
+                    <div className={`w-1.5 h-1.5 rounded-full mt-2.5 flex-shrink-0 ${styleFormatting.icon.replace('text-', 'bg-')}`} />
+                    <span className={`leading-relaxed font-light ${styleFormatting.content}`}>{point}</span>
                   </li>
                 ))}
               </ul>
@@ -149,25 +269,25 @@ export function SummaryOutputPanel({
 
       {/* Statistics */}
       <div>
-        <h3 className="text-xl font-light text-black mb-4 tracking-tight">Statistics</h3>
-        <Card className="border-gray-200 bg-white">
-          <CardContent className="p-6">
+        <h3 className={`text-xl font-light mb-4 tracking-tight ${styleFormatting.header}`}>Statistics</h3>
+        <Card className={`${styleFormatting.container} border`}>
+          <CardContent className={`${lengthStyling.padding}`}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="text-center">
-                <div className="text-2xl font-light text-black mb-1">{result.readingTime}</div>
-                <div className="text-sm text-gray-600 font-light">Minutes</div>
+                <div className={`text-2xl font-light mb-1 ${styleFormatting.header}`}>{result.readingTime}</div>
+                <div className={`text-sm font-light ${styleFormatting.content}`}>Minutes</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-light text-black mb-1">{result.compressionRatio}</div>
-                <div className="text-sm text-gray-600 font-light">Compressed</div>
+                <div className={`text-2xl font-light mb-1 ${styleFormatting.header}`}>{result.compressionRatio}</div>
+                <div className={`text-sm font-light ${styleFormatting.content}`}>Compressed</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-light text-black mb-1">{getWordCount(result.summary)}</div>
-                <div className="text-sm text-gray-600 font-light">Words</div>
+                <div className={`text-2xl font-light mb-1 ${styleFormatting.header}`}>{getWordCount(result.summary)}</div>
+                <div className={`text-sm font-light ${styleFormatting.content}`}>Words</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-light text-black mb-1">{result.originalLength}</div>
-                <div className="text-sm text-gray-600 font-light">Original</div>
+                <div className={`text-2xl font-light mb-1 ${styleFormatting.header}`}>{result.originalLength}</div>
+                <div className={`text-sm font-light ${styleFormatting.content}`}>Original</div>
               </div>
             </div>
           </CardContent>
@@ -177,14 +297,14 @@ export function SummaryOutputPanel({
       {/* Topics */}
       {result.topics && result.topics.length > 0 && (
         <div>
-          <h3 className="text-xl font-light text-black mb-4 tracking-tight">Topics</h3>
-          <Card className="border-gray-200 bg-white">
-            <CardContent className="p-6">
+          <h3 className={`text-xl font-light mb-4 tracking-tight ${styleFormatting.header}`}>Topics</h3>
+          <Card className={`${styleFormatting.container} border`}>
+            <CardContent className={`${lengthStyling.padding}`}>
               <div className="flex flex-wrap gap-2">
                 {result.topics.map((topic, index) => (
                   <span
                     key={index}
-                    className="px-3 py-1 bg-gray-100 text-gray-800 text-sm font-light border border-gray-200 rounded-sm"
+                    className={`px-3 py-1 text-sm font-light border rounded-sm ${styleFormatting.badge}`}
                   >
                     {topic}
                   </span>
@@ -198,18 +318,18 @@ export function SummaryOutputPanel({
       {/* Tables */}
       {Array.isArray((result as any).tables) && (result as any).tables.length > 0 && (
         <div>
-          <h3 className="text-xl font-light text-black mb-4 tracking-tight">Tables</h3>
+          <h3 className={`text-xl font-light mb-4 tracking-tight ${styleFormatting.header}`}>Tables</h3>
           <div className="space-y-6">
             {(result as any).tables.map((table: any, idx: number) => (
-              <Card key={idx} className="border-gray-200 bg-white">
-                <CardContent className="p-6">
-                  <div className="font-light text-lg mb-4 text-black">{table.title}</div>
+              <Card key={idx} className={`${styleFormatting.container} border`}>
+                <CardContent className={`${lengthStyling.padding}`}>
+                  <div className={`font-light text-lg mb-4 ${styleFormatting.header}`}>{table.title}</div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full border-collapse">
                       <thead>
                         <tr>
                           {table.headers.map((header: string, hidx: number) => (
-                            <th key={hidx} className="border border-gray-300 px-4 py-2 bg-gray-50 text-left font-light text-black">
+                            <th key={hidx} className={`border px-4 py-2 text-left font-light ${styleFormatting.badge}`}>
                               {header}
                             </th>
                           ))}
@@ -219,7 +339,7 @@ export function SummaryOutputPanel({
                         {table.rows.map((row: any[], ridx: number) => (
                           <tr key={ridx}>
                             {row.map((cell: any, cidx: number) => (
-                              <td key={cidx} className="border border-gray-300 px-4 py-2 text-gray-800 font-light">
+                              <td key={cidx} className={`border px-4 py-2 font-light ${styleFormatting.content}`}>
                                 {cell}
                               </td>
                             ))}

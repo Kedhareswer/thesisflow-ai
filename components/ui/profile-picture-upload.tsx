@@ -83,19 +83,19 @@ export function ProfilePictureUpload({
         .from('avatars')
         .upload(fileName, file, {
           upsert: false,
-          cacheControl: '3600'
+          cacheControl: '0' // Disable cache
         })
 
       if (error) {
         throw new Error(`Upload failed: ${error.message}`)
       }
 
-      // Get public URL
+      // Get public URL with cache-busting parameter
       const { data: urlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName)
 
-      const avatarUrl = urlData.publicUrl
+      const avatarUrl = `${urlData.publicUrl}?v=${Date.now()}`
 
       // Update user profile with new avatar URL
       const { error: updateError } = await supabase
@@ -110,6 +110,16 @@ export function ProfilePictureUpload({
         // Clean up uploaded file if profile update fails
         await supabase.storage.from('avatars').remove([fileName])
         throw new Error(`Profile update failed: ${updateError.message}`)
+      }
+
+      // Also update user metadata for consistency
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { avatar_url: avatarUrl }
+      })
+
+      if (metadataError) {
+        console.warn('Failed to update user metadata:', metadataError)
+        // Don't throw here as the main upload succeeded
       }
 
       onUploadComplete(avatarUrl)
