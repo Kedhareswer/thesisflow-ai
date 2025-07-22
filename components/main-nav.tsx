@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut } from "lucide-react"
+import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ const NotificationBell = lazy(() => import("@/app/collaborate/components/notific
 const navigation = [
   { name: "Explorer", href: "/explorer", icon: Search },
   { name: "Summarizer", href: "/summarizer", icon: FileText },
+  { name: "Writer", href: "/writer", icon: PenLine },
   { name: "Planner", href: "/planner", icon: Calendar },
   { name: "Collaborate", href: "/collaborate", icon: Users },
 ]
