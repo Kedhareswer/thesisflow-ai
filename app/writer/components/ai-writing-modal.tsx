@@ -12,18 +12,17 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Loader2, Sparkles, FileText } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 const writingTasks = [
-  { id: "continue", name: "Continue writing", description: "Continue from where you left off" },
-  { id: "introduction", name: "Write introduction", description: "Create an engaging introduction" },
-  { id: "conclusion", name: "Write conclusion", description: "Summarize findings and implications" },
-  { id: "abstract", name: "Write abstract", description: "Concise summary of the research" },
-  { id: "methodology", name: "Write methodology", description: "Describe research methods" },
-  { id: "results", name: "Write results", description: "Present findings clearly" },
-  { id: "custom", name: "Custom prompt", description: "Use your own writing prompt" },
+  { id: "continue", name: "Continue writing" },
+  { id: "introduction", name: "Write introduction" },
+  { id: "conclusion", name: "Write conclusion" },
+  { id: "abstract", name: "Write abstract" },
+  { id: "methodology", name: "Write methodology" },
+  { id: "results", name: "Write results" },
+  { id: "custom", name: "Custom prompt" },
 ]
 
 interface AIWritingModalProps {
@@ -48,15 +47,15 @@ export function AIWritingModal({
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
   const [generatedContent, setGeneratedContent] = useState<string>("")
 
-  // Generate AI content based on task
+  // Generate mock AI content based on task
   const generateContent = async () => {
     setIsGenerating(true)
     setGeneratedContent("")
     try {
+      // Build the prompt
       const systemPrompt =
         "You are a professional academic writer. Write in a clear, academic style appropriate for publication. Focus on producing coherent, well-structured text suitable for a scholarly publication. "
       let taskPrompt = ""
-
       switch (selectedTask) {
         case "introduction":
           taskPrompt =
@@ -84,13 +83,10 @@ export function AIWritingModal({
           taskPrompt = customPrompt || "Continue the writing in a coherent and logical manner."
           break
       }
-
       const fullPrompt = `${systemPrompt}\n\n${taskPrompt}`
-
       // Get the user's access token
       const { data } = await supabase.auth.getSession()
       const token = data.session?.access_token
-
       const response = await fetch("/api/ai/generate", {
         method: "POST",
         headers: {
@@ -105,13 +101,11 @@ export function AIWritingModal({
           maxTokens: 800,
         }),
       })
-
       if (!response.ok) throw new Error("Failed to generate content")
-
       const dataRes = await response.json()
       setGeneratedContent(dataRes.content || dataRes.choices?.[0]?.text || "No content generated.")
     } catch (err) {
-      setGeneratedContent("Error generating content. Please try again.")
+      setGeneratedContent("Error generating content.")
     } finally {
       setIsGenerating(false)
     }
@@ -124,60 +118,53 @@ export function AIWritingModal({
     setCustomPrompt("")
   }
 
-  const handleClose = () => {
-    onOpenChange(false)
-    setGeneratedContent("")
-    setCustomPrompt("")
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-white border-gray-200">
-        <DialogHeader className="pb-4">
-          <DialogTitle className="flex items-center space-x-2 text-lg font-semibold text-black">
-            <Sparkles className="h-5 w-5" />
-            <span>AI Writing Assistant</span>
-          </DialogTitle>
+      <DialogContent className="sm:max-w-[700px] bg-white border-gray-200">
+        <DialogHeader className="border-b border-gray-200 pb-4">
+          <DialogTitle className="text-lg font-semibold text-black">AI Writing Assistant</DialogTitle>
           <DialogDescription className="text-sm text-gray-600">
             Generate content using {selectedProvider} with {selectedModel}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Task Selection */}
+        <div className="grid gap-4 py-4">
+          {/* Task selection */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Writing Task</Label>
+            <label htmlFor="task" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+              Writing Task
+            </label>
             <Select value={selectedTask} onValueChange={setSelectedTask}>
-              <SelectTrigger className="border-gray-300 bg-white">
-                <SelectValue />
+              <SelectTrigger className="border-gray-300">
+                <SelectValue placeholder="Select task" />
               </SelectTrigger>
               <SelectContent>
                 {writingTasks.map((task) => (
                   <SelectItem key={task.id} value={task.id}>
-                    <div>
-                      <div className="font-medium">{task.name}</div>
-                      <div className="text-xs text-gray-500">{task.description}</div>
-                    </div>
+                    {task.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Custom Prompt */}
+          {/* Custom prompt (visible only for custom task) */}
           {selectedTask === "custom" && (
             <div className="space-y-2">
-              <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Custom Prompt</Label>
+              <label htmlFor="custom-prompt" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+                Custom Prompt
+              </label>
               <Textarea
-                placeholder="Describe what you want the AI to write..."
+                id="custom-prompt"
+                placeholder="Enter your writing prompt here..."
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                className="h-24 border-gray-300 bg-white resize-none"
+                className="h-24 border-gray-300 resize-none"
               />
             </div>
           )}
 
-          {/* Generate Button */}
+          {/* Generation button */}
           <Button
             onClick={generateContent}
             className="w-full bg-black text-white hover:bg-gray-800"
@@ -186,7 +173,7 @@ export function AIWritingModal({
             {isGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating content...
+                Generating...
               </>
             ) : (
               <>
@@ -196,28 +183,27 @@ export function AIWritingModal({
             )}
           </Button>
 
-          {/* Generated Content */}
+          {/* Generated content */}
           {generatedContent && (
             <div className="space-y-2">
-              <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Generated Content</Label>
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 max-h-[300px] overflow-y-auto">
-                <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{generatedContent}</div>
+              <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Generated Content</label>
+              <div className="border border-gray-200 rounded-md p-4 bg-gray-50 overflow-y-auto max-h-[300px]">
+                <div className="whitespace-pre-wrap text-sm text-gray-800">{generatedContent}</div>
               </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="pt-4 border-t border-gray-200">
-          <Button variant="outline" onClick={handleClose} className="border-gray-300 bg-white hover:bg-gray-50">
+        <DialogFooter className="border-t border-gray-200 pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-gray-300">
             Cancel
           </Button>
           <Button
             onClick={handleInsertContent}
             disabled={!generatedContent}
-            className="bg-black text-white hover:bg-gray-800 disabled:opacity-50"
+            className="bg-black text-white hover:bg-gray-800"
           >
-            <FileText className="h-4 w-4 mr-2" />
-            Insert Content
+            Insert into Document
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useResearchSession } from "@/components/research-session-provider"
-import { FileText, Plus, Trash2, Download, BookOpen } from "lucide-react"
+import { FileText, Plus, Trash2, Download } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 
 // Citation format types
@@ -94,8 +94,12 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
 
   // Format citations based on selected format
   const formatCitations = () => {
+    // In a real implementation, we would use a citation formatting library like Citation.js
+    // For now, we're mocking the formatted references
+
     const allCitations = [...papersToCitations(), ...manualCitations]
 
+    // Simplified citation formatting based on IEEE style
     let formatted = ""
 
     if (citationFormat === "ieee") {
@@ -118,6 +122,7 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
         })
         .join("\n\n")
     } else {
+      // Default or other formats could be implemented similarly
       formatted = allCitations
         .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
         .join("\n\n")
@@ -141,12 +146,18 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
       title: "",
       authors: [""],
     }
+
     setManualCitations([...manualCitations, newCitation])
   }
 
   // Remove a manual citation
   const removeManualCitation = (id: string) => {
     setManualCitations(manualCitations.filter((c) => c.id !== id))
+  }
+
+  // Generate references button handler
+  const handleGenerateReferences = () => {
+    formatCitations()
   }
 
   // Export references as a text file
@@ -162,13 +173,15 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
 
   return (
     <div className="space-y-4">
-      {/* Configuration */}
+      {/* Format Selection */}
       <div className="space-y-3">
         <div>
-          <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Citation Format</Label>
+          <Label htmlFor="citation-format" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+            Citation Format
+          </Label>
           <Select value={citationFormat} onValueChange={setCitationFormat}>
-            <SelectTrigger className="mt-1 h-8 text-xs border-gray-300 bg-white">
-              <SelectValue />
+            <SelectTrigger className="mt-1 h-8 text-xs border-gray-300">
+              <SelectValue placeholder="Select format" />
             </SelectTrigger>
             <SelectContent>
               {CITATION_FORMATS.map((format) => (
@@ -181,10 +194,12 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
         </div>
 
         <div>
-          <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Publisher Template</Label>
+          <Label htmlFor="publisher-template" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+            Publisher Template
+          </Label>
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-            <SelectTrigger className="mt-1 h-8 text-xs border-gray-300 bg-white">
-              <SelectValue />
+            <SelectTrigger className="mt-1 h-8 text-xs border-gray-300">
+              <SelectValue placeholder="Select template" />
             </SelectTrigger>
             <SelectContent>
               {PUBLISHER_TEMPLATES.map((template) => (
@@ -197,23 +212,19 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
         </div>
       </div>
 
-      <Separator className="bg-gray-200" />
+      <Separator />
 
-      {/* Research Papers Section */}
-      <div className="space-y-3">
-        <div className="flex items-center space-x-2">
-          <BookOpen className="h-4 w-4 text-gray-600" />
-          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-            Research Papers ({selectedPapers.length})
-          </h4>
-        </div>
-
+      {/* Research Papers */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+          Research Papers ({selectedPapers.length})
+        </h4>
         {selectedPapers.length > 0 ? (
           <div className="space-y-2 max-h-32 overflow-y-auto">
             {selectedPapers.map((paper) => (
-              <div key={paper.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                <div className="text-xs font-medium text-black line-clamp-2">{paper.title}</div>
-                <div className="text-xs text-gray-500 mt-1">
+              <div key={paper.id} className="text-xs p-2 border border-gray-200 rounded bg-gray-50">
+                <div className="font-medium text-black truncate">{paper.title}</div>
+                <div className="text-gray-500 mt-0.5">
                   {paper.authors
                     ? paper.authors
                         .map((a: any) => {
@@ -222,32 +233,29 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                           return ""
                         })
                         .filter(Boolean)
-                        .slice(0, 3)
                         .join(", ")
                     : ""}{" "}
-                  {paper.authors && paper.authors.length > 3 && "et al."} ({paper.year || "n.d."})
+                  ({paper.year || ""})
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-xs text-gray-500 py-4 text-center bg-gray-50 rounded-md border border-gray-200">
-            No papers selected from research session
-          </div>
+          <p className="text-xs text-gray-500 py-2">No papers selected from research session</p>
         )}
       </div>
 
-      {/* Manual Citations Section */}
-      <div className="space-y-3">
+      {/* Manual Citations */}
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+          <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
             Manual Citations ({manualCitations.length})
           </h4>
           <Button
             variant="outline"
             size="sm"
             onClick={addManualCitation}
-            className="h-7 px-2 text-xs border-gray-300 bg-white hover:bg-gray-50"
+            className="h-6 px-2 text-xs border-gray-300 bg-transparent"
           >
             <Plus className="h-3 w-3 mr-1" />
             Add
@@ -257,9 +265,9 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
         {manualCitations.length > 0 ? (
           <div className="space-y-3 max-h-48 overflow-y-auto">
             {manualCitations.map((citation, index) => (
-              <div key={citation.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <div key={citation.id} className="p-3 border border-gray-200 rounded bg-gray-50">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-black">Citation #{index + 1}</span>
+                  <h5 className="text-xs font-medium text-black">Citation #{index + 1}</h5>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -272,8 +280,11 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
 
                 <div className="space-y-2">
                   <div>
-                    <Label className="text-xs text-gray-600">Title</Label>
+                    <Label htmlFor={`title-${citation.id}`} className="text-xs text-gray-600">
+                      Title
+                    </Label>
                     <Input
+                      id={`title-${citation.id}`}
                       value={citation.title}
                       onChange={(e) => {
                         const updated = manualCitations.map((c) =>
@@ -281,14 +292,16 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                         )
                         setManualCitations(updated)
                       }}
-                      className="h-7 text-xs mt-1 border-gray-300 bg-white"
-                      placeholder="Enter title..."
+                      className="h-6 text-xs mt-1 border-gray-300"
                     />
                   </div>
 
                   <div>
-                    <Label className="text-xs text-gray-600">Authors</Label>
+                    <Label htmlFor={`authors-${citation.id}`} className="text-xs text-gray-600">
+                      Authors (comma separated)
+                    </Label>
                     <Input
+                      id={`authors-${citation.id}`}
                       value={citation.authors.join(", ")}
                       onChange={(e) => {
                         const updated = manualCitations.map((c) =>
@@ -296,15 +309,17 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                         )
                         setManualCitations(updated)
                       }}
-                      className="h-7 text-xs mt-1 border-gray-300 bg-white"
-                      placeholder="Author 1, Author 2..."
+                      className="h-6 text-xs mt-1 border-gray-300"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs text-gray-600">Year</Label>
+                      <Label htmlFor={`year-${citation.id}`} className="text-xs text-gray-600">
+                        Year
+                      </Label>
                       <Input
+                        id={`year-${citation.id}`}
                         value={citation.year || ""}
                         onChange={(e) => {
                           const updated = manualCitations.map((c) =>
@@ -312,14 +327,16 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                           )
                           setManualCitations(updated)
                         }}
-                        className="h-7 text-xs mt-1 border-gray-300 bg-white"
-                        placeholder="2024"
+                        className="h-6 text-xs mt-1 border-gray-300"
                       />
                     </div>
 
                     <div>
-                      <Label className="text-xs text-gray-600">Journal</Label>
+                      <Label htmlFor={`journal-${citation.id}`} className="text-xs text-gray-600">
+                        Journal
+                      </Label>
                       <Input
+                        id={`journal-${citation.id}`}
                         value={citation.journal || ""}
                         onChange={(e) => {
                           const updated = manualCitations.map((c) =>
@@ -327,8 +344,7 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                           )
                           setManualCitations(updated)
                         }}
-                        className="h-7 text-xs mt-1 border-gray-300 bg-white"
-                        placeholder="Journal name"
+                        className="h-6 text-xs mt-1 border-gray-300"
                       />
                     </div>
                   </div>
@@ -337,38 +353,30 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
             ))}
           </div>
         ) : (
-          <div className="text-xs text-gray-500 py-4 text-center bg-gray-50 rounded-md border border-gray-200">
-            No manual citations added
-          </div>
+          <p className="text-xs text-gray-500 py-2">No manual citations added</p>
         )}
       </div>
 
       {/* Action Buttons */}
       <div className="flex gap-2 pt-2">
-        <Button onClick={formatCitations} className="flex-1 h-8 text-xs bg-black text-white hover:bg-gray-800">
+        <Button onClick={handleGenerateReferences} className="flex-1 h-8 text-xs bg-black text-white hover:bg-gray-800">
           <FileText className="h-3 w-3 mr-2" />
           Generate References
         </Button>
 
         {formattedReferences && (
-          <Button
-            variant="outline"
-            onClick={exportReferences}
-            className="h-8 px-3 border-gray-300 bg-white hover:bg-gray-50"
-          >
+          <Button variant="outline" onClick={exportReferences} className="h-8 px-2 border-gray-300 bg-transparent">
             <Download className="h-3 w-3" />
           </Button>
         )}
       </div>
 
-      {/* Formatted References Output */}
+      {/* Formatted References */}
       {formattedReferences && (
-        <div className="space-y-2">
-          <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Formatted References</Label>
-          <div className="bg-white border border-gray-200 rounded-md p-3 max-h-64 overflow-y-auto">
-            <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
-              {formattedReferences}
-            </pre>
+        <div className="mt-4">
+          <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-2">Formatted References</h4>
+          <div className="border border-gray-200 rounded-md p-3 bg-gray-50 whitespace-pre-wrap text-xs font-mono overflow-auto max-h-64">
+            {formattedReferences}
           </div>
         </div>
       )}
