@@ -332,14 +332,8 @@ We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for
 
 ---
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 <div align="center">
-  <p>Built with ❤️ by the AI Research Hub Team</p>
+  <p>Built with ❤️ by Me</p>
   <p>
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Report Bug</a> | 
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a> | 
