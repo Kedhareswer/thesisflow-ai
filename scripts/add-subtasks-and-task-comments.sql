@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS public.task_comments (
     created_at timestamp with time zone DEFAULT timezone('utc', now())
 );
 CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON public.task_comments(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_comments_user_id ON public.task_comments(user_id); 
+CREATE INDEX IF NOT EXISTS idx_task_comments_user_id ON public.task_comments(user_id);

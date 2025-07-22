@@ -193,4 +193,4 @@ export function CreateTeamModal({ isOpen, onClose, onCreateTeam, isCreating }: C
       </DialogContent>
     </Dialog>
   )
-} 
+}

@@ -66,7 +66,7 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 
 ## System Architecture
 
-```mermaid
+\`\`\`mermaid
 flowchart TD
   Client[Next.js Frontend] --> Middleware[Auth Middleware]
   Middleware --> API[API Routes]
@@ -113,7 +113,7 @@ flowchart TD
     Python
     Literature
   end
-```
+\`\`\`
 
 ---
 
@@ -130,61 +130,61 @@ flowchart TD
 ### Environment Setup
 
 1. **Clone the repository**
-   ```bash
+   \`\`\`bash
    git clone https://github.com/Kedhareswer/ai-project-planner.git
    cd ai-project-planner
-   ```
+   \`\`\`
 
 2. **Install frontend dependencies**
-   ```bash
+   \`\`\`bash
    pnpm install
-   ```
+   \`\`\`
 
 3. **Configure environment variables**
-   ```bash
+   \`\`\`bash
    cp env.template .env.local
-   ```
+   \`\`\`
    Edit `.env.local` with your configuration.
 
 4. **Set up Python backend**
-   ```bash
+   \`\`\`bash
    cd python
    ./setup.sh   # or setup.bat for Windows
-   ```
+   \`\`\`
 
 5. **Configure Supabase Database**
-   ```bash
+   \`\`\`bash
    node scripts/run-migration.js
-   ```
+   \`\`\`
 
 ### Development Server
 
 1. **Start the full development environment**
-   ```bash
+   \`\`\`bash
    pnpm dev:all
-   ```
+   \`\`\`
    - Next.js frontend at `http://localhost:3000`
    - WebSocket server at port `3001`
 
 2. **Start Python backend (separate terminal)**
-   ```bash
+   \`\`\`bash
    cd python
    python app.py
-   ```
+   \`\`\`
    - Python service runs at `http://localhost:5000`
 
 ### Production Deployment
 
-```bash
+\`\`\`bash
 pnpm build
 pnpm start:all
-```
+\`\`\`
 
 ---
 
 ## Project Structure
 
-```
+\`\`\`
 ai-project-planner/
   app/                 # Next.js 13+ App Router
     (auth)/            # Authentication pages
@@ -203,7 +203,7 @@ ai-project-planner/
   scripts/             # Database/setup scripts
   public/              # Static assets
   ...
-```
+\`\`\`
 
 ---
 

@@ -59,4 +59,4 @@ export function GeneratedIdeas({ className }: { className?: string }) {
       </MotionGrid>
     </div>
   )
-} 
+}
