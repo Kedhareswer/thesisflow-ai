@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Latest-green?style=flat-square&logo=supabase)](https://supabase.io/)
-[![Socket.io](https://img.shields.io/badge/Socket.io-4.8.1-black?style=flat-square&logo=socket.io)](https://socket.io/)
+[![Socket.io](https://img.shields.io/badge/Socket.io-Latest-black?style=flat-square&logo=socket.io)](https://socket.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
 
 **Advanced AI-Powered Research Platform**
@@ -50,9 +50,19 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 
 - **Literature Explorer:** AI-powered paper discovery, topic analysis, and research gap identification.
 - **Smart Summarizer:** Summarize documents (PDF, DOCX, text, URLs), extract key points, perform sentiment analysis, and export results.
+- **Academic Writer:** Advanced document editor with AI-assisted writing, citation management, and publisher templates.
 - **Project Planner:** Organize research projects, manage tasks, track progress, and collaborate.
 - **Collaboration Hub:** Real-time teamwork, chat, file sharing, notifications, and flexible team permissions.
 - **AI Assistant:** Integrate multiple AI providers (Google Gemini, OpenAI, Groq, DeepInfra, AIML) for research guidance and writing support.
+
+### Writer Features
+
+- **Rich Text Editor:** Advanced document editor with formatting tools and real-time collaboration.
+- **AI Writing Assistant:** Context-aware AI assistance with multiple writing personalities (Academic, Technical, Creative).
+- **Citation Management:** Import citations from research, generate formatted references in multiple styles (APA, MLA, Chicago, IEEE, Harvard).
+- **Publisher Templates:** Support for multiple academic publisher formats (IEEE, ACM, Springer, Elsevier).
+- **Grammar & Style Checking:** Integrated language tool for grammar, style, and clarity improvements.
+- **Research Integration:** Seamlessly incorporate findings from the Literature Explorer into your documents.
 
 ### Additional Features
 
@@ -66,7 +76,7 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 
 ## System Architecture
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
   Client[Next.js Frontend] --> Middleware[Auth Middleware]
   Middleware --> API[API Routes]
@@ -113,7 +123,7 @@ flowchart TD
     Python
     Literature
   end
-\`\`\`
+```
 
 ---
 
@@ -130,80 +140,95 @@ flowchart TD
 ### Environment Setup
 
 1. **Clone the repository**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/Kedhareswer/ai-project-planner.git
    cd ai-project-planner
-   \`\`\`
+   ```
 
 2. **Install frontend dependencies**
-   \`\`\`bash
+   ```bash
    pnpm install
-   \`\`\`
+   ```
 
 3. **Configure environment variables**
-   \`\`\`bash
+   ```bash
    cp env.template .env.local
-   \`\`\`
+   ```
    Edit `.env.local` with your configuration.
 
-4. **Set up Python backend**
-   \`\`\`bash
+4. **Set up Python Backend**
+   ```bash
    cd python
-   ./setup.sh   # or setup.bat for Windows
-   \`\`\`
+   # For Linux/Mac
+   pip install -r requirements.txt
+   # For Windows
+   setup.bat
+   ```
 
 5. **Configure Supabase Database**
-   \`\`\`bash
+   ```bash
    node scripts/run-migration.js
-   \`\`\`
+   ```
 
 ### Development Server
 
 1. **Start the full development environment**
-   \`\`\`bash
+   ```bash
+   node start-dev.js
+   # or
    pnpm dev:all
-   \`\`\`
+   ```
    - Next.js frontend at `http://localhost:3000`
    - WebSocket server at port `3001`
 
 2. **Start Python backend (separate terminal)**
-   \`\`\`bash
+   ```bash
    cd python
    python app.py
-   \`\`\`
+   # or for improved version
+   python improved_app.py
+   ```
    - Python service runs at `http://localhost:5000`
 
 ### Production Deployment
 
-\`\`\`bash
+```bash
 pnpm build
 pnpm start:all
-\`\`\`
+```
 
 ---
 
 ## Project Structure
 
-\`\`\`
+```bash
 ai-project-planner/
-  app/                 # Next.js 13+ App Router
-    (auth)/            # Authentication pages
-    (ai-assistant)/    # AI assistant interface
-    (collaborate)/     # Team collaboration features
-    (explorer)/        # Research discovery tools
-    (planner)/         # Project management interface
-    (summarizer)/      # Document summarization tools
-    (api)/             # API routes
-    ...
+  app/                 # Next.js App Router
+    ai-assistant/      # AI assistant interface
+    api/               # API routes
+    collaborate/       # Team collaboration features
+    collaboration/     # Additional collaboration tools
+    explorer/          # Research discovery tools
+    planner/           # Project management interface
+    summarizer/        # Document summarization tools
+    writer/            # Writing tools
+    writing-assistant/ # Writing assistance features
+    login/             # Authentication pages
+    signup/            # User registration
+    profile/           # User profile management
+    settings/          # User settings
   components/          # Reusable UI components
+  hooks/               # Custom React hooks
+  integrations/        # External service integrations
   lib/                 # Core utilities/services
   services/            # Business logic
   server/              # WebSocket server
   python/              # Python backend services
   scripts/             # Database/setup scripts
   public/              # Static assets
-  ...
-\`\`\`
+  styles/              # Global styles
+  types/               # TypeScript type definitions
+```
 
 ---
 
@@ -234,8 +259,8 @@ ai-project-planner/
 
 ### Literature Search
 
-- **Backend:** Python Flask + pygetpapers
-- **Sources:** Crossref, arXiv, Europe PMC, Semantic Scholar
+- **Backend:** Python Flask + pygetpapers (v1.2.5)
+- **Sources:** Europe PMC, arXiv, Crossref, Semantic Scholar
 
 ### Development Tools
 
@@ -320,4 +345,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a> | 
     <a href="https://github.com/Kedhareswer/ai-project-planner/discussions">Join Discussion</a>
   </p>
+  <p>Last Updated: July 2025</p>
 </div>
