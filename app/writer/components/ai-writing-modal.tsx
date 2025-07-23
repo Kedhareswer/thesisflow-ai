@@ -10,379 +10,341 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Loader2, Sparkles, Check, FileText, AlertCircle } from "lucide-react"
+import { Loader2, Sparkles, Check, FileText, AlertCircle, GripVertical } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
+import type { DropResult, DraggableProvided, DroppableProvided } from 'react-beautiful-dnd'
+import { useRef } from "react"
 
-const sectionTasks = [
-  {
-    id: "introduction",
-    name: "Introduction",
-    description: "Create an engaging introduction with background and motivation",
-  },
-  { id: "table", name: "Key Table", description: "Present findings or comparisons in a structured table" },
-  { id: "diagram", name: "Diagram (Mermaid)", description: "Generate process workflows or relationship diagrams" },
-  {
-    id: "image",
-    name: "Image Suggestion",
-    description: "Suggest relevant images or figures with detailed descriptions",
-  },
-  { id: "conclusion", name: "Conclusion", description: "Summarize key points and provide closing thoughts" },
-]
-
-interface AIWritingModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  selectedProvider: string
-  selectedModel: string
-  documentTemplate: string
-  researchContext: string
-  writingStylePrompt: string
-  templatePrompt: string
-  supabaseToken: string | null
-  onGenerateContent: (text: string) => void
+// 1. Template config for multiple publishers
+const templates = {
+  ieee: [
+    { id: "title", title: "Title", prompt: "Write a concise, descriptive title for an IEEE research paper on the given topic.", required: true, editable: true },
+    { id: "authors", title: "Authors & Affiliations", prompt: "List the authors and their affiliations in IEEE format.", required: true, editable: true },
+    { id: "abstract", title: "Abstract", prompt: "Write an IEEE-style abstract (150-250 words) summarizing the motivation, methods, results, and significance. No citations or figures/tables.", required: true, editable: true },
+    { id: "keywords", title: "Keywords", prompt: "List 3-6 keywords relevant to the paper, comma-separated.", required: true, editable: true },
+    { id: "introduction", title: "1. Introduction", prompt: "Write the Introduction section for an IEEE research paper. Include motivation, problem statement, contributions, and paper organization.", required: true, editable: true },
+    { id: "related", title: "2. Related Work", prompt: "Write the Related Work section, discussing previous research and citing relevant literature.", required: true, editable: true },
+    { id: "methods", title: "3. Methods", prompt: "Describe the methods, datasets, algorithms, and experimental setup in detail.", required: true, editable: true },
+    { id: "results", title: "4. Results", prompt: "Present the results with tables, figures, and statistical analysis.", required: true, editable: true },
+    { id: "discussion", title: "5. Discussion", prompt: "Interpret the results, compare with prior work, and discuss limitations.", required: true, editable: true },
+    { id: "conclusion", title: "6. Conclusion", prompt: "Summarize the findings, contributions, and suggest future work.", required: true, editable: true },
+    { id: "acknowledgments", title: "Acknowledgments", prompt: "Write the acknowledgments section (optional).", required: false, editable: true },
+    { id: "references", title: "References", prompt: "List all references cited in the paper in IEEE format.", required: true, editable: true },
+  ],
+  acm: [
+    { id: "title", title: "Title", prompt: "Write a concise, descriptive title for an ACM research paper on the given topic.", required: true, editable: true },
+    { id: "authors", title: "Authors & Affiliations", prompt: "List the authors and their affiliations in ACM format.", required: true, editable: true },
+    { id: "abstract", title: "Abstract", prompt: "Write an ACM-style abstract (150-250 words) summarizing the motivation, methods, results, and significance. No citations or figures/tables.", required: true, editable: true },
+    { id: "keywords", title: "Keywords", prompt: "List 3-6 keywords relevant to the paper, comma-separated.", required: true, editable: true },
+    { id: "introduction", title: "1. Introduction", prompt: "Write the Introduction section for an ACM research paper. Include motivation, problem statement, contributions, and paper organization.", required: true, editable: true },
+    { id: "related", title: "2. Related Work", prompt: "Write the Related Work section, discussing previous research and citing relevant literature.", required: true, editable: true },
+    { id: "methods", title: "3. Methods", prompt: "Describe the methods, datasets, algorithms, and experimental setup in detail.", required: true, editable: true },
+    { id: "results", title: "4. Results", prompt: "Present the results with tables, figures, and statistical analysis.", required: true, editable: true },
+    { id: "discussion", title: "5. Discussion", prompt: "Interpret the results, compare with prior work, and discuss limitations.", required: true, editable: true },
+    { id: "conclusion", title: "6. Conclusion", prompt: "Summarize the findings, contributions, and suggest future work.", required: true, editable: true },
+    { id: "acknowledgments", title: "Acknowledgments", prompt: "Write the acknowledgments section (optional).", required: false, editable: true },
+    { id: "references", title: "References", prompt: "List all references cited in the paper in ACM format.", required: true, editable: true },
+  ],
 }
 
-export function AIWritingModal({
-  open,
-  onOpenChange,
-  selectedProvider,
-  selectedModel,
-  documentTemplate,
-  researchContext,
-  writingStylePrompt,
-  templatePrompt,
-  supabaseToken,
-  onGenerateContent,
-}: AIWritingModalProps) {
-  const [isGenerating, setIsGenerating] = useState<boolean>(false)
-  const [generatedSections, setGeneratedSections] = useState<{ id: string, name: string, content: string, loading: boolean }[]>([])
-  const [error, setError] = useState<string>("")
-  const [currentStep, setCurrentStep] = useState<number>(0)
+// Real AI integration for section generation
+async function generateSectionContent(
+  prompt: string,
+  context: string,
+  provider: string,
+  model: string,
+  supabaseToken: string | null,
+  writingStylePrompt: string,
+  templatePrompt: string,
+  researchContext: string
+) {
+  if (!supabaseToken) {
+    return 'Authentication error: Please log in again.'
+  }
+  // Compose the full prompt
+  const fullPrompt = [
+    writingStylePrompt,
+    templatePrompt,
+    researchContext ? `Research Context:\n${researchContext}` : '',
+    context ? `Previous Content:\n${context}` : '',
+    prompt
+  ].filter(Boolean).join('\n\n')
 
-  // Helper to build section-specific prompts
-  const buildPrompt = (sectionId: string, previousContent: string) => {
-    let sectionInstruction = ""
-    switch (sectionId) {
-      case "introduction":
-        sectionInstruction = "Write a comprehensive introduction for this research paper. Include background context, problem statement, research objectives, and a brief overview of the approach. Make it engaging and scholarly."
-        break
-      case "table":
-        sectionInstruction = "Create a well-structured Markdown table that presents key findings, comparisons, or data relevant to the research. Include proper headers and organize information logically."
-        break
-      case "diagram":
-        sectionInstruction = "If a process, workflow, architecture, or relationship can be visualized, create a Mermaid diagram enclosed in a Markdown code block (\`\`\`mermaid ... \`\`\`). Provide a clear explanation of the diagram and its significance."
-        break
-      case "image":
-        sectionInstruction = "Suggest a relevant image, figure, or visualization that would enhance the paper. Use Markdown image syntax with a detailed alt text and comprehensive caption explaining what the image should show and why it's important."
-        break
-      case "conclusion":
-        sectionInstruction = "Write a comprehensive conclusion that summarizes the key findings, discusses their implications, addresses limitations, and suggests future research directions."
-        break
-      default:
-        sectionInstruction = "Write this section using proper Markdown formatting."
+  try {
+    const response = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseToken}`,
+      },
+      body: JSON.stringify({
+        provider,
+        model,
+        prompt: fullPrompt,
+        temperature: 0.7,
+        maxTokens: 1200,
+      }),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return `Error: ${errorData.error || response.statusText}`
     }
-    
-    return `${writingStylePrompt}\n\n${templatePrompt}\n\n${researchContext ? `Research Context:\n${researchContext}\n\n` : ''}${previousContent ? `Previous Content:\n${previousContent}\n\n` : ''}Task: ${sectionInstruction}\n\nRequirements:\n- Format all output in clean Markdown\n- Use LaTeX notation for mathematical expressions\n- Create well-formatted tables using Markdown syntax\n- Use \`\`\`mermaid code blocks for diagrams\n- Suggest images with descriptive Markdown syntax and detailed captions\n- Maintain academic tone and scholarly standards`
+    const data = await response.json()
+    return data.content || data.result || 'No content generated.'
+  } catch (err) {
+    return 'Error: Failed to connect to AI service.'
+  }
+}
+
+type Section = {
+  id: string;
+  title: string;
+  prompt: string;
+  required: boolean;
+  editable: boolean;
+  content: string;
+  edited: boolean;
+}
+
+type TemplateKey = 'ieee' | 'acm';
+
+interface AIWritingModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedProvider: string;
+  selectedModel: string;
+  supabaseToken: string | null;
+  writingStylePrompt: string;
+  templatePrompt: string;
+  researchContext: string;
+}
+
+export function AIWritingModal(props: AIWritingModalProps) {
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>('ieee')
+  const [sections, setSections] = useState<Section[]>(() => templates[selectedTemplate].map(s => ({ ...s, content: '', edited: false })))
+  const [generatingIdx, setGeneratingIdx] = useState<number | null>(null)
+  const [customSectionTitle, setCustomSectionTitle] = useState('')
+  const [customSectionPrompt, setCustomSectionPrompt] = useState('')
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  // When template changes, reset sections
+  const handleTemplateChange = (template: TemplateKey) => {
+    setSelectedTemplate(template)
+    setSections(templates[template].map(s => ({ ...s, content: '', edited: false })))
   }
 
-  // Enhanced streaming-style generation with better error handling
-  const handleGenerateAll = async () => {
-    if (!supabaseToken) {
-      setError("Authentication error: Please log in again to use AI features.")
-      return
-    }
-    
-    setIsGenerating(true)
-    setGeneratedSections([])
-    setError("")
-    setCurrentStep(0)
-    
-    let previousContent = ""
-    
-    for (let i = 0; i < sectionTasks.length; i++) {
-      const section = sectionTasks[i]
-      setCurrentStep(i + 1)
-      
-      // Add section with loading state
-      setGeneratedSections(sections => [...sections, { ...section, content: "", loading: true }])
-      
-      try {
-        const prompt = buildPrompt(section.id, previousContent)
-        
-        const response = await fetch("/api/ai/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseToken}`,
-          },
-          body: JSON.stringify({
-            provider: selectedProvider,
-            model: selectedModel,
-            prompt,
-            temperature: 0.7,
-            maxTokens: 1000,
-          }),
-        })
-        
-        let sectionContent = ""
-        
-        if (response.ok) {
-          const dataRes = await response.json()
-          sectionContent = dataRes.content || dataRes.choices?.[0]?.text || "No content generated."
-        } else {
-          const errorData = await response.json().catch(() => ({}))
-          sectionContent = `Error generating content: ${errorData.error || response.statusText}`
-        }
-        
-        // Update previous content for context
-        previousContent += `\n\n## ${section.name}\n${sectionContent}`
-        
-        // Update section with generated content
-        setGeneratedSections(sections =>
-          sections.map(s =>
-            s.id === section.id ? { ...s, content: sectionContent, loading: false } : s
-          )
-        )
-        
-        // Small delay between sections for better UX
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-      } catch (err) {
-        console.error(`Error generating ${section.name}:`, err)
-        setGeneratedSections(sections =>
-          sections.map(s =>
-            s.id === section.id ? { ...s, content: "Error generating content. Please try again.", loading: false } : s
-          )
-        )
+  // Drag-and-drop handlers
+  function handleDragEnd(result: any) {
+    if (!result.destination) return
+    const reordered = Array.from(sections)
+    const [removed] = reordered.splice(result.source.index, 1)
+    reordered.splice(result.destination.index, 0, removed)
+    setSections(reordered)
+  }
+
+  // Handle content edit
+  function handleContentChange(idx: number, value: string) {
+    setSections(sections => sections.map((s, i) => i === idx ? { ...s, content: value, edited: true } : s))
+  }
+
+  // Handle AI generation for a section
+  async function handleGenerate(idx: number) {
+    setGeneratingIdx(idx)
+    const section = sections[idx]
+    const context = sections.slice(0, idx).map(s => s.content).join('\n\n')
+    const content = await generateSectionContent(
+      section.prompt,
+      context,
+      props.selectedProvider,
+      props.selectedModel,
+      props.supabaseToken,
+      props.writingStylePrompt,
+      props.templatePrompt,
+      props.researchContext
+    )
+    setSections(sections => sections.map((s, i) => i === idx ? { ...s, content, edited: false } : s))
+    setGeneratingIdx(null)
+  }
+
+  // Add custom section
+  function handleAddCustomSection() {
+    if (!customSectionTitle.trim() || !customSectionPrompt.trim()) return
+    setSections(sections => [
+      ...sections,
+      {
+        id: `custom-${Date.now()}`,
+        title: customSectionTitle,
+        prompt: customSectionPrompt,
+        required: false,
+        editable: true,
+        content: '',
+        edited: false,
+      },
+    ])
+    setCustomSectionTitle('')
+    setCustomSectionPrompt('')
+  }
+
+  // Remove section
+  function handleRemoveSection(idx: number) {
+    setSections(sections => sections.filter((_, i) => i !== idx))
+  }
+
+  // Export as Markdown
+  function exportMarkdown() {
+    const md = sections.map(s => `## ${s.title}\n\n${s.content}`).join('\n\n')
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'paper.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Export as LaTeX (basic)
+  function exportLatex() {
+    const latex = sections.map(s => `\\section{${s.title.replace(/^[0-9. ]+/, '')}}\n${s.content}`).join('\n\n')
+    const blob = new Blob([latex], { type: 'text/x-tex' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'paper.tex'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Export as PDF (print dialog as placeholder)
+  function exportPDF() {
+    if (exportRef.current) {
+      const printContents = exportRef.current.innerHTML
+      const win = window.open('', '', 'height=800,width=800')
+      if (win) {
+        win.document.write('<html><head><title>Paper PDF</title></head><body>')
+        win.document.write(printContents)
+        win.document.write('</body></html>')
+        win.document.close()
+        win.print()
       }
     }
-    
-    setIsGenerating(false)
-    setCurrentStep(0)
   }
-
-  const handleInsertContent = () => {
-    const allContent = generatedSections
-      .filter(s => s.content && !s.content.startsWith("Error"))
-      .map(s => `## ${s.name}\n\n${s.content}`)
-      .join("\n\n")
-    
-    onGenerateContent(allContent)
-    onOpenChange(false)
-    setGeneratedSections([])
-    setCurrentStep(0)
-  }
-
-  const handleClose = () => {
-    onOpenChange(false)
-    setGeneratedSections([])
-    setError("")
-    setCurrentStep(0)
-  }
-
-  const completedSections = generatedSections.filter(s => !s.loading && s.content).length
-  const hasErrors = generatedSections.some(s => s.content.startsWith("Error"))
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] bg-white border-gray-200">
-        <DialogHeader className="border-b border-gray-200 pb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold text-gray-900">AI Writing Assistant</DialogTitle>
-              <DialogDescription className="text-sm text-gray-600 mt-1">
-                Generate comprehensive sections with tables, diagrams, and image suggestions
-              </DialogDescription>
-            </div>
-          </div>
-          
-          {/* Progress indicator */}
-          {isGenerating && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                <span>Generating sections... ({currentStep}/{sectionTasks.length})</span>
-                <span>{Math.round((currentStep / sectionTasks.length) * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(currentStep / sectionTasks.length) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>AI Research Paper Generator</DialogTitle>
+          <DialogDescription>
+            Select a publisher template and generate/edit each section. You can reorder, edit, or regenerate sections as needed.
+          </DialogDescription>
         </DialogHeader>
-
-        <div className="max-h-[60vh] overflow-y-auto px-1">
-          <div className="space-y-6 py-4">
-            {/* Configuration Summary */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Generation Configuration</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Provider:</span>
-                  <Badge variant="outline" className="ml-2">{selectedProvider}</Badge>
-                </div>
-                <div>
-                  <span className="text-gray-500">Model:</span>
-                  <Badge variant="outline" className="ml-2">{selectedModel}</Badge>
-                </div>
-                <div>
-                  <span className="text-gray-500">Template:</span>
-                  <Badge variant="outline" className="ml-2">{documentTemplate.toUpperCase()}</Badge>
-                </div>
-                <div>
-                  <span className="text-gray-500">Sections:</span>
-                  <Badge variant="outline" className="ml-2">{sectionTasks.length} sections</Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* Generate Button */}
-            <Button
-              onClick={handleGenerateAll}
-              disabled={isGenerating}
-              className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg transition-all duration-200"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                  Generating sections... ({currentStep}/{sectionTasks.length})
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-5 w-5 mr-3" />
-                  Generate All Sections
-                </>
-              )}
-            </Button>
-
-            {/* Error Display */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
-                  <span className="text-sm font-medium text-red-800">Error</span>
-                </div>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Template</label>
+          <select
+            value={selectedTemplate}
+            onChange={e => handleTemplateChange(e.target.value as TemplateKey)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="ieee">IEEE</option>
+            <option value="acm">ACM</option>
+          </select>
+        </div>
+        {/* Section List with Drag-and-Drop */}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="sections-droppable">
+            {(provided: any) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {sections.map((section, idx) => (
+                  <Draggable key={section.id} draggableId={section.id} index={idx}>
+                    {(dragProvided: any) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        className="mb-4 bg-white border rounded shadow p-4 flex flex-col"
+                      >
+                        <div className="flex items-center mb-2">
+                          <span {...dragProvided.dragHandleProps} className="mr-2 cursor-move"><GripVertical className="w-4 h-4 text-gray-400" /></span>
+                          <span className="font-semibold text-gray-900">{section.title}</span>
+                          {section.required ? (
+                            <Badge className="ml-2" variant="outline">Required</Badge>
+                          ) : (
+                            <Badge className="ml-2" variant="secondary">Optional</Badge>
+                          )}
+                          {!section.required && (
+                            <Button size="sm" variant="ghost" className="ml-auto text-red-500" onClick={() => handleRemoveSection(idx)}>
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                        <textarea
+                          className="border rounded p-2 w-full min-h-[80px] text-sm mb-2"
+                          value={section.content}
+                          onChange={e => handleContentChange(idx, e.target.value)}
+                          placeholder={`Enter or generate content for ${section.title}`}
+                          disabled={generatingIdx === idx}
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGenerate(idx)}
+                            disabled={generatingIdx !== null}
+                          >
+                            {generatingIdx === idx ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                              <Sparkles className="w-4 h-4 mr-2" />
+                            )}
+                            Generate
+                          </Button>
+                          {section.edited && <span className="text-xs text-blue-600 ml-2">Edited</span>}
+                        </div>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
               </div>
             )}
-
-            {/* Generated Sections */}
-            {generatedSections.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-medium text-gray-900">Generated Sections</h4>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      {completedSections}/{sectionTasks.length} completed
-                    </Badge>
-                    {hasErrors && (
-                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                        Some errors
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {generatedSections.map((section, idx) => (
-                  <div key={section.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            section.loading 
-                              ? 'bg-blue-100' 
-                              : section.content.startsWith('Error') 
-                                ? 'bg-red-100' 
-                                : 'bg-green-100'
-                          }`}>
-                            {section.loading ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                            ) : section.content.startsWith('Error') ? (
-                              <AlertCircle className="h-3 w-3 text-red-600" />
-                            ) : (
-                              <Check className="h-3 w-3 text-green-600" />
-                            )}
-                          </div>
-                          <div>
-                            <h5 className="font-medium text-gray-900 text-sm">{section.name}</h5>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {sectionTasks.find(t => t.id === section.id)?.description}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {idx + 1}/{sectionTasks.length}
-                        </Badge>
-                      </div>
-                    
-                    {section.content && (
-                      <div className="p-4">
-                        <div className="bg-white border border-gray-200 rounded-md p-4 max-h-60 overflow-y-auto">
-                          <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
-                            {section.content}
-                          </pre>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <Separator className="bg-gray-200" />
-
-                {/* Summary */}
-                {completedSections > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      <span className="font-medium text-blue-900">Generation Summary</span>
-                    </div>
-                    <div className="text-sm text-blue-700">
-                      <p className="mb-1">✓ {completedSections} sections generated successfully</p>
-                      <p className="mb-1">✓ Ready to insert into your document</p>
-                      {hasErrors && (
-                        <p className="text-red-600">⚠ Some sections had errors - please review before inserting</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}\
-          </div>
+          </Droppable>
+        </DragDropContext>
+        {/* Add custom section UI */}
+        <div className="mt-6 mb-4 p-4 bg-gray-50 rounded">
+          <div className="font-semibold mb-2">Add Custom Section</div>
+          <input
+            className="border rounded px-2 py-1 mr-2 mb-2 w-1/3"
+            placeholder="Section Title"
+            value={customSectionTitle}
+            onChange={e => setCustomSectionTitle(e.target.value)}
+          />
+          <input
+            className="border rounded px-2 py-1 mr-2 mb-2 w-1/2"
+            placeholder="Section Prompt (for AI)"
+            value={customSectionPrompt}
+            onChange={e => setCustomSectionPrompt(e.target.value)}
+          />
+          <Button size="sm" onClick={handleAddCustomSection} disabled={!customSectionTitle.trim() || !customSectionPrompt.trim()}>
+            Add Section
+          </Button>
         </div>
-
-        <DialogFooter className="border-t border-gray-200 pt-4 bg-gray-50">
-          <div className="flex items-center justify-between w-full">
-            <div className="text-xs text-gray-500">
-              {completedSections > 0 && (
-                <span>{completedSections} sections ready to insert</span>
-              )}
+        {/* Export controls */}
+        <div className="flex gap-3 mt-6 mb-2">
+          <Button size="sm" variant="outline" onClick={exportMarkdown}>Export Markdown</Button>
+          <Button size="sm" variant="outline" onClick={exportLatex}>Export LaTeX</Button>
+          <Button size="sm" variant="outline" onClick={exportPDF}>Export PDF</Button>
+        </div>
+        {/* Hidden export content for PDF printing */}
+        <div style={{ display: 'none' }} ref={exportRef}>
+          {sections.map(s => (
+            <div key={s.id}>
+              <h2>{s.title}</h2>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{s.content}</div>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
-                onClick={handleClose}
-                className="border-gray-300 bg-white hover:bg-gray-50"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleInsertContent}
-                disabled={completedSections === 0 || isGenerating}
-                className="bg-black text-white hover:bg-gray-800 disabled:opacity-50"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Insert All Sections
-              </Button>
-            </div>
-          </div>
-        </DialogFooter>
+          ))}
+        </div>
       </DialogContent>
     </Dialog>
-  )\
+  )
 }

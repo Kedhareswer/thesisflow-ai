@@ -76,6 +76,7 @@
     "path": "latest",
     "pdf-parse": "latest",
     "react": "^19",
+    "react-beautiful-dnd": "^13.1.1",
     "react-day-picker": "latest",
     "react-dom": "^19",
     "react-hook-form": "latest",
