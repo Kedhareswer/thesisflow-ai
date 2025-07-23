@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { PenLine, BookOpen, Check, AlertCircle, FileCode, Sparkles, Quote } from "lucide-react"
+import { PenLine, BookOpen, Check, AlertCircle, FileCode, Sparkles, Quote, Settings, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import RichTextEditor from "./components/rich-text-editor"
 import CitationManager from "./components/citation-manager"
@@ -10,11 +10,13 @@ import { useToast } from "@/hooks/use-toast"
 import { ResearchSessionProvider, useResearchContext } from "@/components/research-session-provider"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { RouteGuard } from "@/components/route-guard"
-import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
+import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import type { AIProvider } from "@/lib/ai-providers"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Card, CardContent } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
 
 // Supported publisher templates
 const publisherTemplates = [
@@ -266,54 +268,61 @@ function WriterPageContent() {
 
           {/* Sidebar - Right Column */}
           <div className="col-span-4 space-y-6">
-            {/* AI Assistant */}
-            <div className="bg-white border border-gray-200 rounded-lg">
+            {/* AI Provider Selector */}
+            <Card className="border-gray-200">
               <div className="px-4 py-3 border-b border-gray-200">
                 <div className="flex items-center space-x-2">
-                  <Sparkles className="h-4 w-4 text-gray-600" />
-                  <h3 className="text-sm font-medium text-black">AI Assistant</h3>
+                  <Zap className="h-4 w-4 text-blue-600" />
+                  <h3 className="text-sm font-medium text-black">AI Configuration</h3>
                 </div>
               </div>
-              <div className="p-4">
-                <CompactAIProviderSelector
-                  selectedProvider={selectedProvider}
-                  selectedModel={selectedModel}
-                  onProviderChange={setSelectedProvider}
-                  onModelChange={setSelectedModel}
-                />
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-700 mb-2 block">AI Provider</Label>
+                    <MinimalAIProviderSelector
+                      selectedProvider={selectedProvider}
+                      onProviderChange={setSelectedProvider}
+                      selectedModel={selectedModel}
+                      onModelChange={setSelectedModel}
+                      variant="inline"
+                      showModelSelector={true}
+                      showConfigLink={true}
+                    />
+                  </div>
 
-                <Separator className="my-4" />
+                  <Separator className="my-2" />
 
-                <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Writing Style</h4>
-                  <div className="space-y-2">
-                    {personalities.map((personality) => (
-                      <div
-                        key={personality.key}
-                        className={`flex items-start space-x-3 p-3 rounded-md cursor-pointer border transition-colors ${
-                          selectedPersonality.key === personality.key
-                            ? "bg-black text-white border-black"
-                            : "border-gray-200 hover:bg-gray-50"
-                        }`}
-                        onClick={() => setSelectedPersonality(personality)}
-                      >
-                        <personality.icon className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <h5 className="text-sm font-medium">{personality.name}</h5>
-                          <p
-                            className={`text-xs mt-0.5 ${
-                              selectedPersonality.key === personality.key ? "text-gray-300" : "text-gray-500"
-                            }`}
-                          >
-                            {personality.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <Label className="text-xs font-medium text-gray-700 mb-2 block">Writing Style</Label>
+                    <Select
+                      value={selectedPersonality.key}
+                      onValueChange={(value) => {
+                        const personality = personalities.find((p) => p.key === value)
+                        if (personality) setSelectedPersonality(personality)
+                      }}
+                    >
+                      <SelectTrigger className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-10 text-sm">
+                        <SelectValue placeholder="Select writing style" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-gray-200">
+                        {personalities.map((personality) => (
+                          <SelectItem key={personality.key} value={personality.key} className="hover:bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              <personality.icon className="h-4 w-4" />
+                              <div>
+                                <div className="font-medium">{personality.name}</div>
+                                <div className="text-xs text-gray-500">{personality.description}</div>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Citations */}
             <div className="bg-white border border-gray-200 rounded-lg">
