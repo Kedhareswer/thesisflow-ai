@@ -377,15 +377,9 @@ function WriterPageContent() {
                 </Button>
 
                 <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
-                  <SelectTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      Export
-                    </Button>
+                  <SelectTrigger>
+                    <Download className="h-4 w-4 mr-1" />
+                    Export
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="markdown">Export as Markdown</SelectItem>
@@ -547,7 +541,7 @@ function WriterPageContent() {
                             </Badge>
                           </div>
 
-                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
+                          <div className="text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
                             <span>{before}</span>
                             <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
                             <span>{after}</span>
