@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useResearchSession } from "@/components/research-session-provider"
-import { FileText, Plus, Trash2, Download, BookOpen } from "lucide-react"
+import { FileText, Plus, Trash2, Download, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 // Citation format types
 const CITATION_FORMATS = [
@@ -46,13 +47,17 @@ interface Citation {
 interface CitationManagerProps {
   selectedTemplate: string
   onTemplateChange?: (template: string) => void
+  compact?: boolean
 }
 
-export function CitationManager({ selectedTemplate, onTemplateChange }: CitationManagerProps) {
+export function CitationManager({ selectedTemplate, onTemplateChange, compact = false }: CitationManagerProps) {
   const [citationFormat, setCitationFormat] = useState("ieee")
   const [manualCitations, setManualCitations] = useState<Citation[]>([])
   const [formattedReferences, setFormattedReferences] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isConfigOpen, setIsConfigOpen] = useState(!compact)
+  const [isPapersOpen, setIsPapersOpen] = useState(!compact)
+  const [isManualOpen, setIsManualOpen] = useState(false)
 
   // Get research session data
   const { session, getSelectedPapers } = useResearchSession()
@@ -148,6 +153,7 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
       authors: [""],
     }
     setManualCitations([...manualCitations, newCitation])
+    setIsManualOpen(true)
   }
 
   // Remove a manual citation
@@ -168,6 +174,280 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
 
   const totalCitations = papersToCitations().length + manualCitations.length
 
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        {/* Configuration Section - Collapsible in compact mode */}
+        <Collapsible open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+              <span>Citation Settings</span>
+              {isConfigOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 mt-2">
+            <div>
+              <Label className="text-xs font-medium text-gray-700 mb-1 block">Format</Label>
+              <Select value={citationFormat} onValueChange={setCitationFormat}>
+                <SelectTrigger className="h-8 text-xs border-gray-300 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200">
+                  {CITATION_FORMATS.map((format) => (
+                    <SelectItem key={format.id} value={format.id} className="text-xs">
+                      {format.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-medium text-gray-700 mb-1 block">Template</Label>
+              <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+                <SelectTrigger className="h-8 text-xs border-gray-300 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200">
+                  {PUBLISHER_TEMPLATES.map((template) => (
+                    <SelectItem key={template.id} value={template.id} className="text-xs">
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Separator />
+
+        {/* Research Papers Section - Compact */}
+        <div>
+          <Collapsible open={isPapersOpen} onOpenChange={setIsPapersOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                <div className="flex items-center space-x-2">
+                  <BookOpen className="h-3 w-3 text-gray-600" />
+                  <span>Research Papers</span>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs px-1">
+                    {selectedPapers.length}
+                  </Badge>
+                </div>
+                {isPapersOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              {selectedPapers.length > 0 ? (
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {selectedPapers.slice(0, 3).map((paper, index) => (
+                    <div key={paper.id} className="p-2 bg-gray-50 border border-gray-200 rounded text-xs">
+                      <div className="font-medium text-gray-900 line-clamp-1 mb-1">{paper.title}</div>
+                      <div className="text-gray-500 line-clamp-1">
+                        {paper.authors
+                          ? paper.authors
+                              .map((a: any) => {
+                                if (typeof a === "string") return a
+                                if (a && typeof a === "object" && "name" in a) return a.name || ""
+                                return ""
+                              })
+                              .filter(Boolean)
+                              .slice(0, 2)
+                              .join(", ")
+                          : ""}{" "}
+                        {paper.authors && paper.authors.length > 2 && "et al."} ({paper.year || "n.d."})
+                      </div>
+                    </div>
+                  ))}
+                  {selectedPapers.length > 3 && (
+                    <div className="text-center text-xs text-gray-500 py-1">
+                      +{selectedPapers.length - 3} more papers
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 bg-gray-50 rounded border border-gray-200">
+                  <BookOpen className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                  <p className="text-xs text-gray-500">No papers selected</p>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
+        {/* Manual Citations Section - Compact */}
+        <div>
+          <Collapsible open={isManualOpen} onOpenChange={setIsManualOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                <div className="flex items-center space-x-2">
+                  <span>Manual Citations</span>
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs px-1">
+                    {manualCitations.length}
+                  </Badge>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      addManualCitation()
+                    }}
+                    className="h-6 w-6 p-0 hover:bg-gray-100"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                  {isManualOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </div>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              {manualCitations.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {manualCitations.map((citation, index) => (
+                    <div key={citation.id} className="p-2 bg-gray-50 border border-gray-200 rounded">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-900">Citation #{index + 1}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeManualCitation(citation.id)}
+                          className="h-5 w-5 p-0 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Input
+                          value={citation.title}
+                          onChange={(e) => {
+                            const updated = manualCitations.map((c) =>
+                              c.id === citation.id ? { ...c, title: e.target.value } : c,
+                            )
+                            setManualCitations(updated)
+                          }}
+                          className="h-7 text-xs border-gray-300 bg-white"
+                          placeholder="Title..."
+                        />
+                        <Input
+                          value={citation.authors.join(", ")}
+                          onChange={(e) => {
+                            const updated = manualCitations.map((c) =>
+                              c.id === citation.id
+                                ? { ...c, authors: e.target.value.split(",").map((a) => a.trim()) }
+                                : c,
+                            )
+                            setManualCitations(updated)
+                          }}
+                          className="h-7 text-xs border-gray-300 bg-white"
+                          placeholder="Authors..."
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            value={citation.year || ""}
+                            onChange={(e) => {
+                              const updated = manualCitations.map((c) =>
+                                c.id === citation.id ? { ...c, year: e.target.value } : c,
+                              )
+                              setManualCitations(updated)
+                            }}
+                            className="h-7 text-xs border-gray-300 bg-white"
+                            placeholder="Year"
+                          />
+                          <Input
+                            value={citation.journal || ""}
+                            onChange={(e) => {
+                              const updated = manualCitations.map((c) =>
+                                c.id === citation.id ? { ...c, journal: e.target.value } : c,
+                              )
+                              setManualCitations(updated)
+                            }}
+                            className="h-7 text-xs border-gray-300 bg-white"
+                            placeholder="Journal"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 bg-gray-50 rounded border border-gray-200">
+                  <FileText className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                  <p className="text-xs text-gray-500">No manual citations</p>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
+        {/* Action Buttons - Compact */}
+        <div className="flex gap-1 pt-2">
+          <Button
+            onClick={formatCitations}
+            disabled={totalCitations === 0 || isGenerating}
+            className="flex-1 h-8 text-xs bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            <FileText className="h-3 w-3 mr-1" />
+            {isGenerating ? "Generating..." : "Generate"}
+          </Button>
+
+          {formattedReferences && (
+            <Button
+              variant="outline"
+              onClick={exportReferences}
+              className="h-8 px-2 border-gray-300 bg-white hover:bg-gray-50"
+            >
+              <Download className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
+        {/* Summary - Compact */}
+        {totalCitations > 0 && (
+          <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
+            <p className="text-xs text-blue-700">
+              <strong>{totalCitations}</strong> citations • <strong>{citationFormat.toUpperCase()}</strong>
+            </p>
+          </div>
+        )}
+
+        {/* Formatted References Output - Compact */}
+        {formattedReferences && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium text-gray-700">References</Label>
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                {citationFormat.toUpperCase()}
+              </Badge>
+            </div>
+            <div className="bg-white border border-gray-200 rounded p-3 max-h-40 overflow-y-auto">
+              <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
+                {formattedReferences}
+              </pre>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>Ready to copy</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(formattedReferences)
+                }}
+                className="h-6 px-2 text-xs hover:bg-gray-100"
+              >
+                Copy
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Full version (non-compact) - keeping original implementation
   return (
     <div className="space-y-5">
       {/* Configuration Section */}

@@ -14,7 +14,11 @@ import {
   FileText,
   Save,
   Download,
-  Share2,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  BarChart3,
+  Brain,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MarkdownEditor } from "./components/rich-text-editor"
@@ -33,6 +37,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase"
 import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -129,12 +135,12 @@ function getTemplatePrompt(templateId: string): string {
 function WriterPageContent() {
   const { toast } = useToast()
   const { hasContext, contextSummary, buildContext } = useResearchContext()
-  
+
   // AI provider selection state
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
-  
+
   // Document state
   const [selectedTemplate, setSelectedTemplate] = useState(publisherTemplates[0].id)
   const [documentText, setDocumentText] = useState("")
@@ -145,6 +151,12 @@ function WriterPageContent() {
   const [supabaseToken, setSupabaseToken] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<Date>(new Date())
   const [isAutoSaving, setIsAutoSaving] = useState(false)
+
+  // Sidebar state for collapsible sections
+  const [activeTab, setActiveTab] = useState("assistant")
+  const [isAIConfigOpen, setIsAIConfigOpen] = useState(true)
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(true)
+  const [isCitationsOpen, setIsCitationsOpen] = useState(true)
 
   // Fetch Supabase session/token on mount
   useEffect(() => {
@@ -179,7 +191,7 @@ function WriterPageContent() {
 
     return () => clearInterval(autoSaveInterval)
   }, [documentText])
-  
+
   // Check text for grammar/style issues using LanguageTool
   const checkText = async () => {
     if (!documentText.trim()) {
@@ -202,7 +214,7 @@ function WriterPageContent() {
       setLanguageToolSuggestions(data.matches || [])
       toast({
         title: `Found ${data.matches?.length || 0} suggestions`,
-        description: data.matches?.length 
+        description: data.matches?.length
           ? "Review and apply suggestions to improve your text."
           : "No issues found in your text.",
         variant: "default",
@@ -218,7 +230,7 @@ function WriterPageContent() {
       setIsChecking(false)
     }
   }
-  
+
   // Manual save function
   const handleSave = async () => {
     setIsAutoSaving(true)
@@ -291,16 +303,15 @@ function WriterPageContent() {
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
     return date.toLocaleDateString()
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Enhanced Header with Document Controls */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            {/* Left: Only Document Title Editor remains */}
+            {/* Left: Document Title Editor */}
             <div className="flex items-center space-x-4">
-              {/* Document Title Editor */}
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
@@ -318,11 +329,11 @@ function WriterPageContent() {
             {/* Right: Actions and Status */}
             <div className="flex items-center space-x-4">
               {/* Research Context Badge */}
-                {hasContext && (
+              {hasContext && (
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1.5">
                   <BookOpen className="h-3 w-3 mr-1.5" />
                   <span className="text-xs font-medium">{contextSummary}</span>
-                  </Badge>
+                </Badge>
               )}
 
               {/* Document Stats */}
@@ -366,9 +377,15 @@ function WriterPageContent() {
                 </Button>
 
                 <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
-                  <SelectTrigger>
-                    <Download className="h-4 w-4 mr-1" />
-                    Export
+                  <SelectTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Export
+                    </Button>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="markdown">Export as Markdown</SelectItem>
@@ -380,11 +397,11 @@ function WriterPageContent() {
             </div>
           </div>
         </div>
-              </header>
+      </header>
 
       {/* Main Content Area */}
       <div className="max-w-[1600px] mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
           {/* Main Editor Column */}
           <div className="xl:col-span-3 space-y-6">
             {/* Document Progress Card */}
@@ -421,15 +438,15 @@ function WriterPageContent() {
                       <CardTitle className="text-lg font-medium text-gray-900">Document Editor</CardTitle>
                       <p className="text-sm text-gray-500 mt-0.5">Write and edit your research document</p>
                     </div>
-                        </div>
-                        
+                  </div>
+
                   <div className="flex items-center space-x-3">
-                        <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                       <SelectTrigger className="w-48 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
                         <SelectValue />
-                          </SelectTrigger>
+                      </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200 shadow-lg">
-                            {publisherTemplates.map((template) => (
+                        {publisherTemplates.map((template) => (
                           <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
                             <div>
                               <div className="font-medium">{template.name}</div>
@@ -438,13 +455,13 @@ function WriterPageContent() {
                                 {template.wordLimit.toLocaleString()} words • {template.sections.length} sections
                               </div>
                             </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                    </CardHeader>
+              </CardHeader>
 
               <CardContent className="p-0">
                 <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-0 rounded-none" />
@@ -453,26 +470,26 @@ function WriterPageContent() {
                 <div className="p-6 border-t border-gray-100 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <Button 
-                          onClick={checkText} 
+                      <Button
+                        onClick={checkText}
                         variant="outline"
                         size="sm"
-                          disabled={isChecking || !documentText.trim()}
+                        disabled={isChecking || !documentText.trim()}
                         className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
-                        >
-                          <Check className="h-4 w-4 mr-2" />
+                      >
+                        <Check className="h-4 w-4 mr-2" />
                         {isChecking ? "Checking..." : "Grammar Check"}
-                        </Button>
-                        
-                        <Button 
+                      </Button>
+
+                      <Button
                         onClick={handleOpenAIModal}
                         size="sm"
                         disabled={!selectedProvider || !selectedModel || !supabaseToken}
                         className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
-                        >
-                          <Sparkles className="h-4 w-4 mr-2" />
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
                         AI Assistant
-                        </Button>
+                      </Button>
                     </div>
 
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -488,12 +505,12 @@ function WriterPageContent() {
                       </div>
                     </div>
                   </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Grammar Suggestions Card */}
-                  {languageToolSuggestions.length > 0 && (
+            {languageToolSuggestions.length > 0 && (
               <Card className="bg-white border-gray-200 shadow-sm">
                 <CardHeader className="pb-4 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
@@ -503,11 +520,11 @@ function WriterPageContent() {
                     <div>
                       <CardTitle className="text-lg font-medium text-gray-900">
                         Writing Suggestions ({languageToolSuggestions.length})
-                        </CardTitle>
+                      </CardTitle>
                       <p className="text-sm text-gray-500 mt-0.5">Grammar and style improvements</p>
                     </div>
                   </div>
-                      </CardHeader>
+                </CardHeader>
 
                 <CardContent className="p-6">
                   <div className="space-y-4">
@@ -530,7 +547,7 @@ function WriterPageContent() {
                             </Badge>
                           </div>
 
-                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono">
+                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
                             <span>{before}</span>
                             <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
                             <span>{after}</span>
@@ -572,199 +589,284 @@ function WriterPageContent() {
 
                   <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
                     Powered by{" "}
-                          <a 
-                            href="https://languagetool.org/" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
+                    <a
+                      href="https://languagetool.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-gray-900 hover:underline font-medium"
-                          >
+                    >
                       LanguageTool
-                          </a>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-                
-          {/* Enhanced Sidebar */}
-          <div className="xl:col-span-2 space-y-6">
-            {/* AI Configuration Panel */}
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Redesigned Compact Sidebar */}
+          <div className="xl:col-span-1 space-y-4">
+            {/* Tabbed Interface for Main Tools */}
             <Card className="bg-white border-gray-200 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <Zap className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-medium text-gray-900">AI Writing Assistant</CardTitle>
-                    <p className="text-sm text-gray-500 mt-0.5">Configure AI-powered writing help</p>
-                  </div>
-                </div>
-                    </CardHeader>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 bg-gray-50 p-1 rounded-lg">
+                  <TabsTrigger
+                    value="assistant"
+                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                  >
+                    <Brain className="h-3 w-3" />
+                    <span className="hidden sm:inline">AI</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="analytics"
+                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                  >
+                    <BarChart3 className="h-3 w-3" />
+                    <span className="hidden sm:inline">Stats</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="citations"
+                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                  >
+                    <Quote className="h-3 w-3" />
+                    <span className="hidden sm:inline">Refs</span>
+                  </TabsTrigger>
+                </TabsList>
 
-              <CardContent className="p-4 space-y-5">
-                <div>
-                  <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3 block">
-                    AI Provider
-                  </Label>
-                  <MinimalAIProviderSelector
-                        selectedProvider={selectedProvider}
-                    onProviderChange={setSelectedProvider}
-                        selectedModel={selectedModel}
-                        onModelChange={setSelectedModel}
-                    variant="inline"
-                    showModelSelector={true}
-                    showConfigLink={true}
-                  />
-                </div>
+                {/* AI Writing Assistant Tab */}
+                <TabsContent value="assistant" className="mt-4 space-y-4">
+                  <div className="px-4 pb-4">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Zap className="h-4 w-4 text-blue-600" />
+                      <h3 className="text-sm font-medium text-gray-900">AI Writing Assistant</h3>
+                    </div>
 
-                <Separator className="bg-gray-200" />
+                    {/* Collapsible AI Configuration */}
+                    <Collapsible open={isAIConfigOpen} onOpenChange={setIsAIConfigOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                          <span className="flex items-center space-x-2">
+                            <Settings className="h-3 w-3" />
+                            <span>Configuration</span>
+                          </span>
+                          {isAIConfigOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-3 mt-2">
+                        <div>
+                          <Label className="text-xs font-medium text-gray-700 mb-2 block">Provider</Label>
+                          <MinimalAIProviderSelector
+                            selectedProvider={selectedProvider}
+                            onProviderChange={setSelectedProvider}
+                            selectedModel={selectedModel}
+                            onModelChange={setSelectedModel}
+                            variant="compact"
+                            showModelSelector={true}
+                            showConfigLink={false}
+                          />
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
 
-                <div>
-                  <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3 block">
-                    Writing Style
-                  </Label>
-                  <div className="space-y-2">
-                          {personalities.map((personality) => (
-                            <div
-                              key={personality.key}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                                selectedPersonality.key === personality.key
-                            ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
-                            : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                              }`}
-                              onClick={() => setSelectedPersonality(personality)}
-                            >
-                        <div className="flex items-center space-x-3">
-                          <personality.icon className="h-4 w-4" />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{personality.name}</div>
-                            <div className="text-xs opacity-75 mt-0.5">{personality.description}</div>
-                          </div>
-                          {selectedPersonality.key === personality.key && (
-                            <div className="w-2 h-2 bg-current rounded-full" />
-                          )}
+                    <Separator className="my-3" />
+
+                    {/* Writing Style Selection */}
+                    <div>
+                      <Label className="text-xs font-medium text-gray-700 mb-2 block">Writing Style</Label>
+                      <div className="space-y-1">
+                        {personalities.map((personality) => (
+                          <button
+                            key={personality.key}
+                            className={`w-full p-2 rounded-md border text-left transition-all duration-200 ${
+                              selectedPersonality.key === personality.key
+                                ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
+                                : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                            }`}
+                            onClick={() => setSelectedPersonality(personality)}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <personality.icon className="h-3 w-3" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium">{personality.name}</div>
+                                <div className="text-xs opacity-75 truncate">{personality.description}</div>
                               </div>
+                              {selectedPersonality.key === personality.key && (
+                                <div className="w-1.5 h-1.5 bg-current rounded-full flex-shrink-0" />
+                              )}
                             </div>
-                          ))}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* AI Status */}
+                    <div className="mt-4 p-2 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              selectedProvider && selectedModel && supabaseToken ? "bg-green-500" : "bg-gray-400"
+                            }`}
+                          />
+                          <span className="text-xs text-gray-600 font-medium">
+                            {selectedProvider && selectedModel && supabaseToken ? "Ready" : "Setup Required"}
+                          </span>
+                        </div>
+                        {selectedProvider && selectedModel && supabaseToken && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-green-50 text-green-700 border-green-200 px-2 py-0.5"
+                          >
+                            Connected
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick AI Action */}
+                    <Button
+                      onClick={handleOpenAIModal}
+                      disabled={!selectedProvider || !selectedModel || !supabaseToken}
+                      className="w-full mt-3 bg-gray-900 text-white hover:bg-gray-800 h-8 text-xs"
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Generate Content
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                {/* Document Analytics Tab */}
+                <TabsContent value="analytics" className="mt-4 space-y-4">
+                  <div className="px-4 pb-4">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Eye className="h-4 w-4 text-gray-600" />
+                      <h3 className="text-sm font-medium text-gray-900">Document Analytics</h3>
+                    </div>
+
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className="text-center p-2 bg-gray-50 rounded-md">
+                        <div className="text-lg font-bold text-gray-900">{wordCount.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Words</div>
+                      </div>
+                      <div className="text-center p-2 bg-gray-50 rounded-md">
+                        <div className="text-lg font-bold text-gray-900">{readingTime}</div>
+                        <div className="text-xs text-gray-500">Min Read</div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Stats */}
+                    <Collapsible open={isAnalyticsOpen} onOpenChange={setIsAnalyticsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                          <span>Detailed Statistics</span>
+                          {isAnalyticsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 mt-2">
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Characters</span>
+                            <span className="font-medium text-gray-900">{charCount.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Characters (no spaces)</span>
+                            <span className="font-medium text-gray-900">{charCountNoSpaces.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Paragraphs</span>
+                            <span className="font-medium text-gray-900">{paragraphCount}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Grammar Issues</span>
+                            <span
+                              className={`font-medium ${
+                                languageToolSuggestions.length > 0 ? "text-orange-600" : "text-green-600"
+                              }`}
+                            >
+                              {languageToolSuggestions.length}
+                            </span>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    <Separator className="my-3" />
+
+                    {/* Template Progress */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-600">Template Progress</span>
+                        <Badge variant="outline" className="text-xs bg-gray-50 border-gray-300">
+                          {currentTemplate.name}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1">
+                        <Progress value={Math.min(wordProgress, 100)} className="h-1.5" />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>{Math.round(wordProgress)}% complete</span>
+                          <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
+                            {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} remaining`}
+                          </span>
                         </div>
                       </div>
-
-                {/* AI Status Indicator */}
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          selectedProvider && selectedModel && supabaseToken ? "bg-green-500" : "bg-gray-400"
-                        }`}
-                      />
-                      <span className="text-xs text-gray-600 font-medium">
-                        {selectedProvider && selectedModel && supabaseToken ? "AI Ready" : "Configuration Required"}
-                      </span>
                     </div>
-                    {selectedProvider && selectedModel && supabaseToken && (
-                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                        Connected
-                      </Badge>
-                    )}
                   </div>
-                </div>
-                    </CardContent>
-                  </Card>
-                  
-            {/* Document Statistics Card */}
+                </TabsContent>
+
+                {/* Citations & References Tab */}
+                <TabsContent value="citations" className="mt-4 space-y-4">
+                  <div className="px-4 pb-4">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Quote className="h-4 w-4 text-purple-600" />
+                      <h3 className="text-sm font-medium text-gray-900">Citations & References</h3>
+                    </div>
+
+                    {/* Compact Citation Manager */}
+                    <CitationManager
+                      selectedTemplate={selectedTemplate}
+                      onTemplateChange={setSelectedTemplate}
+                      compact={true}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </Card>
+
+            {/* Quick Actions Card */}
             <Card className="bg-white border-gray-200 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <Eye className="h-4 w-4 text-gray-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-medium text-gray-900">Document Analytics</CardTitle>
-                    <p className="text-sm text-gray-500 mt-0.5">Real-time writing statistics</p>
-                  </div>
-                </div>
-                    </CardHeader>
-
-              <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-gray-900">{wordCount.toLocaleString()}</div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Words</div>
-                  </div>
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-gray-900">{readingTime}</div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Min Read</div>
-                  </div>
-                </div>
-
-                <Separator className="bg-gray-200" />
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Characters</span>
-                    <span className="font-medium text-gray-900">{charCount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Characters (no spaces)</span>
-                    <span className="font-medium text-gray-900">{charCountNoSpaces.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Paragraphs</span>
-                    <span className="font-medium text-gray-900">{paragraphCount}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Grammar Issues</span>
-                    <span
-                      className={`font-medium ${
-                        languageToolSuggestions.length > 0 ? "text-orange-600" : "text-green-600"
-                      }`}
-                    >
-                      {languageToolSuggestions.length}
-                    </span>
-                  </div>
-                </div>
-
-                <Separator className="bg-gray-200" />
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Template</span>
-                    <Badge variant="outline" className="text-xs bg-gray-50 border-gray-300">
-                      {currentTemplate.name}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Progress</span>
-                    <span className="font-medium text-gray-900">{Math.round(wordProgress)}%</span>
-                  </div>
-                </div>
-                    </CardContent>
-                  </Card>
-
-            {/* Citations Panel */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
-                    <Quote className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-medium text-gray-900">Citations & References</CardTitle>
-                    <p className="text-sm text-gray-500 mt-0.5">Manage your bibliography</p>
-                  </div>
-                </div>
-              </CardHeader>
-
               <CardContent className="p-4">
-                <CitationManager selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
+                <div className="flex items-center space-x-2 mb-3">
+                  <Zap className="h-4 w-4 text-gray-600" />
+                  <h3 className="text-sm font-medium text-gray-900">Quick Actions</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={checkText}
+                    variant="outline"
+                    size="sm"
+                    disabled={isChecking || !documentText.trim()}
+                    className="h-8 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    {isChecking ? "Checking..." : "Grammar"}
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    variant="outline"
+                    size="sm"
+                    disabled={isAutoSaving}
+                    className="h-8 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    Save
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-              </div>
-            </div>
           </div>
-      
+        </div>
+      </div>
+
       {/* Enhanced AI Writing Modal */}
       <AIWritingModal
         open={aiModalOpen}
