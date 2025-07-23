@@ -114,7 +114,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
             <div className="flex items-center space-x-1">
               <Button
                 variant="ghost"
-                size="sm"
+          size="sm"
                 onClick={() => insertMarkdown("bold", "bold text")}
                 className="h-8 w-8 p-0 hover:bg-gray-200"
                 title="Bold"
@@ -123,7 +123,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+          size="sm"
                 onClick={() => insertMarkdown("italic", "italic text")}
                 className="h-8 w-8 p-0 hover:bg-gray-200"
                 title="Italic"
@@ -132,7 +132,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+          size="sm"
                 onClick={() => insertMarkdown("link")}
                 className="h-8 w-8 p-0 hover:bg-gray-200"
                 title="Link"
@@ -141,25 +141,25 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+          size="sm"
                 onClick={() => insertMarkdown("image")}
                 className="h-8 w-8 p-0 hover:bg-gray-200"
                 title="Image"
               >
                 <ImageIcon className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+        <Button
+          variant="ghost"
+          size="sm"
                 onClick={() => insertMarkdown("list")}
                 className="h-8 w-8 p-0 hover:bg-gray-200"
                 title="List"
               >
                 <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
                 onClick={() => insertMarkdown("code", "code")}
                 className="h-8 w-8 p-0 hover:bg-gray-200"
                 title="Inline Code"
@@ -191,7 +191,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
+        </Button>
           </div>
         </div>
       </div>

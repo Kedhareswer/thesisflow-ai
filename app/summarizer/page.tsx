@@ -182,7 +182,7 @@ Style Instructions: ${styleInstructions[summaryStyle as keyof typeof styleInstru
 
 Chunk Summaries:
 ${chunkSummaries
-  .map((s, i) => `Part ${i + 1}: ${s}`)
+      .map((s, i) => `Part ${i + 1}: ${s}`)
   .join("\n\n")}
 
 Return JSON with the following structure. IMPORTANT: The "summary" field should contain clean, readable text (not JSON format):

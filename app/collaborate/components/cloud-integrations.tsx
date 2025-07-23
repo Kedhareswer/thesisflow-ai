@@ -206,18 +206,18 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
             }),
           })
         : await (await getAuthenticatedFetch())('/api/collaborate/cloud-integrations', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              teamId,
-              serviceName: serviceType,
-              serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
-              permissions: { read: true, write: true, share: true },
-              syncEnabled: true,
-              autoSync: false
-            }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          teamId,
+          serviceName: serviceType,
+          serviceAccount: `user@${serviceType.replace('-', '')}.com`, // Mock account
+          permissions: { read: true, write: true, share: true },
+          syncEnabled: true,
+          autoSync: false
+        }),
           })
 
       if (data.success) {
@@ -263,7 +263,7 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
             method: 'DELETE',
           })
         : await (await getAuthenticatedFetch())(`/api/collaborate/cloud-integrations?id=${serviceId}&teamId=${teamId}`, {
-            method: 'DELETE',
+        method: 'DELETE',
           })
 
       if (data.success) {

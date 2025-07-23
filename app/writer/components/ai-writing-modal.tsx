@@ -438,7 +438,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
               <DialogDescription className="text-sm text-gray-600 mt-1">
                 Generate comprehensive academic papers with structured sections, drag-and-drop reordering, and export
                 options
-              </DialogDescription>
+          </DialogDescription>
             </div>
           </div>
 
@@ -453,7 +453,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
             </div>
           )}
         </DialogHeader>
-
+        
         <div className="max-h-[60vh] overflow-y-auto px-1">
           <div className="space-y-6 py-4">
             {/* Template and Configuration */}
@@ -476,32 +476,32 @@ export function AIWritingModal(props: AIWritingModalProps) {
                   <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
                     <SelectTrigger className="h-9 bg-white border-gray-300">
                       <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
+              </SelectTrigger>
+              <SelectContent>
                       <SelectItem value="ieee">IEEE Conference/Journal</SelectItem>
                       <SelectItem value="acm">ACM Conference/Journal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
+              </SelectContent>
+            </Select>
+          </div>
+          
                 <div className="flex items-end">
-                  <Button
+          <Button 
                     onClick={handleGenerateAll}
                     disabled={isGeneratingAll || !props.supabaseToken}
                     className="w-full h-9 bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-sm"
                   >
                     {isGeneratingAll ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
                         Generate All Sections
-                      </>
-                    )}
-                  </Button>
+              </>
+            )}
+          </Button>
                 </div>
               </div>
             </div>
@@ -636,8 +636,8 @@ export function AIWritingModal(props: AIWritingModalProps) {
                         </Draggable>
                       ))}
                       {provided.placeholder}
-                    </div>
-                  )}
+            </div>
+          )}
                 </Droppable>
               </DragDropContext>
             </div>
@@ -721,14 +721,14 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 Cancel
               </Button>
 
-              <Button
+          <Button 
                 onClick={handleInsertAll}
                 disabled={completedSections === 0 || isGeneratingAll}
                 className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm"
-              >
+          >
                 <FileText className="h-4 w-4 mr-2" />
                 Insert All Sections
-              </Button>
+          </Button>
             </div>
           </div>
         </DialogFooter>

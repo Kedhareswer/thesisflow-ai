@@ -129,12 +129,12 @@ function getTemplatePrompt(templateId: string): string {
 function WriterPageContent() {
   const { toast } = useToast()
   const { hasContext, contextSummary, buildContext } = useResearchContext()
-
+  
   // AI provider selection state
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
-
+  
   // Document state
   const [selectedTemplate, setSelectedTemplate] = useState(publisherTemplates[0].id)
   const [documentText, setDocumentText] = useState("")
@@ -179,7 +179,7 @@ function WriterPageContent() {
 
     return () => clearInterval(autoSaveInterval)
   }, [documentText])
-
+  
   // Check text for grammar/style issues using LanguageTool
   const checkText = async () => {
     if (!documentText.trim()) {
@@ -202,7 +202,7 @@ function WriterPageContent() {
       setLanguageToolSuggestions(data.matches || [])
       toast({
         title: `Found ${data.matches?.length || 0} suggestions`,
-        description: data.matches?.length
+        description: data.matches?.length 
           ? "Review and apply suggestions to improve your text."
           : "No issues found in your text.",
         variant: "default",
@@ -218,7 +218,7 @@ function WriterPageContent() {
       setIsChecking(false)
     }
   }
-
+  
   // Manual save function
   const handleSave = async () => {
     setIsAutoSaving(true)
@@ -291,27 +291,15 @@ function WriterPageContent() {
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
     return date.toLocaleDateString()
   }
-
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Enhanced Header with Document Controls */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            {/* Left: Branding and Document Title */}
+            {/* Left: Only Document Title Editor remains */}
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl flex items-center justify-center shadow-lg">
-                  <PenLine className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Research Writer</h1>
-                  <p className="text-sm text-gray-500">Professional academic writing platform</p>
-                </div>
-              </div>
-
-              <Separator orientation="vertical" className="h-8 bg-gray-300" />
-
               {/* Document Title Editor */}
               <div className="flex items-center space-x-2">
                 <input
@@ -330,11 +318,11 @@ function WriterPageContent() {
             {/* Right: Actions and Status */}
             <div className="flex items-center space-x-4">
               {/* Research Context Badge */}
-              {hasContext && (
+                {hasContext && (
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1.5">
                   <BookOpen className="h-3 w-3 mr-1.5" />
                   <span className="text-xs font-medium">{contextSummary}</span>
-                </Badge>
+                  </Badge>
               )}
 
               {/* Document Stats */}
@@ -378,15 +366,9 @@ function WriterPageContent() {
                 </Button>
 
                 <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
-                  <SelectTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      Export
-                    </Button>
+                  <SelectTrigger>
+                    <Download className="h-4 w-4 mr-1" />
+                    Export
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="markdown">Export as Markdown</SelectItem>
@@ -394,20 +376,11 @@ function WriterPageContent() {
                     <SelectItem value="docx">Export as DOCX</SelectItem>
                   </SelectContent>
                 </Select>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <Share2 className="h-4 w-4 mr-1" />
-                  Share
-                </Button>
               </div>
             </div>
           </div>
         </div>
-      </header>
+              </header>
 
       {/* Main Content Area */}
       <div className="max-w-[1600px] mx-auto px-6 py-8">
@@ -448,15 +421,15 @@ function WriterPageContent() {
                       <CardTitle className="text-lg font-medium text-gray-900">Document Editor</CardTitle>
                       <p className="text-sm text-gray-500 mt-0.5">Write and edit your research document</p>
                     </div>
-                  </div>
-
+                        </div>
+                        
                   <div className="flex items-center space-x-3">
-                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                        <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                       <SelectTrigger className="w-48 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
                         <SelectValue />
-                      </SelectTrigger>
+                          </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200 shadow-lg">
-                        {publisherTemplates.map((template) => (
+                            {publisherTemplates.map((template) => (
                           <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
                             <div>
                               <div className="font-medium">{template.name}</div>
@@ -465,13 +438,13 @@ function WriterPageContent() {
                                 {template.wordLimit.toLocaleString()} words • {template.sections.length} sections
                               </div>
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                   </div>
                 </div>
-              </CardHeader>
+                    </CardHeader>
 
               <CardContent className="p-0">
                 <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-0 rounded-none" />
@@ -480,26 +453,26 @@ function WriterPageContent() {
                 <div className="p-6 border-t border-gray-100 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <Button
-                        onClick={checkText}
+                        <Button 
+                          onClick={checkText} 
                         variant="outline"
                         size="sm"
-                        disabled={isChecking || !documentText.trim()}
+                          disabled={isChecking || !documentText.trim()}
                         className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
-                      >
-                        <Check className="h-4 w-4 mr-2" />
+                        >
+                          <Check className="h-4 w-4 mr-2" />
                         {isChecking ? "Checking..." : "Grammar Check"}
-                      </Button>
-
-                      <Button
+                        </Button>
+                        
+                        <Button 
                         onClick={handleOpenAIModal}
                         size="sm"
                         disabled={!selectedProvider || !selectedModel || !supabaseToken}
                         className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
                         AI Assistant
-                      </Button>
+                        </Button>
                     </div>
 
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -515,12 +488,12 @@ function WriterPageContent() {
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
             {/* Grammar Suggestions Card */}
-            {languageToolSuggestions.length > 0 && (
+                  {languageToolSuggestions.length > 0 && (
               <Card className="bg-white border-gray-200 shadow-sm">
                 <CardHeader className="pb-4 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
@@ -530,11 +503,11 @@ function WriterPageContent() {
                     <div>
                       <CardTitle className="text-lg font-medium text-gray-900">
                         Writing Suggestions ({languageToolSuggestions.length})
-                      </CardTitle>
+                        </CardTitle>
                       <p className="text-sm text-gray-500 mt-0.5">Grammar and style improvements</p>
                     </div>
                   </div>
-                </CardHeader>
+                      </CardHeader>
 
                 <CardContent className="p-6">
                   <div className="space-y-4">
@@ -557,7 +530,7 @@ function WriterPageContent() {
                             </Badge>
                           </div>
 
-                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
+                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono">
                             <span>{before}</span>
                             <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
                             <span>{after}</span>
@@ -599,20 +572,20 @@ function WriterPageContent() {
 
                   <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
                     Powered by{" "}
-                    <a
-                      href="https://languagetool.org/"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                          <a 
+                            href="https://languagetool.org/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
                       className="text-gray-900 hover:underline font-medium"
-                    >
+                          >
                       LanguageTool
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
+                          </a>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                
           {/* Enhanced Sidebar */}
           <div className="xl:col-span-2 space-y-6">
             {/* AI Configuration Panel */}
@@ -627,7 +600,7 @@ function WriterPageContent() {
                     <p className="text-sm text-gray-500 mt-0.5">Configure AI-powered writing help</p>
                   </div>
                 </div>
-              </CardHeader>
+                    </CardHeader>
 
               <CardContent className="p-4 space-y-5">
                 <div>
@@ -635,10 +608,10 @@ function WriterPageContent() {
                     AI Provider
                   </Label>
                   <MinimalAIProviderSelector
-                    selectedProvider={selectedProvider}
+                        selectedProvider={selectedProvider}
                     onProviderChange={setSelectedProvider}
-                    selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
+                        selectedModel={selectedModel}
+                        onModelChange={setSelectedModel}
                     variant="inline"
                     showModelSelector={true}
                     showConfigLink={true}
@@ -652,16 +625,16 @@ function WriterPageContent() {
                     Writing Style
                   </Label>
                   <div className="space-y-2">
-                    {personalities.map((personality) => (
-                      <div
-                        key={personality.key}
+                          {personalities.map((personality) => (
+                            <div
+                              key={personality.key}
                         className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                          selectedPersonality.key === personality.key
+                                selectedPersonality.key === personality.key
                             ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
                             : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                        }`}
-                        onClick={() => setSelectedPersonality(personality)}
-                      >
+                              }`}
+                              onClick={() => setSelectedPersonality(personality)}
+                            >
                         <div className="flex items-center space-x-3">
                           <personality.icon className="h-4 w-4" />
                           <div className="flex-1">
@@ -671,11 +644,11 @@ function WriterPageContent() {
                           {selectedPersonality.key === personality.key && (
                             <div className="w-2 h-2 bg-current rounded-full" />
                           )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
                 {/* AI Status Indicator */}
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -697,9 +670,9 @@ function WriterPageContent() {
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
+                    </CardContent>
+                  </Card>
+                  
             {/* Document Statistics Card */}
             <Card className="bg-white border-gray-200 shadow-sm">
               <CardHeader className="pb-4 border-b border-gray-100">
@@ -712,7 +685,7 @@ function WriterPageContent() {
                     <p className="text-sm text-gray-500 mt-0.5">Real-time writing statistics</p>
                   </div>
                 </div>
-              </CardHeader>
+                    </CardHeader>
 
               <CardContent className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -767,8 +740,8 @@ function WriterPageContent() {
                     <span className="font-medium text-gray-900">{Math.round(wordProgress)}%</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
 
             {/* Citations Panel */}
             <Card className="bg-white border-gray-200 shadow-sm">
@@ -788,10 +761,10 @@ function WriterPageContent() {
                 <CitationManager selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
               </CardContent>
             </Card>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
+      
       {/* Enhanced AI Writing Modal */}
       <AIWritingModal
         open={aiModalOpen}

@@ -154,7 +154,7 @@ export function SummaryOutputPanel({
       <div>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-light text-black tracking-tight">Summary</h2>
+          <h2 className="text-2xl font-light text-black tracking-tight">Summary</h2>
             {summaryStyle && summaryLength && (
               <p className="text-sm text-gray-600 font-light mt-1">
                 {summaryStyle.charAt(0).toUpperCase() + summaryStyle.slice(1)} • {summaryLength.charAt(0).toUpperCase() + summaryLength.slice(1)}
@@ -201,13 +201,13 @@ export function SummaryOutputPanel({
               ) : (
                 // Regular paragraph formatting for other styles
                 <div className={lengthStyling.spacing}>
-                  {result.summary.split('\n').map((paragraph, index) => (
-                    paragraph.trim() && (
-                      <p key={index} className="mb-4 last:mb-0">
-                        {paragraph}
-                      </p>
-                    )
-                  ))}
+              {result.summary.split('\n').map((paragraph, index) => (
+                paragraph.trim() && (
+                  <p key={index} className="mb-4 last:mb-0">
+                    {paragraph}
+                  </p>
+                )
+              ))}
                 </div>
               )}
             </div>
