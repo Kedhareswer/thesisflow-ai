@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PenLine, BookOpen, Check, AlertCircle, FileCode, Sparkles, Quote, Settings, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import RichTextEditor from "./components/rich-text-editor"
+import { MarkdownEditor } from "./components/rich-text-editor"
 import CitationManager from "./components/citation-manager"
 import { AIWritingModal } from "./components/ai-writing-modal"
 import { useToast } from "@/hooks/use-toast"
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { supabase } from "@/lib/supabase"
 
 // Supported publisher templates
 const publisherTemplates = [
@@ -57,6 +58,22 @@ const personalities = [
   },
 ]
 
+function getTemplatePrompt(templateId: string): string {
+  switch (templateId) {
+    case "ieee":
+      return "Format the writing according to IEEE guidelines, including section headings and citation style.";
+    case "acm":
+      return "Follow ACM formatting and structure.";
+    case "springer":
+      return "Use concise, formal academic writing as per Springer requirements.";
+    case "elsevier":
+      return "Structure the writing for Elsevier journals, with clear sections and formal tone.";
+    case "general":
+    default:
+      return "Use standard academic formatting.";
+  }
+}
+
 function WriterPageContent() {
   const { toast } = useToast()
   const { hasContext, contextSummary, buildContext } = useResearchContext()
@@ -72,6 +89,25 @@ function WriterPageContent() {
   const [languageToolSuggestions, setLanguageToolSuggestions] = useState<any[]>([])
   const [isChecking, setIsChecking] = useState(false)
   const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [supabaseToken, setSupabaseToken] = useState<string | null>(null)
+
+  // Fetch Supabase session/token on mount
+  useEffect(() => {
+    async function fetchToken() {
+      const { data } = await supabase.auth.getSession();
+      setSupabaseToken(data.session?.access_token || null);
+    }
+    fetchToken();
+
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      setSupabaseToken(session?.access_token || null);
+    });
+
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
+  }, []);
 
   // Check text for grammar/style issues using LanguageTool
   const checkText = async () => {
@@ -129,6 +165,19 @@ function WriterPageContent() {
     })
   }
 
+  // Only allow opening modal if token is present
+  const handleOpenAIModal = () => {
+    if (!supabaseToken) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in again to use AI features.",
+        variant: "destructive",
+      })
+      return
+    }
+    setAiModalOpen(true)
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -179,7 +228,16 @@ function WriterPageContent() {
 
               {/* Editor Content */}
               <div className="p-6">
-                <RichTextEditor value={documentText} onChange={setDocumentText} className="border-gray-200" />
+                <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-gray-200" />
+
+                {process.env.NODE_ENV === 'development' && (
+                  <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>
+                    Provider: {String(!!selectedProvider)} | Model: {String(!!selectedModel)} | Token: {String(!!supabaseToken)}<br />
+                    Provider value: {String(selectedProvider)}<br />
+                    Model value: {String(selectedModel)}<br />
+                    Token (first 8): {supabaseToken?.slice(0, 8)}
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-3 mt-4 pt-4 border-t border-gray-100">
@@ -194,13 +252,23 @@ function WriterPageContent() {
                     {isChecking ? "Checking..." : "Check Grammar"}
                   </Button>
                   <Button
-                    onClick={() => setAiModalOpen(true)}
+                    onClick={handleOpenAIModal}
                     size="sm"
-                    disabled={!selectedProvider || !selectedModel}
+                    disabled={!selectedProvider || !selectedModel || !supabaseToken}
                     className="bg-black text-white hover:bg-gray-800"
                   >
                     <Sparkles className="h-3.5 w-3.5 mr-2" />
                     Generate with AI
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      const { data } = await supabase.auth.getSession();
+                      alert('Token: ' + (data.session?.access_token || 'none'));
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Debug: Fetch Token
                   </Button>
                 </div>
               </div>
@@ -347,6 +415,10 @@ function WriterPageContent() {
         selectedProvider={selectedProvider || ""}
         selectedModel={selectedModel || ""}
         documentTemplate={selectedTemplate}
+        researchContext={buildContext()}
+        writingStylePrompt={selectedPersonality.systemPrompt}
+        templatePrompt={getTemplatePrompt(selectedTemplate)}
+        supabaseToken={supabaseToken}
         onGenerateContent={(text) => {
           setDocumentText((prev) => prev + "\n\n" + text)
           toast({

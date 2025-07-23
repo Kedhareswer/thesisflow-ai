@@ -8,7 +8,13 @@ if (process.env.NODE_ENV !== 'production' && (!process.env.NEXT_PUBLIC_SUPABASE_
   console.warn('Missing Supabase environment variables. Please check your .env file.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storageKey: 'ai-research-platform-auth',
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
 
 // Types for Supabase tables
 export type TeamMember = {

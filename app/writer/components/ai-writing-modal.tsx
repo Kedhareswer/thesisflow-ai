@@ -12,17 +12,15 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles, Check } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
-const writingTasks = [
-  { id: "continue", name: "Continue writing" },
-  { id: "introduction", name: "Write introduction" },
-  { id: "conclusion", name: "Write conclusion" },
-  { id: "abstract", name: "Write abstract" },
-  { id: "methodology", name: "Write methodology" },
-  { id: "results", name: "Write results" },
-  { id: "custom", name: "Custom prompt" },
+const sectionTasks = [
+  { id: "introduction", name: "Introduction" },
+  { id: "table", name: "Key Table" },
+  { id: "diagram", name: "Diagram (Mermaid)" },
+  { id: "image", name: "Image Suggestion" },
+  { id: "conclusion", name: "Conclusion" },
 ]
 
 interface AIWritingModalProps {
@@ -31,6 +29,10 @@ interface AIWritingModalProps {
   selectedProvider: string
   selectedModel: string
   documentTemplate: string
+  researchContext: string
+  writingStylePrompt: string
+  templatePrompt: string
+  supabaseToken: string | null
   onGenerateContent: (text: string) => void
 }
 
@@ -40,82 +42,98 @@ export function AIWritingModal({
   selectedProvider,
   selectedModel,
   documentTemplate,
+  researchContext,
+  writingStylePrompt,
+  templatePrompt,
+  supabaseToken,
   onGenerateContent,
 }: AIWritingModalProps) {
-  const [selectedTask, setSelectedTask] = useState<string>("continue")
-  const [customPrompt, setCustomPrompt] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
-  const [generatedContent, setGeneratedContent] = useState<string>("")
+  const [generatedSections, setGeneratedSections] = useState<{ id: string, name: string, content: string, loading: boolean }[]>([])
+  const [error, setError] = useState<string>("")
 
-  // Generate mock AI content based on task
-  const generateContent = async () => {
-    setIsGenerating(true)
-    setGeneratedContent("")
-    try {
-      // Build the prompt
-      const systemPrompt =
-        "You are a professional academic writer. Write in a clear, academic style appropriate for publication. Focus on producing coherent, well-structured text suitable for a scholarly publication. "
-      let taskPrompt = ""
-      switch (selectedTask) {
-        case "introduction":
-          taskPrompt =
-            "Write an engaging introduction that contextualizes the research, states the problem being addressed, and outlines the approach."
-          break
-        case "conclusion":
-          taskPrompt =
-            "Write a conclusion that summarizes the key findings, discusses their implications, and suggests future research directions."
-          break
-        case "abstract":
-          taskPrompt =
-            "Write a concise abstract summarizing the research objectives, methodology, results, and conclusions in 200-250 words."
-          break
-        case "methodology":
-          taskPrompt =
-            "Write a methodology section that clearly describes the research approach, data collection methods, and analytical techniques used."
-          break
-        case "results":
-          taskPrompt =
-            "Write a results section that presents the findings in a clear, logical manner, using appropriate academic language."
-          break
-        case "continue":
-        case "custom":
-        default:
-          taskPrompt = customPrompt || "Continue the writing in a coherent and logical manner."
-          break
-      }
-      const fullPrompt = `${systemPrompt}\n\n${taskPrompt}`
-      // Get the user's access token
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      const response = await fetch("/api/ai/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          provider: selectedProvider,
-          model: selectedModel,
-          prompt: fullPrompt,
-          temperature: 0.7,
-          maxTokens: 800,
-        }),
-      })
-      if (!response.ok) throw new Error("Failed to generate content")
-      const dataRes = await response.json()
-      setGeneratedContent(dataRes.content || dataRes.choices?.[0]?.text || "No content generated.")
-    } catch (err) {
-      setGeneratedContent("Error generating content.")
-    } finally {
-      setIsGenerating(false)
+  // Helper to build section-specific prompts
+  const buildPrompt = (sectionId: string, previousContent: string) => {
+    let sectionInstruction = ""
+    switch (sectionId) {
+      case "introduction":
+        sectionInstruction = "Write the introduction for this paper. Include background and motivation."
+        break
+      case "table":
+        sectionInstruction = "Present the key findings or comparisons in a Markdown table."
+        break
+      case "diagram":
+        sectionInstruction = "If a process, workflow, or relationship can be visualized, include a Mermaid diagram in a Markdown code block (```mermaid ... ```), and explain it briefly."
+        break
+      case "image":
+        sectionInstruction = "Suggest an image or figure that would help, and describe in detail what it should show. Use a Markdown image placeholder with a detailed caption."
+        break
+      case "conclusion":
+        sectionInstruction = "Write the conclusion for this paper, summarizing the key points."
+        break
+      default:
+        sectionInstruction = "Write this section in Markdown."
     }
+    return `${writingStylePrompt}\n${templatePrompt}\n\n${researchContext}\n\n${previousContent ? `Here is what has been written so far:\n${previousContent}\n` : ''}Now, ${sectionInstruction}\n- Format all output in Markdown.\n- Use LaTeX for math.\n- Use Markdown tables for data.\n- Use \`\`\`mermaid for diagrams.\n- Suggest images with Markdown image syntax and a detailed caption.`
+  }
+
+  // Streaming-style chunked generation
+  const handleGenerateAll = async () => {
+    if (!supabaseToken) {
+      setError("Authentication error: Please log in again.")
+      return
+    }
+    setIsGenerating(true)
+    setGeneratedSections([])
+    setError("")
+    let previousContent = ""
+    for (const section of sectionTasks) {
+      setGeneratedSections(sections => [...sections, { ...section, content: "", loading: true }])
+      try {
+        const prompt = buildPrompt(section.id, previousContent)
+        const response = await fetch("/api/ai/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseToken}`,
+          },
+          body: JSON.stringify({
+            provider: selectedProvider,
+            model: selectedModel,
+            prompt,
+            temperature: 0.7,
+            maxTokens: 800,
+          }),
+        })
+        let sectionContent = ""
+        if (response.ok) {
+          const dataRes = await response.json()
+          sectionContent = dataRes.content || dataRes.choices?.[0]?.text || "No content generated."
+        } else {
+          sectionContent = "Error generating content."
+        }
+        previousContent += `\n\n# ${section.name}\n${sectionContent}`
+        setGeneratedSections(sections =>
+          sections.map(s =>
+            s.id === section.id ? { ...s, content: sectionContent, loading: false } : s
+          )
+        )
+      } catch (err) {
+        setGeneratedSections(sections =>
+          sections.map(s =>
+            s.id === section.id ? { ...s, content: "Error generating content.", loading: false } : s
+          )
+        )
+      }
+    }
+    setIsGenerating(false)
   }
 
   const handleInsertContent = () => {
-    onGenerateContent(generatedContent)
+    const allContent = generatedSections.map(s => `# ${s.name}\n${s.content}`).join("\n\n")
+    onGenerateContent(allContent)
     onOpenChange(false)
-    setGeneratedContent("")
-    setCustomPrompt("")
+    setGeneratedSections([])
   }
 
   return (
@@ -124,51 +142,15 @@ export function AIWritingModal({
         <DialogHeader className="border-b border-gray-200 pb-4">
           <DialogTitle className="text-lg font-semibold text-black">AI Writing Assistant</DialogTitle>
           <DialogDescription className="text-sm text-gray-600">
-            Generate content using {selectedProvider} with {selectedModel}
+            Streaming multi-section generation (tables, diagrams, images, etc.)
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          {/* Task selection */}
-          <div className="space-y-2">
-            <label htmlFor="task" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
-              Writing Task
-            </label>
-            <Select value={selectedTask} onValueChange={setSelectedTask}>
-              <SelectTrigger className="border-gray-300">
-                <SelectValue placeholder="Select task" />
-              </SelectTrigger>
-              <SelectContent>
-                {writingTasks.map((task) => (
-                  <SelectItem key={task.id} value={task.id}>
-                    {task.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Custom prompt (visible only for custom task) */}
-          {selectedTask === "custom" && (
-            <div className="space-y-2">
-              <label htmlFor="custom-prompt" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
-                Custom Prompt
-              </label>
-              <Textarea
-                id="custom-prompt"
-                placeholder="Enter your writing prompt here..."
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                className="h-24 border-gray-300 resize-none"
-              />
-            </div>
-          )}
-
-          {/* Generation button */}
           <Button
-            onClick={generateContent}
+            onClick={handleGenerateAll}
             className="w-full bg-black text-white hover:bg-gray-800"
-            disabled={isGenerating || (selectedTask === "custom" && !customPrompt.trim())}
+            disabled={isGenerating}
           >
             {isGenerating ? (
               <>
@@ -178,20 +160,25 @@ export function AIWritingModal({
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Generate Content
+                Generate All Sections
               </>
             )}
           </Button>
 
-          {/* Generated content */}
-          {generatedContent && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Generated Content</label>
-              <div className="border border-gray-200 rounded-md p-4 bg-gray-50 overflow-y-auto max-h-[300px]">
-                <div className="whitespace-pre-wrap text-sm text-gray-800">{generatedContent}</div>
+          {error && <div className="text-red-600 text-sm">{error}</div>}
+
+          {generatedSections.map((section, idx) => (
+            <div key={section.id} className="space-y-2 border-b pb-4 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-black">{section.name}</span>
+                {section.loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+                {!section.loading && <Check className="h-4 w-4 text-green-600" />}
+              </div>
+              <div className="border border-gray-200 rounded-md p-4 bg-gray-50 overflow-x-auto text-sm whitespace-pre-wrap">
+                {section.content}
               </div>
             </div>
-          )}
+          ))}
         </div>
 
         <DialogFooter className="border-t border-gray-200 pt-4">
@@ -200,10 +187,10 @@ export function AIWritingModal({
           </Button>
           <Button
             onClick={handleInsertContent}
-            disabled={!generatedContent}
+            disabled={generatedSections.length === 0 || generatedSections.some(s => s.loading)}
             className="bg-black text-white hover:bg-gray-800"
           >
-            Insert into Document
+            Insert All into Document
           </Button>
         </DialogFooter>
       </DialogContent>
