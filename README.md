@@ -11,7 +11,7 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Latest-green?style=flat-square&logo=supabase)](https://supabase.io/)
 [![Socket.io](https://img.shields.io/badge/Socket.io-Latest-black?style=flat-square&logo=socket.io)](https://socket.io/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/License-None-yellow.svg)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
 
 **Advanced AI-Powered Research Platform**
 
@@ -332,14 +332,8 @@ We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for
 
 ---
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 <div align="center">
-  <p>Built with ❤️ by the AI Research Hub Team</p>
+  <p>Built with ❤️ by Me</p>
   <p>
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Report Bug</a> | 
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a> | 
