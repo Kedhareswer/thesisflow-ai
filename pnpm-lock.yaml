@@ -210,7 +210,7 @@ importers:
         specifier: ^19
         version: 19.1.0
       react-beautiful-dnd:
-        specifier: ^13.1.1
+        specifier: latest
         version: 13.1.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-day-picker:
         specifier: latest

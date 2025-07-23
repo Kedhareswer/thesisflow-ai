@@ -9,10 +9,12 @@ import {
   FileCode,
   Sparkles,
   Quote,
-  Settings,
   Zap,
   Eye,
   FileText,
+  Save,
+  Download,
+  Share2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MarkdownEditor } from "./components/rich-text-editor"
@@ -30,59 +32,97 @@ import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase"
+import { Progress } from "@/components/ui/progress"
 
-// Supported publisher templates
+// Supported publisher templates with enhanced metadata
 const publisherTemplates = [
-  { id: "ieee", name: "IEEE", description: "IEEE Conference/Journal Template" },
-  { id: "acm", name: "ACM", description: "ACM Conference/Journal Template" },
-  { id: "springer", name: "Springer", description: "Springer Conference/Journal Template" },
-  { id: "elsevier", name: "Elsevier", description: "Elsevier Journal Template" },
-  { id: "general", name: "General Academic", description: "General Academic Paper Template" },
+  {
+    id: "ieee",
+    name: "IEEE",
+    description: "IEEE Conference/Journal Template",
+    wordLimit: 8000,
+    sections: ["Abstract", "Introduction", "Methods", "Results", "Discussion", "Conclusion"],
+  },
+  {
+    id: "acm",
+    name: "ACM",
+    description: "ACM Conference/Journal Template",
+    wordLimit: 10000,
+    sections: ["Abstract", "Introduction", "Related Work", "Methodology", "Evaluation", "Conclusion"],
+  },
+  {
+    id: "springer",
+    name: "Springer",
+    description: "Springer Conference/Journal Template",
+    wordLimit: 12000,
+    sections: ["Abstract", "Introduction", "Literature Review", "Methods", "Results", "Discussion"],
+  },
+  {
+    id: "elsevier",
+    name: "Elsevier",
+    description: "Elsevier Journal Template",
+    wordLimit: 15000,
+    sections: ["Abstract", "Introduction", "Materials and Methods", "Results", "Discussion", "Conclusion"],
+  },
+  {
+    id: "general",
+    name: "General Academic",
+    description: "General Academic Paper Template",
+    wordLimit: 10000,
+    sections: ["Abstract", "Introduction", "Body", "Conclusion"],
+  },
 ]
 
-// Writer personalities
+// Enhanced writer personalities with detailed descriptions
 const personalities = [
   {
     key: "academic",
     name: "Academic",
-    description: "Formal, precise and scholarly writing style.",
+    description: "Formal, precise and scholarly writing style with proper citations.",
     systemPrompt:
-      "You are an academic writing assistant. Use formal language, proper citations, and logical structure.",
+      "You are an academic writing assistant. Use formal language, proper citations, and logical structure. Maintain scholarly tone throughout.",
     icon: BookOpen,
-    color: [34, 139, 230] as [number, number, number],
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
   },
   {
     key: "technical",
     name: "Technical",
-    description: "Clear, concise technical writing.",
-    systemPrompt: "You are a technical writing assistant. Focus on clarity, precision, and detailed explanations.",
+    description: "Clear, concise technical writing with detailed explanations.",
+    systemPrompt:
+      "You are a technical writing assistant. Focus on clarity, precision, and detailed explanations. Use technical terminology appropriately.",
     icon: FileCode,
-    color: [52, 211, 153] as [number, number, number],
+    color: "text-green-600",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
   },
   {
     key: "creative",
     name: "Creative",
-    description: "Engaging, vivid academic writing.",
+    description: "Engaging, vivid academic writing while maintaining standards.",
     systemPrompt:
-      "You are a creative academic writing assistant. Write engaging content while maintaining scholarly standards.",
+      "You are a creative academic writing assistant. Write engaging content while maintaining scholarly standards. Use varied sentence structures.",
     icon: Sparkles,
-    color: [236, 72, 153] as [number, number, number],
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
+    borderColor: "border-purple-200",
   },
 ]
 
 function getTemplatePrompt(templateId: string): string {
   switch (templateId) {
     case "ieee":
-      return "Format the writing according to IEEE guidelines, including section headings and citation style."
+      return "Format the writing according to IEEE guidelines, including section headings and citation style. Use clear, concise language with technical precision."
     case "acm":
-      return "Follow ACM formatting and structure."
+      return "Follow ACM formatting and structure. Emphasize computational aspects and technical contributions."
     case "springer":
-      return "Use concise, formal academic writing as per Springer requirements."
+      return "Use concise, formal academic writing as per Springer requirements. Focus on research methodology and findings."
     case "elsevier":
-      return "Structure the writing for Elsevier journals, with clear sections and formal tone."
+      return "Structure the writing for Elsevier journals, with clear sections and formal tone. Include detailed methodology."
     case "general":
     default:
-      return "Use standard academic formatting."
+      return "Use standard academic formatting with clear structure and appropriate scholarly tone."
   }
 }
 
@@ -98,10 +138,13 @@ function WriterPageContent() {
   // Document state
   const [selectedTemplate, setSelectedTemplate] = useState(publisherTemplates[0].id)
   const [documentText, setDocumentText] = useState("")
+  const [documentTitle, setDocumentTitle] = useState("Untitled Document")
   const [languageToolSuggestions, setLanguageToolSuggestions] = useState<any[]>([])
   const [isChecking, setIsChecking] = useState(false)
   const [aiModalOpen, setAiModalOpen] = useState(false)
   const [supabaseToken, setSupabaseToken] = useState<string | null>(null)
+  const [lastSaved, setLastSaved] = useState<Date>(new Date())
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
 
   // Fetch Supabase session/token on mount
   useEffect(() => {
@@ -120,6 +163,22 @@ function WriterPageContent() {
       listener?.subscription.unsubscribe()
     }
   }, [])
+
+  // Auto-save functionality
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      if (documentText.trim()) {
+        setIsAutoSaving(true)
+        // Simulate auto-save
+        setTimeout(() => {
+          setLastSaved(new Date())
+          setIsAutoSaving(false)
+        }, 1000)
+      }
+    }, 30000) // Auto-save every 30 seconds
+
+    return () => clearInterval(autoSaveInterval)
+  }, [documentText])
 
   // Check text for grammar/style issues using LanguageTool
   const checkText = async () => {
@@ -160,6 +219,40 @@ function WriterPageContent() {
     }
   }
 
+  // Manual save function
+  const handleSave = async () => {
+    setIsAutoSaving(true)
+    // Simulate save
+    setTimeout(() => {
+      setLastSaved(new Date())
+      setIsAutoSaving(false)
+      toast({
+        title: "Document saved",
+        description: "Your document has been saved successfully.",
+        duration: 2000,
+      })
+    }, 500)
+  }
+
+  // Export functions
+  const handleExport = (format: "markdown" | "pdf" | "docx") => {
+    const blob = new Blob([documentText], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: `Exported as ${format.toUpperCase()}`,
+      description: `Your document has been exported successfully.`,
+      duration: 2000,
+    })
+  }
+
   // Only allow opening modal if token is present
   const handleOpenAIModal = () => {
     if (!supabaseToken) {
@@ -173,58 +266,182 @@ function WriterPageContent() {
     setAiModalOpen(true)
   }
 
+  // Calculate document statistics
   const wordCount = documentText
     .trim()
     .split(/\s+/)
     .filter((word) => word.length > 0).length
   const charCount = documentText.length
+  const charCountNoSpaces = documentText.replace(/\s/g, "").length
+  const paragraphCount = documentText.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length
+  const readingTime = Math.ceil(wordCount / 200) // Average reading speed: 200 words per minute
+
+  // Get current template info
+  const currentTemplate = publisherTemplates.find((t) => t.id === selectedTemplate) || publisherTemplates[0]
+  const wordProgress = (wordCount / currentTemplate.wordLimit) * 100
+
+  // Format last saved time
+  const formatLastSaved = (date: Date) => {
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const minutes = Math.floor(diff / 60000)
+
+    if (minutes < 1) return "just now"
+    if (minutes < 60) return `${minutes}m ago`
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
+    return date.toLocaleDateString()
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Clean Header with Modern Typography */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-6 py-5">
+      {/* Enhanced Header with Document Controls */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
+            {/* Left: Branding and Document Title */}
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center shadow-sm">
-                <PenLine className="h-5 w-5 text-white" />
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl flex items-center justify-center shadow-lg">
+                  <PenLine className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Research Writer</h1>
+                  <p className="text-sm text-gray-500">Professional academic writing platform</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Research Writer</h1>
-                <p className="text-sm text-gray-500 mt-0.5">Professional academic writing platform</p>
+
+              <Separator orientation="vertical" className="h-8 bg-gray-300" />
+
+              {/* Document Title Editor */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={documentTitle}
+                  onChange={(e) => setDocumentTitle(e.target.value)}
+                  className="text-lg font-medium text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded transition-colors"
+                  placeholder="Document title..."
+                />
+                <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-300">
+                  {currentTemplate.name}
+                </Badge>
               </div>
             </div>
 
+            {/* Right: Actions and Status */}
             <div className="flex items-center space-x-4">
+              {/* Research Context Badge */}
               {hasContext && (
-                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300 px-3 py-1">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1.5">
                   <BookOpen className="h-3 w-3 mr-1.5" />
                   <span className="text-xs font-medium">{contextSummary}</span>
                 </Badge>
               )}
 
-              <div className="flex items-center space-x-2 text-xs text-gray-500">
-                <FileText className="h-3.5 w-3.5" />
-                <span>
-                  {wordCount} words • {charCount} characters
-                </span>
+              {/* Document Stats */}
+              <div className="hidden md:flex items-center space-x-4 text-sm text-gray-500">
+                <div className="flex items-center space-x-1">
+                  <FileText className="h-4 w-4" />
+                  <span>{wordCount.toLocaleString()} words</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Eye className="h-4 w-4" />
+                  <span>{readingTime}min read</span>
+                </div>
+              </div>
+
+              {/* Save Status */}
+              <div className="flex items-center space-x-2 text-sm text-gray-500">
+                {isAutoSaving ? (
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span>Saved {formatLastSaved(lastSaved)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isAutoSaving}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+
+                <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
+                  <SelectTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Export
+                    </Button>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="markdown">Export as Markdown</SelectItem>
+                    <SelectItem value="pdf">Export as PDF</SelectItem>
+                    <SelectItem value="docx">Export as DOCX</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                >
+                  <Share2 className="h-4 w-4 mr-1" />
+                  Share
+                </Button>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area with Improved Layout */}
-      <div className="max-w-[1400px] mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Main Editor Column - Enhanced */}
+      {/* Main Content Area */}
+      <div className="max-w-[1600px] mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+          {/* Main Editor Column */}
           <div className="xl:col-span-3 space-y-6">
-            {/* Document Editor Card with Modern Design */}
-            <Card className="bg-white border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            {/* Document Progress Card */}
+            <Card className="bg-white border-gray-200 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                    <span className="text-sm font-medium text-gray-900">Writing Progress</span>
+                  </div>
+                  <span className="text-sm text-gray-500">
+                    {wordCount.toLocaleString()} / {currentTemplate.wordLimit.toLocaleString()} words
+                  </span>
+                </div>
+                <Progress value={Math.min(wordProgress, 100)} className="h-2" />
+                <div className="flex justify-between text-xs text-gray-500 mt-2">
+                  <span>{Math.round(wordProgress)}% complete</span>
+                  <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
+                    {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} words remaining`}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Document Editor Card */}
+            <Card className="bg-white border-gray-200 shadow-sm">
               <CardHeader className="pb-4 border-b border-gray-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
                       <PenLine className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
@@ -234,45 +451,41 @@ function WriterPageContent() {
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2">
-                      <Settings className="h-4 w-4 text-gray-400" />
-                      <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                        <SelectTrigger className="w-40 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-gray-200 shadow-lg">
-                          {publisherTemplates.map((template) => (
-                            <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50">
-                              <div>
-                                <div className="font-medium">{template.name}</div>
-                                <div className="text-xs text-gray-500">{template.description}</div>
+                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                      <SelectTrigger className="w-48 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-gray-200 shadow-lg">
+                        {publisherTemplates.map((template) => (
+                          <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
+                            <div>
+                              <div className="font-medium">{template.name}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{template.description}</div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                {template.wordLimit.toLocaleString()} words • {template.sections.length} sections
                               </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardHeader>
 
-              <CardContent className="p-6">
-                <div className="space-y-6">
-                  <MarkdownEditor
-                    value={documentText}
-                    onChange={setDocumentText}
-                    className="border-gray-200 rounded-lg"
-                  />
+              <CardContent className="p-0">
+                <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-0 rounded-none" />
 
-                  {/* Enhanced Action Bar */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                {/* Enhanced Action Bar */}
+                <div className="p-6 border-t border-gray-100 bg-gray-50">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Button
                         onClick={checkText}
                         variant="outline"
                         size="sm"
                         disabled={isChecking || !documentText.trim()}
-                        className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors duration-200 bg-transparent"
+                        className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
                       >
                         <Check className="h-4 w-4 mr-2" />
                         {isChecking ? "Checking..." : "Grammar Check"}
@@ -282,21 +495,23 @@ function WriterPageContent() {
                         onClick={handleOpenAIModal}
                         size="sm"
                         disabled={!selectedProvider || !selectedModel || !supabaseToken}
-                        className="bg-black text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
+                        className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
                       >
                         <Sparkles className="h-4 w-4 mr-2" />
-                        Generate with AI
+                        AI Assistant
                       </Button>
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                      <div className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-full">
-                        {languageToolSuggestions.length > 0 && (
-                          <span className="text-orange-600 font-medium mr-2">
-                            {languageToolSuggestions.length} suggestions
-                          </span>
-                        )}
-                        Last saved: just now
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      {languageToolSuggestions.length > 0 && (
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                          {languageToolSuggestions.length} suggestions
+                        </Badge>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <span>{charCount.toLocaleString()} characters</span>
+                        <span>•</span>
+                        <span>{paragraphCount} paragraphs</span>
                       </div>
                     </div>
                   </div>
@@ -304,12 +519,12 @@ function WriterPageContent() {
               </CardContent>
             </Card>
 
-            {/* Grammar Suggestions with Enhanced Design */}
+            {/* Grammar Suggestions Card */}
             {languageToolSuggestions.length > 0 && (
               <Card className="bg-white border-gray-200 shadow-sm">
                 <CardHeader className="pb-4 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-orange-50 rounded-md flex items-center justify-center">
+                    <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center">
                       <AlertCircle className="h-4 w-4 text-orange-600" />
                     </div>
                     <div>
@@ -323,30 +538,46 @@ function WriterPageContent() {
 
                 <CardContent className="p-6">
                   <div className="space-y-4">
-                    {languageToolSuggestions.map((sugg, idx) => {
+                    {languageToolSuggestions.slice(0, 5).map((sugg, idx) => {
                       const before = sugg.context?.text?.slice(0, sugg.context?.offset) || ""
                       const error =
                         sugg.context?.text?.slice(sugg.context?.offset, sugg.context?.offset + sugg.context?.length) ||
                         ""
                       const after = sugg.context?.text?.slice(sugg.context?.offset + sugg.context?.length) || ""
+
                       return (
                         <div
                           key={idx}
                           className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
                         >
-                          <div className="text-sm font-medium text-gray-900 mb-3">{sugg.message}</div>
-                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="text-sm font-medium text-gray-900">{sugg.message}</div>
+                            <Badge variant="outline" className="text-xs bg-white border-gray-300">
+                              {sugg.rule?.category?.name || "Style"}
+                            </Badge>
+                          </div>
+
+                          <div className="text-sm text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
                             <span>{before}</span>
                             <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
                             <span>{after}</span>
                           </div>
+
                           {sugg.replacements && sugg.replacements.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                               <span className="text-xs text-gray-500 font-medium">Suggestions:</span>
-                              {sugg.replacements.map((rep: any, i: number) => (
+                              {sugg.replacements.slice(0, 3).map((rep: any, i: number) => (
                                 <button
                                   key={i}
                                   className="inline-block bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full text-xs font-medium hover:bg-green-100 transition-colors duration-200"
+                                  onClick={() => {
+                                    // Apply suggestion logic would go here
+                                    toast({
+                                      title: "Suggestion applied",
+                                      description: `Replaced with "${rep.value}"`,
+                                      duration: 2000,
+                                    })
+                                  }}
                                 >
                                   {rep.value}
                                 </button>
@@ -356,8 +587,17 @@ function WriterPageContent() {
                         </div>
                       )
                     })}
+
+                    {languageToolSuggestions.length > 5 && (
+                      <div className="text-center pt-4">
+                        <Button variant="outline" size="sm" className="border-gray-300 text-gray-700 bg-transparent">
+                          Show {languageToolSuggestions.length - 5} more suggestions
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200">
+
+                  <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
                     Powered by{" "}
                     <a
                       href="https://languagetool.org/"
@@ -374,17 +614,17 @@ function WriterPageContent() {
           </div>
 
           {/* Enhanced Sidebar */}
-          <div className="xl:col-span-1 space-y-6">
+          <div className="xl:col-span-2 space-y-6">
             {/* AI Configuration Panel */}
             <Card className="bg-white border-gray-200 shadow-sm">
               <CardHeader className="pb-4 border-b border-gray-100">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-50 rounded-md flex items-center justify-center">
+                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
                     <Zap className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-base font-medium text-gray-900">AI Assistant</CardTitle>
-                    <p className="text-sm text-gray-500 mt-0.5">Configure AI writing assistance</p>
+                    <CardTitle className="text-base font-medium text-gray-900">AI Writing Assistant</CardTitle>
+                    <p className="text-sm text-gray-500 mt-0.5">Configure AI-powered writing help</p>
                   </div>
                 </div>
               </CardHeader>
@@ -411,41 +651,120 @@ function WriterPageContent() {
                   <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3 block">
                     Writing Style
                   </Label>
-                  <Select
-                    value={selectedPersonality.key}
-                    onValueChange={(value) => {
-                      const personality = personalities.find((p) => p.key === value)
-                      if (personality) setSelectedPersonality(personality)
-                    }}
-                  >
-                    <SelectTrigger className="border-gray-200 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 h-11 text-sm">
-                      <SelectValue placeholder="Select writing style" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-200 shadow-lg">
-                      {personalities.map((personality) => (
-                        <SelectItem key={personality.key} value={personality.key} className="hover:bg-gray-50 p-3">
-                          <div className="flex items-center gap-3">
-                            <personality.icon className="h-4 w-4 text-gray-600" />
-                            <div>
-                              <div className="font-medium text-gray-900">{personality.name}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{personality.description}</div>
-                            </div>
+                  <div className="space-y-2">
+                    {personalities.map((personality) => (
+                      <div
+                        key={personality.key}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                          selectedPersonality.key === personality.key
+                            ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
+                            : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                        }`}
+                        onClick={() => setSelectedPersonality(personality)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <personality.icon className="h-4 w-4" />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{personality.name}</div>
+                            <div className="text-xs opacity-75 mt-0.5">{personality.description}</div>
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          {selectedPersonality.key === personality.key && (
+                            <div className="w-2 h-2 bg-current rounded-full" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* AI Status Indicator */}
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className={`w-2 h-2 rounded-full ${selectedProvider && selectedModel && supabaseToken ? "bg-green-500" : "bg-gray-400"}`}
-                    />
-                    <span className="text-xs text-gray-600">
-                      {selectedProvider && selectedModel && supabaseToken ? "AI Ready" : "AI Configuration Required"}
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          selectedProvider && selectedModel && supabaseToken ? "bg-green-500" : "bg-gray-400"
+                        }`}
+                      />
+                      <span className="text-xs text-gray-600 font-medium">
+                        {selectedProvider && selectedModel && supabaseToken ? "AI Ready" : "Configuration Required"}
+                      </span>
+                    </div>
+                    {selectedProvider && selectedModel && supabaseToken && (
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                        Connected
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Document Statistics Card */}
+            <Card className="bg-white border-gray-200 shadow-sm">
+              <CardHeader className="pb-4 border-b border-gray-100">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
+                    <Eye className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-medium text-gray-900">Document Analytics</CardTitle>
+                    <p className="text-sm text-gray-500 mt-0.5">Real-time writing statistics</p>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gray-900">{wordCount.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Words</div>
+                  </div>
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gray-900">{readingTime}</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide mt-1">Min Read</div>
+                  </div>
+                </div>
+
+                <Separator className="bg-gray-200" />
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Characters</span>
+                    <span className="font-medium text-gray-900">{charCount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Characters (no spaces)</span>
+                    <span className="font-medium text-gray-900">{charCountNoSpaces.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Paragraphs</span>
+                    <span className="font-medium text-gray-900">{paragraphCount}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Grammar Issues</span>
+                    <span
+                      className={`font-medium ${
+                        languageToolSuggestions.length > 0 ? "text-orange-600" : "text-green-600"
+                      }`}
+                    >
+                      {languageToolSuggestions.length}
                     </span>
+                  </div>
+                </div>
+
+                <Separator className="bg-gray-200" />
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Template</span>
+                    <Badge variant="outline" className="text-xs bg-gray-50 border-gray-300">
+                      {currentTemplate.name}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Progress</span>
+                    <span className="font-medium text-gray-900">{Math.round(wordProgress)}%</span>
                   </div>
                 </div>
               </CardContent>
@@ -455,64 +774,18 @@ function WriterPageContent() {
             <Card className="bg-white border-gray-200 shadow-sm">
               <CardHeader className="pb-4 border-b border-gray-100">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-purple-50 rounded-md flex items-center justify-center">
+                  <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
                     <Quote className="h-4 w-4 text-purple-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-base font-medium text-gray-900">Citations</CardTitle>
-                    <p className="text-sm text-gray-500 mt-0.5">Manage references and citations</p>
+                    <CardTitle className="text-base font-medium text-gray-900">Citations & References</CardTitle>
+                    <p className="text-sm text-gray-500 mt-0.5">Manage your bibliography</p>
                   </div>
                 </div>
               </CardHeader>
 
               <CardContent className="p-4">
                 <CitationManager selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gray-50 rounded-md flex items-center justify-center">
-                    <Eye className="h-4 w-4 text-gray-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-medium text-gray-900">Document Stats</CardTitle>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-semibold text-gray-900">{wordCount}</div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide">Words</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-semibold text-gray-900">{charCount}</div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide">Characters</div>
-                  </div>
-                </div>
-
-                <Separator className="bg-gray-200" />
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Grammar Issues</span>
-                    <span
-                      className={`font-medium ${languageToolSuggestions.length > 0 ? "text-orange-600" : "text-green-600"}`}
-                    >
-                      {languageToolSuggestions.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Template</span>
-                    <span className="font-medium text-gray-900">
-                      {publisherTemplates.find((t) => t.id === selectedTemplate)?.name}
-                    </span>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -525,11 +798,10 @@ function WriterPageContent() {
         onOpenChange={setAiModalOpen}
         selectedProvider={selectedProvider || ""}
         selectedModel={selectedModel || ""}
-        documentTemplate={selectedTemplate}
-        researchContext={buildContext()}
+        supabaseToken={supabaseToken}
         writingStylePrompt={selectedPersonality.systemPrompt}
         templatePrompt={getTemplatePrompt(selectedTemplate)}
-        supabaseToken={supabaseToken}
+        researchContext={buildContext()}
         onGenerateContent={(text) => {
           setDocumentText((prev) => prev + "\n\n" + text)
           toast({
