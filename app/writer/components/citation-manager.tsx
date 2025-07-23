@@ -6,25 +6,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useResearchSession } from "@/components/research-session-provider"
-import { FileText, Plus, Trash2, Download } from "lucide-react"
+import { FileText, Plus, Trash2, Download, BookOpen } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 // Citation format types
 const CITATION_FORMATS = [
-  { id: "apa", name: "APA" },
-  { id: "mla", name: "MLA" },
-  { id: "chicago", name: "Chicago" },
-  { id: "ieee", name: "IEEE" },
-  { id: "harvard", name: "Harvard" },
+  { id: "apa", name: "APA", description: "American Psychological Association" },
+  { id: "mla", name: "MLA", description: "Modern Language Association" },
+  { id: "chicago", name: "Chicago", description: "Chicago Manual of Style" },
+  { id: "ieee", name: "IEEE", description: "Institute of Electrical and Electronics Engineers" },
+  { id: "harvard", name: "Harvard", description: "Harvard referencing system" },
 ]
 
 // Template formats for different publishers
 const PUBLISHER_TEMPLATES = [
-  { id: "ieee", name: "IEEE" },
-  { id: "acm", name: "ACM" },
-  { id: "springer", name: "Springer" },
-  { id: "elsevier", name: "Elsevier" },
-  { id: "general", name: "General Academic" },
+  { id: "ieee", name: "IEEE", description: "Institute of Electrical and Electronics Engineers" },
+  { id: "acm", name: "ACM", description: "Association for Computing Machinery" },
+  { id: "springer", name: "Springer", description: "Springer Nature publications" },
+  { id: "elsevier", name: "Elsevier", description: "Elsevier journal publications" },
+  { id: "general", name: "General", description: "General academic format" },
 ]
 
 interface Citation {
@@ -51,6 +52,7 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
   const [citationFormat, setCitationFormat] = useState("ieee")
   const [manualCitations, setManualCitations] = useState<Citation[]>([])
   const [formattedReferences, setFormattedReferences] = useState<string>("")
+  const [isGenerating, setIsGenerating] = useState(false)
 
   // Get research session data
   const { session, getSelectedPapers } = useResearchSession()
@@ -94,41 +96,40 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
 
   // Format citations based on selected format
   const formatCitations = () => {
-    // In a real implementation, we would use a citation formatting library like Citation.js
-    // For now, we're mocking the formatted references
+    setIsGenerating(true)
 
-    const allCitations = [...papersToCitations(), ...manualCitations]
+    setTimeout(() => {
+      const allCitations = [...papersToCitations(), ...manualCitations]
+      let formatted = ""
 
-    // Simplified citation formatting based on IEEE style
-    let formatted = ""
+      if (citationFormat === "ieee") {
+        formatted = allCitations
+          .map((citation, index) => {
+            const authors = citation.authors.join(", ")
+            return `[${index + 1}] ${authors}, "${citation.title}," ${citation.journal ? `in ${citation.journal}, ` : ""}${citation.volume ? `vol. ${citation.volume}, ` : ""}${citation.issue ? `no. ${citation.issue}, ` : ""}${citation.pages ? `pp. ${citation.pages}, ` : ""}${citation.year || ""}.${citation.doi ? ` doi: ${citation.doi}.` : ""}`
+          })
+          .join("\n\n")
+      } else if (citationFormat === "apa") {
+        formatted = allCitations
+          .map((citation) => {
+            const lastAuthorIndex = citation.authors.length - 1
+            const authors =
+              lastAuthorIndex > 0
+                ? citation.authors.slice(0, lastAuthorIndex).join(", ") + ", & " + citation.authors[lastAuthorIndex]
+                : citation.authors.join("")
 
-    if (citationFormat === "ieee") {
-      formatted = allCitations
-        .map((citation, index) => {
-          const authors = citation.authors.join(", ")
-          return `[${index + 1}] ${authors}, "${citation.title}," ${citation.journal ? `in ${citation.journal}, ` : ""}${citation.volume ? `vol. ${citation.volume}, ` : ""}${citation.issue ? `no. ${citation.issue}, ` : ""}${citation.pages ? `pp. ${citation.pages}, ` : ""}${citation.year || ""}.${citation.doi ? ` doi: ${citation.doi}.` : ""}`
-        })
-        .join("\n\n")
-    } else if (citationFormat === "apa") {
-      formatted = allCitations
-        .map((citation) => {
-          const lastAuthorIndex = citation.authors.length - 1
-          const authors =
-            lastAuthorIndex > 0
-              ? citation.authors.slice(0, lastAuthorIndex).join(", ") + ", & " + citation.authors[lastAuthorIndex]
-              : citation.authors.join("")
+            return `${authors}. (${citation.year || "n.d."}). ${citation.title}. ${citation.journal || ""}${citation.volume ? `, ${citation.volume}` : ""}${citation.issue ? `(${citation.issue})` : ""}${citation.pages ? `, ${citation.pages}` : ""}.${citation.doi ? ` https://doi.org/${citation.doi}` : ""}`
+          })
+          .join("\n\n")
+      } else {
+        formatted = allCitations
+          .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
+          .join("\n\n")
+      }
 
-          return `${authors}. (${citation.year || "n.d."}). ${citation.title}. ${citation.journal || ""}${citation.volume ? `, ${citation.volume}` : ""}${citation.issue ? `(${citation.issue})` : ""}${citation.pages ? `, ${citation.pages}` : ""}.${citation.doi ? ` https://doi.org/${citation.doi}` : ""}`
-        })
-        .join("\n\n")
-    } else {
-      // Default or other formats could be implemented similarly
-      formatted = allCitations
-        .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
-        .join("\n\n")
-    }
-
-    setFormattedReferences(formatted)
+      setFormattedReferences(formatted)
+      setIsGenerating(false)
+    }, 1000)
   }
 
   // Handle template selection
@@ -146,18 +147,12 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
       title: "",
       authors: [""],
     }
-
     setManualCitations([...manualCitations, newCitation])
   }
 
   // Remove a manual citation
   const removeManualCitation = (id: string) => {
     setManualCitations(manualCitations.filter((c) => c.id !== id))
-  }
-
-  // Generate references button handler
-  const handleGenerateReferences = () => {
-    formatCitations()
   }
 
   // Export references as a text file
@@ -171,22 +166,27 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
     document.body.removeChild(element)
   }
 
+  const totalCitations = papersToCitations().length + manualCitations.length
+
   return (
-    <div className="space-y-4">
-      {/* Format Selection */}
-      <div className="space-y-3">
+    <div className="space-y-5">
+      {/* Configuration Section */}
+      <div className="space-y-4">
         <div>
-          <Label htmlFor="citation-format" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+          <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 block">
             Citation Format
           </Label>
           <Select value={citationFormat} onValueChange={setCitationFormat}>
-            <SelectTrigger className="mt-1 h-8 text-xs border-gray-300">
-              <SelectValue placeholder="Select format" />
+            <SelectTrigger className="h-10 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white border-gray-200 shadow-lg">
               {CITATION_FORMATS.map((format) => (
-                <SelectItem key={format.id} value={format.id} className="text-xs">
-                  {format.name}
+                <SelectItem key={format.id} value={format.id} className="text-sm hover:bg-gray-50 p-3">
+                  <div>
+                    <div className="font-medium">{format.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{format.description}</div>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -194,17 +194,20 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
         </div>
 
         <div>
-          <Label htmlFor="publisher-template" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+          <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 block">
             Publisher Template
           </Label>
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-            <SelectTrigger className="mt-1 h-8 text-xs border-gray-300">
-              <SelectValue placeholder="Select template" />
+            <SelectTrigger className="h-10 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white border-gray-200 shadow-lg">
               {PUBLISHER_TEMPLATES.map((template) => (
-                <SelectItem key={template.id} value={template.id} className="text-xs">
-                  {template.name}
+                <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
+                  <div>
+                    <div className="font-medium">{template.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{template.description}</div>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -212,79 +215,99 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
         </div>
       </div>
 
-      <Separator />
+      <Separator className="bg-gray-200" />
 
-      {/* Research Papers */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
-          Research Papers ({selectedPapers.length})
-        </h4>
+      {/* Research Papers Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <BookOpen className="h-4 w-4 text-gray-600" />
+            <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Research Papers</Label>
+          </div>
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            {selectedPapers.length} papers
+          </Badge>
+        </div>
+
         {selectedPapers.length > 0 ? (
-          <div className="space-y-2 max-h-32 overflow-y-auto">
-            {selectedPapers.map((paper) => (
-              <div key={paper.id} className="text-xs p-2 border border-gray-200 rounded bg-gray-50">
-                <div className="font-medium text-black truncate">{paper.title}</div>
-                <div className="text-gray-500 mt-0.5">
-                  {paper.authors
-                    ? paper.authors
-                        .map((a: any) => {
-                          if (typeof a === "string") return a
-                          if (a && typeof a === "object" && "name" in a) return a.name || ""
-                          return ""
-                        })
-                        .filter(Boolean)
-                        .join(", ")
-                    : ""}{" "}
-                  ({paper.year || ""})
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {selectedPapers.map((paper, index) => (
+              <div
+                key={paper.id}
+                className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">{paper.title}</div>
+                    <div className="text-xs text-gray-500">
+                      {paper.authors
+                        ? paper.authors
+                            .map((a: any) => {
+                              if (typeof a === "string") return a
+                              if (a && typeof a === "object" && "name" in a) return a.name || ""
+                              return ""
+                            })
+                            .filter(Boolean)
+                            .slice(0, 3)
+                            .join(", ")
+                        : ""}{" "}
+                      {paper.authors && paper.authors.length > 3 && "et al."} ({paper.year || "n.d."})
+                    </div>
+                  </div>
+                  <div className="ml-2 text-xs text-gray-400 font-mono">[{index + 1}]</div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-gray-500 py-2">No papers selected from research session</p>
+          <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
+            <BookOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No papers selected from research session</p>
+            <p className="text-xs text-gray-400 mt-1">Add papers from the Explorer to include them here</p>
+          </div>
         )}
       </div>
 
-      {/* Manual Citations */}
-      <div className="space-y-2">
+      {/* Manual Citations Section */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
-            Manual Citations ({manualCitations.length})
-          </h4>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addManualCitation}
-            className="h-6 px-2 text-xs border-gray-300 bg-transparent"
-          >
-            <Plus className="h-3 w-3 mr-1" />
-            Add
-          </Button>
+          <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Manual Citations</Label>
+          <div className="flex items-center space-x-2">
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+              {manualCitations.length} citations
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addManualCitation}
+              className="h-8 px-3 text-xs border-gray-300 bg-white hover:bg-gray-50 transition-colors duration-200"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add
+            </Button>
+          </div>
         </div>
 
         {manualCitations.length > 0 ? (
-          <div className="space-y-3 max-h-48 overflow-y-auto">
+          <div className="space-y-3 max-h-64 overflow-y-auto">
             {manualCitations.map((citation, index) => (
-              <div key={citation.id} className="p-3 border border-gray-200 rounded bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <h5 className="text-xs font-medium text-black">Citation #{index + 1}</h5>
+              <div key={citation.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-900">Citation #{index + 1}</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => removeManualCitation(citation.id)}
-                    className="h-5 w-5 p-0 hover:bg-gray-200"
+                    className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
                   >
-                    <Trash2 className="h-3 w-3 text-red-600" />
+                    <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div>
-                    <Label htmlFor={`title-${citation.id}`} className="text-xs text-gray-600">
-                      Title
-                    </Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">Title</Label>
                     <Input
-                      id={`title-${citation.id}`}
                       value={citation.title}
                       onChange={(e) => {
                         const updated = manualCitations.map((c) =>
@@ -292,16 +315,14 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                         )
                         setManualCitations(updated)
                       }}
-                      className="h-6 text-xs mt-1 border-gray-300"
+                      className="h-8 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+                      placeholder="Enter citation title..."
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor={`authors-${citation.id}`} className="text-xs text-gray-600">
-                      Authors (comma separated)
-                    </Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">Authors</Label>
                     <Input
-                      id={`authors-${citation.id}`}
                       value={citation.authors.join(", ")}
                       onChange={(e) => {
                         const updated = manualCitations.map((c) =>
@@ -309,17 +330,15 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                         )
                         setManualCitations(updated)
                       }}
-                      className="h-6 text-xs mt-1 border-gray-300"
+                      className="h-8 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+                      placeholder="Author 1, Author 2, Author 3..."
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor={`year-${citation.id}`} className="text-xs text-gray-600">
-                        Year
-                      </Label>
+                      <Label className="text-xs text-gray-600 mb-1 block">Year</Label>
                       <Input
-                        id={`year-${citation.id}`}
                         value={citation.year || ""}
                         onChange={(e) => {
                           const updated = manualCitations.map((c) =>
@@ -327,16 +346,14 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                           )
                           setManualCitations(updated)
                         }}
-                        className="h-6 text-xs mt-1 border-gray-300"
+                        className="h-8 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+                        placeholder="2024"
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor={`journal-${citation.id}`} className="text-xs text-gray-600">
-                        Journal
-                      </Label>
+                      <Label className="text-xs text-gray-600 mb-1 block">Journal</Label>
                       <Input
-                        id={`journal-${citation.id}`}
                         value={citation.journal || ""}
                         onChange={(e) => {
                           const updated = manualCitations.map((c) =>
@@ -344,7 +361,8 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
                           )
                           setManualCitations(updated)
                         }}
-                        className="h-6 text-xs mt-1 border-gray-300"
+                        className="h-8 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+                        placeholder="Journal name"
                       />
                     </div>
                   </div>
@@ -353,30 +371,73 @@ export function CitationManager({ selectedTemplate, onTemplateChange }: Citation
             ))}
           </div>
         ) : (
-          <p className="text-xs text-gray-500 py-2">No manual citations added</p>
+          <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
+            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No manual citations added</p>
+            <p className="text-xs text-gray-400 mt-1">Click "Add" to create manual citations</p>
+          </div>
         )}
       </div>
 
       {/* Action Buttons */}
       <div className="flex gap-2 pt-2">
-        <Button onClick={handleGenerateReferences} className="flex-1 h-8 text-xs bg-black text-white hover:bg-gray-800">
-          <FileText className="h-3 w-3 mr-2" />
-          Generate References
+        <Button
+          onClick={formatCitations}
+          disabled={totalCitations === 0 || isGenerating}
+          className="flex-1 h-9 text-sm bg-black text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          {isGenerating ? "Generating..." : "Generate References"}
         </Button>
 
         {formattedReferences && (
-          <Button variant="outline" onClick={exportReferences} className="h-8 px-2 border-gray-300 bg-transparent">
-            <Download className="h-3 w-3" />
+          <Button
+            variant="outline"
+            onClick={exportReferences}
+            className="h-9 px-3 border-gray-300 bg-white hover:bg-gray-50 transition-colors duration-200"
+          >
+            <Download className="h-4 w-4" />
           </Button>
         )}
       </div>
 
-      {/* Formatted References */}
+      {/* Summary */}
+      {totalCitations > 0 && (
+        <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-700">
+            <strong>{totalCitations}</strong> citations ready • <strong>{citationFormat.toUpperCase()}</strong> format
+          </p>
+        </div>
+      )}
+
+      {/* Formatted References Output */}
       {formattedReferences && (
-        <div className="mt-4">
-          <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-2">Formatted References</h4>
-          <div className="border border-gray-200 rounded-md p-3 bg-gray-50 whitespace-pre-wrap text-xs font-mono overflow-auto max-h-64">
-            {formattedReferences}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Formatted References</Label>
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              {citationFormat.toUpperCase()} Style
+            </Badge>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 max-h-80 overflow-y-auto">
+            <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">
+              {formattedReferences}
+            </pre>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
+            <span>Ready to copy and paste into your document</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(formattedReferences)
+                // You could add a toast notification here
+              }}
+              className="h-6 px-2 text-xs hover:bg-gray-100"
+            >
+              Copy to Clipboard
+            </Button>
           </div>
         </div>
       )}
