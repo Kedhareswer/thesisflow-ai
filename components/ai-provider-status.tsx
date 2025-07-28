@@ -67,16 +67,22 @@ export function AIProviderStatus({ showActions = true }: { showActions?: boolean
           models: ['gemini-2.0-flash', 'gemini-1.5-pro']
         },
         {
+          provider: 'anthropic',
+          name: 'Anthropic (Claude)',
+          available: status.available.includes('anthropic'),
+          models: ['claude-3.5-sonnet', 'claude-3-opus']
+        },
+        {
+          provider: 'mistral',
+          name: 'Mistral AI',
+          available: status.available.includes('mistral'),
+          models: ['mistral-large-latest', 'mistral-medium-latest']
+        },
+        {
           provider: 'aiml',
           name: 'AI/ML API',
           available: status.available.includes('aiml'),
           models: ['gpt-4o', 'claude-3-sonnet']
-        },
-        {
-          provider: 'deepinfra',
-          name: 'DeepInfra',
-          available: status.available.includes('deepinfra'),
-          models: ['Meta-Llama-3.1-70B-Instruct']
         }
       ]
 

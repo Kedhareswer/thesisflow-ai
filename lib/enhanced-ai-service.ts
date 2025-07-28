@@ -261,11 +261,15 @@ class EnhancedAIService {
         case 'gemini':
           return await this.callGeminiAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
         
+        case 'anthropic':
+          return await this.callAnthropicAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
+        case 'mistral':
+          return await this.callMistralAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
+        
         case 'aiml':
           return await this.callAIMLAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
         
-        case 'deepinfra':
-          return await this.callDeepInfraAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
         
         default:
           return {
@@ -395,37 +399,120 @@ class EnhancedAIService {
     maxTokens: number,
     temperature: number
   ): Promise<GenerateTextResult> {
+    console.log("Enhanced AI Service: Calling Anthropic API...")
+    
     const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
+      method: 'POST',
       headers: {
-        'x-api-key': apiKey,
         'Content-Type': 'application/json',
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-        body: JSON.stringify({
-        model,
+      body: JSON.stringify({
+        model: model || 'claude-3.5-sonnet',
         max_tokens: maxTokens,
-        temperature,
-        messages: [{ role: 'user', content: prompt }]
-      }),
+        temperature: temperature,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      console.error("Enhanced AI Service: Anthropic API error data:", errorData)
       throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
     }
 
     const data = await response.json()
+    console.log("Enhanced AI Service: Anthropic API response data:", {
+      hasContent: !!data.content,
+      contentLength: data.content?.length,
+      firstContent: data.content?.[0]?.text?.substring(0, 100),
+      usage: data.usage
+    })
+    
+    const content = data.content?.[0]?.text || ''
+    
+    if (!content) {
+      console.error("Enhanced AI Service: Anthropic API returned no content!", data)
+      throw new Error("Anthropic API returned no content")
+    }
     
     return {
       success: true,
-      content: data.content?.[0]?.text || '',
-      provider: 'openai', // Fallback since anthropic not in AIProvider type
+      content,
+      provider: 'anthropic',
       model,
       usage: {
         promptTokens: data.usage?.input_tokens,
         completionTokens: data.usage?.output_tokens,
-        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        totalTokens: data.usage?.input_tokens + data.usage?.output_tokens,
+      }
+    }
+  }
+
+  private async callMistralAPI(
+    apiKey: string,
+    prompt: string,
+    model: string,
+    maxTokens: number,
+    temperature: number
+  ): Promise<GenerateTextResult> {
+    console.log("Enhanced AI Service: Calling Mistral API...")
+    
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model || 'mistral-large-latest',
+        max_tokens: maxTokens,
+        temperature: temperature,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Enhanced AI Service: Mistral API error data:", errorData)
+      throw new Error(`Mistral API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+    }
+
+    const data = await response.json()
+    console.log("Enhanced AI Service: Mistral API response data:", {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
+      usage: data.usage
+    })
+    
+    const content = data.choices?.[0]?.message?.content || ''
+    
+    if (!content) {
+      console.error("Enhanced AI Service: Mistral API returned no content!", data)
+      throw new Error("Mistral API returned no content")
+    }
+    
+    return {
+      success: true,
+      content,
+      provider: 'mistral',
+      model,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+        totalTokens: data.usage?.total_tokens,
       }
     }
   }
@@ -560,69 +647,7 @@ class EnhancedAIService {
     }
   }
 
-  private async callDeepInfraAPI(
-    apiKey: string,
-    prompt: string,
-    model: string,
-    maxTokens: number,
-    temperature: number
-  ): Promise<GenerateTextResult> {
-    console.log("Enhanced AI Service: Calling DeepInfra API with:", {
-      model,
-      maxTokens,
-      temperature,
-      promptLength: prompt.length
-    })
 
-    const response = await fetch('https://api.deepinfra.com/v1/openai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    })
-
-    console.log("Enhanced AI Service: DeepInfra API response status:", response.status)
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error("Enhanced AI Service: DeepInfra API error data:", errorData)
-      throw new Error(`DeepInfra API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
-    }
-
-    const data = await response.json()
-    console.log("Enhanced AI Service: DeepInfra API response data:", {
-      hasChoices: !!data.choices,
-      choicesLength: data.choices?.length,
-      firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
-      usage: data.usage
-    })
-    
-    const content = data.choices?.[0]?.message?.content || ''
-    
-    if (!content) {
-      console.error("Enhanced AI Service: DeepInfra API returned no content!", data)
-      throw new Error("DeepInfra API returned no content")
-    }
-    
-    return {
-      success: true,
-      content,
-      provider: 'deepinfra',
-      model,
-      usage: {
-        promptTokens: data.usage?.prompt_tokens,
-        completionTokens: data.usage?.completion_tokens,
-        totalTokens: data.usage?.total_tokens,
-      }
-    }
-  }
 
   // Backward compatibility method for components that expect chatCompletion
   async chatCompletion(
@@ -994,8 +1019,7 @@ SENTIMENT: [positive/neutral/negative]`
         gemini: /^AIza[A-Za-z0-9_\-]{35,}$/,
         anthropic: /^sk-ant-[A-Za-z0-9]{40,}$/,
         mistral: /^[A-Za-z0-9]{32,}$/,
-        aiml: /.{10,}/,
-        deepinfra: /.{10,}/
+        aiml: /.{10,}/
       }
 
       const pattern = regexMap[provider]
@@ -1010,8 +1034,7 @@ SENTIMENT: [positive/neutral/negative]`
         gemini: 'gemini-1.5-pro',
         anthropic: 'claude-3-sonnet',
         mistral: 'mistral-small',
-        aiml: 'claude-3-sonnet',
-        deepinfra: 'Meta-Llama-3.1-70B-Instruct'
+        aiml: 'claude-3-sonnet'
       }
 
       return { valid: true, model: defaultModelMap[provider] }

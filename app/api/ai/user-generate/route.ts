@@ -47,12 +47,16 @@ async function getUserApiKeys(userId: string, supabase: any): Promise<Map<string
   if (!apiKeys.has('gemini') && process.env.GEMINI_API_KEY) {
     apiKeys.set('gemini', process.env.GEMINI_API_KEY)
   }
+  if (!apiKeys.has('anthropic') && process.env.ANTHROPIC_API_KEY) {
+    apiKeys.set('anthropic', process.env.ANTHROPIC_API_KEY)
+  }
+  if (!apiKeys.has('mistral') && process.env.MISTRAL_API_KEY) {
+    apiKeys.set('mistral', process.env.MISTRAL_API_KEY)
+  }
   if (!apiKeys.has('aiml') && process.env.AIML_API_KEY) {
     apiKeys.set('aiml', process.env.AIML_API_KEY)
   }
-  if (!apiKeys.has('deepinfra') && process.env.DEEPINFRA_API_KEY) {
-    apiKeys.set('deepinfra', process.env.DEEPINFRA_API_KEY)
-  }
+
 
   return apiKeys
 }
@@ -63,7 +67,7 @@ async function generateWithAI(
   userApiKeys: Map<string, string>
 ): Promise<string> {
   // Define provider priority order
-  const providerOrder = ['openai', 'groq', 'gemini', 'aiml', 'deepinfra']
+  const providerOrder = ['openai', 'groq', 'gemini', 'anthropic', 'mistral', 'aiml']
   
   let providersToTry = []
   
@@ -104,10 +108,12 @@ async function generateWithAI(
         result = await callGroqAPI(apiKey, prompt)
       } else if (provider === 'gemini') {
         result = await callGeminiAPI(apiKey, prompt)
+      } else if (provider === 'anthropic') {
+        result = await callAnthropicAPI(apiKey, prompt)
+      } else if (provider === 'mistral') {
+        result = await callMistralAPI(apiKey, prompt)
       } else if (provider === 'aiml') {
         result = await callAIMLAPI(apiKey, prompt)
-      } else if (provider === 'deepinfra') {
-        result = await callDeepInfraAPI(apiKey, prompt)
       }
       
       if (result && result.trim()) {
@@ -197,6 +203,60 @@ async function callGeminiAPI(apiKey: string, prompt: string): Promise<string> {
   return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 }
 
+async function callAnthropicAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3.5-sonnet',
+      max_tokens: 2000,
+      temperature: 0.7,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.content?.[0]?.text || ''
+}
+
+async function callMistralAPI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'mistral-small',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Mistral API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || ''
+}
+
 async function callAIMLAPI(apiKey: string, prompt: string): Promise<string> {
   const response = await fetch('https://api.aimlapi.com/v1/chat/completions', {
       method: 'POST',
@@ -215,30 +275,6 @@ async function callAIMLAPI(apiKey: string, prompt: string): Promise<string> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
     throw new Error(`AIML API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.choices?.[0]?.message?.content || ''
-}
-
-async function callDeepInfraAPI(apiKey: string, prompt: string): Promise<string> {
-  const response = await fetch('https://api.deepinfra.com/v1/openai/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'Meta-Llama-3.1-70B-Instruct',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 2000,
-      temperature: 0.7,
-    }),
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(`DeepInfra API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
   }
 
   const data = await response.json()

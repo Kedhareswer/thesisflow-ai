@@ -1,7 +1,7 @@
 import { AIProviderDetector } from "./ai-provider-detector"
 
 // AI Provider Types
-export type AIProvider = "gemini" | "aiml" | "groq" | "deepinfra" | "openai"
+export type AIProvider = "gemini" | "aiml" | "groq" | "openai" | "anthropic" | "mistral"
 
 export interface AIProviderConfig {
   name: string
@@ -100,6 +100,33 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
     ],
     maxTokens: 1000000, // GPT-4.1 supports up to 1M tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "function-calling", "reasoning", "multimodal"],
+  },
+  anthropic: {
+    name: "Anthropic",
+    models: [
+      "claude-3.5-sonnet",
+      "claude-3.5-haiku",
+      "claude-3-opus",
+      "claude-3-sonnet",
+      "claude-3-haiku",
+      "claude-2.1",
+      "claude-2.0"
+    ],
+    maxTokens: 200000, // Claude 3.5 supports up to 200k tokens
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "reasoning", "long-context"],
+  },
+  mistral: {
+    name: "Mistral AI",
+    models: [
+      "mistral-large-latest",
+      "mistral-medium-latest",
+      "mistral-small-latest",
+      "mistral-large",
+      "mistral-medium",
+      "mistral-small"
+    ],
+    maxTokens: 32768, // Mistral supports up to 32k tokens
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference"],
   },
 }
 
