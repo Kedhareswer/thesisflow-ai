@@ -46,10 +46,25 @@ export async function GET(request: Request) {
     try {
       console.log("API: Using Enhanced Search Service with filters:", filters)
       
-      // Use the new enhanced search service
+      // Use the enhanced search service
       const searchResult = await EnhancedSearchService.searchPapers(query.trim(), filters, limit)
 
       console.log(`API: Enhanced search returned ${searchResult.papers.length} papers from ${searchResult.sources.join(', ')} in ${searchResult.search_time}ms`)
+
+      // Only return results if we have real papers from actual sources
+      if (searchResult.papers.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: "No papers found from available sources",
+          suggestion: "Try different keywords or check if search services are available",
+          count: 0,
+          total: 0,
+          sources: [],
+          search_time: searchResult.search_time,
+          filters_applied: searchResult.filters_applied,
+          data: []
+        })
+      }
 
       const responseData = {
         success: true,
@@ -63,43 +78,19 @@ export async function GET(request: Request) {
 
       return NextResponse.json(responseData)
     } catch (searchError) {
-      console.error("API: Enhanced search failed, falling back to basic search:", searchError)
+      console.error("API: Enhanced search failed:", searchError)
       
-      // Fallback to original OpenAlex search
-      const { fetchOpenAlexWorks } = await import("@/app/explorer/openalex")
-      const papers = await fetchOpenAlexWorks(query.trim(), limit)
-
-      console.log("API: Fallback search found papers:", papers.length)
-
-      // Transform to expected format
-      const transformedPapers = papers
-        .filter((paper) => paper.title && paper.title.trim() !== "")
-        .map((paper) => ({
-          id: paper.id,
-          title: paper.title,
-          authors: paper.authors || [],
-          year: paper.publication_year,
-          journal: paper.host_venue || "Unknown Journal",
-          abstract: paper.abstract || "No abstract available",
-          url: paper.url,
-          doi: paper.doi,
-          pdf_url: paper.doi ? `https://doi.org/${paper.doi}` : paper.url,
-          source: 'openalex'
-        }))
-        .slice(0, limit)
-
-      const responseData = {
-        success: true,
-        count: transformedPapers.length,
-        total: transformedPapers.length,
-        sources: ['openalex'],
+      return NextResponse.json({
+        success: false,
+        error: "Search service unavailable",
+        suggestion: "Please try again later or check your internet connection",
+        count: 0,
+        total: 0,
+        sources: [],
         search_time: 0,
         filters_applied: {},
-        data: transformedPapers,
-        fallback: true
-      }
-
-      return NextResponse.json(responseData)
+        data: []
+      }, { status: 503 })
     }
   } catch (error) {
     console.error("API: Unexpected error:", error)
