@@ -204,7 +204,7 @@ export default function HomePage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-background/20 text-background hover:bg-background/10 focus-ring"
+                className="border-background/20 text-black hover:bg-background/10 focus-ring"
                 onClick={() => handleProtectedAction('/explorer')}
               >
                 View Demo

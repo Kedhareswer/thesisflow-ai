@@ -3,15 +3,13 @@
 ![Bolt Research Hub](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
 </div>
 
-<div align="center">
-
-[![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Latest-green?style=flat-square&logo=supabase)](https://supabase.io/)
-[![Socket.io](https://img.shields.io/badge/Socket.io-Latest-black?style=flat-square&logo=socket.io)](https://socket.io/)
-[![License](https://img.shields.io/badge/License-None-yellow.svg)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Latest-green?style=for-the-badge&logo=supabase)](https://supabase.io/)
+[![Socket.io](https://img.shields.io/badge/Socket.io-Latest-black?style=for-the-badge&logo=socket.io)](https://socket.io/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
 
 **Advanced AI-Powered Research Platform**
 
@@ -57,7 +55,7 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 
 ### Writer Features
 
-- **Rich Text Editor:** Advanced document editor with formatting tools and real-time collaboration.
+- **Markdown Editor:** Advanced document editor with Markdown and LaTeX support, real-time collaboration, and formatting tools.
 - **AI Writing Assistant:** Context-aware AI assistance with multiple writing personalities (Academic, Technical, Creative).
 - **Citation Management:** Import citations from research, generate formatted references in multiple styles (APA, MLA, Chicago, IEEE, Harvard).
 - **Publisher Templates:** Support for multiple academic publisher formats (IEEE, ACM, Springer, Elsevier).
@@ -76,7 +74,7 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 
 ## System Architecture
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
   Client[Next.js Frontend] --> Middleware[Auth Middleware]
   Middleware --> API[API Routes]
@@ -123,7 +121,7 @@ flowchart TD
     Python
     Literature
   end
-\`\`\`
+```
 
 ---
 
@@ -140,68 +138,68 @@ flowchart TD
 ### Environment Setup
 
 1. **Clone the repository**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/Kedhareswer/ai-project-planner.git
    cd ai-project-planner
-   \`\`\`
+   ```
 
 2. **Install frontend dependencies**
-   \`\`\`bash
+   ```bash
    pnpm install
-   \`\`\`
+   ```
 
 3. **Configure environment variables**
-   \`\`\`bash
+   ```bash
    cp env.template .env.local
-   \`\`\`
+   ```
    Edit `.env.local` with your configuration.
 
 4. **Set up Python Backend**
-   \`\`\`bash
+   ```bash
    cd python
    # For Linux/Mac
    pip install -r requirements.txt
    # For Windows
    setup.bat
-   \`\`\`
+   ```
 
 5. **Configure Supabase Database**
-   \`\`\`bash
+   ```bash
    node scripts/run-migration.js
-   \`\`\`
+   ```
 
 ### Development Server
 
 1. **Start the full development environment**
-   \`\`\`bash
+   ```bash
    node start-dev.js
    # or
    pnpm dev:all
-   \`\`\`
+   ```
    - Next.js frontend at `http://localhost:3000`
    - WebSocket server at port `3001`
 
 2. **Start Python backend (separate terminal)**
-   \`\`\`bash
+   ```bash
    cd python
    python app.py
    # or for improved version
    python improved_app.py
-   \`\`\`
+   ```
    - Python service runs at `http://localhost:5000`
 
 ### Production Deployment
 
-\`\`\`bash
+```bash
 pnpm build
 pnpm start:all
-\`\`\`
+```
 
 ---
 
 ## Project Structure
 
-\`\`\`bash
+```bash
 ai-project-planner/
   app/                 # Next.js App Router
     ai-assistant/      # AI assistant interface
@@ -228,7 +226,7 @@ ai-project-planner/
   public/              # Static assets
   styles/              # Global styles
   types/               # TypeScript type definitions
-\`\`\`
+```
 
 ---
 

@@ -474,12 +474,44 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 <div>
                   <Label className="text-xs font-medium text-gray-700 mb-2 block">Template</Label>
                   <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-                    <SelectTrigger className="h-9 bg-white border-gray-300">
-                      <SelectValue />
+                    <SelectTrigger className="h-11 bg-white border-gray-300 rounded-lg shadow-sm hover:border-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all pr-12">
+                      <SelectValue placeholder="Select publisher template" />
               </SelectTrigger>
-              <SelectContent>
-                      <SelectItem value="ieee">IEEE Conference/Journal</SelectItem>
-                      <SelectItem value="acm">ACM Conference/Journal</SelectItem>
+                    <SelectContent className="bg-white border-gray-100 rounded-xl shadow-2xl p-2 w-80 max-w-full">
+                      <div className="space-y-2">
+                        {Object.entries(templates).map(([key, sections]) => {
+                          // Get a display name and description for each template
+                          let name = "";
+                          let description = "";
+                          let wordLimit = 0;
+                          let sectionCount = sections.length;
+                          if (key === "ieee") {
+                            name = "IEEE";
+                            description = "IEEE Conference/Journal Template";
+                            wordLimit = 8000;
+                          } else if (key === "acm") {
+                            name = "ACM";
+                            description = "ACM Conference/Journal Template";
+                            wordLimit = 10000;
+                          } // Add more as needed
+                          return (
+                            <SelectItem
+                              key={key}
+                              value={key}
+                              className="p-0 border-none bg-transparent hover:bg-gray-50 focus:bg-blue-50 rounded-lg transition-all group"
+                            >
+                              <div className="flex flex-col px-4 py-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-semibold text-gray-900 text-base">{name}</span>
+                                  <span className="text-xs text-gray-400">{sectionCount} sections</span>
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">{description}</div>
+                                <div className="text-xs text-gray-400 mt-1">{wordLimit.toLocaleString()} words</div>
+                              </div>
+                  </SelectItem>
+                          );
+                        })}
+                      </div>
               </SelectContent>
             </Select>
           </div>
