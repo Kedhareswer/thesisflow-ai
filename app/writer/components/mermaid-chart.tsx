@@ -1,12 +1,9 @@
 "use client"
 
-import React, { useEffect, useRef } from "react"
-import mermaid from "mermaid"
+import React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { FileText, AlertCircle } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useSafeDOM } from "../hooks/use-safe-dom"
+import { FileText, Code } from "lucide-react"
 
 interface MermaidChartProps {
   code: string
@@ -15,113 +12,27 @@ interface MermaidChartProps {
 }
 
 export function MermaidChart({ code, index, className = "" }: MermaidChartProps) {
-  const chartRef = useRef<HTMLDivElement>(null)
-  const [isRendered, setIsRendered] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const { safeClearElement, safeSetInnerHTML } = useSafeDOM()
-
-  useEffect(() => {
-    // Initialize mermaid
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      flowchart: {
-        useMaxWidth: true,
-        htmlLabels: true,
-        curve: 'basis'
-      },
-      themeVariables: {
-        primaryColor: '#3b82f6',
-        primaryTextColor: '#1f2937',
-        primaryBorderColor: '#3b82f6',
-        lineColor: '#6b7280',
-        secondaryColor: '#f3f4f6',
-        tertiaryColor: '#ffffff'
-      }
-    })
-
-    const renderChart = async () => {
-      if (!chartRef.current) return
-
-      try {
-        setError(null)
-        
-        // Clear previous content safely
-        safeClearElement(chartRef.current)
-        
-        // Generate unique ID for the chart
-        const chartId = `mermaid-chart-${index}-${Date.now()}`
-        chartRef.current.id = chartId
-        
-        // Render the mermaid chart
-        const { svg } = await mermaid.render(chartId, code)
-        
-        // Safely set the SVG content
-        if (chartRef.current) {
-          safeSetInnerHTML(chartRef.current, svg)
-        }
-        
-        setIsRendered(true)
-      } catch (err) {
-        console.error('Error rendering mermaid chart:', err)
-        setError(err instanceof Error ? err.message : 'Failed to render chart')
-        setIsRendered(false)
-      }
-    }
-
-    // Use setTimeout to avoid conflicts with React reconciliation
-    const timeoutId = setTimeout(renderChart, 0)
-    
-    return () => {
-      clearTimeout(timeoutId)
-    }
-  }, [code, index])
-
-  if (error) {
-    return (
-      <Card className={`my-4 border-red-200 ${className}`}>
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <FileText className="h-4 w-4 text-red-600" />
-            <Badge variant="outline" className="text-xs text-red-600 border-red-300">
-              Flowchart {index + 1} (Error)
-            </Badge>
-          </div>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Failed to render flowchart: {error}
-            </AlertDescription>
-          </Alert>
-          <div className="mt-3 p-3 bg-gray-50 rounded border">
-            <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono">
-              {code}
-            </pre>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <Card className={`my-4 border-gray-200 ${className}`}>
       <CardContent className="p-4">
         <div className="flex items-center space-x-2 mb-3">
-          <FileText className="h-4 w-4 text-gray-600" />
+          <Code className="h-4 w-4 text-gray-600" />
           <Badge variant="outline" className="text-xs">
-            Flowchart {index + 1}
+            Flowchart {index + 1} (Code)
           </Badge>
         </div>
-        <div className="flex justify-center">
-          <div 
-            ref={chartRef} 
-            className={`mermaid-chart-container ${!isRendered ? 'min-h-[200px] flex items-center justify-center bg-gray-50 rounded' : ''}`}
-          >
-            {!isRendered && (
-              <div className="text-gray-500 text-sm">
-                Rendering chart...
-              </div>
-            )}
+        <div className="bg-gray-50 rounded-lg p-4 border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Mermaid Flowchart Code:</span>
+            <Badge variant="outline" className="text-xs text-gray-500">
+              Code Only
+            </Badge>
+          </div>
+          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">
+            {code}
+          </pre>
+          <div className="mt-3 text-xs text-gray-500">
+            <p>💡 This is the Mermaid flowchart code. You can copy this code and paste it into any Mermaid-compatible editor to visualize the chart.</p>
           </div>
         </div>
       </CardContent>

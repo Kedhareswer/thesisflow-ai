@@ -152,62 +152,27 @@ h6 {
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }
 
-/* Custom scrollbar styles for modal */
-.modal-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #d1d5db #f3f4f6;
-}
-
+/* Custom scrollbar for modals */
 .modal-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
 
 .modal-scrollbar::-webkit-scrollbar-track {
-  background: #f3f4f6;
+  background: #f1f1f1;
   border-radius: 3px;
 }
 
 .modal-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: #c1c1c1;
   border-radius: 3px;
 }
 
 .modal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #a8a8a8;
 }
 
 /* Ensure modal content is properly contained */
 .modal-content-container {
   max-height: calc(90vh - 200px);
   overflow-y: auto;
-}
-
-/* Mermaid Chart Styles */
-.mermaid {
-  @apply w-full max-w-full overflow-auto;
-}
-
-.mermaid svg {
-  @apply max-w-full h-auto;
-}
-
-.mermaid .node {
-  @apply font-sans text-sm;
-}
-
-.mermaid .label {
-  @apply font-sans text-sm;
-}
-
-.mermaid .edgeLabel {
-  @apply font-sans text-xs;
-}
-
-/* Ensure charts are responsive */
-.mermaid-chart-container {
-  @apply w-full max-w-full overflow-x-auto;
-}
-
-.mermaid-chart-container svg {
-  @apply min-w-full;
 }
