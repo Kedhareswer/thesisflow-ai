@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { VisualContentRenderer } from "./visual-content-renderer"
 
 // Enhanced template configurations
 const templates = {
@@ -89,7 +90,7 @@ const templates = {
       id: "methods",
       title: "3. Methods",
       prompt:
-        "Describe methods, datasets, algorithms, and experimental setup. Do not include the '3. Methods' heading.",
+        "Describe methods, datasets, algorithms, and experimental setup. Include flowcharts for methodology and procedures where appropriate. Do not include the '3. Methods' heading.",
       required: true,
       editable: true,
     },
@@ -97,7 +98,7 @@ const templates = {
       id: "results",
       title: "4. Results",
       prompt:
-        "Present results with tables, figures, and statistical analysis. Do not include the '4. Results' heading.",
+        "Present results with tables, figures, and statistical analysis. Include tables for experimental data, performance metrics, and comparison results. Do not include the '4. Results' heading.",
       required: true,
       editable: true,
     },
@@ -105,7 +106,7 @@ const templates = {
       id: "discussion",
       title: "5. Discussion",
       prompt:
-        "Interpret results, compare with prior work, discuss limitations. Do not include the '5. Discussion' heading.",
+        "Interpret results, compare with prior work, discuss limitations. Include tables for comparison with prior work and statistical analysis where appropriate. Do not include the '5. Discussion' heading.",
       required: true,
       editable: true,
     },
@@ -177,21 +178,21 @@ const templates = {
     {
       id: "methods",
       title: "3. Methods",
-      prompt: "Describe methodology in detail. Do not include the '3. Methods' heading.",
+      prompt: "Describe methodology in detail. Include flowcharts for algorithms and experimental procedures where appropriate. Do not include the '3. Methods' heading.",
       required: true,
       editable: true,
     },
     {
       id: "results",
       title: "4. Results",
-      prompt: "Present results and analysis. Do not include the '4. Results' heading.",
+      prompt: "Present results and analysis. Include tables for experimental data and performance metrics where appropriate. Do not include the '4. Results' heading.",
       required: true,
       editable: true,
     },
     {
       id: "discussion",
       title: "5. Discussion",
-      prompt: "Interpret and discuss results. Do not include the '5. Discussion' heading.",
+      prompt: "Interpret and discuss results. Include tables for comparison with prior work where appropriate. Do not include the '5. Discussion' heading.",
       required: true,
       editable: true,
     },
@@ -267,14 +268,14 @@ const templates = {
       id: "methods",
       title: "3. Materials and Methods",
       prompt:
-        "Describe the materials and methods used in the research. Do not include the '3. Materials and Methods' heading.",
+        "Describe the materials and methods used in the research. Include flowcharts for experimental procedures and methodology where appropriate. Do not include the '3. Materials and Methods' heading.",
       required: true,
       editable: true,
     },
     {
       id: "results",
       title: "4. Results",
-      prompt: "Present the findings and results of the study. Do not include the '4. Results' heading.",
+      prompt: "Present the findings and results of the study. Include tables for experimental data and statistical analysis where appropriate. Do not include the '4. Results' heading.",
       required: true,
       editable: true,
     },
@@ -282,7 +283,7 @@ const templates = {
       id: "discussion",
       title: "5. Discussion",
       prompt:
-        "Discuss the implications of the results and compare them with existing literature. Do not include the '5. Discussion' heading.",
+        "Discuss the implications of the results and compare them with existing literature. Include tables for comparison with prior work where appropriate. Do not include the '5. Discussion' heading.",
       required: true,
       editable: true,
     },
@@ -350,14 +351,14 @@ const templates = {
       id: "methods",
       title: "2. Materials and Methods",
       prompt:
-        "Describe the experimental procedures, materials, and methods in detail. Do not include the '2. Materials and Methods' heading.",
+        "Describe the experimental procedures, materials, and methods in detail. Include flowcharts for experimental procedures where appropriate. Do not include the '2. Materials and Methods' heading.",
       required: true,
       editable: true,
     },
     {
       id: "results",
       title: "3. Results",
-      prompt: "Present the experimental results clearly and concisely. Do not include the '3. Results' heading.",
+      prompt: "Present the experimental results clearly and concisely. Include tables for experimental data and statistical analysis where appropriate. Do not include the '3. Results' heading.",
       required: true,
       editable: true,
     },
@@ -365,7 +366,7 @@ const templates = {
       id: "discussion",
       title: "4. Discussion",
       prompt:
-        "Discuss the interpretation of results, their significance, and comparison with previous studies. Do not include the '4. Discussion' heading.",
+        "Discuss the interpretation of results, their significance, and comparison with previous studies. Include tables for comparison with prior work where appropriate. Do not include the '4. Discussion' heading.",
       required: true,
       editable: true,
     },
@@ -434,7 +435,7 @@ const templates = {
       id: "body",
       title: "2. Body",
       prompt:
-        "Write the main body of the paper, including methodology, results, and discussion. Do not include the '2. Body' heading.",
+        "Write the main body of the paper, including methodology, results, and discussion. Include tables for data presentation and flowcharts for methodology where appropriate. Do not include the '2. Body' heading.",
       required: true,
       editable: true,
     },
@@ -473,9 +474,53 @@ async function generateSectionContent(
   writingStylePrompt: string,
   templatePrompt: string,
   researchContext: string,
+  sectionType?: string,
 ) {
   if (!supabaseToken) {
     return "Authentication error: Please log in again."
+  }
+
+  // Enhanced prompt for sections that typically need tables or flowcharts
+  const needsVisualContent = sectionType && ['methods', 'results', 'discussion', 'introduction'].includes(sectionType.toLowerCase())
+  
+  let enhancedPrompt = prompt
+  
+  if (needsVisualContent) {
+    enhancedPrompt = `${prompt}
+
+IMPORTANT: If this section would benefit from structured data presentation, include the following where appropriate:
+
+1. TABLES: Generate markdown tables for:
+   - Experimental results and data
+   - Comparison of methods or approaches
+   - Statistical analysis results
+   - Performance metrics
+   - Literature comparison
+   - Parameter settings
+
+2. FLOWCHARTS: Generate mermaid flowcharts for:
+   - Methodology and procedures
+   - Algorithm flow
+   - Experimental workflow
+   - Decision trees
+   - Process diagrams
+
+Use this format for tables:
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Data 1   | Data 2   | Data 3   |
+
+Use this format for flowcharts:
+\`\`\`mermaid
+flowchart TD
+    A[Start] --> B{Decision?}
+    B -->|Yes| C[Process 1]
+    B -->|No| D[Process 2]
+    C --> E[End]
+    D --> E
+\`\`\`
+
+Only include tables and flowcharts where they add value to the content. Ensure all visual elements are properly labeled and referenced in the text.`
   }
 
   const fullPrompt = [
@@ -483,7 +528,7 @@ async function generateSectionContent(
     templatePrompt,
     researchContext ? `Research Context:\n${researchContext}` : "",
     context ? `Previous Content for Context:\n${context}` : "",
-    `Generate ONLY the content for the following section, without including its title or any subsequent section titles. Focus strictly on the requested content:\n${prompt}`,
+    `Generate ONLY the content for the following section, without including its title or any subsequent section titles. Focus strictly on the requested content:\n${enhancedPrompt}`,
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -500,7 +545,7 @@ async function generateSectionContent(
         model,
         prompt: fullPrompt,
         temperature: 0.7,
-        maxTokens: 1200,
+        maxTokens: 2000, // Increased for visual content
       }),
     })
 
@@ -605,6 +650,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
       props.writingStylePrompt,
       props.templatePrompt,
       props.researchContext,
+      section.id, // Pass section ID for visual content detection
     )
 
     setSections((sections) =>
@@ -639,6 +685,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
         props.writingStylePrompt,
         props.templatePrompt,
         props.researchContext,
+        section.id, // Pass section ID for visual content detection
       )
 
       setSections((sections) =>
@@ -747,6 +794,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
   const generatingSections = sections.filter((s) => s.status === "generating").length
 
   // Status icon component
+  // Type guard for generating status
+  const isGenerating = (status: Section["status"]): status is "generating" => status === "generating"
+
   const StatusIcon = ({ status }: { status: Section["status"] }) => {
     switch (status) {
       case "completed":
@@ -1062,10 +1112,10 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleGenerateSection(idx)}
-                                      disabled={section.status === "generating" || isGeneratingAll}
+                                      disabled={isGenerating(section.status) || isGeneratingAll}
                                       className="h-9 px-4 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                                     >
-                                      {section.status === "generating" ? (
+                                      {isGenerating(section.status) ? (
                                         <Loader2 className="w-4 h-4 animate-spin" aria-label="Generating" />
                                       ) : (
                                         <Sparkles className="w-4 h-4" aria-label="Generate section" />
@@ -1089,31 +1139,55 @@ export function AIWritingModal(props: AIWritingModalProps) {
 
                               {/* Section Content */}
                               <CardContent className="pt-6">
-                                <Textarea
-                                  value={section.content}
-                                  onChange={(e) => handleContentChange(idx, e.target.value)}
-                                  placeholder={`${section.title} content will be generated here...`}
-                                  className="min-h-[140px] text-base border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-black focus:ring-0 transition-all resize-none leading-relaxed"
-                                  disabled={section.status === "generating"}
-                                  onKeyDown={(e) => handleKeyDown(e, idx)}
-                                  aria-label={`${section.title} content`}
-                                />
-
-                                {section.content && (
-                                  <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
-                                    <span className="font-mono">
-                                      {section.content.split(" ").filter(Boolean).length} words •{" "}
-                                      {section.content.length} characters
-                                    </span>
-                                    {section.status === "completed" && !section.content.startsWith("Error") && (
-                                      <Badge
-                                        variant="outline"
-                                        className="bg-gray-100 text-gray-800 border-gray-300 text-xs font-medium"
-                                      >
-                                        Ready
-                                      </Badge>
-                                    )}
+                                {isGenerating(section.status) ? (
+                                  <div className="min-h-[140px] flex items-center justify-center">
+                                    <div className="text-gray-500">Generating content...</div>
                                   </div>
+                                ) : section.content ? (
+                                  <div className="space-y-4">
+                                    {/* Visual Content Renderer */}
+                                    <VisualContentRenderer content={section.content} />
+                                    
+                                    {/* Raw Content Editor */}
+                                    <div className="border-t pt-4">
+                                      <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                        Raw Content (Editable)
+                                      </Label>
+                                      <Textarea
+                                        value={section.content}
+                                        onChange={(e) => handleContentChange(idx, e.target.value)}
+                                        placeholder={`${section.title} content will be generated here...`}
+                                        className="min-h-[120px] text-sm border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-black focus:ring-0 transition-all resize-none leading-relaxed font-mono"
+                                        onKeyDown={(e) => handleKeyDown(e, idx)}
+                                        aria-label={`${section.title} content`}
+                                      />
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between text-sm text-gray-500">
+                                      <span className="font-mono">
+                                        {section.content.split(" ").filter(Boolean).length} words •{" "}
+                                        {section.content.length} characters
+                                      </span>
+                                      {section.status === "completed" && !section.content.startsWith("Error") && (
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-gray-100 text-gray-800 border-gray-300 text-xs font-medium"
+                                        >
+                                          Ready
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Textarea
+                                    value={section.content}
+                                    onChange={(e) => handleContentChange(idx, e.target.value)}
+                                    placeholder={`${section.title} content will be generated here...`}
+                                    className="min-h-[140px] text-base border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-black focus:ring-0 transition-all resize-none leading-relaxed"
+                                    disabled={isGenerating(section.status)}
+                                    onKeyDown={(e) => handleKeyDown(e, idx)}
+                                    aria-label={`${section.title} content`}
+                                  />
                                 )}
                               </CardContent>
                             </Card>
