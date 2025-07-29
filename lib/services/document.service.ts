@@ -59,6 +59,9 @@ class DocumentService {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
       const params = new URLSearchParams()
       if (filters.document_type) params.append('document_type', filters.document_type)
       if (filters.project_id) params.append('project_id', filters.project_id)
@@ -70,6 +73,7 @@ class DocumentService {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
       })
 
@@ -90,10 +94,14 @@ class DocumentService {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
       const response = await fetch(`/api/documents/${id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
       })
 
@@ -117,10 +125,14 @@ class DocumentService {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
       const response = await fetch('/api/documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
         body: JSON.stringify(data),
       })
@@ -142,10 +154,14 @@ class DocumentService {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
       const response = await fetch(`/api/documents/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
         body: JSON.stringify(data),
       })
@@ -170,10 +186,14 @@ class DocumentService {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
       const response = await fetch(`/api/documents/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || ''}`,
         },
       })
 
