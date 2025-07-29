@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic"
 import MarkdownPreview from "@uiw/react-markdown-preview"
-import { useState } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useSafeDOM } from "../hooks/use-safe-dom"
 import {
   Eye,
   Edit3,
@@ -31,38 +32,49 @@ interface MarkdownEditorProps {
 export function MarkdownEditor({ value, onChange, className }: MarkdownEditorProps) {
   const [viewMode, setViewMode] = useState<"split" | "edit" | "preview">("split")
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const editorRef = useRef<any>(null)
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen)
   }
 
-  const insertMarkdown = (syntax: string, placeholder = "") => {
-    const textarea = document.querySelector(".w-md-editor-text-textarea") as HTMLTextAreaElement
-    if (!textarea) return
+  const insertMarkdown = useCallback((syntax: string, placeholder = "") => {
+    // Use setTimeout to ensure DOM is ready and avoid conflicts with React reconciliation
+    setTimeout(() => {
+      try {
+        const textarea = document.querySelector(".w-md-editor-text-textarea") as HTMLTextAreaElement
+        if (!textarea) {
+          console.warn("Textarea not found for markdown insertion")
+          return
+        }
 
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selectedText = value.substring(start, end)
-    const replacement = selectedText || placeholder
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const selectedText = value.substring(start, end)
+        const replacement = selectedText || placeholder
 
-    let newText = ""
-    if (syntax === "bold") {
-      newText = `**${replacement}**`
-    } else if (syntax === "italic") {
-      newText = `*${replacement}*`
-    } else if (syntax === "link") {
-      newText = `[${replacement || "link text"}](url)`
-    } else if (syntax === "image") {
-      newText = `![${replacement || "alt text"}](image-url)`
-    } else if (syntax === "code") {
-      newText = `\`${replacement}\``
-    } else if (syntax === "list") {
-      newText = `- ${replacement || "list item"}`
-    }
+        let newText = ""
+        if (syntax === "bold") {
+          newText = `**${replacement}**`
+        } else if (syntax === "italic") {
+          newText = `*${replacement}*`
+        } else if (syntax === "link") {
+          newText = `[${replacement || "link text"}](url)`
+        } else if (syntax === "image") {
+          newText = `![${replacement || "alt text"}](image-url)`
+        } else if (syntax === "code") {
+          newText = `\`${replacement}\``
+        } else if (syntax === "list") {
+          newText = `- ${replacement || "list item"}`
+        }
 
-    const newValue = value.substring(0, start) + newText + value.substring(end)
-    onChange(newValue)
-  }
+        const newValue = value.substring(0, start) + newText + value.substring(end)
+        onChange(newValue)
+      } catch (error) {
+        console.warn("Error inserting markdown:", error)
+      }
+    }, 0)
+  }, [value, onChange])
 
   return (
     <div

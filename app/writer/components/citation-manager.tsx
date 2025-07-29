@@ -10,6 +10,7 @@ import { FileText, Plus, Trash2, Download, BookOpen, ChevronDown, ChevronUp } fr
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useSafeDOM } from "../hooks/use-safe-dom"
 
 // Citation format types
 const CITATION_FORMATS = [
@@ -58,6 +59,7 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
   const [isConfigOpen, setIsConfigOpen] = useState(!compact)
   const [isPapersOpen, setIsPapersOpen] = useState(!compact)
   const [isManualOpen, setIsManualOpen] = useState(false)
+  const { safeDownload } = useSafeDOM()
 
   // Get research session data
   const { session, getSelectedPapers } = useResearchSession()
@@ -163,25 +165,11 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
 
   // Export references as a text file
   const exportReferences = () => {
-    const element = document.createElement("a")
-    const file = new Blob([formattedReferences], { type: "text/plain" })
-    element.href = URL.createObjectURL(file)
-    element.download = `references-${citationFormat}.txt`
-    element.style.display = 'none' // Hide the element
-    
-    // Add to DOM
-    document.body.appendChild(element)
-    
-    // Trigger download
-    element.click()
-    
-    // Clean up with proper error handling
     try {
-      if (element.parentNode) {
-        document.body.removeChild(element)
-      }
-    } catch (removeError) {
-      console.warn('Could not remove download element:', removeError)
+      const file = new Blob([formattedReferences], { type: "text/plain" })
+      safeDownload(file, `references-${citationFormat}.txt`)
+    } catch (error) {
+      console.error('Error exporting references:', error)
     }
   }
 

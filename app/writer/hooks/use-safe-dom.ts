@@ -4,31 +4,34 @@ import { useCallback } from 'react'
 
 export function useSafeDOM() {
   const safeDownload = useCallback((blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    a.style.display = 'none'
-    
-    // Add to DOM
-    document.body.appendChild(a)
-    
-    // Trigger download
-    a.click()
-    
-    // Clean up with proper error handling and timeout
-    setTimeout(() => {
-      try {
-        if (a.parentNode) {
-          document.body.removeChild(a)
-        }
-      } catch (removeError) {
-        console.warn('Could not remove download element:', removeError)
-      }
+    try {
+      const element = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      element.href = url
+      element.download = filename
+      element.style.display = 'none'
       
-      // Revoke URL
-      URL.revokeObjectURL(url)
-    }, 100) // Small delay to ensure click completes
+      // Add to DOM
+      document.body.appendChild(element)
+      
+      // Trigger download
+      element.click()
+      
+      // Clean up with delayed removal to ensure download starts
+      setTimeout(() => {
+        try {
+          if (element.parentNode) {
+            document.body.removeChild(element)
+          }
+        } catch (removeError) {
+          console.warn('Could not remove download element:', removeError)
+        }
+        // Revoke URL
+        URL.revokeObjectURL(url)
+      }, 100)
+    } catch (error) {
+      console.error('Error in safeDownload:', error)
+    }
   }, [])
 
   const safeRemoveElement = useCallback((element: HTMLElement) => {
@@ -41,8 +44,42 @@ export function useSafeDOM() {
     }
   }, [])
 
+  const safeQuerySelector = useCallback((selector: string): HTMLElement | null => {
+    try {
+      return document.querySelector(selector) as HTMLElement
+    } catch (error) {
+      console.warn('Error querying selector:', selector, error)
+      return null
+    }
+  }, [])
+
+  const safeSetInnerHTML = useCallback((element: HTMLElement, content: string) => {
+    try {
+      if (element) {
+        element.innerHTML = content
+      }
+    } catch (error) {
+      console.warn('Error setting innerHTML:', error)
+    }
+  }, [])
+
+  const safeClearElement = useCallback((element: HTMLElement) => {
+    try {
+      if (element) {
+        while (element.firstChild) {
+          element.removeChild(element.firstChild)
+        }
+      }
+    } catch (error) {
+      console.warn('Error clearing element:', error)
+    }
+  }, [])
+
   return {
     safeDownload,
-    safeRemoveElement
+    safeRemoveElement,
+    safeQuerySelector,
+    safeSetInnerHTML,
+    safeClearElement
   }
 } 

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { FileText, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useSafeDOM } from "../hooks/use-safe-dom"
 
 interface MermaidChartProps {
   code: string
@@ -17,6 +18,7 @@ export function MermaidChart({ code, index, className = "" }: MermaidChartProps)
   const chartRef = useRef<HTMLDivElement>(null)
   const [isRendered, setIsRendered] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const { safeClearElement, safeSetInnerHTML } = useSafeDOM()
 
   useEffect(() => {
     // Initialize mermaid
@@ -44,8 +46,8 @@ export function MermaidChart({ code, index, className = "" }: MermaidChartProps)
       try {
         setError(null)
         
-        // Clear previous content
-        chartRef.current.innerHTML = ''
+        // Clear previous content safely
+        safeClearElement(chartRef.current)
         
         // Generate unique ID for the chart
         const chartId = `mermaid-chart-${index}-${Date.now()}`
@@ -53,7 +55,11 @@ export function MermaidChart({ code, index, className = "" }: MermaidChartProps)
         
         // Render the mermaid chart
         const { svg } = await mermaid.render(chartId, code)
-        chartRef.current.innerHTML = svg
+        
+        // Safely set the SVG content
+        if (chartRef.current) {
+          safeSetInnerHTML(chartRef.current, svg)
+        }
         
         setIsRendered(true)
       } catch (err) {
@@ -63,7 +69,12 @@ export function MermaidChart({ code, index, className = "" }: MermaidChartProps)
       }
     }
 
-    renderChart()
+    // Use setTimeout to avoid conflicts with React reconciliation
+    const timeoutId = setTimeout(renderChart, 0)
+    
+    return () => {
+      clearTimeout(timeoutId)
+    }
   }, [code, index])
 
   if (error) {

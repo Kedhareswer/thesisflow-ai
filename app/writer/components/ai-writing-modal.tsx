@@ -33,6 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { VisualContentRenderer } from "./visual-content-renderer"
+import { useSafeDOM } from "../hooks/use-safe-dom"
 
 // Enhanced template configurations
 const templates = {
@@ -588,7 +589,6 @@ interface AIWritingModalProps {
 }
 
 export function AIWritingModal(props: AIWritingModalProps) {
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>("ieee")
   const [sections, setSections] = useState<Section[]>(() =>
     templates[selectedTemplate].map((s) => ({
       ...s,
@@ -597,11 +597,13 @@ export function AIWritingModal(props: AIWritingModalProps) {
       status: "pending" as const,
     })),
   )
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>("ieee")
   const [isGeneratingAll, setIsGeneratingAll] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [customSectionTitle, setCustomSectionTitle] = useState("")
   const [customSectionPrompt, setCustomSectionPrompt] = useState("")
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null)
+  const { safeDownload } = useSafeDOM()
 
   // Template change handler
   const handleTemplateChange = (template: TemplateKey) => {
@@ -749,67 +751,31 @@ export function AIWritingModal(props: AIWritingModalProps) {
 
   // Export functions
   function exportMarkdown() {
-    const md = sections
-      .filter((s) => s.content.trim())
-      .map((s) => `## ${s.title}\n\n${s.content}`)
-      .join("\n\n")
-
-    const blob = new Blob([md], { type: "text/markdown" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "research-paper.md"
-    a.style.display = 'none' // Hide the element
-    
-    // Add to DOM
-    document.body.appendChild(a)
-    
-    // Trigger download
-    a.click()
-    
-    // Clean up with proper error handling
     try {
-      if (a.parentNode) {
-        document.body.removeChild(a)
-      }
-    } catch (removeError) {
-      console.warn('Could not remove download element:', removeError)
+      const md = sections
+        .filter((s) => s.content.trim())
+        .map((s) => `## ${s.title}\n\n${s.content}`)
+        .join("\n\n")
+
+      const blob = new Blob([md], { type: "text/markdown" })
+      safeDownload(blob, "research-paper.md")
+    } catch (error) {
+      console.error('Error exporting markdown:', error)
     }
-    
-    // Revoke URL
-    URL.revokeObjectURL(url)
   }
 
   function exportLatex() {
-    const latex = sections
-      .filter((s) => s.content.trim())
-      .map((s) => `\\section{${s.title.replace(/^[0-9. ]+/, "")}}\n${s.content}`)
-      .join("\n\n")
-
-    const blob = new Blob([latex], { type: "text/x-tex" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "research-paper.tex"
-    a.style.display = 'none' // Hide the element
-    
-    // Add to DOM
-    document.body.appendChild(a)
-    
-    // Trigger download
-    a.click()
-    
-    // Clean up with proper error handling
     try {
-      if (a.parentNode) {
-        document.body.removeChild(a)
-      }
-    } catch (removeError) {
-      console.warn('Could not remove download element:', removeError)
+      const latex = sections
+        .filter((s) => s.content.trim())
+        .map((s) => `\\section{${s.title.replace(/^[0-9. ]+/, "")}}\n${s.content}`)
+        .join("\n\n")
+
+      const blob = new Blob([latex], { type: "text/x-tex" })
+      safeDownload(blob, "research-paper.tex")
+    } catch (error) {
+      console.error('Error exporting latex:', error)
     }
-    
-    // Revoke URL
-    URL.revokeObjectURL(url)
   }
 
   // Insert all content
