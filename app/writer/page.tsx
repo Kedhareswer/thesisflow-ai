@@ -47,35 +47,96 @@ const publisherTemplates = [
     name: "IEEE",
     description: "IEEE Conference/Journal Template",
     wordLimit: 8000,
-    sections: ["Abstract", "Introduction", "Methods", "Results", "Discussion", "Conclusion"],
+    sections: [
+      "Title",
+      "Authors",
+      "Abstract",
+      "Keywords",
+      "Introduction",
+      "Related Work",
+      "Methods",
+      "Results",
+      "Discussion",
+      "Conclusion",
+      "Acknowledgments",
+      "References",
+    ],
   },
   {
     id: "acm",
     name: "ACM",
     description: "ACM Conference/Journal Template",
     wordLimit: 10000,
-    sections: ["Abstract", "Introduction", "Related Work", "Methodology", "Evaluation", "Conclusion"],
+    sections: [
+      "Title",
+      "Authors",
+      "Abstract",
+      "Keywords",
+      "Introduction",
+      "Related Work",
+      "Methods",
+      "Results",
+      "Discussion",
+      "Conclusion",
+      "Acknowledgments",
+      "References",
+    ],
   },
   {
     id: "springer",
     name: "Springer",
     description: "Springer Conference/Journal Template",
     wordLimit: 12000,
-    sections: ["Abstract", "Introduction", "Literature Review", "Methods", "Results", "Discussion"],
+    sections: [
+      "Title",
+      "Authors",
+      "Abstract",
+      "Keywords",
+      "Introduction",
+      "Literature Review",
+      "Materials and Methods",
+      "Results",
+      "Discussion",
+      "Conclusion",
+      "Acknowledgments",
+      "References",
+    ],
   },
   {
     id: "elsevier",
     name: "Elsevier",
     description: "Elsevier Journal Template",
     wordLimit: 15000,
-    sections: ["Abstract", "Introduction", "Materials and Methods", "Results", "Discussion", "Conclusion"],
+    sections: [
+      "Title",
+      "Authors",
+      "Abstract",
+      "Keywords",
+      "Introduction",
+      "Materials and Methods",
+      "Results",
+      "Discussion",
+      "Conclusion",
+      "Acknowledgments",
+      "References",
+    ],
   },
   {
     id: "general",
     name: "General Academic",
-    description: "General Academic Paper Template",
+    description: "Standard Academic Paper Template",
     wordLimit: 10000,
-    sections: ["Abstract", "Introduction", "Body", "Conclusion"],
+    sections: [
+      "Title",
+      "Authors",
+      "Abstract",
+      "Keywords",
+      "Introduction",
+      "Body",
+      "Conclusion",
+      "Acknowledgments",
+      "References",
+    ],
   },
 ]
 
@@ -88,9 +149,9 @@ const personalities = [
     systemPrompt:
       "You are an academic writing assistant. Use formal language, proper citations, and logical structure. Maintain scholarly tone throughout.",
     icon: BookOpen,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
+    color: "text-gray-900", // Monochromatic adjustment
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
   },
   {
     key: "technical",
@@ -99,9 +160,9 @@ const personalities = [
     systemPrompt:
       "You are a technical writing assistant. Focus on clarity, precision, and detailed explanations. Use technical terminology appropriately.",
     icon: FileCode,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
+    color: "text-gray-900", // Monochromatic adjustment
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
   },
   {
     key: "creative",
@@ -110,37 +171,37 @@ const personalities = [
     systemPrompt:
       "You are a creative academic writing assistant. Write engaging content while maintaining scholarly standards. Use varied sentence structures.",
     icon: Sparkles,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-200",
+    color: "text-gray-900", // Monochromatic adjustment
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
   },
 ]
 
 function getTemplatePrompt(templateId: string): string {
   switch (templateId) {
     case "ieee":
-      return "Format the writing according to IEEE guidelines, including section headings and citation style. Use clear, concise language with technical precision."
+      return "Format the writing according to IEEE guidelines, including section headings and citation style. Use clear, concise language with technical precision. Ensure content is suitable for an IEEE conference or journal."
     case "acm":
-      return "Follow ACM formatting and structure. Emphasize computational aspects and technical contributions."
+      return "Follow ACM formatting and structure. Emphasize computational aspects and technical contributions. Ensure content is suitable for an ACM conference or journal."
     case "springer":
-      return "Use concise, formal academic writing as per Springer requirements. Focus on research methodology and findings."
+      return "Use concise, formal academic writing as per Springer requirements. Focus on research methodology and findings. Ensure content is suitable for a Springer conference or journal."
     case "elsevier":
-      return "Structure the writing for Elsevier journals, with clear sections and formal tone. Include detailed methodology."
+      return "Structure the writing for Elsevier journals, with clear sections and formal tone. Include detailed methodology. Ensure content is suitable for an Elsevier journal."
     case "general":
     default:
-      return "Use standard academic formatting with clear structure and appropriate scholarly tone."
+      return "Use standard academic formatting with clear structure and appropriate scholarly tone. Do not adhere to any specific publisher guidelines."
   }
 }
 
 function WriterPageContent() {
   const { toast } = useToast()
   const { hasContext, contextSummary, buildContext } = useResearchContext()
-  
+
   // AI provider selection state
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
-  
+
   // Document state
   const [selectedTemplate, setSelectedTemplate] = useState(publisherTemplates[0].id)
   const [documentText, setDocumentText] = useState("")
@@ -192,7 +253,7 @@ function WriterPageContent() {
 
     return () => clearInterval(autoSaveInterval)
   }, [documentText])
-  
+
   // Check text for grammar/style issues using LanguageTool
   const checkText = async () => {
     if (!documentText.trim()) {
@@ -207,7 +268,7 @@ function WriterPageContent() {
     // Check text size before sending to API
     const textSizeInBytes = new TextEncoder().encode(documentText).length
     const maxSizeInBytes = 25000 // Same limit as API
-    
+
     if (textSizeInBytes > maxSizeInBytes) {
       // Estimate number of chunks needed
       const estimatedChunks = Math.ceil(textSizeInBytes / maxSizeInBytes)
@@ -226,24 +287,26 @@ function WriterPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: documentText }),
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         if (response.status === 413) {
           toast({
             title: "Text too large",
-            description: errorData.message || "Your document is too large to check. Please try checking a smaller portion of your text.",
+            description:
+              errorData.message ||
+              "Your document is too large to check. Please try checking a smaller portion of your text.",
             variant: "destructive",
           })
           return
         }
         throw new Error("Failed to check text")
       }
-      
+
       const data = await response.json()
       setLanguageToolSuggestions(data.matches || [])
       setCheckProgress("")
-      
+
       if (data.chunked) {
         toast({
           title: `Found ${data.matches?.length || 0} suggestions`,
@@ -253,7 +316,7 @@ function WriterPageContent() {
       } else {
         toast({
           title: `Found ${data.matches?.length || 0} suggestions`,
-          description: data.matches?.length 
+          description: data.matches?.length
             ? "Review and apply suggestions to improve your text."
             : "No issues found in your text.",
           variant: "default",
@@ -271,7 +334,7 @@ function WriterPageContent() {
       setCheckProgress("")
     }
   }
-  
+
   // Manual save function
   const handleSave = async () => {
     setIsAutoSaving(true)
@@ -344,7 +407,7 @@ function WriterPageContent() {
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
     return date.toLocaleDateString()
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Enhanced Header with Document Controls */}
@@ -360,6 +423,7 @@ function WriterPageContent() {
                   onChange={(e) => setDocumentTitle(e.target.value)}
                   className="text-lg font-medium text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded transition-colors"
                   placeholder="Document title..."
+                  aria-label="Document title"
                 />
                 <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-300">
                   {currentTemplate.name}
@@ -370,11 +434,11 @@ function WriterPageContent() {
             {/* Right: Actions and Status */}
             <div className="flex items-center space-x-4">
               {/* Research Context Badge */}
-                {hasContext && (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1.5">
+              {hasContext && (
+                <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300 px-3 py-1.5">
                   <BookOpen className="h-3 w-3 mr-1.5" />
                   <span className="text-xs font-medium">{contextSummary}</span>
-                  </Badge>
+                </Badge>
               )}
 
               {/* Document Stats */}
@@ -393,12 +457,12 @@ function WriterPageContent() {
               <div className="flex items-center space-x-2 text-sm text-gray-500">
                 {isAutoSaving ? (
                   <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse" />
                     <span>Saving...</span>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <div className="w-2 h-2 bg-black rounded-full" />
                     <span>Saved {formatLastSaved(lastSaved)}</span>
                   </div>
                 )}
@@ -418,11 +482,11 @@ function WriterPageContent() {
                 </Button>
 
                 <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 px-4 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
                     <Download className="h-4 w-4 mr-1" />
                     Export
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border-gray-200 shadow-lg">
                     <SelectItem value="markdown">Export as Markdown</SelectItem>
                     <SelectItem value="pdf">Export as PDF</SelectItem>
                     <SelectItem value="docx">Export as DOCX</SelectItem>
@@ -432,7 +496,7 @@ function WriterPageContent() {
             </div>
           </div>
         </div>
-              </header>
+      </header>
 
       {/* Main Content Area */}
       <div className="max-w-[1600px] mx-auto px-6 py-8">
@@ -444,14 +508,14 @@ function WriterPageContent() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                    <div className="w-2 h-2 bg-black rounded-full" />
                     <span className="text-sm font-medium text-gray-900">Writing Progress</span>
                   </div>
                   <span className="text-sm text-gray-500">
                     {wordCount.toLocaleString()} / {currentTemplate.wordLimit.toLocaleString()} words
                   </span>
                 </div>
-                <Progress value={Math.min(wordProgress, 100)} className="h-2" />
+                <Progress value={Math.min(wordProgress, 100)} className="h-2 bg-gray-200 [&>*]:bg-black" />
                 <div className="flex justify-between text-xs text-gray-500 mt-2">
                   <span>{Math.round(wordProgress)}% complete</span>
                   <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
@@ -473,15 +537,15 @@ function WriterPageContent() {
                       <CardTitle className="text-lg font-medium text-gray-900">Document Editor</CardTitle>
                       <p className="text-sm text-gray-500 mt-0.5">Write and edit your research document</p>
                     </div>
-                        </div>
-                        
+                  </div>
+
                   <div className="flex items-center space-x-3">
-                        <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                       <SelectTrigger className="w-48 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
                         <SelectValue />
-                          </SelectTrigger>
+                      </SelectTrigger>
                       <SelectContent className="bg-white border-gray-200 shadow-lg">
-                            {publisherTemplates.map((template) => (
+                        {publisherTemplates.map((template) => (
                           <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
                             <div>
                               <div className="font-medium">{template.name}</div>
@@ -490,13 +554,13 @@ function WriterPageContent() {
                                 {template.wordLimit.toLocaleString()} words • {template.sections.length} sections
                               </div>
                             </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                    </CardHeader>
+              </CardHeader>
 
               <CardContent className="p-0">
                 <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-0 rounded-none" />
@@ -505,31 +569,31 @@ function WriterPageContent() {
                 <div className="p-6 border-t border-gray-100 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <Button 
-                          onClick={checkText} 
+                      <Button
+                        onClick={checkText}
                         variant="outline"
                         size="sm"
-                          disabled={isChecking || !documentText.trim()}
+                        disabled={isChecking || !documentText.trim()}
                         className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                        {isChecking ? (checkProgress || "Checking...") : "Grammar Check"}
-                        </Button>
-                        
-                        <Button 
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        {isChecking ? checkProgress || "Checking..." : "Grammar Check"}
+                      </Button>
+
+                      <Button
                         onClick={handleOpenAIModal}
                         size="sm"
                         disabled={!selectedProvider || !selectedModel || !supabaseToken}
                         className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
-                        >
-                          <Sparkles className="h-4 w-4 mr-2" />
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
                         AI Assistant
-                        </Button>
+                      </Button>
                     </div>
 
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
                       {languageToolSuggestions.length > 0 && (
-                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                        <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">
                           {languageToolSuggestions.length} suggestions
                         </Badge>
                       )}
@@ -540,26 +604,26 @@ function WriterPageContent() {
                       </div>
                     </div>
                   </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Grammar Suggestions Card */}
-                  {languageToolSuggestions.length > 0 && (
+            {languageToolSuggestions.length > 0 && (
               <Card className="bg-white border-gray-200 shadow-sm">
                 <CardHeader className="pb-4 border-b border-gray-100">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center">
-                      <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <AlertCircle className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
                       <CardTitle className="text-lg font-medium text-gray-900">
                         Writing Suggestions ({languageToolSuggestions.length})
-                        </CardTitle>
+                      </CardTitle>
                       <p className="text-sm text-gray-500 mt-0.5">Grammar and style improvements</p>
                     </div>
                   </div>
-                      </CardHeader>
+                </CardHeader>
 
                 <CardContent className="p-6">
                   <div className="space-y-4">
@@ -584,7 +648,7 @@ function WriterPageContent() {
 
                           <div className="text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
                             <span>{before}</span>
-                            <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
+                            <span className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
                             <span>{after}</span>
                           </div>
 
@@ -594,7 +658,7 @@ function WriterPageContent() {
                               {sugg.replacements.slice(0, 3).map((rep: any, i: number) => (
                                 <button
                                   key={i}
-                                  className="inline-block bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full text-xs font-medium hover:bg-green-100 transition-colors duration-200"
+                                  className="inline-block bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors duration-200"
                                   onClick={() => {
                                     // Apply suggestion logic would go here
                                     toast({
@@ -624,20 +688,20 @@ function WriterPageContent() {
 
                   <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
                     Powered by{" "}
-                          <a 
-                            href="https://languagetool.org/" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
+                    <a
+                      href="https://languagetool.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-gray-900 hover:underline font-medium"
-                          >
+                    >
                       LanguageTool
-                          </a>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-                
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
           {/* Redesigned Compact Sidebar */}
           <div className="xl:col-span-1 space-y-4">
             {/* Tabbed Interface for Main Tools */}
@@ -671,7 +735,7 @@ function WriterPageContent() {
                 <TabsContent value="assistant" className="mt-4 space-y-4">
                   <div className="px-4 pb-4">
                     <div className="flex items-center space-x-2 mb-4">
-                      <Zap className="h-4 w-4 text-blue-600" />
+                      <Zap className="h-4 w-4 text-gray-600" />
                       <h3 className="text-sm font-medium text-gray-900">AI Writing Assistant</h3>
                     </div>
 
@@ -690,10 +754,10 @@ function WriterPageContent() {
                         <div>
                           <Label className="text-xs font-medium text-gray-700 mb-2 block">Provider</Label>
                           <MinimalAIProviderSelector
-                        selectedProvider={selectedProvider}
+                            selectedProvider={selectedProvider}
                             onProviderChange={setSelectedProvider}
-                        selectedModel={selectedModel}
-                        onModelChange={setSelectedModel}
+                            selectedModel={selectedModel}
+                            onModelChange={setSelectedModel}
                             variant="compact"
                             showModelSelector={true}
                             showConfigLink={false}
@@ -708,16 +772,16 @@ function WriterPageContent() {
                     <div>
                       <Label className="text-xs font-medium text-gray-700 mb-2 block">Writing Style</Label>
                       <div className="space-y-1">
-                          {personalities.map((personality) => (
+                        {personalities.map((personality) => (
                           <button
-                              key={personality.key}
+                            key={personality.key}
                             className={`w-full p-2 rounded-md border text-left transition-all duration-200 ${
-                                selectedPersonality.key === personality.key
+                              selectedPersonality.key === personality.key
                                 ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
                                 : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                              }`}
-                              onClick={() => setSelectedPersonality(personality)}
-                            >
+                            }`}
+                            onClick={() => setSelectedPersonality(personality)}
+                          >
                             <div className="flex items-center space-x-2">
                               <personality.icon className="h-3 w-3" />
                               <div className="flex-1 min-w-0">
@@ -725,7 +789,7 @@ function WriterPageContent() {
                                 <div className="text-xs opacity-75 truncate">{personality.description}</div>
                               </div>
                               {selectedPersonality.key === personality.key && (
-                                <div className="w-1.5 h-1.5 bg-current rounded-full flex-shrink-0" />
+                                <div className="w-1.5 h-1.5 bg-black rounded-full flex-shrink-0" />
                               )}
                             </div>
                           </button>
@@ -739,7 +803,7 @@ function WriterPageContent() {
                         <div className="flex items-center space-x-2">
                           <div
                             className={`w-1.5 h-1.5 rounded-full ${
-                              selectedProvider && selectedModel && supabaseToken ? "bg-green-500" : "bg-gray-400"
+                              selectedProvider && selectedModel && supabaseToken ? "bg-black" : "bg-gray-400"
                             }`}
                           />
                           <span className="text-xs text-gray-600 font-medium">
@@ -749,7 +813,7 @@ function WriterPageContent() {
                         {selectedProvider && selectedModel && supabaseToken && (
                           <Badge
                             variant="outline"
-                            className="text-xs bg-green-50 text-green-700 border-green-200 px-2 py-0.5"
+                            className="text-xs bg-gray-100 text-gray-700 border-gray-300 px-2 py-0.5"
                           >
                             Connected
                           </Badge>
@@ -815,7 +879,7 @@ function WriterPageContent() {
                             <span className="text-gray-600">Grammar Issues</span>
                             <span
                               className={`font-medium ${
-                                languageToolSuggestions.length > 0 ? "text-orange-600" : "text-green-600"
+                                languageToolSuggestions.length > 0 ? "text-red-600" : "text-black"
                               }`}
                             >
                               {languageToolSuggestions.length}
@@ -836,7 +900,7 @@ function WriterPageContent() {
                         </Badge>
                       </div>
                       <div className="space-y-1">
-                        <Progress value={Math.min(wordProgress, 100)} className="h-1.5" />
+                        <Progress value={Math.min(wordProgress, 100)} className="h-1.5 bg-gray-200 [&>*]:bg-black" />
                         <div className="flex justify-between text-xs text-gray-500">
                           <span>{Math.round(wordProgress)}% complete</span>
                           <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
@@ -852,14 +916,14 @@ function WriterPageContent() {
                 <TabsContent value="citations" className="mt-4 space-y-4">
                   <div className="px-4 pb-4">
                     <div className="flex items-center space-x-2 mb-4">
-                      <Quote className="h-4 w-4 text-purple-600" />
+                      <Quote className="h-4 w-4 text-gray-600" />
                       <h3 className="text-sm font-medium text-gray-900">Citations & References</h3>
                     </div>
 
                     {/* Compact Citation Manager */}
-                      <CitationManager 
-                        selectedTemplate={selectedTemplate}
-                        onTemplateChange={setSelectedTemplate}
+                    <CitationManager
+                      selectedTemplate={selectedTemplate}
+                      onTemplateChange={setSelectedTemplate}
                       compact={true}
                     />
                   </div>
@@ -896,12 +960,12 @@ function WriterPageContent() {
                     Save
                   </Button>
                 </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </div>
-      
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
       {/* Enhanced AI Writing Modal */}
       <AIWritingModal
         open={aiModalOpen}

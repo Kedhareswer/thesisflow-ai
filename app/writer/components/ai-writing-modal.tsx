@@ -43,84 +43,89 @@ const templates = {
     {
       id: "title",
       title: "Title",
-      prompt: "Write a concise, descriptive title for an IEEE research paper.",
+      prompt: "Write a concise, descriptive title for an IEEE research paper. Focus solely on the title content.",
       required: true,
       editable: true,
     },
     {
       id: "authors",
       title: "Authors & Affiliations",
-      prompt: "List authors and affiliations in IEEE format.",
+      prompt: "List authors and affiliations in IEEE format. Provide only the author and affiliation details.",
       required: true,
       editable: true,
     },
     {
       id: "abstract",
       title: "Abstract",
-      prompt: "Write an IEEE-style abstract (150-250 words) with motivation, methods, results, and significance.",
+      prompt:
+        "Write an IEEE-style abstract (150-250 words) with motivation, methods, results, and significance. Do not include the 'Abstract' heading.",
       required: true,
       editable: true,
     },
     {
       id: "keywords",
       title: "Keywords",
-      prompt: "List 3-6 relevant keywords, comma-separated.",
+      prompt: "List 3-6 relevant keywords, comma-separated. Do not include the 'Keywords' heading.",
       required: true,
       editable: true,
     },
     {
       id: "introduction",
       title: "1. Introduction",
-      prompt: "Write the Introduction with motivation, problem statement, contributions, and organization.",
+      prompt:
+        "Write the Introduction section with motivation, problem statement, contributions, and organization. Do not include the '1. Introduction' heading.",
       required: true,
       editable: true,
     },
     {
       id: "related",
       title: "2. Related Work",
-      prompt: "Discuss previous research and cite relevant literature.",
+      prompt: "Discuss previous research and cite relevant literature. Do not include the '2. Related Work' heading.",
       required: true,
       editable: true,
     },
     {
       id: "methods",
       title: "3. Methods",
-      prompt: "Describe methods, datasets, algorithms, and experimental setup.",
+      prompt:
+        "Describe methods, datasets, algorithms, and experimental setup. Do not include the '3. Methods' heading.",
       required: true,
       editable: true,
     },
     {
       id: "results",
       title: "4. Results",
-      prompt: "Present results with tables, figures, and statistical analysis.",
+      prompt:
+        "Present results with tables, figures, and statistical analysis. Do not include the '4. Results' heading.",
       required: true,
       editable: true,
     },
     {
       id: "discussion",
       title: "5. Discussion",
-      prompt: "Interpret results, compare with prior work, discuss limitations.",
+      prompt:
+        "Interpret results, compare with prior work, discuss limitations. Do not include the '5. Discussion' heading.",
       required: true,
       editable: true,
     },
     {
       id: "conclusion",
       title: "6. Conclusion",
-      prompt: "Summarize findings, contributions, and suggest future work.",
+      prompt: "Summarize findings, contributions, and suggest future work. Do not include the '6. Conclusion' heading.",
       required: true,
       editable: true,
     },
     {
       id: "acknowledgments",
       title: "Acknowledgments",
-      prompt: "Write acknowledgments (optional).",
+      prompt: "Write acknowledgments (optional). Do not include the 'Acknowledgments' heading.",
       required: false,
       editable: true,
     },
     {
       id: "references",
       title: "References",
-      prompt: "List references in IEEE format.",
+      prompt: "List references in IEEE format. Do not include the 'References' heading.",
       required: true,
       editable: true,
     },
@@ -129,51 +134,331 @@ const templates = {
     {
       id: "title",
       title: "Title",
-      prompt: "Write a concise, descriptive title for an ACM research paper.",
+      prompt: "Write a concise, descriptive title for an ACM research paper. Focus solely on the title content.",
       required: true,
       editable: true,
     },
     {
       id: "authors",
       title: "Authors & Affiliations",
-      prompt: "List authors and affiliations in ACM format.",
+      prompt: "List authors and affiliations in ACM format. Provide only the author and affiliation details.",
       required: true,
       editable: true,
     },
     {
       id: "abstract",
       title: "Abstract",
-      prompt: "Write an ACM-style abstract (150-250 words).",
+      prompt: "Write an ACM-style abstract (150-250 words). Do not include the 'Abstract' heading.",
       required: true,
       editable: true,
     },
-    { id: "keywords", title: "Keywords", prompt: "List 3-6 relevant keywords.", required: true, editable: true },
+    {
+      id: "keywords",
+      title: "Keywords",
+      prompt: "List 3-6 relevant keywords. Do not include the 'Keywords' heading.",
+      required: true,
+      editable: true,
+    },
     {
       id: "introduction",
       title: "1. Introduction",
-      prompt: "Write the Introduction for ACM paper.",
+      prompt: "Write the Introduction section for an ACM paper. Do not include the '1. Introduction' heading.",
       required: true,
       editable: true,
     },
-    { id: "related", title: "2. Related Work", prompt: "Discuss previous research.", required: true, editable: true },
-    { id: "methods", title: "3. Methods", prompt: "Describe methodology in detail.", required: true, editable: true },
-    { id: "results", title: "4. Results", prompt: "Present results and analysis.", required: true, editable: true },
+    {
+      id: "related",
+      title: "2. Related Work",
+      prompt: "Discuss previous research. Do not include the '2. Related Work' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "methods",
+      title: "3. Methods",
+      prompt: "Describe methodology in detail. Do not include the '3. Methods' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "results",
+      title: "4. Results",
+      prompt: "Present results and analysis. Do not include the '4. Results' heading.",
+      required: true,
+      editable: true,
+    },
     {
       id: "discussion",
       title: "5. Discussion",
-      prompt: "Interpret and discuss results.",
+      prompt: "Interpret and discuss results. Do not include the '5. Discussion' heading.",
       required: true,
       editable: true,
     },
-    { id: "conclusion", title: "6. Conclusion", prompt: "Summarize and conclude.", required: true, editable: true },
+    {
+      id: "conclusion",
+      title: "6. Conclusion",
+      prompt: "Summarize and conclude. Do not include the '6. Conclusion' heading.",
+      required: true,
+      editable: true,
+    },
     {
       id: "acknowledgments",
       title: "Acknowledgments",
-      prompt: "Write acknowledgments.",
+      prompt: "Write acknowledgments. Do not include the 'Acknowledgments' heading.",
       required: false,
       editable: true,
     },
-    { id: "references", title: "References", prompt: "List references in ACM format.", required: true, editable: true },
+    {
+      id: "references",
+      title: "References",
+      prompt: "List references in ACM format. Do not include the 'References' heading.",
+      required: true,
+      editable: true,
+    },
+  ],
+  springer: [
+    {
+      id: "title",
+      title: "Title",
+      prompt: "Write a concise, descriptive title for a Springer research paper. Focus solely on the title content.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "authors",
+      title: "Authors & Affiliations",
+      prompt: "List authors and affiliations in Springer format. Provide only the author and affiliation details.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "abstract",
+      title: "Abstract",
+      prompt:
+        "Write a Springer-style abstract (150-250 words) summarizing the paper's content. Do not include the 'Abstract' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "keywords",
+      title: "Keywords",
+      prompt: "List 3-6 relevant keywords. Do not include the 'Keywords' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "introduction",
+      title: "1. Introduction",
+      prompt:
+        "Write the Introduction section for a Springer paper, outlining the problem, motivation, and paper structure. Do not include the '1. Introduction' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "literature",
+      title: "2. Literature Review",
+      prompt:
+        "Provide a comprehensive review of relevant literature. Do not include the '2. Literature Review' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "methods",
+      title: "3. Materials and Methods",
+      prompt:
+        "Describe the materials and methods used in the research. Do not include the '3. Materials and Methods' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "results",
+      title: "4. Results",
+      prompt: "Present the findings and results of the study. Do not include the '4. Results' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "discussion",
+      title: "5. Discussion",
+      prompt:
+        "Discuss the implications of the results and compare them with existing literature. Do not include the '5. Discussion' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "conclusion",
+      title: "6. Conclusion",
+      prompt: "Summarize the main conclusions and suggest future work. Do not include the '6. Conclusion' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "acknowledgments",
+      title: "Acknowledgments",
+      prompt: "Write acknowledgments (optional). Do not include the 'Acknowledgments' heading.",
+      required: false,
+      editable: true,
+    },
+    {
+      id: "references",
+      title: "References",
+      prompt: "List references in Springer format. Do not include the 'References' heading.",
+      required: true,
+      editable: true,
+    },
+  ],
+  elsevier: [
+    {
+      id: "title",
+      title: "Title",
+      prompt: "Write a concise, descriptive title for an Elsevier research paper. Focus solely on the title content.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "authors",
+      title: "Authors & Affiliations",
+      prompt: "List authors and affiliations in Elsevier format. Provide only the author and affiliation details.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "abstract",
+      title: "Abstract",
+      prompt:
+        "Write an Elsevier-style abstract (150-250 words) with a clear summary of the paper. Do not include the 'Abstract' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "keywords",
+      title: "Keywords",
+      prompt: "List 3-6 relevant keywords. Do not include the 'Keywords' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "introduction",
+      title: "1. Introduction",
+      prompt:
+        "Write the Introduction section for an Elsevier paper, providing background and objectives. Do not include the '1. Introduction' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "methods",
+      title: "2. Materials and Methods",
+      prompt:
+        "Describe the experimental procedures, materials, and methods in detail. Do not include the '2. Materials and Methods' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "results",
+      title: "3. Results",
+      prompt: "Present the experimental results clearly and concisely. Do not include the '3. Results' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "discussion",
+      title: "4. Discussion",
+      prompt:
+        "Discuss the interpretation of results, their significance, and comparison with previous studies. Do not include the '4. Discussion' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "conclusion",
+      title: "5. Conclusion",
+      prompt:
+        "Summarize the main findings and conclusions of the research. Do not include the '5. Conclusion' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "acknowledgments",
+      title: "Acknowledgments",
+      prompt: "Write acknowledgments (optional). Do not include the 'Acknowledgments' heading.",
+      required: false,
+      editable: true,
+    },
+    {
+      id: "references",
+      title: "References",
+      prompt: "List references in Elsevier format. Do not include the 'References' heading.",
+      required: true,
+      editable: true,
+    },
+  ],
+  general: [
+    {
+      id: "title",
+      title: "Title",
+      prompt: "Write a concise, descriptive title for a general academic paper. Focus solely on the title content.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "authors",
+      title: "Authors & Affiliations",
+      prompt: "List authors and affiliations. Provide only the author and affiliation details.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "abstract",
+      title: "Abstract",
+      prompt:
+        "Write a general academic abstract (150-250 words) summarizing the paper. Do not include the 'Abstract' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "keywords",
+      title: "Keywords",
+      prompt: "List 3-6 relevant keywords. Do not include the 'Keywords' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "introduction",
+      title: "1. Introduction",
+      prompt:
+        "Write the Introduction section, providing background, problem statement, and objectives. Do not include the '1. Introduction' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "body",
+      title: "2. Body",
+      prompt:
+        "Write the main body of the paper, including methodology, results, and discussion. Do not include the '2. Body' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "conclusion",
+      title: "3. Conclusion",
+      prompt:
+        "Write the Conclusion section, summarizing findings and implications. Do not include the '3. Conclusion' heading.",
+      required: true,
+      editable: true,
+    },
+    {
+      id: "acknowledgments",
+      title: "Acknowledgments",
+      prompt: "Write acknowledgments (optional). Do not include the 'Acknowledgments' heading.",
+      required: false,
+      editable: true,
+    },
+    {
+      id: "references",
+      title: "References",
+      prompt: "List references. Do not include the 'References' heading.",
+      required: true,
+      editable: true,
+    },
   ],
 }
 
@@ -196,8 +481,8 @@ async function generateSectionContent(
     writingStylePrompt,
     templatePrompt,
     researchContext ? `Research Context:\n${researchContext}` : "",
-    context ? `Previous Content:\n${context}` : "",
-    prompt,
+    context ? `Previous Content for Context:\n${context}` : "",
+    `Generate ONLY the content for the following section, without including its title or any subsequent section titles. Focus strictly on the requested content:\n${prompt}`,
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -241,7 +526,7 @@ type Section = {
   status: "pending" | "generating" | "completed" | "error"
 }
 
-type TemplateKey = "ieee" | "acm"
+type TemplateKey = "ieee" | "acm" | "springer" | "elsevier" | "general"
 
 interface AIWritingModalProps {
   open: boolean
@@ -464,13 +749,13 @@ export function AIWritingModal(props: AIWritingModalProps) {
   const StatusIcon = ({ status }: { status: Section["status"] }) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="w-4 h-4 text-black" />
+        return <CheckCircle2 className="w-4 h-4 text-black" aria-label="Completed" />
       case "generating":
-        return <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
+        return <Loader2 className="w-4 h-4 text-gray-600 animate-spin" aria-label="Generating" />
       case "error":
-        return <AlertCircle className="w-4 h-4 text-gray-800" />
+        return <AlertCircle className="w-4 h-4 text-red-600" aria-label="Error" />
       default:
-        return <Circle className="w-4 h-4 text-gray-400" />
+        return <Circle className="w-4 h-4 text-gray-400" aria-label="Pending" />
     }
   }
 
@@ -485,11 +770,11 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 <Sparkles className="h-7 w-7 text-white" />
               </div>
               <div className="flex-1">
-                <DialogTitle className="text-3xl font-light text-white mb-2 tracking-wide">
+                <DialogTitle className="text-3xl font-medium text-white mb-2 tracking-wide">
                   AI Research Paper Generator
                 </DialogTitle>
-                <DialogDescription className="text-gray-300 text-base font-light leading-relaxed">
-                  Generate comprehensive academic papers with structured sections and intelligent content creation
+                <DialogDescription className="text-gray-300 text-base font-normal leading-relaxed">
+                  Generate comprehensive academic papers with structured sections and intelligent content creation.
                 </DialogDescription>
               </div>
             </div>
@@ -559,6 +844,21 @@ export function AIWritingModal(props: AIWritingModalProps) {
                           acm: {
                             name: "ACM",
                             desc: "ACM Conference/Journal Template",
+                            words: "10,000",
+                          },
+                          springer: {
+                            name: "Springer",
+                            desc: "Springer Conference/Journal Template",
+                            words: "12,000",
+                          },
+                          elsevier: {
+                            name: "Elsevier",
+                            desc: "Elsevier Journal Template",
+                            words: "15,000",
+                          },
+                          general: {
+                            name: "General Academic",
+                            desc: "Standard Academic Paper Template",
                             words: "10,000",
                           },
                         }[key] || {
@@ -637,7 +937,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 {hasErrors && (
                   <div className="flex justify-between text-base">
                     <span className="text-gray-700">Errors</span>
-                    <span className="font-semibold text-gray-800">
+                    <span className="font-semibold text-red-600">
                       {sections.filter((s) => s.status === "error").length}
                     </span>
                   </div>
@@ -717,6 +1017,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                     <span
                                       {...dragProvided.dragHandleProps}
                                       className="cursor-move text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                      aria-label="Drag to reorder section"
                                     >
                                       <GripVertical className="w-5 h-5" />
                                     </span>
@@ -764,9 +1065,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                       className="h-9 px-4 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                                     >
                                       {section.status === "generating" ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <Loader2 className="w-4 h-4 animate-spin" aria-label="Generating" />
                                       ) : (
-                                        <Sparkles className="w-4 h-4" />
+                                        <Sparkles className="w-4 h-4" aria-label="Generate section" />
                                       )}
                                     </Button>
 
@@ -774,8 +1075,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        onClick={() => handleRemoveSection(idx)}
+                                        onClick={() => handleDeleteClick(idx)} // Use handleDeleteClick for confirmation
                                         className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all"
+                                        aria-label={`Remove ${section.title} section`}
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
@@ -792,12 +1094,15 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                   placeholder={`${section.title} content will be generated here...`}
                                   className="min-h-[140px] text-base border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-black focus:ring-0 transition-all resize-none leading-relaxed"
                                   disabled={section.status === "generating"}
+                                  onKeyDown={(e) => handleKeyDown(e, idx)}
+                                  aria-label={`${section.title} content`}
                                 />
 
                                 {section.content && (
                                   <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
                                     <span className="font-mono">
-                                      {section.content.split(" ").length} words • {section.content.length} characters
+                                      {section.content.split(" ").filter(Boolean).length} words •{" "}
+                                      {section.content.length} characters
                                     </span>
                                     {section.status === "completed" && !section.content.startsWith("Error") && (
                                       <Badge
