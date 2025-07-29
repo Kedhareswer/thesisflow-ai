@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, BarChart3, AlertCircle } from "lucide-react"
+import { MermaidChart } from "./mermaid-chart"
 
 interface VisualContentRendererProps {
   content: string
@@ -104,25 +105,11 @@ export function VisualContentRenderer({ content, className = "" }: VisualContent
   // Render flowchart as React component
   const renderFlowchart = (flowchartCode: string, index: number) => {
     return (
-      <Card key={`flowchart-${index}`} className="my-4 border-gray-200">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <FileText className="h-4 w-4 text-gray-600" />
-            <Badge variant="outline" className="text-xs">
-              Flowchart {index + 1}
-            </Badge>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
-              {flowchartCode}
-            </pre>
-            <div className="mt-3 text-xs text-gray-500">
-              <AlertCircle className="h-3 w-3 inline mr-1" />
-              Mermaid flowchart code - can be rendered in markdown viewers
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <MermaidChart 
+        key={`flowchart-${index}`}
+        code={flowchartCode} 
+        index={index} 
+      />
     )
   }
 

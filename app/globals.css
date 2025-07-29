@@ -181,3 +181,33 @@ h6 {
   max-height: calc(90vh - 200px);
   overflow-y: auto;
 }
+
+/* Mermaid Chart Styles */
+.mermaid {
+  @apply w-full max-w-full overflow-auto;
+}
+
+.mermaid svg {
+  @apply max-w-full h-auto;
+}
+
+.mermaid .node {
+  @apply font-sans text-sm;
+}
+
+.mermaid .label {
+  @apply font-sans text-sm;
+}
+
+.mermaid .edgeLabel {
+  @apply font-sans text-xs;
+}
+
+/* Ensure charts are responsive */
+.mermaid-chart-container {
+  @apply w-full max-w-full overflow-x-auto;
+}
+
+.mermaid-chart-container svg {
+  @apply min-w-full;
+}
