@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,14 +12,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Loader2, Sparkles, FileText, GripVertical, Plus, Trash2 } from "lucide-react"
+import {
+  Loader2,
+  Sparkles,
+  FileText,
+  GripVertical,
+  Plus,
+  Trash2,
+  Download,
+  FileDown,
+  Settings2,
+  BookOpen,
+  CheckCircle2,
+  Circle,
+  AlertCircle,
+  Clock,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Enhanced template configurations
 const templates = {
@@ -389,7 +406,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
 
   // Handle keyboard shortcuts
   function handleKeyDown(event: React.KeyboardEvent, idx: number) {
-    if (event.key === 'Delete' && !sections[idx].required) {
+    if (event.key === "Delete" && !sections[idx].required) {
       event.preventDefault()
       handleDeleteClick(idx)
     }
@@ -440,322 +457,363 @@ export function AIWritingModal(props: AIWritingModalProps) {
   const completedSections = sections.filter((s) => s.status === "completed" && s.content.trim()).length
   const totalSections = sections.length
   const hasErrors = sections.some((s) => s.status === "error")
+  const generatingSections = sections.filter((s) => s.status === "generating").length
+
+  // Status icon component
+  const StatusIcon = ({ status }: { status: Section["status"] }) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+      case "generating":
+        return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+      case "error":
+        return <AlertCircle className="w-4 h-4 text-red-500" />
+      default:
+        return <Circle className="w-4 h-4 text-gray-300" />
+    }
+  }
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="sm:max-w-[1000px] max-h-[90vh] bg-white border-gray-200 shadow-xl">
-        <DialogHeader className="border-b border-gray-200 pb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Sparkles className="h-5 w-5 text-white" />
+      <DialogContent className="max-w-6xl max-h-[95vh] bg-gradient-to-br from-slate-50 to-white border-0 shadow-2xl overflow-hidden">
+        {/* Enhanced Header */}
+        <DialogHeader className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white p-6 -m-6 mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-white" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold text-gray-900">AI Research Paper Generator</DialogTitle>
-              <DialogDescription className="text-sm text-gray-600 mt-1">
-                Generate comprehensive academic papers with structured sections, drag-and-drop reordering, and export
-                options
-          </DialogDescription>
+            <div className="flex-1">
+              <DialogTitle className="text-2xl font-bold text-white mb-1">AI Research Paper Generator</DialogTitle>
+              <DialogDescription className="text-blue-100 text-sm">
+                Generate comprehensive academic papers with structured sections and intelligent content creation
+              </DialogDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary" className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                {props.selectedProvider}
+              </Badge>
+              <Badge variant="secondary" className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                {props.selectedModel}
+              </Badge>
             </div>
           </div>
 
           {/* Progress indicator */}
           {isGeneratingAll && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>Generating sections...</span>
-                <span>{Math.round(generationProgress)}%</span>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between text-sm text-blue-100">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4" />
+                  <span>Generating sections...</span>
+                </div>
+                <span className="font-medium">{Math.round(generationProgress)}% complete</span>
               </div>
-              <Progress value={generationProgress} className="h-2" />
+              <div className="w-full bg-white/20 rounded-full h-2 backdrop-blur-sm">
+                <div
+                  className="bg-white h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${generationProgress}%` }}
+                />
+              </div>
             </div>
           )}
         </DialogHeader>
-        
-        <div className="max-h-[60vh] overflow-y-auto px-1">
-          <div className="space-y-6 py-4">
-            {/* Template and Configuration */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-900">Configuration</h4>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className="bg-white border-gray-300">
-                    {props.selectedProvider}
-                  </Badge>
-                  <Badge variant="outline" className="bg-white border-gray-300">
-                    {props.selectedModel}
-                  </Badge>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-6 max-h-[70vh] overflow-hidden">
+          {/* Left Panel - Configuration */}
+          <div className="w-80 flex-shrink-0 space-y-4">
+            {/* Template Configuration Card */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-2">
+                  <Settings2 className="w-4 h-4 text-slate-600" />
+                  <CardTitle className="text-sm font-semibold text-slate-800">Configuration</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-xs font-medium text-gray-700 mb-2 block">Template</Label>
+                  <Label className="text-xs font-medium text-slate-700 mb-2 block">Template Format</Label>
                   <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-                    <SelectTrigger className="h-11 bg-white border-gray-300 rounded-lg shadow-sm hover:border-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all pr-12">
-                      <SelectValue placeholder="Select publisher template" />
-              </SelectTrigger>
-                    <SelectContent className="bg-white border-gray-100 rounded-xl shadow-2xl p-2 w-80 max-w-full">
-                      <div className="space-y-2">
-                        {Object.entries(templates).map(([key, sections]) => {
-                          // Get a display name and description for each template
-                          let name = "";
-                          let description = "";
-                          let wordLimit = 0;
-                          let sectionCount = sections.length;
-                          if (key === "ieee") {
-                            name = "IEEE";
-                            description = "IEEE Conference/Journal Template";
-                            wordLimit = 8000;
-                          } else if (key === "acm") {
-                            name = "ACM";
-                            description = "ACM Conference/Journal Template";
-                            wordLimit = 10000;
-                          } // Add more as needed
-                          return (
-                            <SelectItem
-                              key={key}
-                              value={key}
-                              className="p-0 border-none bg-transparent hover:bg-gray-50 focus:bg-blue-50 rounded-lg transition-all group"
-                            >
-                              <div className="flex flex-col px-4 py-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-gray-900 text-base">{name}</span>
-                                  <span className="text-xs text-gray-400">{sectionCount} sections</span>
-                                </div>
-                                <div className="text-xs text-gray-600 mt-1">{description}</div>
-                                <div className="text-xs text-gray-400 mt-1">{wordLimit.toLocaleString()} words</div>
+                    <SelectTrigger className="h-10 bg-white border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200 shadow-xl rounded-lg">
+                      {Object.entries(templates).map(([key, sections]) => {
+                        const templateInfo = {
+                          ieee: {
+                            name: "IEEE",
+                            desc: "IEEE Conference/Journal",
+                            words: "8,000",
+                            color: "text-blue-600",
+                          },
+                          acm: {
+                            name: "ACM",
+                            desc: "ACM Conference/Journal",
+                            words: "10,000",
+                            color: "text-purple-600",
+                          },
+                        }[key] || {
+                          name: key.toUpperCase(),
+                          desc: "Academic Template",
+                          words: "N/A",
+                          color: "text-slate-600",
+                        }
+
+                        return (
+                          <SelectItem
+                            key={key}
+                            value={key}
+                            className="p-3 hover:bg-slate-50 focus:bg-blue-50 cursor-pointer"
+                          >
+                            <div className="flex flex-col">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`font-semibold ${templateInfo.color}`}>{templateInfo.name}</span>
+                                <span className="text-xs text-slate-400">{sections.length} sections</span>
                               </div>
-                  </SelectItem>
-                          );
-                        })}
-                      </div>
-              </SelectContent>
-            </Select>
-          </div>
-          
-                <div className="flex items-end">
-          <Button 
-                    onClick={handleGenerateAll}
-                    disabled={isGeneratingAll || !props.supabaseToken}
-                    className="w-full h-9 bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-sm"
-                  >
-                    {isGeneratingAll ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                        Generate All Sections
-              </>
-            )}
-          </Button>
+                              <div className="text-xs text-slate-600">{templateInfo.desc}</div>
+                              <div className="text-xs text-slate-400 mt-1">{templateInfo.words} words</div>
+                            </div>
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-            </div>
 
-            {/* Sections List with Drag and Drop */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-semibold text-gray-900">Paper Sections</h4>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    {completedSections}/{totalSections} completed
-                  </Badge>
-                  {hasErrors && (
-                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                      Some errors
-                    </Badge>
+                <Button
+                  onClick={handleGenerateAll}
+                  disabled={isGeneratingAll || !props.supabaseToken}
+                  className="w-full h-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  {isGeneratingAll ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate All Sections
+                    </>
                   )}
-                </div>
-              </div>
+                </Button>
+              </CardContent>
+            </Card>
 
+            {/* Progress Overview Card */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <BookOpen className="w-4 h-4 text-slate-600" />
+                    <CardTitle className="text-sm font-semibold text-slate-800">Progress Overview</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                    {completedSections}/{totalSections}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Completed</span>
+                  <span className="font-medium text-emerald-600">{completedSections}</span>
+                </div>
+                {generatingSections > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Generating</span>
+                    <span className="font-medium text-blue-600">{generatingSections}</span>
+                  </div>
+                )}
+                {hasErrors && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Errors</span>
+                    <span className="font-medium text-red-600">
+                      {sections.filter((s) => s.status === "error").length}
+                    </span>
+                  </div>
+                )}
+                <div className="pt-2">
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-emerald-500 to-blue-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${(completedSections / totalSections) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Add Custom Section Card */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-2">
+                  <Plus className="w-4 h-4 text-slate-600" />
+                  <CardTitle className="text-sm font-semibold text-slate-800">Add Custom Section</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-xs font-medium text-slate-700 mb-1 block">Section Title</Label>
+                  <Input
+                    value={customSectionTitle}
+                    onChange={(e) => setCustomSectionTitle(e.target.value)}
+                    placeholder="e.g., Methodology"
+                    className="h-9 text-sm border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-slate-700 mb-1 block">AI Prompt</Label>
+                  <Input
+                    value={customSectionPrompt}
+                    onChange={(e) => setCustomSectionPrompt(e.target.value)}
+                    placeholder="Describe what to write..."
+                    className="h-9 text-sm border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleAddCustomSection}
+                  disabled={!customSectionTitle.trim() || !customSectionPrompt.trim()}
+                  className="w-full h-8 bg-slate-800 hover:bg-slate-900 text-white text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Section
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Panel - Sections */}
+          <div className="flex-1 overflow-hidden">
+            <div className="h-full overflow-y-auto pr-2 space-y-3">
               <DragDropContext onDragEnd={handleDragEnd}>
                 <Droppable droppableId="sections-droppable">
                   {(provided: any) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
                       {sections.map((section, idx) => (
                         <Draggable key={section.id} draggableId={section.id} index={idx}>
-                          {(dragProvided: any) => (
-                            <div
+                          {(dragProvided: any, snapshot: any) => (
+                            <Card
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
-                              className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
-                              onKeyDown={(e) => handleKeyDown(e, idx)}
-                              tabIndex={0}
-                              role="button"
-                              aria-label={`Section: ${section.title}. ${section.required ? 'Required section' : 'Optional section, press Delete to remove'}`}
+                              className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 ${
+                                snapshot.isDragging ? "shadow-lg ring-2 ring-blue-200" : ""
+                              }`}
                             >
                               {/* Section Header */}
-                              <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                                                              <div className="flex items-center space-x-3">
-                                <span
-                                  {...dragProvided.dragHandleProps}
-                                  className="cursor-move text-gray-400 hover:text-gray-600"
-                                  title="Drag to reorder"
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </span>
+                              <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    <span
+                                      {...dragProvided.dragHandleProps}
+                                      className="cursor-move text-slate-400 hover:text-slate-600 transition-colors"
+                                    >
+                                      <GripVertical className="w-4 h-4" />
+                                    </span>
 
-                                <div className="flex items-center space-x-2">
-                                  <div
-                                    className={`w-3 h-3 rounded-full ${
-                                      section.status === "generating"
-                                        ? "bg-blue-500 animate-pulse"
-                                        : section.status === "completed"
-                                          ? "bg-green-500"
-                                          : section.status === "error"
-                                            ? "bg-red-500"
-                                            : "bg-gray-300"
-                                    }`}
-                                    title={
-                                      section.status === "generating"
-                                        ? "Generating content..."
-                                        : section.status === "completed"
-                                          ? "Content generated"
-                                          : section.status === "error"
-                                            ? "Generation failed"
-                                            : "Pending generation"
-                                    }
-                                  />
-                                  <span className="font-semibold text-gray-900">{section.title}</span>
-                                </div>
+                                    <StatusIcon status={section.status} />
+
+                                    <div className="flex items-center space-x-3">
+                                      <span className="font-semibold text-slate-800 text-sm">{section.title}</span>
+
+                                      <div className="flex items-center space-x-2">
+                                        {section.required ? (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs bg-blue-50 text-blue-700 border-blue-200 px-2 py-0.5"
+                                          >
+                                            Required
+                                          </Badge>
+                                        ) : (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs bg-slate-50 text-slate-600 border-slate-300 px-2 py-0.5"
+                                          >
+                                            Optional
+                                          </Badge>
+                                        )}
+
+                                        {section.edited && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs bg-amber-50 text-amber-700 border-amber-200 px-2 py-0.5"
+                                          >
+                                            Edited
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
 
                                   <div className="flex items-center space-x-2">
-                                    {section.required ? (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-                                      >
-                                        Required
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-gray-50 text-gray-600 border-gray-300"
-                                      >
-                                        Optional
-                                      </Badge>
-                                    )}
-
-                                    {section.edited && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"
-                                      >
-                                        Edited
-                                      </Badge>
-                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleGenerateSection(idx)}
+                                      disabled={section.status === "generating" || isGeneratingAll}
+                                      className="h-8 px-3 border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all"
+                                    >
+                                      {section.status === "generating" ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Sparkles className="w-3 h-3" />
+                                      )}
+                                    </Button>
 
                                     {!section.required && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-red-50 text-red-600 border-red-200"
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleRemoveSection(idx)}
+                                        className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600 transition-all"
                                       >
-                                        Deletable
-                                      </Badge>
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
                                     )}
                                   </div>
                                 </div>
-
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleGenerateSection(idx)}
-                                    disabled={section.status === "generating" || isGeneratingAll}
-                                    className="h-8 px-3 border-gray-300 text-gray-700 hover:bg-gray-50"
-                                  >
-                                    {section.status === "generating" ? (
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                      <Sparkles className="w-3 h-3" />
-                                    )}
-                                  </Button>
-
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleDeleteClick(idx)}
-                                    className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                    title={section.required ? "Cannot delete required section" : "Delete section"}
-                                    disabled={section.required}
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </div>
+                              </CardHeader>
 
                               {/* Section Content */}
-                              <div className="p-4">
+                              <CardContent className="pt-0">
                                 <Textarea
                                   value={section.content}
                                   onChange={(e) => handleContentChange(idx, e.target.value)}
                                   placeholder={`${section.title} content will be generated here...`}
-                                  className="min-h-[120px] text-sm border-gray-300 bg-gray-50 focus:bg-white transition-colors"
+                                  className="min-h-[120px] text-sm border-slate-300 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all resize-none"
                                   disabled={section.status === "generating"}
                                 />
 
                                 {section.content && (
-                                  <div className="mt-2 text-xs text-gray-500">
-                                    {section.content.split(" ").length} words • {section.content.length} characters
+                                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                                    <span>
+                                      {section.content.split(" ").length} words • {section.content.length} characters
+                                    </span>
+                                    {section.status === "completed" && !section.content.startsWith("Error") && (
+                                      <Badge
+                                        variant="outline"
+                                        className="bg-emerald-50 text-emerald-600 border-emerald-200 text-xs"
+                                      >
+                                        Ready
+                                      </Badge>
+                                    )}
                                   </div>
                                 )}
-                              </div>
-                            </div>
+                              </CardContent>
+                            </Card>
                           )}
                         </Draggable>
                       ))}
                       {provided.placeholder}
-            </div>
-          )}
+                    </div>
+                  )}
                 </Droppable>
               </DragDropContext>
-            </div>
-
-            {/* Add Custom Section */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <h4 className="text-sm font-semibold text-gray-900 flex items-center">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Custom Section
-              </h4>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">Section Title</Label>
-                  <Input
-                    value={customSectionTitle}
-                    onChange={(e) => setCustomSectionTitle(e.target.value)}
-                    placeholder="e.g., Methodology"
-                    className="h-8 text-sm border-gray-300 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">AI Prompt</Label>
-                  <Input
-                    value={customSectionPrompt}
-                    onChange={(e) => setCustomSectionPrompt(e.target.value)}
-                    placeholder="Describe what to write..."
-                    className="h-8 text-sm border-gray-300 bg-white"
-                  />
-                </div>
-              </div>
-
-              <Button
-                size="sm"
-                onClick={handleAddCustomSection}
-                disabled={!customSectionTitle.trim() || !customSectionPrompt.trim()}
-                className="h-8 bg-gray-900 text-white hover:bg-gray-800"
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                Add Section
-              </Button>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="border-t border-gray-200 pt-4 bg-gray-50">
+        {/* Enhanced Footer */}
+        <DialogFooter className="border-t border-slate-200 pt-4 bg-slate-50/50 -mx-6 -mb-6 px-6 pb-6 mt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-3">
               <Button
@@ -763,8 +821,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 size="sm"
                 onClick={exportMarkdown}
                 disabled={completedSections === 0}
-                className="border-gray-300 text-gray-700 hover:bg-white bg-transparent"
+                className="border-slate-300 text-slate-700 hover:bg-white hover:border-slate-400 bg-transparent transition-all"
               >
+                <Download className="w-4 h-4 mr-2" />
                 Export Markdown
               </Button>
 
@@ -773,33 +832,39 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 size="sm"
                 onClick={exportLatex}
                 disabled={completedSections === 0}
-                className="border-gray-300 text-gray-700 hover:bg-white bg-transparent"
+                className="border-slate-300 text-slate-700 hover:bg-white hover:border-slate-400 bg-transparent transition-all"
               >
+                <FileDown className="w-4 h-4 mr-2" />
                 Export LaTeX
               </Button>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="text-xs text-gray-500">
-                {completedSections > 0 && `${completedSections} sections ready`}
+            <div className="flex items-center space-x-4">
+              {completedSections > 0 && (
+                <div className="text-sm text-slate-600 flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <span>{completedSections} sections ready</span>
+                </div>
+              )}
+
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => props.onOpenChange(false)}
+                  className="border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all"
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  onClick={handleInsertAll}
+                  disabled={completedSections === 0 || isGeneratingAll}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Insert All Sections
+                </Button>
               </div>
-
-              <Button
-                variant="outline"
-                onClick={() => props.onOpenChange(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </Button>
-
-          <Button 
-                onClick={handleInsertAll}
-                disabled={completedSections === 0 || isGeneratingAll}
-                className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm"
-          >
-                <FileText className="h-4 w-4 mr-2" />
-                Insert All Sections
-          </Button>
             </div>
           </div>
         </DialogFooter>
