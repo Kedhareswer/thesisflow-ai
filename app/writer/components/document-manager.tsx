@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast"
 import DocumentService, { Document, CreateDocumentData } from "@/lib/services/document.service"
 import { useSafeDOM } from "../hooks/use-safe-dom"
+import { useSafeState, useSafeCallback } from "../hooks/use-safe-state"
 
 interface DocumentManagerProps {
   onDocumentSelect: (document: Document) => void
@@ -43,24 +44,21 @@ export function DocumentManager({
 }: DocumentManagerProps) {
   const { toast } = useToast()
   const { safeDownload } = useSafeDOM()
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [newDocument, setNewDocument] = useState({
+  const [documents, setDocuments] = useSafeState<Document[]>([])
+  const [loading, setLoading] = useSafeState(true)
+  const [searchTerm, setSearchTerm] = useSafeState("")
+  const [showCreateDialog, setShowCreateDialog] = useSafeState(false)
+  const [newDocument, setNewDocument] = useSafeState({
     title: "",
     content: "",
     document_type: "paper" as const
   })
-  const [creating, setCreating] = useState(false)
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [creating, setCreating] = useSafeState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useSafeState<string | null>(null)
   const documentService = DocumentService.getInstance()
 
-  useEffect(() => {
-    loadDocuments()
-  }, [])
-
-  const loadDocuments = async () => {
+  // Load documents with safe cleanup
+  const loadDocuments = useSafeCallback(async () => {
     try {
       setLoading(true)
       const docs = await documentService.getDocuments()
@@ -75,31 +73,44 @@ export function DocumentManager({
     } finally {
       setLoading(false)
     }
-  }
+  })
 
-  const handleCreateDocument = async () => {
+  useEffect(() => {
+    let isMounted = true
+
+    const loadDocs = async () => {
+      if (!isMounted) return
+      await loadDocuments()
+    }
+
+    loadDocs()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const handleCreateDocument = useSafeCallback(async () => {
     try {
       if (!newDocument.title.trim()) {
         toast({
           title: "Error",
-          description: "Document title is required",
+          description: "Please enter a document title",
           variant: "destructive"
         })
         return
       }
 
+      setCreating(true)
       const newDoc = await documentService.createDocument(newDocument)
       setDocuments(prev => [newDoc, ...prev])
       setShowCreateDialog(false)
-      setNewDocument({ title: "", content: "", document_type: "paper" })
+      setNewDocument({ title: "", content: "", document_type: "paper" as const })
       
       toast({
         title: "Success",
         description: "Document created successfully"
       })
-
-      // Auto-select the new document
-      handleDocumentSelect(newDoc)
     } catch (error) {
       console.error("Error creating document:", error)
       toast({
@@ -107,15 +118,17 @@ export function DocumentManager({
         description: "Failed to create document",
         variant: "destructive"
       })
+    } finally {
+      setCreating(false)
     }
-  }
+  })
 
-  const handleDocumentSelect = (document: Document) => {
+  const handleDocumentSelect = useSafeCallback((document: Document) => {
     onDocumentSelect(document)
     onDocumentLoad(document.content)
-  }
+  })
 
-  const handleDeleteDocument = async (documentId: string) => {
+  const handleDeleteDocument = useSafeCallback(async (documentId: string) => {
     try {
       await documentService.deleteDocument(documentId)
       setDocuments(prev => prev.filter(doc => doc.id !== documentId))
@@ -132,9 +145,9 @@ export function DocumentManager({
         variant: "destructive"
       })
     }
-  }
+  })
 
-  const handleDuplicateDocument = async (document: Document) => {
+  const handleDuplicateDocument = useSafeCallback(async (document: Document) => {
     try {
       const duplicated = await documentService.duplicateDocument(document.id)
       setDocuments(prev => [duplicated, ...prev])
@@ -151,9 +164,9 @@ export function DocumentManager({
         variant: "destructive"
       })
     }
-  }
+  })
 
-  const handleExportDocument = async (document: Document, format: 'markdown' | 'pdf' | 'docx') => {
+  const handleExportDocument = useSafeCallback(async (document: Document, format: 'markdown' | 'pdf' | 'docx') => {
     try {
       const blob = await documentService.exportDocument(document.id, format)
       const filename = `${document.title}.${format}`
@@ -172,7 +185,7 @@ export function DocumentManager({
         variant: "destructive"
       })
     }
-  }
+  })
 
   const filteredDocuments = documents.filter(doc =>
     doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||

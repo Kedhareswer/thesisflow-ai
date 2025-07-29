@@ -43,6 +43,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import DocumentService, { Document } from "@/lib/services/document.service"
 import { useSafeDOM } from "./hooks/use-safe-dom"
+import { useSafeState, useSafeCallback } from "./hooks/use-safe-state"
+import { useDebouncedState } from "./hooks/use-debounced-state"
+import { WriterErrorBoundary } from "./components/error-boundary"
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -203,83 +206,109 @@ function WriterPageContent() {
   const { safeDownload } = useSafeDOM()
 
   // AI provider selection state
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
-  const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
+  const [selectedProvider, setSelectedProvider] = useSafeState<AIProvider | undefined>(undefined)
+  const [selectedModel, setSelectedModel] = useSafeState<string | undefined>(undefined)
+  const [selectedPersonality, setSelectedPersonality] = useSafeState(personalities[0])
 
-  // Document state
-  const [selectedTemplate, setSelectedTemplate] = useState(publisherTemplates[0].id)
-  const [documentText, setDocumentText] = useState("")
-  const [documentTitle, setDocumentTitle] = useState("Untitled Document")
-  const [languageToolSuggestions, setLanguageToolSuggestions] = useState<any[]>([])
-  const [isChecking, setIsChecking] = useState(false)
-  const [checkProgress, setCheckProgress] = useState<string>("")
-  const [aiModalOpen, setAiModalOpen] = useState(false)
-  const [supabaseToken, setSupabaseToken] = useState<string | null>(null)
-  const [lastSaved, setLastSaved] = useState<Date>(new Date())
-  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  // Document state with debouncing
+  const [selectedTemplate, setSelectedTemplate] = useSafeState(publisherTemplates[0].id)
+  const [documentText, setDocumentText] = useDebouncedState("", 500) // Debounce text changes
+  const [documentTitle, setDocumentTitle] = useDebouncedState("Untitled Document", 300)
+  const [languageToolSuggestions, setLanguageToolSuggestions] = useSafeState<any[]>([])
+  const [isChecking, setIsChecking] = useSafeState(false)
+  const [checkProgress, setCheckProgress] = useSafeState<string>("")
+  const [aiModalOpen, setAiModalOpen] = useSafeState(false)
+  const [supabaseToken, setSupabaseToken] = useSafeState<string | null>(null)
+  const [lastSaved, setLastSaved] = useSafeState<Date>(new Date())
+  const [isAutoSaving, setIsAutoSaving] = useSafeState(false)
   
   // Document management state
-  const [currentDocument, setCurrentDocument] = useState<Document | null>(null)
-  const [documentManagerOpen, setDocumentManagerOpen] = useState(false)
+  const [currentDocument, setCurrentDocument] = useSafeState<Document | null>(null)
+  const [documentManagerOpen, setDocumentManagerOpen] = useSafeState(false)
   const documentService = DocumentService.getInstance()
 
   // Sidebar state for collapsible sections
-  const [activeTab, setActiveTab] = useState("assistant")
-  const [isAIConfigOpen, setIsAIConfigOpen] = useState(true)
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(true)
-  const [isCitationsOpen, setIsCitationsOpen] = useState(true)
+  const [activeTab, setActiveTab] = useSafeState("assistant")
+  const [isAIConfigOpen, setIsAIConfigOpen] = useSafeState(true)
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useSafeState(true)
+  const [isCitationsOpen, setIsCitationsOpen] = useSafeState(true)
 
   // Fetch Supabase session/token on mount
   useEffect(() => {
+    let isMounted = true
+
     async function fetchToken() {
-      const { data } = await supabase.auth.getSession()
-      setSupabaseToken(data.session?.access_token || null)
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (isMounted) {
+          setSupabaseToken(data.session?.access_token || null)
+        }
+      } catch (error) {
+        console.error("Error fetching token:", error)
+      }
     }
+
     fetchToken()
 
     // Listen for auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      setSupabaseToken(session?.access_token || null)
+      if (isMounted) {
+        setSupabaseToken(session?.access_token || null)
+      }
     })
 
     return () => {
+      isMounted = false
       listener?.subscription.unsubscribe()
     }
   }, [])
 
-  // Auto-save functionality
+  // Auto-save functionality with safe cleanup
   useEffect(() => {
-    const autoSaveInterval = setInterval(async () => {
-      if (documentText.trim() && documentTitle.trim()) {
+    let isMounted = true
+    let autoSaveInterval: NodeJS.Timeout | null = null
+
+    const performAutoSave = async () => {
+      if (!isMounted || !documentText.trim() || !documentTitle.trim()) return
+
+      try {
         setIsAutoSaving(true)
-        try {
-          await documentService.autoSaveDocument(documentTitle, documentText, "paper")
+        await documentService.autoSaveDocument(documentTitle, documentText, "paper")
+        if (isMounted) {
           setLastSaved(new Date())
-        } catch (error) {
-          console.error("Auto-save failed:", error)
-        } finally {
+        }
+      } catch (error) {
+        console.error("Auto-save failed:", error)
+      } finally {
+        if (isMounted) {
           setIsAutoSaving(false)
         }
       }
-    }, 30000) // Auto-save every 30 seconds
+    }
 
-    return () => clearInterval(autoSaveInterval)
+    autoSaveInterval = setInterval(performAutoSave, 30000) // Auto-save every 30 seconds
+
+    return () => {
+      isMounted = false
+      if (autoSaveInterval) {
+        clearInterval(autoSaveInterval)
+      }
+    }
   }, [documentText, documentTitle])
 
-  // Document management functions
-  const handleDocumentSelect = (document: Document) => {
+  // Document management functions with safe callbacks
+  const handleDocumentSelect = useSafeCallback((document: Document) => {
     setCurrentDocument(document)
     setDocumentTitle(document.title)
     setDocumentText(document.content)
     setDocumentManagerOpen(false)
-  }
+  })
 
-  const handleDocumentLoad = (content: string) => {
+  const handleDocumentLoad = useSafeCallback((content: string) => {
     setDocumentText(content)
-  }
+  })
 
-  const handleSaveDocument = async () => {
+  const handleSaveDocument = useSafeCallback(async () => {
     try {
       if (!documentTitle.trim()) {
         toast({
@@ -317,10 +346,10 @@ function WriterPageContent() {
         variant: "destructive"
       })
     }
-  }
+  })
 
   // Check text for grammar/style issues using LanguageTool
-  const checkText = async () => {
+  const checkText = useSafeCallback(async () => {
     if (!documentText.trim()) {
       toast({
         title: "No text to check",
@@ -398,10 +427,10 @@ function WriterPageContent() {
       setIsChecking(false)
       setCheckProgress("")
     }
-  }
+  })
 
   // Manual save function
-  const handleSave = async () => {
+  const handleSave = useSafeCallback(async () => {
     setIsAutoSaving(true)
     // Simulate save
     setTimeout(() => {
@@ -413,10 +442,10 @@ function WriterPageContent() {
         duration: 2000,
       })
     }, 500)
-  }
+  })
 
   // Export functions
-  const handleExport = (format: "markdown" | "pdf" | "docx") => {
+  const handleExport = useSafeCallback((format: "markdown" | "pdf" | "docx") => {
     const blob = new Blob([documentText], { type: "text/markdown" })
     const filename = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
     
@@ -427,10 +456,10 @@ function WriterPageContent() {
       description: `Your document has been exported successfully.`,
       duration: 2000,
     })
-  }
+  })
 
   // Only allow opening modal if token is present
-  const handleOpenAIModal = () => {
+  const handleOpenAIModal = useSafeCallback(() => {
     if (!supabaseToken) {
       toast({
         title: "Authentication required",
@@ -440,7 +469,7 @@ function WriterPageContent() {
       return
     }
     setAiModalOpen(true)
-  }
+  })
 
   // Calculate document statistics
   const wordCount = documentText
@@ -1079,9 +1108,11 @@ export default function WriterPage() {
   return (
     <RouteGuard requireAuth={true}>
       <ResearchSessionProvider>
-        <ErrorBoundary>
-          <WriterPageContent />
-        </ErrorBoundary>
+        <WriterErrorBoundary>
+          <ErrorBoundary>
+            <WriterPageContent />
+          </ErrorBoundary>
+        </WriterErrorBoundary>
       </ResearchSessionProvider>
     </RouteGuard>
   )
