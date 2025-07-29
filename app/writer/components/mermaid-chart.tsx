@@ -116,4 +116,4 @@ export function MermaidChart({ code, index, className = "" }: MermaidChartProps)
       </CardContent>
     </Card>
   )
-} 
+}

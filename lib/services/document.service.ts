@@ -278,4 +278,4 @@ class DocumentService {
   }
 }
 
-export default DocumentService 
+export default DocumentService
