@@ -41,17 +41,17 @@ The generator supports two main academic templates:
 ### Sequential Context Building
 Each section is generated with cumulative context from all previously generated sections:
 
-\`\`\`typescript
+```typescript
 const context = sections
   .slice(0, idx)
   .map((s) => s.content)
   .join("\n\n")
-\`\`\`
+```
 
 ### Prompt Construction
 The final prompt for each section combines multiple elements:
 
-\`\`\`typescript
+```typescript
 const fullPrompt = [
   writingStylePrompt,        // User-defined writing style
   templatePrompt,            // Template-specific formatting
@@ -61,7 +61,7 @@ const fullPrompt = [
 ]
   .filter(Boolean)
   .join("\n\n")
-\`\`\`
+```
 
 ### Section Data Structure
 Each section contains:

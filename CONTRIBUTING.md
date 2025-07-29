@@ -26,14 +26,14 @@ Please read this guide to make your contribution process smooth and effective.
 
 1. **Fork** the repository.
 2. **Clone** your fork:
-   \`\`\`bash
+   ```bash
    git clone https://github.com/<your-username>/ai-project-planner.git
    cd ai-project-planner
-   \`\`\`
+   ```
 3. **Create a branch** for your feature or bugfix:
-   \`\`\`bash
+   ```bash
    git checkout -b feature/your-feature-name
-   \`\`\`
+   ```
 4. **Make your changes** and commit them.
 5. **Push** your branch to your fork.
 6. **Open a Pull Request** against the `master` branch of this repo.
@@ -70,36 +70,36 @@ By participating, you are expected to uphold our [Code of Conduct](CODE_OF_CONDU
 
 ### Install Dependencies
 
-\`\`\`bash
+```bash
 pnpm install
-\`\`\`
+```
 
 ### Configure Environment
 
 Copy the template and adjust as needed:
-\`\`\`bash
+```bash
 cp env.template .env.local
-\`\`\`
+```
 
 ### Python Backend
 
-\`\`\`bash
+```bash
 cd python
 ./setup.sh       # or setup.bat for Windows
-\`\`\`
+```
 
 ### Database Migration
 
-\`\`\`bash
+```bash
 node scripts/run-migration.js
-\`\`\`
+```
 
 ### Run Development Environment
 
-\`\`\`bash
+```bash
 pnpm dev:all
 # Or run frontend/backend individually as needed
-\`\`\`
+```
 
 ---
 
@@ -140,12 +140,12 @@ pnpm dev:all
 - Use present tense (e.g., "Add feature", not "Added feature")
 - Be concise but descriptive
 - Format example:
-  \`\`\`
+  ```
   fix(planner): handle empty project names
   feat(ai): add Gemini provider for summarization
   docs(readme): update getting started section
   refactor(components): split Chat and ChatList
-  \`\`\`
+  ```
 
 ---
 
