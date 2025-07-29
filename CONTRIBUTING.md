@@ -27,14 +27,14 @@ Please read this guide to make your contribution process smooth and effective.
 
 1. **Fork** the repository.
 2. **Clone** your fork:
-   \`\`\`bash
+   ```bash
    git clone https://github.com/<your-username>/ai-project-planner.git
    cd ai-project-planner
-   \`\`\`
+   ```
 3. **Create a branch** for your feature or bugfix:
-   \`\`\`bash
+   ```bash
    git checkout -b feature/your-feature-name
-   \`\`\`
+   ```
 4. **Make your changes** and commit them.
 5. **Push** your branch to your fork.
 6. **Open a Pull Request** against the `master` branch of this repo.
@@ -86,44 +86,44 @@ By participating, you are expected to uphold our [Code of Conduct](CODE_OF_CONDU
 ### Quick Start
 
 1. **Clone and install dependencies:**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/Kedhareswer/ai-project-planner.git
    cd ai-project-planner
    pnpm install
-   \`\`\`
+   ```
 
 2. **Configure environment:**
-   \`\`\`bash
+   ```bash
    cp env.template .env.local
-   \`\`\`
+   ```
    Edit `.env.local` with your configuration (see [Environment Setup](#environment-setup))
 
 3. **Set up database:**
-   \`\`\`bash
+   ```bash
    node scripts/run-migration.js
-   \`\`\`
+   ```
 
 4. **Start development servers:**
-   \`\`\`bash
+   ```bash
    node start-dev.js
    # or individually:
    # pnpm dev (Next.js frontend)
    # node server.js (WebSocket server)
-   \`\`\`
+   ```
 
 ### Environment Setup
 
 #### Required Environment Variables
 
 **Supabase (Required):**
-\`\`\`bash
+```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-\`\`\`
+```
 
 **AI Providers (At least one required):**
-\`\`\`bash
+```bash
 # OpenAI (Recommended)
 OPENAI_API_KEY=your_openai_api_key
 
@@ -141,19 +141,19 @@ MISTRAL_API_KEY=your_mistral_api_key
 
 # AIML API (Additional provider)
 AIML_API_KEY=your_aiml_api_key
-\`\`\`
+```
 
 **Real-time Features:**
-\`\`\`bash
+```bash
 NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
 WEBSOCKET_PORT=3001
-\`\`\`
+```
 
 ### Python Backend Setup
 
 For literature search features:
 
-\`\`\`bash
+```bash
 cd python
 # Install dependencies
 pip install -r requirements-improved.txt
@@ -163,15 +163,15 @@ setup.bat
 
 # Run the backend
 python improved_app.py
-\`\`\`
+```
 
 ### Database Setup
 
 Run the database migration script to set up all required tables:
 
-\`\`\`bash
+```bash
 node scripts/run-migration.js
-\`\`\`
+```
 
 This will create:
 - User authentication tables
@@ -206,7 +206,7 @@ This will create:
 
 ### File Structure Conventions
 
-\`\`\`
+```
 app/                    # Next.js App Router pages
   api/                  # API routes
   [feature]/            # Feature-specific pages
@@ -222,11 +222,11 @@ lib/                    # Core utilities and services
   types/                # TypeScript type definitions
 scripts/                # Database and setup scripts
 python/                 # Python backend services
-\`\`\`
+```
 
 ### Linting and Formatting
 
-\`\`\`bash
+```bash
 # Lint code
 pnpm lint
 
@@ -235,7 +235,7 @@ pnpm format
 
 # Type checking
 pnpm type-check
-\`\`\`
+```
 
 ---
 
@@ -297,7 +297,7 @@ pnpm type-check
 
 ### PR Template
 
-\`\`\`markdown
+```markdown
 ## Description
 Brief description of changes
 
@@ -321,7 +321,7 @@ Add screenshots for UI changes
 - [ ] Self-review completed
 - [ ] Documentation updated
 - [ ] No breaking changes (or documented)
-\`\`\`
+```
 
 ---
 
@@ -343,7 +343,7 @@ Add screenshots for UI changes
 
 ### Issue Template
 
-\`\`\`markdown
+```markdown
 ## Summary
 Brief description of the issue
 
@@ -365,20 +365,20 @@ What actually happens
 
 ## Additional Context
 Any other context, logs, or screenshots
-\`\`\`
+```
 
 ---
 
 ## Commit Message Guidelines
 
 ### Format
-\`\`\`
+```
 type(scope): description
 
 [optional body]
 
 [optional footer]
-\`\`\`
+```
 
 ### Types
 - `feat`: New feature
@@ -390,14 +390,14 @@ type(scope): description
 - `chore`: Maintenance tasks
 
 ### Examples
-\`\`\`
+```
 feat(ai): add Mistral AI provider support
 fix(explorer): handle empty search results properly
 docs(readme): update getting started section
 refactor(components): split Chat and ChatList components
 test(api): add tests for literature search endpoints
 chore(deps): update dependencies to latest versions
-\`\`\`
+```
 
 ### Scope Examples
 - `ai`: AI-related features

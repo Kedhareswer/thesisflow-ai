@@ -97,7 +97,7 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 
 ## System Architecture
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
   Client[Next.js Frontend] --> Middleware[Auth Middleware]
   Middleware --> API[API Routes]
@@ -151,7 +151,7 @@ flowchart TD
     Python
     Literature
   end
-\`\`\`
+```
 
 ---
 
@@ -168,20 +168,20 @@ flowchart TD
 ### Environment Setup
 
 1. **Clone the repository**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/Kedhareswer/ai-project-planner.git
    cd ai-project-planner
-   \`\`\`
+   ```
 
 2. **Install frontend dependencies**
-   \`\`\`bash
+   ```bash
    pnpm install
-   \`\`\`
+   ```
 
 3. **Configure environment variables**
-   \`\`\`bash
+   ```bash
    cp env.template .env.local
-   \`\`\`
+   ```
    Edit `.env.local` with your configuration. At least one AI provider API key is required:
    - `OPENAI_API_KEY` (recommended)
    - `GROQ_API_KEY` (fast and cost-effective)
@@ -190,51 +190,51 @@ flowchart TD
    - `MISTRAL_API_KEY` (Mistral AI)
 
 4. **Set up Python Backend**
-   \`\`\`bash
+   ```bash
    cd python
    # For Linux/Mac
    pip install -r requirements.txt
    # For Windows
    setup.bat
-   \`\`\`
+   ```
 
 5. **Configure Supabase Database**
-   \`\`\`bash
+   ```bash
    node scripts/run-migration.js
-   \`\`\`
+   ```
 
 ### Development Server
 
 1. **Start the full development environment**
-   \`\`\`bash
+   ```bash
    node start-dev.js
    # or
    pnpm dev:all
-   \`\`\`
+   ```
    - Next.js frontend at `http://localhost:3000`
    - WebSocket server at port `3001`
 
 2. **Start Python backend (separate terminal)**
-   \`\`\`bash
+   ```bash
    cd python
    python app.py
    # or for improved version
    python improved_app.py
-   \`\`\`
+   ```
    - Python service runs at `http://localhost:5000`
 
 ### Production Deployment
 
-\`\`\`bash
+```bash
 pnpm build
 pnpm start:all
-\`\`\`
+```
 
 ---
 
 ## Project Structure
 
-\`\`\`bash
+```bash
 ai-project-planner/
   app/                 # Next.js App Router
     ai-assistant/      # AI assistant interface
@@ -266,7 +266,7 @@ ai-project-planner/
   public/              # Static assets
   styles/              # Global styles
   types/               # TypeScript type definitions
-\`\`\`
+```
 
 ---
 

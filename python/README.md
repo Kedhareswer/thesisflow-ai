@@ -43,19 +43,19 @@ The Python backend provides advanced literature search capabilities through mult
 ## Setup Instructions
 
 1. **Install Python dependencies:**
-   \`\`\`bash
+   ```bash
    pip install -r requirements-improved.txt
-   \`\`\`
+   ```
 
 2. **For Windows users:**
-   \`\`\`bash
+   ```bash
    setup.bat
-   \`\`\`
+   ```
 
 3. **Run the application:**
-   \`\`\`bash
+   ```bash
    python improved_app.py
-   \`\`\`
+   ```
 
 ## Configuration
 
