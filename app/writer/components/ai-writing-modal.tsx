@@ -941,6 +941,35 @@ export function AIWritingModal(props: AIWritingModalProps) {
                   </Select>
                 </div>
 
+                {/* Research Context Display */}
+                {props.researchContext ? (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-900 mb-2 block">Research Context</Label>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-32 overflow-y-auto">
+                      <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
+                        {props.researchContext}
+                      </pre>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      This context includes your current research topic, selected papers, ideas, and recent searches. 
+                      It will be used to inform the AI generation for all sections, making the content more relevant and accurate.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-900 mb-2 block">Research Context</Label>
+                    <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center space-x-2 text-gray-500">
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="text-xs">No research context available</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Visit the Explorer page to set up your research topic, select papers, and generate ideas to enhance AI generation.
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   onClick={handleGenerateAll}
                   disabled={isGeneratingAll || !props.supabaseToken}
@@ -1079,6 +1108,12 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                       <span className="font-semibold text-gray-900 text-base">{section.title}</span>
 
                                       <div className="flex items-center space-x-2">
+                                        {props.researchContext && (
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                            <BookOpen className="w-3 h-3 mr-1" />
+                                            Context
+                                          </Badge>
+                                        )}
                                         {section.required ? (
                                           <Badge
                                             variant="outline"
