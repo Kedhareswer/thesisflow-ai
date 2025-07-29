@@ -54,7 +54,6 @@
     "@uiw/react-md-editor": "latest",
     "@vercel/analytics": "latest",
     "autoprefixer": "^10.4.20",
-    "buffer": "latest",
     "cheerio": "latest",
     "child_process": "latest",
     "class-variance-authority": "^0.7.1",

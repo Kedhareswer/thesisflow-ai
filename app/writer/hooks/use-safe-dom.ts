@@ -12,35 +12,17 @@ export function useSafeDOM() {
     (blob: Blob, filename: string) => {
       if (!isMounted()) return
 
-      try {
-        const element = document.createElement("a")
+      if (typeof window !== "undefined") {
         const url = URL.createObjectURL(blob)
-        element.href = url
-        element.download = filename
-        element.style.display = "none"
-
-        // Add to DOM
-        document.body.appendChild(element)
-
-        // Trigger download
-        element.click()
-
-        // Clean up with delayed removal to ensure download starts
-        setTimeout(() => {
-          if (!isMounted()) return
-
-          try {
-            if (element.parentNode) {
-              document.body.removeChild(element)
-            }
-          } catch (removeError) {
-            console.warn("Could not remove download element:", removeError)
-          }
-          // Revoke URL
-          URL.revokeObjectURL(url)
-        }, 100)
-      } catch (error) {
-        console.error("Error in safeDownload:", error)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        console.warn("safeDownload: Not in a browser environment. Cannot download file.")
       }
     },
     [isMounted],
