@@ -251,6 +251,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
   const [generationProgress, setGenerationProgress] = useState(0)
   const [customSectionTitle, setCustomSectionTitle] = useState("")
   const [customSectionPrompt, setCustomSectionPrompt] = useState("")
+  const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null)
 
   // Template change handler
   const handleTemplateChange = (template: TemplateKey) => {
@@ -377,6 +378,21 @@ export function AIWritingModal(props: AIWritingModalProps) {
   // Remove section
   function handleRemoveSection(idx: number) {
     setSections((sections) => sections.filter((_, i) => i !== idx))
+    setDeleteConfirmIndex(null)
+  }
+
+  // Show delete confirmation
+  function handleDeleteClick(idx: number) {
+    if (sections[idx].required) return
+    setDeleteConfirmIndex(idx)
+  }
+
+  // Handle keyboard shortcuts
+  function handleKeyDown(event: React.KeyboardEvent, idx: number) {
+    if (event.key === 'Delete' && !sections[idx].required) {
+      event.preventDefault()
+      handleDeleteClick(idx)
+    }
   }
 
   // Export functions
@@ -565,31 +581,45 @@ export function AIWritingModal(props: AIWritingModalProps) {
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
                               className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+                              onKeyDown={(e) => handleKeyDown(e, idx)}
+                              tabIndex={0}
+                              role="button"
+                              aria-label={`Section: ${section.title}. ${section.required ? 'Required section' : 'Optional section, press Delete to remove'}`}
                             >
                               {/* Section Header */}
                               <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                                <div className="flex items-center space-x-3">
-                                  <span
-                                    {...dragProvided.dragHandleProps}
-                                    className="cursor-move text-gray-400 hover:text-gray-600"
-                                  >
-                                    <GripVertical className="w-4 h-4" />
-                                  </span>
+                                                              <div className="flex items-center space-x-3">
+                                <span
+                                  {...dragProvided.dragHandleProps}
+                                  className="cursor-move text-gray-400 hover:text-gray-600"
+                                  title="Drag to reorder"
+                                >
+                                  <GripVertical className="w-4 h-4" />
+                                </span>
 
-                                  <div className="flex items-center space-x-2">
-                                    <div
-                                      className={`w-3 h-3 rounded-full ${
-                                        section.status === "generating"
-                                          ? "bg-blue-500 animate-pulse"
-                                          : section.status === "completed"
-                                            ? "bg-green-500"
-                                            : section.status === "error"
-                                              ? "bg-red-500"
-                                              : "bg-gray-300"
-                                      }`}
-                                    />
-                                    <span className="font-semibold text-gray-900">{section.title}</span>
-                                  </div>
+                                <div className="flex items-center space-x-2">
+                                  <div
+                                    className={`w-3 h-3 rounded-full ${
+                                      section.status === "generating"
+                                        ? "bg-blue-500 animate-pulse"
+                                        : section.status === "completed"
+                                          ? "bg-green-500"
+                                          : section.status === "error"
+                                            ? "bg-red-500"
+                                            : "bg-gray-300"
+                                    }`}
+                                    title={
+                                      section.status === "generating"
+                                        ? "Generating content..."
+                                        : section.status === "completed"
+                                          ? "Content generated"
+                                          : section.status === "error"
+                                            ? "Generation failed"
+                                            : "Pending generation"
+                                    }
+                                  />
+                                  <span className="font-semibold text-gray-900">{section.title}</span>
+                                </div>
 
                                   <div className="flex items-center space-x-2">
                                     {section.required ? (
@@ -616,6 +646,15 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                         Edited
                                       </Badge>
                                     )}
+
+                                    {!section.required && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs bg-red-50 text-red-600 border-red-200"
+                                      >
+                                        Deletable
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
 
@@ -634,16 +673,16 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                     )}
                                   </Button>
 
-                                  {!section.required && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleRemoveSection(idx)}
-                                      className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteClick(idx)}
+                                    className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                    title={section.required ? "Cannot delete required section" : "Delete section"}
+                                    disabled={section.required}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
                                 </div>
                               </div>
 
@@ -765,6 +804,36 @@ export function AIWritingModal(props: AIWritingModalProps) {
           </div>
         </DialogFooter>
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmIndex !== null && (
+        <Dialog open={deleteConfirmIndex !== null} onOpenChange={() => setDeleteConfirmIndex(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-gray-900">Delete Section</DialogTitle>
+              <DialogDescription className="text-sm text-gray-600">
+                Are you sure you want to delete "{sections[deleteConfirmIndex]?.title}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmIndex(null)}
+                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleRemoveSection(deleteConfirmIndex)}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete Section
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   )
 }

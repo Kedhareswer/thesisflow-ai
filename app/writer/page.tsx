@@ -147,6 +147,7 @@ function WriterPageContent() {
   const [documentTitle, setDocumentTitle] = useState("Untitled Document")
   const [languageToolSuggestions, setLanguageToolSuggestions] = useState<any[]>([])
   const [isChecking, setIsChecking] = useState(false)
+  const [checkProgress, setCheckProgress] = useState<string>("")
   const [aiModalOpen, setAiModalOpen] = useState(false)
   const [supabaseToken, setSupabaseToken] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<Date>(new Date())
@@ -202,23 +203,62 @@ function WriterPageContent() {
       })
       return
     }
+
+    // Check text size before sending to API
+    const textSizeInBytes = new TextEncoder().encode(documentText).length
+    const maxSizeInBytes = 25000 // Same limit as API
+    
+    if (textSizeInBytes > maxSizeInBytes) {
+      // Estimate number of chunks needed
+      const estimatedChunks = Math.ceil(textSizeInBytes / maxSizeInBytes)
+      toast({
+        title: "Large document detected",
+        description: `Your document (${Math.round(textSizeInBytes / 1024)}KB) will be processed sequentially in approximately ${estimatedChunks} chunks. This may take a few moments.`,
+        variant: "default",
+      })
+      // Continue with processing - the API will handle chunking
+    }
     setIsChecking(true)
+    setCheckProgress("Analyzing document...")
     try {
       const response = await fetch("/api/language-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: documentText }),
       })
-      if (!response.ok) throw new Error("Failed to check text")
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        if (response.status === 413) {
+          toast({
+            title: "Text too large",
+            description: errorData.message || "Your document is too large to check. Please try checking a smaller portion of your text.",
+            variant: "destructive",
+          })
+          return
+        }
+        throw new Error("Failed to check text")
+      }
+      
       const data = await response.json()
       setLanguageToolSuggestions(data.matches || [])
-      toast({
-        title: `Found ${data.matches?.length || 0} suggestions`,
-        description: data.matches?.length 
-          ? "Review and apply suggestions to improve your text."
-          : "No issues found in your text.",
-        variant: "default",
-      })
+      setCheckProgress("")
+      
+      if (data.chunked) {
+        toast({
+          title: `Found ${data.matches?.length || 0} suggestions`,
+          description: `Processed your large document sequentially in ${data.totalChunks} chunks. Review and apply suggestions to improve your text.`,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: `Found ${data.matches?.length || 0} suggestions`,
+          description: data.matches?.length 
+            ? "Review and apply suggestions to improve your text."
+            : "No issues found in your text.",
+          variant: "default",
+        })
+      }
     } catch (error) {
       console.error("Error checking text:", error)
       toast({
@@ -228,6 +268,7 @@ function WriterPageContent() {
       })
     } finally {
       setIsChecking(false)
+      setCheckProgress("")
     }
   }
   
@@ -472,7 +513,7 @@ function WriterPageContent() {
                         className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
                         >
                           <Check className="h-4 w-4 mr-2" />
-                        {isChecking ? "Checking..." : "Grammar Check"}
+                        {isChecking ? (checkProgress || "Checking...") : "Grammar Check"}
                         </Button>
                         
                         <Button 
