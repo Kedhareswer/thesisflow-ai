@@ -198,8 +198,7 @@ class DocumentService {
       if (existingDoc) {
         // Update existing document
         return await this.updateDocument(existingDoc.id, {
-          content,
-          updated_at: new Date().toISOString()
+          content
         })
       } else {
         // Create new document
