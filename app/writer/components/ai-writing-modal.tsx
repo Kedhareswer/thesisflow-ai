@@ -36,6 +36,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { VisualContentRenderer } from "./visual-content-renderer"
 import { useSafeDOM } from "../hooks/use-safe-dom"
 import { SafeDOMWrapper } from "./safe-dom-wrapper"
+import { Blob } from "buffer"
 
 // Enhanced template configurations
 const templates = {
@@ -762,7 +763,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
       const blob = new Blob([md], { type: "text/markdown" })
       safeDownload(blob, "research-paper.md")
     } catch (error) {
-      console.error('Error exporting markdown:', error)
+      console.error("Error exporting markdown:", error)
     }
   }
 
@@ -773,10 +774,10 @@ export function AIWritingModal(props: AIWritingModalProps) {
         .map((s) => `\\section{${s.title.replace(/^[0-9. ]+/, "")}}\n${s.content}`)
         .join("\n\n")
 
-      const blob = new Blob([latex], { type: "text/x-tex" })
+      const blob = new Blob([latex], { type: "application/x-latex" })
       safeDownload(blob, "research-paper.tex")
     } catch (error) {
-      console.error('Error exporting latex:', error)
+      console.error("Error exporting latex:", error)
     }
   }
 
@@ -945,12 +946,12 @@ export function AIWritingModal(props: AIWritingModalProps) {
                   {props.researchContext && (
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-900">Research Context</Label>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="bg-gray-100 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start space-x-2">
-                          <BookOpen className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <BookOpen className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-blue-900 mb-1">Available Context</div>
-                            <div className="text-xs text-blue-700 line-clamp-3">
+                            <div className="text-sm font-medium text-gray-900 mb-1">Available Context</div>
+                            <div className="text-xs text-gray-700 line-clamp-3">
                               {props.researchContext.length > 200
                                 ? `${props.researchContext.substring(0, 200)}...`
                                 : props.researchContext}
@@ -996,20 +997,14 @@ export function AIWritingModal(props: AIWritingModalProps) {
               <DragDropContext onDragEnd={handleDragEnd}>
                 <Droppable droppableId="sections">
                   {(provided: any) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      className="space-y-4 pr-2"
-                    >
+                    <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-4 pr-2">
                       {sections.map((section, idx) => (
                         <Draggable key={section.id} draggableId={section.id} index={idx}>
                           {(provided: any, snapshot: any) => (
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className={`relative ${
-                                snapshot.isDragging ? "opacity-50" : ""
-                              }`}
+                              className={`relative ${snapshot.isDragging ? "opacity-50" : ""}`}
                             >
                               <Card className="border-2 border-gray-200 hover:border-gray-300 transition-all bg-white shadow-sm">
                                 <CardHeader className="pb-4">
@@ -1027,7 +1022,10 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                           {section.title}
                                         </CardTitle>
                                         {props.researchContext && (
-                                          <Badge variant="outline" className="text-xs">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs bg-gray-100 text-gray-700 border-gray-300"
+                                          >
                                             Context
                                           </Badge>
                                         )}
@@ -1035,7 +1033,10 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                     </div>
                                     <div className="flex items-center space-x-2">
                                       {section.edited && (
-                                        <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs bg-gray-50 text-gray-700 border-gray-400"
+                                        >
                                           Edited
                                         </Badge>
                                       )}
@@ -1070,9 +1071,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                                       <span>{section.content.length} characters</span>
-                                      {section.content.length > 0 && (
-                                        <span>•</span>
-                                      )}
+                                      {section.content.length > 0 && <span>•</span>}
                                       {section.content.length > 0 && (
                                         <span>{Math.ceil(section.content.length / 5)} words</span>
                                       )}
@@ -1110,9 +1109,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                   </div>
 
                                   {/* Visual Content Display */}
-                                  {section.content && (
-                                    <VisualContentRenderer content={section.content} />
-                                  )}
+                                  {section.content && <VisualContentRenderer content={section.content} />}
                                 </CardContent>
                               </Card>
                             </div>
