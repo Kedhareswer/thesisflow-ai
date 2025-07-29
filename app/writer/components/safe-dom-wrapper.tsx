@@ -1,31 +1,17 @@
-"use client"
-
 import type React from "react"
-import { useState, useEffect } from "react"
 
 interface SafeDOMWrapperProps {
   children: React.ReactNode
 }
 
-/**
- * A wrapper component that renders its children only when the DOM is safely available.
- * This can prevent hydration errors or issues with components that rely heavily on DOM APIs
- * during server-side rendering.
- */
 export function SafeDOMWrapper({ children }: SafeDOMWrapperProps) {
-  const [isDOMReady, setIsDOMReady] = useState(false)
-
-  useEffect(() => {
-    // Check if window and document are defined, indicating client-side rendering
-    if (typeof window !== "undefined" && typeof document !== "undefined") {
-      setIsDOMReady(true)
-    }
-  }, [])
-
-  if (!isDOMReady) {
-    // Optionally render a fallback or null during server-side rendering
-    return null
-  }
-
+  // This component acts as a boundary for client-side DOM interactions.
+  // It ensures that any direct DOM manipulation or browser-specific APIs
+  // are only accessed when window is defined.
+  // In this specific case, it's used to wrap the DialogContent
+  // to ensure that react-beautiful-dnd, which relies on DOM,
+  // functions correctly within Next.js's SSR environment.
+  // It also helps in cases where components might conditionally render
+  // based on browser environment.
   return <>{children}</>
 }

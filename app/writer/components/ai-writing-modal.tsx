@@ -36,7 +36,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { VisualContentRenderer } from "./visual-content-renderer"
 import { useSafeDOM } from "../hooks/use-safe-dom"
 import { SafeDOMWrapper } from "./safe-dom-wrapper"
-import { Blob } from "buffer"
 
 // Enhanced template configurations
 const templates = {
@@ -1176,6 +1175,15 @@ export function AIWritingModal(props: AIWritingModalProps) {
                     className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all h-11 px-6"
                   >
                     Cancel
+                  </Button>
+
+                  <Button
+                    onClick={handleGenerateAll}
+                    disabled={isGeneratingAll}
+                    className="bg-gray-700 hover:bg-gray-900 text-white shadow-md hover:shadow-lg transition-all duration-200 h-11 px-6 font-medium"
+                  >
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    {isGeneratingAll ? "Generating All..." : "Generate All Sections"}
                   </Button>
 
                   <Button

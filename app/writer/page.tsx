@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import {
   PenLine,
   BookOpen,
@@ -19,6 +19,10 @@ import {
   Settings,
   BarChart3,
   Brain,
+  BotIcon as Robot,
+  User,
+  ClipboardCopy,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MarkdownEditor } from "./components/rich-text-editor"
@@ -27,7 +31,6 @@ import { AIWritingModal } from "./components/ai-writing-modal"
 import { DocumentManager } from "./components/document-manager"
 import { useToast } from "@/hooks/use-toast"
 import { ResearchSessionProvider, useResearchContext } from "@/components/research-session-provider"
-import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { RouteGuard } from "@/components/route-guard"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import type { AIProvider } from "@/lib/ai-providers"
@@ -41,13 +44,14 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import DocumentService, { Document } from "@/lib/services/document.service"
+import DocumentService, { type Document } from "@/lib/services/document.service"
 import { useSafeDOM } from "./hooks/use-safe-dom"
 import { useSafeState, useSafeCallback } from "./hooks/use-safe-state"
 import { useDebouncedState } from "./hooks/use-debounced-state"
 import { WriterErrorBoundary } from "./components/error-boundary"
 import { SafeDOMWrapper } from "./components/safe-dom-wrapper"
 import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
+import { ResearchService } from "@/lib/services/research.service" // Import ResearchService
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -226,7 +230,23 @@ function WriterPageContent() {
   const [supabaseToken, setSupabaseToken] = useSafeState<string | null>(null)
   const [lastSaved, setLastSaved] = useSafeState<Date>(new Date())
   const [isAutoSaving, setIsAutoSaving] = useSafeState(false)
-  
+
+  // New states for AI Detection, Humanizer, and Plagiarism
+  const [aiDetectionResult, setAiDetectionResult] = useSafeState<{
+    is_ai: boolean
+    ai_probability: number
+    message: string
+  } | null>(null)
+  const [isDetectingAI, setIsDetectingAI] = useSafeState(false)
+  const [humanizedText, setHumanizedText] = useSafeState<string>("")
+  const [isHumanizing, setIsHumanizing] = useSafeState(false)
+  const [plagiarismResult, setPlagiarismResult] = useSafeState<{
+    plagiarism_percentage: number
+    sources: { url: string; match: string }[]
+    message: string
+  } | null>(null)
+  const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useSafeState(false)
+
   // Document management state
   const [currentDocument, setCurrentDocument] = useSafeState<Document | null>(null)
   const [documentManagerOpen, setDocumentManagerOpen] = useSafeState(false)
@@ -237,6 +257,10 @@ function WriterPageContent() {
   const [isAIConfigOpen, setIsAIConfigOpen] = useSafeState(true)
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useSafeState(true)
   const [isCitationsOpen, setIsCitationsOpen] = useSafeState(true)
+  // New collapsible states
+  const [isAIDetectionOpen, setIsAIDetectionOpen] = useSafeState(false)
+  const [isHumanizerOpen, setIsHumanizerOpen] = useSafeState(false)
+  const [isPlagiarismOpen, setIsPlagiarismOpen] = useSafeState(false)
 
   // Fetch Supabase session/token on mount
   useEffect(() => {
@@ -319,7 +343,7 @@ function WriterPageContent() {
         toast({
           title: "Error",
           description: "Please enter a document title",
-          variant: "destructive"
+          variant: "destructive",
         })
         return
       }
@@ -327,13 +351,13 @@ function WriterPageContent() {
       if (currentDocument) {
         await documentService.updateDocument(currentDocument.id, {
           title: documentTitle,
-          content: documentText
+          content: documentText,
         })
       } else {
         const newDoc = await documentService.createDocument({
           title: documentTitle,
           content: documentText,
-          document_type: "paper"
+          document_type: "paper",
         })
         setCurrentDocument(newDoc)
       }
@@ -341,14 +365,14 @@ function WriterPageContent() {
       setLastSaved(new Date())
       toast({
         title: "Success",
-        description: "Document saved successfully"
+        description: "Document saved successfully",
       })
     } catch (error) {
       console.error("Error saving document:", error)
       toast({
         title: "Error",
         description: "Failed to save document",
-        variant: "destructive"
+        variant: "destructive",
       })
     }
   })
@@ -434,6 +458,99 @@ function WriterPageContent() {
     }
   })
 
+  // New function: Handle AI Detection
+  const handleDetectAI = useSafeCallback(async () => {
+    if (!documentText.trim()) {
+      toast({
+        title: "No text to analyze",
+        description: "Please write some text before checking for AI content.",
+        variant: "default",
+      })
+      return
+    }
+    setIsDetectingAI(true)
+    setAiDetectionResult(null)
+    try {
+      const result = await ResearchService.detectAI(documentText)
+      setAiDetectionResult(result)
+      toast({
+        title: "AI Detection Complete",
+        description: result.message,
+      })
+    } catch (error) {
+      console.error("Error detecting AI:", error)
+      toast({
+        title: "AI Detection Failed",
+        description: "There was an error detecting AI content. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDetectingAI(false)
+    }
+  })
+
+  // New function: Handle Humanize Text
+  const handleHumanizeText = useSafeCallback(async () => {
+    if (!documentText.trim()) {
+      toast({
+        title: "No text to humanize",
+        description: "Please write some text before humanizing.",
+        variant: "default",
+      })
+      return
+    }
+    setIsHumanizing(true)
+    setHumanizedText("")
+    try {
+      const result = await ResearchService.humanizeText(documentText)
+      setHumanizedText(result.humanized_text)
+      toast({
+        title: "Text Humanized",
+        description: "Your text has been humanized.",
+      })
+    } catch (error) {
+      console.error("Error humanizing text:", error)
+      toast({
+        title: "Humanization Failed",
+        description: "There was an error humanizing your text. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsHumanizing(false)
+    }
+  })
+
+  // New function: Handle Plagiarism Check
+  const handleCheckPlagiarism = useSafeCallback(async () => {
+    if (!documentText.trim()) {
+      toast({
+        title: "No text to check",
+        description: "Please write some text before checking for plagiarism.",
+        variant: "default",
+      })
+      return
+    }
+    setIsCheckingPlagiarism(true)
+    setPlagiarismResult(null)
+    try {
+      const result = await ResearchService.checkPlagiarism(documentText)
+      setPlagiarismResult(result)
+      toast({
+        title: "Plagiarism Check Complete",
+        description: result.message,
+      })
+    } catch (error) {
+      console.error("Error checking plagiarism:", error)
+      toast({
+        title: "Plagiarism Check Failed",
+        description: "There was an error checking for plagiarism. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCheckingPlagiarism(false)
+    }
+  })
+
   // Manual save function
   const handleSave = useSafeCallback(async () => {
     setIsAutoSaving(true)
@@ -453,7 +570,7 @@ function WriterPageContent() {
   const handleExport = useSafeCallback((format: "markdown" | "pdf" | "docx") => {
     const blob = new Blob([documentText], { type: "text/markdown" })
     const filename = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
-    
+
     safeDownload(blob, filename)
 
     toast({
@@ -994,7 +1111,159 @@ function WriterPageContent() {
 
                     <Separator className="my-3" />
 
+                    {/* New: AI Detection Section */}
+                    <Collapsible open={isAIDetectionOpen} onOpenChange={setIsAIDetectionOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                          <span className="flex items-center space-x-2">
+                            <Robot className="h-3 w-3" />
+                            <span>AI Detection</span>
+                          </span>
+                          {isAIDetectionOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 mt-2">
+                        <Button
+                          onClick={handleDetectAI}
+                          disabled={isDetectingAI || !documentText.trim()}
+                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
+                        >
+                          {isDetectingAI ? (
+                            <>
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              Detecting AI...
+                            </>
+                          ) : (
+                            "Detect AI Content"
+                          )}
+                        </Button>
+                        {aiDetectionResult && (
+                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
+                            <p className="font-medium mb-1">Result:</p>
+                            <p className={aiDetectionResult.is_ai ? "text-red-600" : "text-green-600"}>
+                              {aiDetectionResult.message}
+                            </p>
+                            <p className="text-gray-600 mt-1">
+                              AI Probability: {aiDetectionResult.ai_probability.toFixed(2)}%
+                            </p>
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    <Separator className="my-3" />
+
+                    {/* New: Humanizer Section */}
+                    <Collapsible open={isHumanizerOpen} onOpenChange={setIsHumanizerOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                          <span className="flex items-center space-x-2">
+                            <User className="h-3 w-3" />
+                            <span>Humanizer</span>
+                          </span>
+                          {isHumanizerOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 mt-2">
+                        <Button
+                          onClick={handleHumanizeText}
+                          disabled={isHumanizing || !documentText.trim()}
+                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
+                        >
+                          {isHumanizing ? (
+                            <>
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              Humanizing...
+                            </>
+                          ) : (
+                            "Humanize Text"
+                          )}
+                        </Button>
+                        {humanizedText && (
+                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
+                            <p className="font-medium mb-1">Humanized Version:</p>
+                            <div className="whitespace-pre-wrap text-gray-700">{humanizedText}</div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="mt-2 w-full h-7 text-xs"
+                              onClick={() => setDocumentText(humanizedText)}
+                            >
+                              <Check className="h-3 w-3 mr-1" /> Apply to Document
+                            </Button>
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    <Separator className="my-3" />
+
+                    {/* New: Plagiarism Detection Section */}
+                    <Collapsible open={isPlagiarismOpen} onOpenChange={setIsPlagiarismOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
+                          <span className="flex items-center space-x-2">
+                            <ClipboardCopy className="h-3 w-3" />
+                            <span>Plagiarism Check</span>
+                          </span>
+                          {isPlagiarismOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 mt-2">
+                        <Button
+                          onClick={handleCheckPlagiarism}
+                          disabled={isCheckingPlagiarism || !documentText.trim()}
+                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
+                        >
+                          {isCheckingPlagiarism ? (
+                            <>
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              Checking Plagiarism...
+                            </>
+                          ) : (
+                            "Check Plagiarism"
+                          )}
+                        </Button>
+                        {plagiarismResult && (
+                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
+                            <p className="font-medium mb-1">Result:</p>
+                            <p
+                              className={
+                                plagiarismResult.plagiarism_percentage > 20 ? "text-red-600" : "text-green-600"
+                              }
+                            >
+                              {plagiarismResult.message}
+                            </p>
+                            <p className="text-gray-600 mt-1">
+                              Plagiarism Score: {plagiarismResult.plagiarism_percentage.toFixed(2)}%
+                            </p>
+                            {plagiarismResult.sources.length > 0 && (
+                              <div className="mt-2">
+                                <p className="font-medium mb-1">Potential Sources:</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                  {plagiarismResult.sources.map((source, idx) => (
+                                    <li key={idx}>
+                                      <a
+                                        href={source.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        {source.url}
+                                      </a>
+                                      <p className="text-gray-500 italic">Match: "{source.match}"</p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+
                     {/* Template Progress */}
+                    <Separator className="my-3" />
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-gray-600">Template Progress</span>
