@@ -35,50 +35,50 @@ async function searchArxiv(query: string, limit = 10): Promise<ResearchPaper[]> 
     // Parse XML response
     const parser = new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
-    const entries = Array.from(doc.getElementsByTagName('entry'))
+  const entries = Array.from(doc.getElementsByTagName('entry'))
     
-    const now = new Date()
+  const now = new Date()
     const papers: ResearchPaper[] = []
 
     for (const entry of entries) {
-      const getText = (tag: string) => {
-        const el = entry.getElementsByTagName(tag)[0]
+    const getText = (tag: string) => {
+      const el = entry.getElementsByTagName(tag)[0]
         return el ? el.textContent?.trim() || '' : ''
-      }
+    }
 
-      const title = getText('title').replace(/\s+/g, ' ').trim()
+    const title = getText('title').replace(/\s+/g, ' ').trim()
       const authors = Array.from(entry.getElementsByTagName('author')).map(author => {
         const name = author.getElementsByTagName('name')[0]
         return name ? name.textContent?.trim() || '' : ''
       }).filter(Boolean)
       
-      const abstract = getText('summary').replace(/\s+/g, ' ').trim()
+    const abstract = getText('summary').replace(/\s+/g, ' ').trim()
       const published = getText('published')
       const year = published ? parseInt(published.slice(0, 4)) : now.getFullYear()
-      const url = getText('id')
+    const url = getText('id')
       
       // Find PDF link
       const links = Array.from(entry.getElementsByTagName('link'))
       const pdfLink = links.find(link => link.getAttribute('type') === 'application/pdf')
-      const pdf_url = pdfLink?.getAttribute('href') || url
+    const pdf_url = pdfLink?.getAttribute('href') || url
 
       const journal = getText('arxiv:journal_ref') || 'arXiv'
-      const doi = getText('arxiv:doi') || undefined
+    const doi = getText('arxiv:doi') || undefined
 
       if (title && title !== 'No title') {
         papers.push({
           id: `arxiv-${doi || title.replace(/\s+/g, '-')}-${Date.now()}`,
-          createdAt: now,
-          updatedAt: now,
-          title,
-          authors,
+      createdAt: now,
+      updatedAt: now,
+      title,
+      authors,
           abstract: abstract || 'No abstract available',
-          year,
-          url,
-          journal,
-          doi,
-          pdf_url,
-          source: 'arxiv',
+      year,
+      url,
+      journal,
+      doi,
+      pdf_url,
+      source: 'arxiv',
           venue_type: 'repository'
         })
       }
@@ -155,7 +155,7 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
           source: 'whiterose',
           venue_type: 'repository'
         })
-      }
+}
 
       if (papers.length >= limit) break
     }
@@ -229,7 +229,7 @@ export class EnhancedSearchService {
           console.log(`[EnhancedSearch] Found ${result.value.length} papers from ${sourceNames[index]}`)
         } else if (result.status === 'rejected') {
           console.warn(`[EnhancedSearch] ${sourceNames[index]} search failed:`, result.reason)
-        }
+      }
       })
 
       // Enhance papers with citation data from Semantic Scholar

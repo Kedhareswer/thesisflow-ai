@@ -13,7 +13,12 @@
 
 **Advanced AI-Powered Research Platform**
 
-Accelerate your research with intelligent tools for discovery, analysis, collaboration, and project management.
+Transform your research workflow with our comprehensive suite of AI-powered tools:
+- Discover groundbreaking papers and identify research gaps through intelligent literature analysis
+- Generate insightful summaries and extract key findings from academic content
+- Collaborate seamlessly with team members in real-time on research projects
+- Stay organized with smart project management features tailored for academics
+- Leverage multiple AI providers to enhance every aspect of your research process
 
 </div>
 

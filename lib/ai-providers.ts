@@ -69,21 +69,6 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
     maxTokens: 128000, // Llama 3.3 supports 128k tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference", "reasoning"],
   },
-  deepinfra: {
-    name: "DeepInfra",
-    models: [
-      "meta-llama/Llama-3.3-70B-Instruct",
-      "meta-llama/Meta-Llama-3.1-70B-Instruct",
-      "meta-llama/Meta-Llama-3.1-8B-Instruct",
-      "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-      "deepseek-ai/DeepSeek-R1",
-      "deepseek-ai/DeepSeek-V3",
-      "Qwen/Qwen3-32B",
-      "microsoft/phi-4"
-    ],
-    maxTokens: 131072, // Llama 3.3 supports 128k tokens
-    supportedFeatures: ["text", "chat", "summarization", "analysis", "cost-effective", "function-calling"],
-  },
   openai: {
     name: "OpenAI",
     models: [

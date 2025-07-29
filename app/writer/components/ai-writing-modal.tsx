@@ -819,14 +819,14 @@ export function AIWritingModal(props: AIWritingModalProps) {
             <div className="flex items-center space-x-4">
               <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/20">
                 <Sparkles className="h-7 w-7 text-white" />
-              </div>
+            </div>
               <div className="flex-1">
                 <DialogTitle className="text-3xl font-medium text-white mb-2 tracking-wide">
                   AI Research Paper Generator
                 </DialogTitle>
                 <DialogDescription className="text-gray-300 text-base font-normal leading-relaxed">
                   Generate comprehensive academic papers with structured sections and intelligent content creation.
-                </DialogDescription>
+          </DialogDescription>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -852,7 +852,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 <div className="flex items-center space-x-3">
                   <Clock className="w-5 h-5" />
                   <span className="font-medium">Generating sections...</span>
-                </div>
+              </div>
                 <span className="font-mono text-lg">{Math.round(generationProgress)}%</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-3 backdrop-blur-sm">
@@ -864,7 +864,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
             </div>
           )}
         </DialogHeader>
-
+        
         <div className="flex flex-col lg:flex-row gap-8 max-h-[60vh] overflow-hidden">
           {/* Left Panel - Configuration */}
           <div className="w-full lg:w-96 flex-shrink-0 space-y-6 overflow-y-auto pr-2 min-w-0 modal-scrollbar">
@@ -883,9 +883,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
                     <SelectTrigger className="h-12 bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-black focus:ring-0 transition-all text-base">
                       <SelectValue className="text-gray-900 font-medium" />
                       <ChevronDown className="h-5 w-5 text-gray-600" />
-                    </SelectTrigger>
+              </SelectTrigger>
                     <SelectContent className="bg-white border-2 border-gray-200 shadow-xl rounded-lg p-2 min-w-[350px]">
-                      {Object.entries(templates).map(([key, sections]) => {
+                        {Object.entries(templates).map(([key, sections]) => {
                         const templateInfo = {
                           ieee: {
                             name: "IEEE",
@@ -918,29 +918,29 @@ export function AIWritingModal(props: AIWritingModalProps) {
                           words: "N/A",
                         }
 
-                        return (
-                          <SelectItem
-                            key={key}
-                            value={key}
+                          return (
+                            <SelectItem
+                              key={key}
+                              value={key}
                             className="p-4 hover:bg-gray-50 focus:bg-gray-100 cursor-pointer rounded-md border-0 data-[highlighted]:bg-gray-100"
-                          >
+                            >
                             <div className="flex flex-col space-y-2 w-full">
-                              <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between">
                                 <span className="font-semibold text-gray-900 text-lg">{templateInfo.name}</span>
                                 <span className="text-sm text-gray-500 font-medium">{sections.length} sections</span>
-                              </div>
+                                </div>
                               <div className="text-sm text-gray-600 leading-relaxed">{templateInfo.desc}</div>
                               <div className="text-sm text-gray-500">
                                 Recommended length: {templateInfo.words} words
                               </div>
-                            </div>
-                          </SelectItem>
+                              </div>
+                  </SelectItem>
                         )
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
+                        })}
+              </SelectContent>
+            </Select>
+          </div>
+          
                 {/* Research Context Display */}
                 {props.researchContext ? (
                   <div className="space-y-3">
@@ -970,30 +970,30 @@ export function AIWritingModal(props: AIWritingModalProps) {
                   </div>
                 )}
 
-                <Button
-                  onClick={handleGenerateAll}
-                  disabled={isGeneratingAll || !props.supabaseToken}
+          <Button 
+                    onClick={handleGenerateAll}
+                    disabled={isGeneratingAll || !props.supabaseToken}
                   className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium text-base shadow-md hover:shadow-lg transition-all duration-200 rounded-lg"
-                >
-                  {isGeneratingAll ? (
-                    <>
+                  >
+                    {isGeneratingAll ? (
+              <>
                       <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
+                Generating...
+              </>
+            ) : (
+              <>
                       <Sparkles className="h-5 w-5 mr-3" />
-                      Generate All Sections
-                    </>
-                  )}
-                </Button>
+                        Generate All Sections
+              </>
+            )}
+          </Button>
               </CardContent>
             </Card>
 
             {/* Progress Overview Card */}
             <Card className="border-gray-200 shadow-sm bg-white">
               <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <BookOpen className="w-5 h-5 text-gray-700" />
                     <CardTitle className="text-lg font-medium text-gray-900">Progress Overview</CardTitle>
@@ -1014,7 +1014,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                     <span className="font-semibold text-gray-600">{generatingSections}</span>
                   </div>
                 )}
-                {hasErrors && (
+                  {hasErrors && (
                   <div className="flex justify-between text-base">
                     <span className="text-gray-700">Errors</span>
                     <span className="font-semibold text-red-600">
@@ -1028,8 +1028,8 @@ export function AIWritingModal(props: AIWritingModalProps) {
                       className="bg-black h-3 rounded-full transition-all duration-500"
                       style={{ width: `${(completedSections / totalSections) * 100}%` }}
                     />
-                  </div>
                 </div>
+              </div>
               </CardContent>
             </Card>
 
@@ -1094,82 +1094,82 @@ export function AIWritingModal(props: AIWritingModalProps) {
                               <CardHeader className="pb-4 border-b border-gray-100">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-4">
-                                    <span
-                                      {...dragProvided.dragHandleProps}
+                                  <span
+                                    {...dragProvided.dragHandleProps}
                                       className="cursor-move text-gray-400 hover:text-gray-600 transition-colors p-1"
                                       aria-label="Drag to reorder section"
-                                    >
+                                  >
                                       <GripVertical className="w-5 h-5" />
-                                    </span>
+                                  </span>
 
                                     <StatusIcon status={section.status} />
 
                                     <div className="flex items-center space-x-4">
                                       <span className="font-semibold text-gray-900 text-base">{section.title}</span>
 
-                                      <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-2">
                                         {props.researchContext && (
                                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
                                             <BookOpen className="w-3 h-3 mr-1" />
                                             Context
                                           </Badge>
                                         )}
-                                        {section.required ? (
-                                          <Badge
-                                            variant="outline"
+                                    {section.required ? (
+                                      <Badge
+                                        variant="outline"
                                             className="text-xs bg-gray-100 text-gray-800 border-gray-300 px-2 py-1 font-medium"
-                                          >
-                                            Required
-                                          </Badge>
-                                        ) : (
-                                          <Badge
-                                            variant="outline"
+                                      >
+                                        Required
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="outline"
                                             className="text-xs bg-white text-gray-600 border-gray-300 px-2 py-1 font-medium"
-                                          >
-                                            Optional
-                                          </Badge>
-                                        )}
+                                      >
+                                        Optional
+                                      </Badge>
+                                    )}
 
-                                        {section.edited && (
-                                          <Badge
-                                            variant="outline"
+                                    {section.edited && (
+                                      <Badge
+                                        variant="outline"
                                             className="text-xs bg-gray-50 text-gray-700 border-gray-400 px-2 py-1 font-medium"
-                                          >
-                                            Edited
-                                          </Badge>
-                                        )}
+                                      >
+                                        Edited
+                                      </Badge>
+                                    )}
                                       </div>
-                                    </div>
                                   </div>
+                                </div>
 
-                                  <div className="flex items-center space-x-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleGenerateSection(idx)}
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleGenerateSection(idx)}
                                       disabled={isGenerating(section.status) || isGeneratingAll}
                                       className="h-9 px-4 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                                    >
+                                  >
                                       {isGenerating(section.status) ? (
                                         <Loader2 className="w-4 h-4 animate-spin" aria-label="Generating" />
-                                      ) : (
+                                    ) : (
                                         <Sparkles className="w-4 h-4" aria-label="Generate section" />
-                                      )}
-                                    </Button>
+                                    )}
+                                  </Button>
 
-                                    {!section.required && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
+                                  {!section.required && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
                                         onClick={() => handleDeleteClick(idx)} // Use handleDeleteClick for confirmation
                                         className="h-9 w-9 p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all"
                                         aria-label={`Remove ${section.title} section`}
-                                      >
+                                    >
                                         <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                  </div>
+                                    </Button>
+                                  )}
                                 </div>
+                              </div>
                               </CardHeader>
 
                               {/* Section Content */}
@@ -1188,15 +1188,15 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                       <Label className="text-sm font-medium text-gray-700 mb-2 block">
                                         Raw Content (Editable)
                                       </Label>
-                                      <Textarea
-                                        value={section.content}
-                                        onChange={(e) => handleContentChange(idx, e.target.value)}
-                                        placeholder={`${section.title} content will be generated here...`}
+                                <Textarea
+                                  value={section.content}
+                                  onChange={(e) => handleContentChange(idx, e.target.value)}
+                                  placeholder={`${section.title} content will be generated here...`}
                                         className="min-h-[120px] text-sm border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-black focus:ring-0 transition-all resize-none leading-relaxed font-mono"
                                         onKeyDown={(e) => handleKeyDown(e, idx)}
                                         aria-label={`${section.title} content`}
-                                      />
-                                    </div>
+                                />
+                                  </div>
                                     
                                     <div className="flex items-center justify-between text-sm text-gray-500">
                                       <span className="font-mono">
@@ -1210,9 +1210,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
                                         >
                                           Ready
                                         </Badge>
-                                      )}
-                                    </div>
-                                  </div>
+                                )}
+                              </div>
+                            </div>
                                 ) : (
                                   <Textarea
                                     value={section.content}
@@ -1230,12 +1230,12 @@ export function AIWritingModal(props: AIWritingModalProps) {
                         </Draggable>
                       ))}
                       {provided.placeholder}
-                    </div>
-                  )}
+            </div>
+          )}
                 </Droppable>
               </DragDropContext>
             </div>
-            
+
             {/* Scroll Indicator */}
             {sections.length > 6 && (
               <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
@@ -1243,7 +1243,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
                   <ChevronDownIcon className="w-4 h-4 animate-bounce" />
                   <span>Scroll for more sections</span>
                 </div>
-              </div>
+                </div>
             )}
           </div>
         </div>
@@ -1280,26 +1280,26 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 <div className="text-base text-gray-700 flex items-center space-x-2">
                   <CheckCircle2 className="w-5 h-5 text-black" />
                   <span className="font-medium">{completedSections} sections ready</span>
-                </div>
+              </div>
               )}
 
               <div className="flex items-center space-x-4">
-                <Button
-                  variant="outline"
-                  onClick={() => props.onOpenChange(false)}
+              <Button
+                variant="outline"
+                onClick={() => props.onOpenChange(false)}
                   className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all h-11 px-6"
-                >
-                  Cancel
-                </Button>
+              >
+                Cancel
+              </Button>
 
-                <Button
-                  onClick={handleInsertAll}
-                  disabled={completedSections === 0 || isGeneratingAll}
+          <Button 
+                onClick={handleInsertAll}
+                disabled={completedSections === 0 || isGeneratingAll}
                   className="bg-black hover:bg-gray-800 text-white shadow-md hover:shadow-lg transition-all duration-200 h-11 px-6 font-medium"
-                >
+          >
                   <FileText className="h-5 w-5 mr-2" />
-                  Insert All Sections
-                </Button>
+                Insert All Sections
+          </Button>
               </div>
             </div>
           </div>
@@ -1330,8 +1330,8 @@ export function AIWritingModal(props: AIWritingModalProps) {
               >
                 Delete Section
               </Button>
-            </DialogFooter>
-          </DialogContent>
+        </DialogFooter>
+      </DialogContent>
         </Dialog>
       )}
     </Dialog>

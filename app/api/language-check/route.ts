@@ -250,26 +250,26 @@ async function checkChunkWithLanguageTool(text: string, language: string) {
     throw new Error(`Chunk too large (${Math.round(textSize / 1024)}KB) for LanguageTool API`)
   }
   
-  const response = await fetch("https://api.languagetool.org/v2/check", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/json",
-    },
-    body: new URLSearchParams({
-      text: text,
-      language: language,
-      enabledOnly: "false",
-    }).toString(),
-  })
+    const response = await fetch("https://api.languagetool.org/v2/check", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+      },
+      body: new URLSearchParams({
+        text: text,
+        language: language,
+        enabledOnly: "false",
+      }).toString(),
+    })
 
-  if (!response.ok) {
+    if (!response.ok) {
     if (response.status === 413) {
       throw new Error(`Chunk too large (${Math.round(textSize / 1024)}KB) for LanguageTool API`)
     }
-    throw new Error(`LanguageTool API error: ${response.status}`)
-  }
+      throw new Error(`LanguageTool API error: ${response.status}`)
+    }
 
-  const data = await response.json()
+    const data = await response.json()
   return data.matches || []
 }

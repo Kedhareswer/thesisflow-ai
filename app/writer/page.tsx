@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { MarkdownEditor } from "./components/rich-text-editor"
 import CitationManager from "./components/citation-manager"
 import { AIWritingModal } from "./components/ai-writing-modal"
+import { DocumentManager } from "./components/document-manager"
 import { useToast } from "@/hooks/use-toast"
 import { ResearchSessionProvider, useResearchContext } from "@/components/research-session-provider"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
@@ -39,6 +40,8 @@ import { supabase } from "@/lib/supabase"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import DocumentService, { Document } from "@/lib/services/document.service"
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -213,6 +216,11 @@ function WriterPageContent() {
   const [supabaseToken, setSupabaseToken] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<Date>(new Date())
   const [isAutoSaving, setIsAutoSaving] = useState(false)
+  
+  // Document management state
+  const [currentDocument, setCurrentDocument] = useState<Document | null>(null)
+  const [documentManagerOpen, setDocumentManagerOpen] = useState(false)
+  const documentService = DocumentService.getInstance()
 
   // Sidebar state for collapsible sections
   const [activeTab, setActiveTab] = useState("assistant")
@@ -240,19 +248,74 @@ function WriterPageContent() {
 
   // Auto-save functionality
   useEffect(() => {
-    const autoSaveInterval = setInterval(() => {
-      if (documentText.trim()) {
+    const autoSaveInterval = setInterval(async () => {
+      if (documentText.trim() && documentTitle.trim()) {
         setIsAutoSaving(true)
-        // Simulate auto-save
-        setTimeout(() => {
+        try {
+          await documentService.autoSaveDocument(documentTitle, documentText, "paper")
           setLastSaved(new Date())
+        } catch (error) {
+          console.error("Auto-save failed:", error)
+        } finally {
           setIsAutoSaving(false)
-        }, 1000)
+        }
       }
     }, 30000) // Auto-save every 30 seconds
 
     return () => clearInterval(autoSaveInterval)
-  }, [documentText])
+  }, [documentText, documentTitle])
+
+  // Document management functions
+  const handleDocumentSelect = (document: Document) => {
+    setCurrentDocument(document)
+    setDocumentTitle(document.title)
+    setDocumentText(document.content)
+    setDocumentManagerOpen(false)
+  }
+
+  const handleDocumentLoad = (content: string) => {
+    setDocumentText(content)
+  }
+
+  const handleSaveDocument = async () => {
+    try {
+      if (!documentTitle.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter a document title",
+          variant: "destructive"
+        })
+        return
+      }
+
+      if (currentDocument) {
+        await documentService.updateDocument(currentDocument.id, {
+          title: documentTitle,
+          content: documentText
+        })
+      } else {
+        const newDoc = await documentService.createDocument({
+          title: documentTitle,
+          content: documentText,
+          document_type: "paper"
+        })
+        setCurrentDocument(newDoc)
+      }
+
+      setLastSaved(new Date())
+      toast({
+        title: "Success",
+        description: "Document saved successfully"
+      })
+    } catch (error) {
+      console.error("Error saving document:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save document",
+        variant: "destructive"
+      })
+    }
+  }
 
   // Check text for grammar/style issues using LanguageTool
   const checkText = async () => {
@@ -473,7 +536,16 @@ function WriterPageContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSave}
+                  onClick={() => setDocumentManagerOpen(true)}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Documents
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveDocument}
                   disabled={isAutoSaving}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                 >
@@ -985,6 +1057,23 @@ function WriterPageContent() {
           })
         }}
       />
+
+      {/* Document Manager Dialog */}
+      <Dialog open={documentManagerOpen} onOpenChange={setDocumentManagerOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Document Management</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <DocumentManager
+              onDocumentSelect={handleDocumentSelect}
+              onDocumentLoad={handleDocumentLoad}
+              currentDocumentId={currentDocument?.id}
+              className="h-full"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

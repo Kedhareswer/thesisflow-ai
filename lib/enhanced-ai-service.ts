@@ -402,13 +402,13 @@ class EnhancedAIService {
     console.log("Enhanced AI Service: Calling Anthropic API...")
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
+        method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
+        body: JSON.stringify({
         model: model || 'claude-3.5-sonnet',
         max_tokens: maxTokens,
         temperature: temperature,
