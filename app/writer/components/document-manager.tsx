@@ -163,9 +163,24 @@ export function DocumentManager({
       const a = window.document.createElement('a')
       a.href = url
       a.download = `${document.title}.${format}`
+      a.style.display = 'none' // Hide the element
+      
+      // Add to DOM
       window.document.body.appendChild(a)
+      
+      // Trigger download
       a.click()
-      window.document.body.removeChild(a)
+      
+      // Clean up with proper error handling
+      try {
+        if (a.parentNode) {
+          window.document.body.removeChild(a)
+        }
+      } catch (removeError) {
+        console.warn('Could not remove download element:', removeError)
+      }
+      
+      // Revoke URL
       URL.revokeObjectURL(url)
       
       toast({

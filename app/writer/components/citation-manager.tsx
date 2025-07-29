@@ -167,9 +167,22 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
     const file = new Blob([formattedReferences], { type: "text/plain" })
     element.href = URL.createObjectURL(file)
     element.download = `references-${citationFormat}.txt`
+    element.style.display = 'none' // Hide the element
+    
+    // Add to DOM
     document.body.appendChild(element)
+    
+    // Trigger download
     element.click()
-    document.body.removeChild(element)
+    
+    // Clean up with proper error handling
+    try {
+      if (element.parentNode) {
+        document.body.removeChild(element)
+      }
+    } catch (removeError) {
+      console.warn('Could not remove download element:', removeError)
+    }
   }
 
   const totalCitations = papersToCitations().length + manualCitations.length

@@ -759,7 +759,24 @@ export function AIWritingModal(props: AIWritingModalProps) {
     const a = document.createElement("a")
     a.href = url
     a.download = "research-paper.md"
+    a.style.display = 'none' // Hide the element
+    
+    // Add to DOM
+    document.body.appendChild(a)
+    
+    // Trigger download
     a.click()
+    
+    // Clean up with proper error handling
+    try {
+      if (a.parentNode) {
+        document.body.removeChild(a)
+      }
+    } catch (removeError) {
+      console.warn('Could not remove download element:', removeError)
+    }
+    
+    // Revoke URL
     URL.revokeObjectURL(url)
   }
 
@@ -774,7 +791,24 @@ export function AIWritingModal(props: AIWritingModalProps) {
     const a = document.createElement("a")
     a.href = url
     a.download = "research-paper.tex"
+    a.style.display = 'none' // Hide the element
+    
+    // Add to DOM
+    document.body.appendChild(a)
+    
+    // Trigger download
     a.click()
+    
+    // Clean up with proper error handling
+    try {
+      if (a.parentNode) {
+        document.body.removeChild(a)
+      }
+    } catch (removeError) {
+      console.warn('Could not remove download element:', removeError)
+    }
+    
+    // Revoke URL
     URL.revokeObjectURL(url)
   }
 

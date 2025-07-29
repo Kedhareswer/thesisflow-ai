@@ -420,9 +420,24 @@ function WriterPageContent() {
     const a = document.createElement("a")
     a.href = url
     a.download = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
+    a.style.display = 'none' // Hide the element
+    
+    // Add to DOM
     document.body.appendChild(a)
+    
+    // Trigger download
     a.click()
-    document.body.removeChild(a)
+    
+    // Clean up with proper error handling
+    try {
+      if (a.parentNode) {
+        document.body.removeChild(a)
+      }
+    } catch (removeError) {
+      console.warn('Could not remove download element:', removeError)
+    }
+    
+    // Revoke URL
     URL.revokeObjectURL(url)
 
     toast({
