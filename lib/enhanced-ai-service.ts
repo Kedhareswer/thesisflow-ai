@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-import { AI_PROVIDERS, type AIProvider } from './ai-providers'
+import { createClient } from "@supabase/supabase-js"
+import { AI_PROVIDERS, type AIProvider } from "./ai-providers"
 
 export interface GenerateTextOptions {
   prompt: string
@@ -31,16 +31,12 @@ export interface UserApiKey {
 }
 
 class EnhancedAIService {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        storageKey: 'ai-research-platform-auth',
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-      }
-    }
-  )
+  private supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: {
+      storageKey: "ai-research-platform-auth",
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    },
+  })
 
   async loadUserApiKeys(userId?: string): Promise<UserApiKey[]> {
     // If userId is provided, use admin client (server-side)
@@ -54,27 +50,30 @@ class EnhancedAIService {
           return []
         }
         const { data: apiKeys, error } = await supabaseAdmin
-          .from('user_api_keys')
-          .select('provider, decrypted_key:api_key, is_active, test_status')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-          .eq('test_status', 'valid')
+          .from("user_api_keys")
+          .select("provider, decrypted_key:api_key, is_active, test_status")
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .eq("test_status", "valid")
         if (error) {
-          console.error('Enhanced AI Service: Error fetching user API keys (server):', error)
+          console.error("Enhanced AI Service: Error fetching user API keys (server):", error)
           return []
         }
         return apiKeys || []
       } catch (error) {
-        console.error('Enhanced AI Service: Exception loading user API keys (server):', error)
+        console.error("Enhanced AI Service: Exception loading user API keys (server):", error)
         return []
       }
     }
     try {
       console.log("Enhanced AI Service: [CLIENT] Loading user API keys...")
-      
+
       // Get current session for authentication
-      const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
-      
+      const {
+        data: { session },
+        error: sessionError,
+      } = await this.supabase.auth.getSession()
+
       if (sessionError) {
         console.error("Enhanced AI Service: Session error:", sessionError)
         return []
@@ -89,20 +88,20 @@ class EnhancedAIService {
 
       // Prepare headers with authentication
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       }
 
       // Add authorization header with access token
       if (session.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
+        headers["Authorization"] = `Bearer ${session.access_token}`
         console.log("Enhanced AI Service: Added authorization header")
       }
 
       // Make authenticated request to get API keys with decrypted values
-      const response = await fetch('/api/user-api-keys?include_keys=true', {
-        method: 'GET',
-        credentials: 'include',
-        headers
+      const response = await fetch("/api/user-api-keys?include_keys=true", {
+        method: "GET",
+        credentials: "include",
+        headers,
       })
 
       console.log("Enhanced AI Service: API response status:", response.status)
@@ -117,7 +116,7 @@ class EnhancedAIService {
       console.log("Enhanced AI Service: API keys loaded:", {
         success: data.success,
         keyCount: data.apiKeys?.length || 0,
-        providers: data.apiKeys?.map((key: UserApiKey) => key.provider) || []
+        providers: data.apiKeys?.map((key: UserApiKey) => key.provider) || [],
       })
 
       if (!data.success) {
@@ -141,24 +140,27 @@ class EnhancedAIService {
         maxTokens: options.maxTokens,
         temperature: options.temperature,
         promptLength: options.prompt?.length,
-        userId: options.userId
+        userId: options.userId,
       })
 
       // Load user API keys (pass userId for server-side)
       const userApiKeys = await this.loadUserApiKeys(options.userId)
-      console.log("Enhanced AI Service: Loaded user API keys:", userApiKeys.map(k => ({ provider: k.provider, active: k.is_active, status: k.test_status })))
+      console.log(
+        "Enhanced AI Service: Loaded user API keys:",
+        userApiKeys.map((k) => ({ provider: k.provider, active: k.is_active, status: k.test_status })),
+      )
 
       // Find available providers
       const availableProviders = userApiKeys
-        .filter(key => key.is_active && key.test_status === 'valid' && key.decrypted_key)
-        .map(key => key.provider as AIProvider)
+        .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
+        .map((key) => key.provider as AIProvider)
 
       console.log("Enhanced AI Service: Available providers:", availableProviders)
 
       if (availableProviders.length === 0) {
         return {
           success: false,
-          error: "No valid API keys available. Please configure API keys in Settings."
+          error: "No valid API keys available. Please configure API keys in Settings.",
         }
       }
 
@@ -170,17 +172,14 @@ class EnhancedAIService {
       }
 
       // Get the API key for the selected provider
-      const userApiKey = userApiKeys.find(key => 
-        key.provider === selectedProvider && 
-        key.is_active && 
-        key.test_status === 'valid' &&
-        key.decrypted_key
+      const userApiKey = userApiKeys.find(
+        (key) => key.provider === selectedProvider && key.is_active && key.test_status === "valid" && key.decrypted_key,
       )
 
       if (!userApiKey || !userApiKey.decrypted_key) {
         return {
           success: false,
-          error: `No valid API key found for provider: ${selectedProvider}`
+          error: `No valid API key found for provider: ${selectedProvider}`,
         }
       }
 
@@ -191,7 +190,7 @@ class EnhancedAIService {
       if (!providerConfig) {
         return {
           success: false,
-          error: `Unknown provider: ${selectedProvider}`
+          error: `Unknown provider: ${selectedProvider}`,
         }
       }
 
@@ -199,40 +198,37 @@ class EnhancedAIService {
       let selectedModel = options.model || providerConfig.models[0]
       console.log("Enhanced AI Service: Requested model:", options.model)
       console.log("Enhanced AI Service: Available models for provider:", providerConfig.models)
-      
+
       // Validate model exists for provider
       if (options.model && !providerConfig.models.includes(options.model)) {
-        console.warn(`Enhanced AI Service: Model ${options.model} not in available models for ${selectedProvider}, using default`)
+        console.warn(
+          `Enhanced AI Service: Model ${options.model} not in available models for ${selectedProvider}, using default`,
+        )
         selectedModel = providerConfig.models[0]
         console.log("Enhanced AI Service: Using default model instead:", selectedModel)
       }
-      
+
       console.log("Enhanced AI Service: Final selected model:", selectedModel)
 
       // Generate the response using the provider's API
-      const result = await this.callProviderAPI(
-        selectedProvider,
-        userApiKey.decrypted_key,
-        {
-          ...options,
-          model: selectedModel,
-          provider: selectedProvider
-        }
-      )
+      const result = await this.callProviderAPI(selectedProvider, userApiKey.decrypted_key, {
+        ...options,
+        model: selectedModel,
+        provider: selectedProvider,
+      })
 
       console.log("Enhanced AI Service: Generation result:", {
         success: result.success,
         contentLength: result.content?.length,
-        error: result.error
+        error: result.error,
       })
 
       return result
-
     } catch (error) {
       console.error("Enhanced AI Service: Error in generateText:", error)
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred"
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       }
     }
   }
@@ -240,48 +236,47 @@ class EnhancedAIService {
   private async callProviderAPI(
     provider: AIProvider,
     apiKey: string,
-    options: GenerateTextOptions
+    options: GenerateTextOptions,
   ): Promise<GenerateTextResult> {
     try {
       console.log(`Enhanced AI Service: Calling ${provider} API...`)
       console.log(`Enhanced AI Service: API Key length:`, apiKey.length)
-      console.log(`Enhanced AI Service: API Key starts with:`, apiKey.substring(0, 10) + '...')
+      console.log(`Enhanced AI Service: API Key starts with:`, apiKey.substring(0, 10) + "...")
 
       const providerConfig = AI_PROVIDERS[provider]
       const maxTokens = Math.min(options.maxTokens || 1000, providerConfig.maxTokens)
       const temperature = Math.min(Math.max(options.temperature || 0.7, 0), 1)
 
       switch (provider) {
-        case 'groq':
+        case "groq":
           return await this.callGroqAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
-        case 'openai':
+
+        case "openai":
           return await this.callOpenAIAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
-        case 'gemini':
+
+        case "gemini":
           return await this.callGeminiAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
-        case 'anthropic':
+
+        case "anthropic":
           return await this.callAnthropicAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
-        case 'mistral':
+
+        case "mistral":
           return await this.callMistralAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
-        case 'aiml':
+
+        case "aiml":
           return await this.callAIMLAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-        
-        
+
         default:
           return {
             success: false,
-            error: `Provider ${provider} is not yet implemented`
+            error: `Provider ${provider} is not yet implemented`,
           }
       }
     } catch (error) {
       console.error(`Enhanced AI Service: Error calling ${provider} API:`, error)
       return {
         success: false,
-        error: error instanceof Error ? error.message : `Failed to call ${provider} API`
+        error: error instanceof Error ? error.message : `Failed to call ${provider} API`,
       }
     }
   }
@@ -291,24 +286,24 @@ class EnhancedAIService {
     prompt: string,
     model: string,
     maxTokens: number,
-    temperature: number
+    temperature: number,
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling Groq API with:", {
       model,
       maxTokens,
       temperature,
-      promptLength: prompt.length
+      promptLength: prompt.length,
     })
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: "user", content: prompt }],
         max_tokens: maxTokens,
         temperature,
       }),
@@ -328,26 +323,26 @@ class EnhancedAIService {
       choicesLength: data.choices?.length,
       firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
       usage: data.usage,
-      fullResponse: data
+      fullResponse: data,
     })
-    
-    const content = data.choices?.[0]?.message?.content || ''
-    
+
+    const content = data.choices?.[0]?.message?.content || ""
+
     if (!content) {
       console.error("Enhanced AI Service: Groq API returned no content!", data)
       throw new Error("Groq API returned no content")
     }
-    
+
     return {
       success: true,
       content,
-      provider: 'groq',
+      provider: "groq",
       model,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
         totalTokens: data.usage?.total_tokens,
-      }
+      },
     }
   }
 
@@ -356,17 +351,17 @@ class EnhancedAIService {
     prompt: string,
     model: string,
     maxTokens: number,
-    temperature: number
+    temperature: number,
   ): Promise<GenerateTextResult> {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: "user", content: prompt }],
         max_tokens: maxTokens,
         temperature,
       }),
@@ -378,17 +373,17 @@ class EnhancedAIService {
     }
 
     const data = await response.json()
-    
+
     return {
       success: true,
-      content: data.choices?.[0]?.message?.content || '',
-      provider: 'openai',
+      content: data.choices?.[0]?.message?.content || "",
+      provider: "openai",
       model,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
         totalTokens: data.usage?.total_tokens,
-      }
+      },
     }
   }
 
@@ -397,28 +392,28 @@ class EnhancedAIService {
     prompt: string,
     model: string,
     maxTokens: number,
-    temperature: number
+    temperature: number,
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling Anthropic API...")
-    
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
       },
-        body: JSON.stringify({
-        model: model || 'claude-3.5-sonnet',
+      body: JSON.stringify({
+        model: model || "claude-3.5-sonnet",
         max_tokens: maxTokens,
         temperature: temperature,
         messages: [
           {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
+            role: "user",
+            content: prompt,
+          },
+        ],
+      }),
     })
 
     if (!response.ok) {
@@ -432,26 +427,26 @@ class EnhancedAIService {
       hasContent: !!data.content,
       contentLength: data.content?.length,
       firstContent: data.content?.[0]?.text?.substring(0, 100),
-      usage: data.usage
+      usage: data.usage,
     })
-    
-    const content = data.content?.[0]?.text || ''
-    
+
+    const content = data.content?.[0]?.text || ""
+
     if (!content) {
       console.error("Enhanced AI Service: Anthropic API returned no content!", data)
       throw new Error("Anthropic API returned no content")
     }
-    
+
     return {
       success: true,
       content,
-      provider: 'anthropic',
+      provider: "anthropic",
       model,
       usage: {
         promptTokens: data.usage?.input_tokens,
         completionTokens: data.usage?.output_tokens,
         totalTokens: data.usage?.input_tokens + data.usage?.output_tokens,
-      }
+      },
     }
   }
 
@@ -460,27 +455,27 @@ class EnhancedAIService {
     prompt: string,
     model: string,
     maxTokens: number,
-    temperature: number
+    temperature: number,
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling Mistral API...")
-    
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
+
+    const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'mistral-large-latest',
+        model: model || "mistral-large-latest",
         max_tokens: maxTokens,
         temperature: temperature,
         messages: [
           {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
+            role: "user",
+            content: prompt,
+          },
+        ],
+      }),
     })
 
     if (!response.ok) {
@@ -494,26 +489,26 @@ class EnhancedAIService {
       hasChoices: !!data.choices,
       choicesLength: data.choices?.length,
       firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
-      usage: data.usage
+      usage: data.usage,
     })
-    
-    const content = data.choices?.[0]?.message?.content || ''
-    
+
+    const content = data.choices?.[0]?.message?.content || ""
+
     if (!content) {
       console.error("Enhanced AI Service: Mistral API returned no content!", data)
       throw new Error("Mistral API returned no content")
     }
-    
+
     return {
       success: true,
       content,
-      provider: 'mistral',
+      provider: "mistral",
       model,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
         totalTokens: data.usage?.total_tokens,
-      }
+      },
     }
   }
 
@@ -522,30 +517,35 @@ class EnhancedAIService {
     prompt: string,
     model: string,
     maxTokens: number,
-    temperature: number
+    temperature: number,
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling Gemini API with:", {
       model,
       maxTokens,
       temperature,
-      promptLength: prompt.length
+      promptLength: prompt.length,
     })
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature,
+          },
+        }),
       },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature,
-        }
-      }),
-    })
+    )
 
     console.log("Enhanced AI Service: Gemini API response status:", response.status)
 
@@ -560,26 +560,26 @@ class EnhancedAIService {
       hasCandidates: !!data.candidates,
       candidatesLength: data.candidates?.length,
       firstCandidateContent: data.candidates?.[0]?.content?.parts?.[0]?.text?.substring(0, 100),
-      fullResponse: data
+      fullResponse: data,
     })
-    
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    
+
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+
     if (!content) {
       console.error("Enhanced AI Service: Gemini API returned no content!", data)
       throw new Error("Gemini API returned no content")
     }
-    
+
     return {
       success: true,
       content,
-      provider: 'gemini',
+      provider: "gemini",
       model,
       usage: {
         promptTokens: data.usageMetadata?.promptTokenCount,
         completionTokens: data.usageMetadata?.candidatesTokenCount,
         totalTokens: data.usageMetadata?.totalTokenCount,
-      }
+      },
     }
   }
 
@@ -588,24 +588,24 @@ class EnhancedAIService {
     prompt: string,
     model: string,
     maxTokens: number,
-    temperature: number
+    temperature: number,
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling AIML API with:", {
       model,
       maxTokens,
       temperature,
-      promptLength: prompt.length
+      promptLength: prompt.length,
     })
 
-    const response = await fetch('https://api.aimlapi.com/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.aimlapi.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: "user", content: prompt }],
         max_tokens: maxTokens,
         temperature,
       }),
@@ -624,30 +624,28 @@ class EnhancedAIService {
       hasChoices: !!data.choices,
       choicesLength: data.choices?.length,
       firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
-      usage: data.usage
+      usage: data.usage,
     })
-    
-    const content = data.choices?.[0]?.message?.content || ''
-    
+
+    const content = data.choices?.[0]?.message?.content || ""
+
     if (!content) {
       console.error("Enhanced AI Service: AIML API returned no content!", data)
       throw new Error("AIML API returned no content")
     }
-    
+
     return {
       success: true,
       content,
-      provider: 'aiml',
+      provider: "aiml",
       model,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
         totalTokens: data.usage?.total_tokens,
-      }
+      },
     }
   }
-
-
 
   // Backward compatibility method for components that expect chatCompletion
   async chatCompletion(
@@ -657,12 +655,12 @@ class EnhancedAIService {
       maxTokens?: number
       preferredProvider?: AIProvider
       model?: string
-    }
+    },
   ): Promise<{ content: string }> {
     // Convert messages to simple prompt (for now, just use the last user message)
-    const userMessage = messages.filter(m => m.role === 'user').pop()
+    const userMessage = messages.filter((m) => m.role === "user").pop()
     if (!userMessage) {
-      throw new Error('No user message found')
+      throw new Error("No user message found")
     }
 
     const result = await this.generateText({
@@ -670,21 +668,21 @@ class EnhancedAIService {
       provider: options?.preferredProvider,
       model: options?.model,
       maxTokens: options?.maxTokens,
-      temperature: options?.temperature
+      temperature: options?.temperature,
     })
 
     if (!result.success) {
-      throw new Error(result.error || 'Failed to generate response')
+      throw new Error(result.error || "Failed to generate response")
     }
 
-    return { content: result.content || '' }
+    return { content: result.content || "" }
   }
 
   // Research-specific methods with enhanced resilience
   async generateResearchIdeas(
     topic: string,
-    context: string = "",
-    count: number = 5
+    context = "",
+    count = 5,
   ): Promise<{
     ideas: Array<{ title: string; description: string }>
     topic: string
@@ -703,10 +701,10 @@ class EnhancedAIService {
       const currentChunkSize = Math.min(chunkSize, count - allIdeas.length)
       const chunkIdeas = await this.generateResearchIdeasChunk(topic, context, currentChunkSize, i + 1)
       allIdeas.push(...chunkIdeas)
-      
+
       // Add small delay between chunks to avoid overwhelming the API
       if (i < chunks - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
     }
 
@@ -715,7 +713,7 @@ class EnhancedAIService {
       topic,
       context,
       count,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }
   }
 
@@ -723,13 +721,13 @@ class EnhancedAIService {
     topic: string,
     context: string,
     count: number,
-    chunkNumber: number
+    chunkNumber: number,
   ): Promise<Array<{ title: string; description: string }>> {
     // Optimized, concise prompt to reduce token usage
-    const prompt = `Generate ${count} research ideas for "${topic}"${context ? `\nContext: ${context.substring(0, 200)}` : ''}
+    const prompt = `Generate ${count} research ideas for "${topic}"${context ? `\nContext: ${context.substring(0, 200)}` : ""}
 
 Format each idea as:
-${count === 1 ? '1' : '1-' + count}. **[Title]**
+${count === 1 ? "1" : "1-" + count}. **[Title]**
 [Brief description in 1-2 sentences]
 
 Requirements: Novel, feasible, practical research directions.`
@@ -740,39 +738,39 @@ Requirements: Novel, feasible, practical research directions.`
     const result = await this.generateTextWithFallback({
       prompt,
       maxTokens: count * 200, // More conservative token limit
-      temperature: 0.8 // Slightly lower for more focused ideas
+      temperature: 0.8, // Slightly lower for more focused ideas
     })
 
     if (!result.success) {
-      throw new Error(result.error || 'Failed to generate research ideas')
+      throw new Error(result.error || "Failed to generate research ideas")
     }
 
-    const content = result.content || ''
+    const content = result.content || ""
     const ideas = this.parseResearchIdeas(content)
-    
+
     console.log(`Enhanced AI Service: Chunk ${chunkNumber} generated ${ideas.length} ideas`)
     return ideas
   }
 
   private parseResearchIdeas(content: string): Array<{ title: string; description: string }> {
     const ideas: Array<{ title: string; description: string }> = []
-    
+
     // Parse standard numbered list with bold titles
     const standardPattern = /\d+\.\s*\*\*([^*]+)\*\*[:\s]*([^\n]+(?:\n(?!\d+\.|\*\*)[^\n]*)*)?/g
     let match
-    
+
     while ((match = standardPattern.exec(content)) !== null) {
       const title = match[1]?.trim()
-      const description = match[2]?.trim().replace(/^Description:\s*/i, '')
-      
+      const description = match[2]?.trim().replace(/^Description:\s*/i, "")
+
       if (title) {
         ideas.push({
           title,
-          description: description || title
+          description: description || title,
         })
       }
     }
-    
+
     // Fallback: Extract any numbered items
     if (ideas.length === 0) {
       const fallbackPattern = /\d+\.\s*([^\n]+)/g
@@ -781,17 +779,17 @@ Requirements: Novel, feasible, practical research directions.`
         if (line && line.length > 10) {
           // Try to split title and description
           const parts = line.split(/[:.]\s/)
-          const title = parts[0]?.replace(/^\*\*|\*\*$/g, '').trim()
-          const description = parts.slice(1).join('. ').trim()
-          
+          const title = parts[0]?.replace(/^\*\*|\*\*$/g, "").trim()
+          const description = parts.slice(1).join(". ").trim()
+
           ideas.push({
             title: title || `Research Idea ${ideas.length + 1}`,
-            description: description || title || line
+            description: description || title || line,
           })
         }
       }
     }
-    
+
     return ideas.slice(0, 10)
   }
 
@@ -803,29 +801,31 @@ Requirements: Novel, feasible, practical research directions.`
     // Get available providers in order of preference
     const userApiKeys = await this.loadUserApiKeys()
     const availableProviders = userApiKeys
-      .filter(key => key.is_active && key.test_status === 'valid' && key.decrypted_key)
-      .map(key => key.provider as AIProvider)
+      .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
+      .map((key) => key.provider as AIProvider)
 
     if (availableProviders.length === 0) {
       return {
         success: false,
-        error: "No valid API keys available. Please configure API keys in Settings."
+        error: "No valid API keys available. Please configure API keys in Settings.",
       }
     }
 
-    console.log(`Enhanced AI Service: Available providers: ${availableProviders.join(', ')}`)
+    console.log(`Enhanced AI Service: Available providers: ${availableProviders.join(", ")}`)
 
     // Try each provider in order
     for (let providerIndex = 0; providerIndex < availableProviders.length; providerIndex++) {
       const provider = availableProviders[providerIndex]
-      console.log(`Enhanced AI Service: Trying provider ${provider} (${providerIndex + 1}/${availableProviders.length})`)
+      console.log(
+        `Enhanced AI Service: Trying provider ${provider} (${providerIndex + 1}/${availableProviders.length})`,
+      )
 
       // Try each provider with retries for transient errors
       for (let retry = 0; retry <= maxRetries; retry++) {
         try {
           const result = await this.generateText({
             ...options,
-            provider
+            provider,
           })
 
           if (result.success) {
@@ -840,15 +840,16 @@ Requirements: Novel, feasible, practical research directions.`
           console.log(`Enhanced AI Service: Error with ${provider} (attempt ${retry + 1}): ${errorMessage}`)
 
           // Check if it's a transient error worth retrying
-          const isTransientError = errorMessage.includes('503') || 
-                                 errorMessage.includes('overloaded') || 
-                                 errorMessage.includes('rate limit') ||
-                                 errorMessage.includes('timeout')
+          const isTransientError =
+            errorMessage.includes("503") ||
+            errorMessage.includes("overloaded") ||
+            errorMessage.includes("rate limit") ||
+            errorMessage.includes("timeout")
 
           if (isTransientError && retry < maxRetries) {
             const delay = baseDelay * Math.pow(2, retry) // Exponential backoff
             console.log(`Enhanced AI Service: Retrying ${provider} in ${delay}ms...`)
-            await new Promise(resolve => setTimeout(resolve, delay))
+            await new Promise((resolve) => setTimeout(resolve, delay))
             continue
           } else {
             console.log(`Enhanced AI Service: Giving up on ${provider} after ${retry + 1} attempts`)
@@ -860,30 +861,30 @@ Requirements: Novel, feasible, practical research directions.`
 
     return {
       success: false,
-      error: `All AI providers failed. Please try again later or check your API keys.`
+      error: `All AI providers failed. Please try again later or check your API keys.`,
     }
   }
 
   // Simplified content summarization with chunking for large content
   async summarizeContent(
-    content: string, 
-    options: { 
-      style?: 'academic' | 'executive' | 'bullet-points' | 'detailed'
-      length?: 'brief' | 'medium' | 'comprehensive'
+    content: string,
+    options: {
+      style?: "academic" | "executive" | "bullet-points" | "detailed"
+      length?: "brief" | "medium" | "comprehensive"
     } = {},
     provider?: AIProvider,
-    model?: string
+    model?: string,
   ): Promise<{
     summary: string
     keyPoints: string[]
     readingTime: number
-    sentiment?: 'positive' | 'neutral' | 'negative'
+    sentiment?: "positive" | "neutral" | "negative"
   }> {
     console.log("Enhanced AI Service: Starting summarizeContent...")
     console.log("Enhanced AI Service: Content length:", content.length)
 
-    const { style = 'academic', length = 'medium' } = options
-    
+    const { style = "academic", length = "medium" } = options
+
     // Chunk large content to avoid overwhelming the API
     const maxContentLength = 3000 // Conservative limit
     let processedContent = content
@@ -911,26 +912,26 @@ SENTIMENT: [positive/neutral/negative]`
     try {
       const result = await this.generateTextWithFallback({
         prompt,
-        maxTokens: length === 'comprehensive' ? 1000 : length === 'medium' ? 600 : 300,
+        maxTokens: length === "comprehensive" ? 1000 : length === "medium" ? 600 : 300,
         temperature: 0.3,
-        provider
+        provider,
       })
 
       console.log("Enhanced AI Service: Generate text result:", {
         success: result.success,
         hasContent: !!result.content,
         contentLength: result.content?.length || 0,
-        error: result.error
+        error: result.error,
       })
 
       if (!result.success) {
         console.error("Enhanced AI Service: Generation failed:", result.error)
-        throw new Error(result.error || 'Failed to summarize content')
+        throw new Error(result.error || "Failed to summarize content")
       }
 
       if (!result.content) {
         console.error("Enhanced AI Service: No content returned")
-        throw new Error('No content returned from AI service')
+        throw new Error("No content returned from AI service")
       }
 
       const parsedResult = this.parseSummaryResult(result.content, content)
@@ -938,63 +939,71 @@ SENTIMENT: [positive/neutral/negative]`
         summaryLength: parsedResult.summary.length,
         keyPointsCount: parsedResult.keyPoints.length,
         readingTime: parsedResult.readingTime,
-        sentiment: parsedResult.sentiment
+        sentiment: parsedResult.sentiment,
       })
 
       return parsedResult
-
     } catch (error) {
       console.error("Enhanced AI Service: Summarization error:", error)
       throw error
     }
   }
 
-  private parseSummaryResult(content: string, originalContent: string): {
+  private parseSummaryResult(
+    content: string,
+    originalContent: string,
+  ): {
     summary: string
     keyPoints: string[]
     readingTime: number
-    sentiment?: 'positive' | 'neutral' | 'negative'
+    sentiment?: "positive" | "neutral" | "negative"
   } {
-    const lines = content.split('\n').map(line => line.trim()).filter(line => line)
-    
-    let summary = ''
+    const lines = content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line)
+
+    let summary = ""
     let keyPoints: string[] = []
     let readingTime = 0
-    let sentiment: 'positive' | 'neutral' | 'negative' | undefined
+    let sentiment: "positive" | "neutral" | "negative" | undefined
 
     for (const line of lines) {
-      if (line.startsWith('SUMMARY:')) {
-        summary = line.replace('SUMMARY:', '').trim()
-      } else if (line.startsWith('KEY_POINTS:')) {
-        const pointsStr = line.replace('KEY_POINTS:', '').trim()
-        keyPoints = pointsStr.split('|').map(p => p.trim()).filter(p => p)
-      } else if (line.startsWith('READING_TIME:')) {
-        const timeStr = line.replace('READING_TIME:', '').trim()
-        readingTime = parseInt(timeStr) || Math.ceil(originalContent.split(/\s+/).length / 200)
-      } else if (line.startsWith('SENTIMENT:')) {
-        const sentimentStr = line.replace('SENTIMENT:', '').trim().toLowerCase()
-        if (['positive', 'neutral', 'negative'].includes(sentimentStr)) {
-          sentiment = sentimentStr as 'positive' | 'neutral' | 'negative'
+      if (line.startsWith("SUMMARY:")) {
+        summary = line.replace("SUMMARY:", "").trim()
+      } else if (line.startsWith("KEY_POINTS:")) {
+        const pointsStr = line.replace("KEY_POINTS:", "").trim()
+        keyPoints = pointsStr
+          .split("|")
+          .map((p) => p.trim())
+          .filter((p) => p)
+      } else if (line.startsWith("READING_TIME:")) {
+        const timeStr = line.replace("READING_TIME:", "").trim()
+        readingTime = Number.parseInt(timeStr) || Math.ceil(originalContent.split(/\s+/).length / 200)
+      } else if (line.startsWith("SENTIMENT:")) {
+        const sentimentStr = line.replace("SENTIMENT:", "").trim().toLowerCase()
+        if (["positive", "neutral", "negative"].includes(sentimentStr)) {
+          sentiment = sentimentStr as "positive" | "neutral" | "negative"
         }
       }
     }
 
     // Fallbacks
     if (!summary) {
-      summary = content.split('\n').find(line => line.length > 50) || content.substring(0, 200)
+      summary = content.split("\n").find((line) => line.length > 50) || content.substring(0, 200)
     }
     if (keyPoints.length === 0) {
-      keyPoints = ['Content analyzed', 'Key insights extracted', 'Summary generated']
+      keyPoints = ["Content analyzed", "Key insights extracted", "Summary generated"]
     }
     if (!readingTime) {
       readingTime = Math.ceil(originalContent.split(/\s+/).length / 200)
     }
 
-    return { 
+    return {
       summary,
       keyPoints,
       readingTime,
-      sentiment
+      sentiment,
     }
   }
 
@@ -1002,44 +1011,41 @@ SENTIMENT: [positive/neutral/negative]`
    * Lightweight validation of an API key. For now, we only verify the format.
    * You can extend this method to hit a cheap provider endpoint for deeper checks.
    */
-  async testApiKey(
-    provider: string,
-    apiKey: string
-  ): Promise<{ valid: boolean; model?: string; error?: string }> {
+  async testApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; model?: string; error?: string }> {
     try {
       // Basic length sanity check
       if (!apiKey || apiKey.length < 10) {
-        return { valid: false, error: 'API key too short' }
+        return { valid: false, error: "API key too short" }
       }
 
       // Provider-specific regex patterns
       const regexMap: Record<string, RegExp> = {
         openai: /^sk-[A-Za-z0-9]{48,}$/,
         groq: /^gsk_[A-Za-z0-9]{50,}$/,
-        gemini: /^AIza[A-Za-z0-9_\-]{35,}$/,
+        gemini: /^AIza[A-Za-z0-9_-]{35,}$/,
         anthropic: /^sk-ant-[A-Za-z0-9]{40,}$/,
         mistral: /^[A-Za-z0-9]{32,}$/,
-        aiml: /.{10,}/
+        aiml: /.{10,}/,
       }
 
       const pattern = regexMap[provider]
       if (pattern && !pattern.test(apiKey)) {
-        return { valid: false, error: 'API key format looks invalid' }
+        return { valid: false, error: "API key format looks invalid" }
       }
 
       // Mapping of default models per provider for UI feedback
       const defaultModelMap: Record<string, string> = {
-        openai: 'gpt-4o',
-        groq: 'llama-3.1-70b-versatile',
-        gemini: 'gemini-1.5-pro',
-        anthropic: 'claude-3-sonnet',
-        mistral: 'mistral-small',
-        aiml: 'claude-3-sonnet'
+        openai: "gpt-4o",
+        groq: "llama-3.1-70b-versatile",
+        gemini: "gemini-1.5-pro",
+        anthropic: "claude-3-sonnet",
+        mistral: "mistral-small",
+        aiml: "claude-3-sonnet",
       }
 
       return { valid: true, model: defaultModelMap[provider] }
     } catch (error) {
-      return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      return { valid: false, error: error instanceof Error ? error.message : "Unknown error" }
     }
   }
 }

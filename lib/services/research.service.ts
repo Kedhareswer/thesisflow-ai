@@ -48,7 +48,7 @@ Depth level: ${depth}/5`,
   static async searchPapers(query: string, type = "keyword") {
     try {
       console.log("[ResearchService] Searching papers for query:", query)
-      
+
       if (!query || query.trim().length < 3) {
         throw new Error("Please enter a more specific search term (at least 3 characters)")
       }
@@ -57,7 +57,7 @@ Depth level: ${depth}/5`,
       try {
         const { fetchOpenAlexWorks } = await import("@/app/explorer/openalex")
         console.log("[ResearchService] OpenAlex module imported successfully")
-        
+
         const papers = await fetchOpenAlexWorks(query, 15) // Get 15 papers to ensure we have at least 5 good ones
         console.log("[ResearchService] Raw papers from OpenAlex:", papers.length)
 
@@ -65,7 +65,7 @@ Depth level: ${depth}/5`,
           console.error("[ResearchService] Invalid response format from OpenAlex - not an array:", papers)
           throw new Error("Invalid response from research API")
         }
-        
+
         // Transform OpenAlex format to match expected UI format
         const transformedPapers = papers
           .filter((paper) => paper.title && paper.title.trim() !== "") // Filter out papers without titles
@@ -84,13 +84,15 @@ Depth level: ${depth}/5`,
           .slice(0, 10) // Limit to top 10 results
 
         console.log("[ResearchService] Transformed papers:", transformedPapers.length)
-        console.log("[ResearchService] First paper sample:", 
-          transformedPapers.length > 0 ? JSON.stringify(transformedPapers[0]).substring(0, 200) + '...' : 'None')
+        console.log(
+          "[ResearchService] First paper sample:",
+          transformedPapers.length > 0 ? JSON.stringify(transformedPapers[0]).substring(0, 200) + "..." : "None",
+        )
 
         if (transformedPapers.length === 0) {
           throw new Error("No relevant papers found. Try different search terms.")
         }
-        
+
         return {
           data: {
             success: true,
@@ -156,7 +158,10 @@ Return the ideas as a Markdown numbered list, where each idea is formatted as:\n
 
   static async detectAI(text: string) {
     try {
-      return await api.post("/api/ai-detect", { text })
+      const response = await api.post<{ is_ai: boolean; ai_probability: number; message: string }>("/api/ai-detect", {
+        text,
+      })
+      return response.data
     } catch (error) {
       console.error("Error detecting AI:", error)
       throw error
@@ -165,9 +170,27 @@ Return the ideas as a Markdown numbered list, where each idea is formatted as:\n
 
   static async humanizeText(text: string) {
     try {
-      return await api.post("/api/humanize", { text })
+      const response = await api.post<{ original_text: string; humanized_text: string; message: string }>(
+        "/api/humanize",
+        { text },
+      )
+      return response.data
     } catch (error) {
       console.error("Error humanizing text:", error)
+      throw error
+    }
+  }
+
+  static async checkPlagiarism(text: string) {
+    try {
+      const response = await api.post<{
+        plagiarism_percentage: number
+        sources: { url: string; match: string }[]
+        message: string
+      }>("/api/plagiarism-check", { text })
+      return response.data
+    } catch (error) {
+      console.error("Error checking plagiarism:", error)
       throw error
     }
   }
