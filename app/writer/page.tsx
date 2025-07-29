@@ -42,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import DocumentService, { Document } from "@/lib/services/document.service"
+import { useSafeDOM } from "./hooks/use-safe-dom"
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -199,6 +200,7 @@ function getTemplatePrompt(templateId: string): string {
 function WriterPageContent() {
   const { toast } = useToast()
   const { hasContext, contextSummary, buildContext } = useResearchContext()
+  const { safeDownload } = useSafeDOM()
 
   // AI provider selection state
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
@@ -416,29 +418,9 @@ function WriterPageContent() {
   // Export functions
   const handleExport = (format: "markdown" | "pdf" | "docx") => {
     const blob = new Blob([documentText], { type: "text/markdown" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
-    a.style.display = 'none' // Hide the element
+    const filename = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
     
-    // Add to DOM
-    document.body.appendChild(a)
-    
-    // Trigger download
-    a.click()
-    
-    // Clean up with proper error handling
-    try {
-      if (a.parentNode) {
-        document.body.removeChild(a)
-      }
-    } catch (removeError) {
-      console.warn('Could not remove download element:', removeError)
-    }
-    
-    // Revoke URL
-    URL.revokeObjectURL(url)
+    safeDownload(blob, filename)
 
     toast({
       title: `Exported as ${format.toUpperCase()}`,

@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import DocumentService, { Document, CreateDocumentData } from "@/lib/services/document.service"
+import { useSafeDOM } from "../hooks/use-safe-dom"
 
 interface DocumentManagerProps {
   onDocumentSelect: (document: Document) => void
@@ -41,17 +42,18 @@ export function DocumentManager({
   className 
 }: DocumentManagerProps) {
   const { toast } = useToast()
+  const { safeDownload } = useSafeDOM()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [newDocumentData, setNewDocumentData] = useState<CreateDocumentData>({
+  const [newDocument, setNewDocument] = useState({
     title: "",
     content: "",
-    document_type: "paper"
+    document_type: "paper" as const
   })
-
+  const [creating, setCreating] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const documentService = DocumentService.getInstance()
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export function DocumentManager({
 
   const handleCreateDocument = async () => {
     try {
-      if (!newDocumentData.title.trim()) {
+      if (!newDocument.title.trim()) {
         toast({
           title: "Error",
           description: "Document title is required",
@@ -86,10 +88,10 @@ export function DocumentManager({
         return
       }
 
-      const newDoc = await documentService.createDocument(newDocumentData)
+      const newDoc = await documentService.createDocument(newDocument)
       setDocuments(prev => [newDoc, ...prev])
       setShowCreateDialog(false)
-      setNewDocumentData({ title: "", content: "", document_type: "paper" })
+      setNewDocument({ title: "", content: "", document_type: "paper" })
       
       toast({
         title: "Success",
@@ -109,7 +111,6 @@ export function DocumentManager({
   }
 
   const handleDocumentSelect = (document: Document) => {
-    setSelectedDocument(document)
     onDocumentSelect(document)
     onDocumentLoad(document.content)
   }
@@ -118,10 +119,6 @@ export function DocumentManager({
     try {
       await documentService.deleteDocument(documentId)
       setDocuments(prev => prev.filter(doc => doc.id !== documentId))
-      
-      if (selectedDocument?.id === documentId) {
-        setSelectedDocument(null)
-      }
       
       toast({
         title: "Success",
@@ -159,29 +156,9 @@ export function DocumentManager({
   const handleExportDocument = async (document: Document, format: 'markdown' | 'pdf' | 'docx') => {
     try {
       const blob = await documentService.exportDocument(document.id, format)
-      const url = URL.createObjectURL(blob)
-      const a = window.document.createElement('a')
-      a.href = url
-      a.download = `${document.title}.${format}`
-      a.style.display = 'none' // Hide the element
+      const filename = `${document.title}.${format}`
       
-      // Add to DOM
-      window.document.body.appendChild(a)
-      
-      // Trigger download
-      a.click()
-      
-      // Clean up with proper error handling
-      try {
-        if (a.parentNode) {
-          window.document.body.removeChild(a)
-        }
-      } catch (removeError) {
-        console.warn('Could not remove download element:', removeError)
-      }
-      
-      // Revoke URL
-      URL.revokeObjectURL(url)
+      safeDownload(blob, filename)
       
       toast({
         title: "Success",
@@ -262,7 +239,7 @@ export function DocumentManager({
                 <div
                   key={document.id}
                   className={`p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
-                    selectedDocument?.id === document.id ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
+                    currentDocumentId === document.id ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
                   }`}
                   onClick={() => handleDocumentSelect(document)}
                 >
@@ -337,16 +314,16 @@ export function DocumentManager({
             <div>
               <label className="text-sm font-medium">Title</label>
               <Input
-                value={newDocumentData.title}
-                onChange={(e) => setNewDocumentData(prev => ({ ...prev, title: e.target.value }))}
+                value={newDocument.title}
+                onChange={(e) => setNewDocument(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Enter document title..."
               />
             </div>
             <div>
               <label className="text-sm font-medium">Type</label>
               <select
-                value={newDocumentData.document_type}
-                onChange={(e) => setNewDocumentData(prev => ({ ...prev, document_type: e.target.value as any }))}
+                value={newDocument.document_type}
+                onChange={(e) => setNewDocument(prev => ({ ...prev, document_type: e.target.value as any }))}
                 className="w-full p-2 border border-gray-300 rounded-md"
               >
                 <option value="paper">Research Paper</option>
