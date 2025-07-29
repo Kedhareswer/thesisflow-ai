@@ -4,12 +4,13 @@ import React from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RefreshCw, AlertTriangle, FileText, Home } from "lucide-react"
+import { RefreshCw, AlertTriangle, FileText, Home, Shield } from "lucide-react"
 
 interface WriterErrorBoundaryState {
   hasError: boolean
   error: Error | null
   errorInfo: React.ErrorInfo | null
+  errorCount: number
 }
 
 interface WriterErrorBoundaryProps {
@@ -19,20 +20,47 @@ interface WriterErrorBoundaryProps {
 export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProps, WriterErrorBoundaryState> {
   constructor(props: WriterErrorBoundaryProps) {
     super(props)
-    this.state = { hasError: false, error: null, errorInfo: null }
+    this.state = { 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      errorCount: 0
+    }
   }
 
   static getDerivedStateFromError(error: Error): WriterErrorBoundaryState {
-    return { hasError: true, error, errorInfo: null }
+    return { 
+      hasError: true, 
+      error, 
+      errorInfo: null,
+      errorCount: 1
+    }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Writer Error Boundary caught an error:", error, errorInfo)
-    this.setState({ error, errorInfo })
+    
+    // Increment error count
+    this.setState(prevState => ({
+      error,
+      errorInfo,
+      errorCount: prevState.errorCount + 1
+    }))
+
+    // If we get too many errors, prevent infinite loops
+    if (this.state.errorCount > 3) {
+      console.error("Too many errors detected, preventing infinite loop")
+      return
+    }
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null })
+    this.setState({ 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      errorCount: 0
+    })
   }
 
   handleReload = () => {
@@ -43,6 +71,21 @@ export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProp
     window.location.href = "/"
   }
 
+  handleSafeMode = () => {
+    // Try to recover by clearing any problematic state
+    try {
+      // Clear any localStorage that might be causing issues
+      localStorage.removeItem('writer-state')
+      localStorage.removeItem('document-content')
+      
+      // Force a clean reload
+      window.location.reload()
+    } catch (e) {
+      console.error("Safe mode recovery failed:", e)
+      window.location.reload()
+    }
+  }
+
   isDOMError = (error: Error): boolean => {
     return (
       error.message.includes("removeChild") ||
@@ -51,14 +94,28 @@ export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProp
       error.message.includes("querySelector") ||
       error.message.includes("getElementById") ||
       error.message.includes("innerHTML") ||
+      error.message.includes("createElement") ||
       error.name === "NotFoundError" ||
-      error.name === "HierarchyRequestError"
+      error.name === "HierarchyRequestError" ||
+      error.name === "InvalidStateError"
+    )
+  }
+
+  isReactError = (error: Error): boolean => {
+    return (
+      error.message.includes("React") ||
+      error.message.includes("component") ||
+      error.message.includes("render") ||
+      error.message.includes("state") ||
+      error.message.includes("props")
     )
   }
 
   render() {
     if (this.state.hasError) {
       const isDOMError = this.state.error ? this.isDOMError(this.state.error) : false
+      const isReactError = this.state.error ? this.isReactError(this.state.error) : false
+      const errorType = isDOMError ? "DOM" : isReactError ? "React" : "General"
 
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -68,7 +125,7 @@ export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProp
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <CardTitle className="text-xl text-gray-900">
-                {isDOMError ? "DOM Manipulation Error" : "Something went wrong"}
+                {errorType} Error Detected
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -77,12 +134,16 @@ export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProp
                 <AlertTitle>
                   {isDOMError 
                     ? "DOM manipulation conflict detected" 
+                    : isReactError
+                    ? "React component error detected"
                     : "An unexpected error occurred"
                   }
                 </AlertTitle>
                 <AlertDescription>
                   {isDOMError 
                     ? "The application encountered a conflict while manipulating the DOM. This is usually caused by rapid state changes or component lifecycle issues."
+                    : isReactError
+                    ? "A React component encountered an error during rendering or state management."
                     : "The writer encountered an error while processing your request."
                   }
                 </AlertDescription>
@@ -116,6 +177,10 @@ export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProp
                   <FileText className="w-4 h-4 mr-2" />
                   Reload Page
                 </Button>
+                <Button onClick={this.handleSafeMode} variant="outline" className="flex-1">
+                  <Shield className="w-4 h-4 mr-2" />
+                  Safe Mode
+                </Button>
                 <Button onClick={this.handleGoHome} variant="ghost" className="flex-1">
                   <Home className="w-4 h-4 mr-2" />
                   Go Home
@@ -129,6 +194,15 @@ export class WriterErrorBoundary extends React.Component<WriterErrorBoundaryProp
                     This error typically occurs when the application tries to manipulate DOM elements 
                     that have already been removed or modified by React's reconciliation process. 
                     The error has been caught and the application should now be stable.
+                  </p>
+                </div>
+              )}
+
+              {this.state.errorCount > 1 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-900 mb-2">Multiple Errors Detected</h4>
+                  <p className="text-sm text-yellow-700">
+                    This is error #{this.state.errorCount}. If errors persist, try "Safe Mode" or reload the page.
                   </p>
                 </div>
               )}

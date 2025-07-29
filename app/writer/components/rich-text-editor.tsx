@@ -42,37 +42,37 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
     // Use setTimeout to ensure DOM is ready and avoid conflicts with React reconciliation
     setTimeout(() => {
       try {
-        const textarea = document.querySelector(".w-md-editor-text-textarea") as HTMLTextAreaElement
+    const textarea = document.querySelector(".w-md-editor-text-textarea") as HTMLTextAreaElement
         if (!textarea) {
           console.warn("Textarea not found for markdown insertion")
           return
         }
 
-        const start = textarea.selectionStart
-        const end = textarea.selectionEnd
-        const selectedText = value.substring(start, end)
-        const replacement = selectedText || placeholder
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = value.substring(start, end)
+    const replacement = selectedText || placeholder
 
-        let newText = ""
-        if (syntax === "bold") {
-          newText = `**${replacement}**`
-        } else if (syntax === "italic") {
-          newText = `*${replacement}*`
-        } else if (syntax === "link") {
-          newText = `[${replacement || "link text"}](url)`
-        } else if (syntax === "image") {
-          newText = `![${replacement || "alt text"}](image-url)`
-        } else if (syntax === "code") {
-          newText = `\`${replacement}\``
-        } else if (syntax === "list") {
-          newText = `- ${replacement || "list item"}`
-        }
+    let newText = ""
+    if (syntax === "bold") {
+      newText = `**${replacement}**`
+    } else if (syntax === "italic") {
+      newText = `*${replacement}*`
+    } else if (syntax === "link") {
+      newText = `[${replacement || "link text"}](url)`
+    } else if (syntax === "image") {
+      newText = `![${replacement || "alt text"}](image-url)`
+    } else if (syntax === "code") {
+      newText = `\`${replacement}\``
+    } else if (syntax === "list") {
+      newText = `- ${replacement || "list item"}`
+    }
 
-        const newValue = value.substring(0, start) + newText + value.substring(end)
-        onChange(newValue)
+    const newValue = value.substring(0, start) + newText + value.substring(end)
+    onChange(newValue)
       } catch (error) {
         console.warn("Error inserting markdown:", error)
-      }
+  }
     }, 0)
   }, [value, onChange])
 

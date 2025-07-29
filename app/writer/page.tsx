@@ -46,6 +46,8 @@ import { useSafeDOM } from "./hooks/use-safe-dom"
 import { useSafeState, useSafeCallback } from "./hooks/use-safe-state"
 import { useDebouncedState } from "./hooks/use-debounced-state"
 import { WriterErrorBoundary } from "./components/error-boundary"
+import { SafeDOMWrapper } from "./components/safe-dom-wrapper"
+import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -204,6 +206,9 @@ function WriterPageContent() {
   const { toast } = useToast()
   const { hasContext, contextSummary, buildContext } = useResearchContext()
   const { safeDownload } = useSafeDOM()
+
+  // Add global error handler
+  useGlobalErrorHandler()
 
   // AI provider selection state
   const [selectedProvider, setSelectedProvider] = useSafeState<AIProvider | undefined>(undefined)
@@ -1109,9 +1114,9 @@ export default function WriterPage() {
     <RouteGuard requireAuth={true}>
       <ResearchSessionProvider>
         <WriterErrorBoundary>
-          <ErrorBoundary>
+          <SafeDOMWrapper>
             <WriterPageContent />
-          </ErrorBoundary>
+          </SafeDOMWrapper>
         </WriterErrorBoundary>
       </ResearchSessionProvider>
     </RouteGuard>

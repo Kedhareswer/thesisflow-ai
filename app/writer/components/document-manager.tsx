@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast"
 import DocumentService, { Document, CreateDocumentData } from "@/lib/services/document.service"
 import { useSafeDOM } from "../hooks/use-safe-dom"
 import { useSafeState, useSafeCallback } from "../hooks/use-safe-state"
+import { SafeDOMWrapper } from "./safe-dom-wrapper"
 
 interface DocumentManagerProps {
   onDocumentSelect: (document: Document) => void
@@ -212,150 +213,153 @@ export function DocumentManager({
 
   return (
     <div className={className}>
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Documents</CardTitle>
-            <Button
-              onClick={() => setShowCreateDialog(true)}
-              size="sm"
-              className="h-8 px-3"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              New Document
-            </Button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search documents..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-6 h-6 animate-spin" />
+      <SafeDOMWrapper>
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold">Documents</CardTitle>
+              <Button
+                onClick={() => setShowCreateDialog(true)}
+                size="sm"
+                className="h-8 px-3"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                New Document
+              </Button>
             </div>
-          ) : filteredDocuments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No documents found</p>
-              <p className="text-sm">Create your first document to get started</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {filteredDocuments.map((document) => (
-                <div
-                  key={document.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
-                    currentDocumentId === document.id ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
-                  }`}
-                  onClick={() => handleDocumentSelect(document)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="font-medium text-gray-900 truncate">
-                          {document.title}
-                        </h3>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${getDocumentTypeColor(document.document_type)}`}
-                        >
-                          {document.document_type}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>{formatDate(document.updated_at)}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-3 h-3" />
-                          <span>{document.content.length} chars</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <DropdownMenu
-                      trigger={
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      }
-                    >
-                      <DropdownMenuItem onClick={() => handleDocumentSelect(document)}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDuplicateDocument(document)}>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExportDocument(document, 'markdown')}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Export Markdown
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => handleDeleteDocument(document.id)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Create Document Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Document</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Title</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
-                value={newDocument.title}
-                onChange={(e) => setNewDocument(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter document title..."
+                placeholder="Search documents..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Type</label>
-              <select
-                value={newDocument.document_type}
-                onChange={(e) => setNewDocument(prev => ({ ...prev, document_type: e.target.value as any }))}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              >
-                <option value="paper">Research Paper</option>
-                <option value="note">Note</option>
-                <option value="summary">Summary</option>
-                <option value="idea">Research Idea</option>
-              </select>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : filteredDocuments.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No documents found</p>
+                <p className="text-sm">Create your first document to get started</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {filteredDocuments.map((document) => (
+                  <div
+                    key={document.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
+                      currentDocumentId === document.id ? 'bg-blue-50 border-blue-200' : 'border-gray-200'
+                    }`}
+                    onClick={() => handleDocumentSelect(document)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h3 className="font-medium text-gray-900 truncate">
+                            {document.title}
+                          </h3>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${getDocumentTypeColor(document.document_type)}`}
+                          >
+                            {document.document_type}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{formatDate(document.updated_at)}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{document.content.length} chars</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <DropdownMenu
+                        trigger={
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        }
+                      >
+                        <DropdownMenuItem onClick={() => handleDocumentSelect(document)}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicateDocument(document)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExportDocument(document, 'markdown')}>
+                          <Download className="w-4 h-4 mr-2" />
+                          Export Markdown
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteDocument(document.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Create Document Dialog */}
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Document</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  value={newDocument.title}
+                  onChange={(e) => setNewDocument(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter document title..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Type</label>
+                <select
+                  value={newDocument.document_type}
+                  onChange={(e) => setNewDocument(prev => ({ ...prev, document_type: e.target.value as any }))}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="paper">Research Paper</option>
+                  <option value="note">Note</option>
+                  <option value="summary">Summary</option>
+                  <option value="idea">Research Idea</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateDocument}>
+                  Create Document
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateDocument}>
-                Create Document
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      </SafeDOMWrapper>
     </div>
   )
 }
+ 

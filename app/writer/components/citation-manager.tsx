@@ -166,7 +166,7 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
   // Export references as a text file
   const exportReferences = () => {
     try {
-      const file = new Blob([formattedReferences], { type: "text/plain" })
+    const file = new Blob([formattedReferences], { type: "text/plain" })
       safeDownload(file, `references-${citationFormat}.txt`)
     } catch (error) {
       console.error('Error exporting references:', error)
