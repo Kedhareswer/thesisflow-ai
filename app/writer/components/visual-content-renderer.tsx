@@ -151,4 +151,4 @@ export function VisualContentRenderer({ content, className = "" }: VisualContent
       )}
     </div>
   )
-} 
+}
