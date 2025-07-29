@@ -151,3 +151,33 @@ h6 {
 .grid-auto-fill {
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }
+
+/* Custom scrollbar styles for modal */
+.modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.modal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Ensure modal content is properly contained */
+.modal-content-container {
+  max-height: calc(90vh - 200px);
+  overflow-y: auto;
+}

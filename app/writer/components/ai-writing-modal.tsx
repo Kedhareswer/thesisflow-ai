@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Clock,
   ChevronDown,
+  ChevronDown as ChevronDownIcon,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -761,7 +762,7 @@ export function AIWritingModal(props: AIWritingModalProps) {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[95vh] bg-white border border-gray-200 shadow-2xl overflow-hidden">
+      <DialogContent className="max-w-7xl w-[98vw] lg:w-[95vw] max-h-[90vh] bg-white border border-gray-200 shadow-2xl overflow-hidden">
         {/* Monochromatic Header */}
         <DialogHeader className="relative bg-black text-white p-8 -m-6 mb-8">
           <div className="flex items-center justify-between">
@@ -814,9 +815,9 @@ export function AIWritingModal(props: AIWritingModalProps) {
           )}
         </DialogHeader>
 
-        <div className="flex gap-8 max-h-[70vh] overflow-hidden">
+        <div className="flex flex-col lg:flex-row gap-8 max-h-[60vh] overflow-hidden">
           {/* Left Panel - Configuration */}
-          <div className="w-96 flex-shrink-0 space-y-6">
+          <div className="w-full lg:w-96 flex-shrink-0 space-y-6 overflow-y-auto pr-2 min-w-0 modal-scrollbar">
             {/* Template Configuration Card */}
             <Card className="border-gray-200 shadow-sm bg-white">
               <CardHeader className="pb-4 border-b border-gray-100">
@@ -994,8 +995,8 @@ export function AIWritingModal(props: AIWritingModalProps) {
           </div>
 
           {/* Right Panel - Sections */}
-          <div className="flex-1 overflow-hidden">
-            <div className="h-full overflow-y-auto pr-3 space-y-4">
+          <div className="flex-1 overflow-hidden relative">
+            <div className="h-full overflow-y-auto pr-3 space-y-4 pb-4 modal-scrollbar" id="sections-container">
               <DragDropContext onDragEnd={handleDragEnd}>
                 <Droppable droppableId="sections-droppable">
                   {(provided: any) => (
@@ -1125,11 +1126,21 @@ export function AIWritingModal(props: AIWritingModalProps) {
                 </Droppable>
               </DragDropContext>
             </div>
+            
+            {/* Scroll Indicator */}
+            {sections.length > 6 && (
+              <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <ChevronDownIcon className="w-4 h-4 animate-bounce" />
+                  <span>Scroll for more sections</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Enhanced Footer */}
-        <DialogFooter className="border-t-2 border-gray-200 pt-6 bg-gray-50 -mx-6 -mb-6 px-8 pb-8 mt-8">
+        <DialogFooter className="border-t-2 border-gray-200 pt-6 bg-gray-50 -mx-6 -mb-6 px-8 pb-8 mt-6 sticky bottom-0">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-4">
               <Button
