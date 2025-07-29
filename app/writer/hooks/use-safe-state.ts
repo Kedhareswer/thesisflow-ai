@@ -37,4 +37,4 @@ export function useSafeCallback<T extends (...args: any[]) => any>(callback: T):
       return callback(...args)
     }
   }) as T
-} 
+}
