@@ -11,8 +11,6 @@
 [![Socket.io](https://img.shields.io/badge/Socket.io-Latest-black?style=for-the-badge&logo=socket.io)](https://socket.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
 
-**Advanced AI-Powered Research Platform**
-
 Transform your research workflow with our comprehensive suite of AI-powered tools:
 - Discover groundbreaking papers and identify research gaps through intelligent literature analysis
 - Generate insightful summaries and extract key findings from academic content
