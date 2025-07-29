@@ -71,8 +71,9 @@ export class AIConfig {
       groq: "Groq (Fast)",
       openai: "OpenAI (GPT)",
       gemini: "Google Gemini",
-      aiml: "AIML API",
-      deepinfra: "DeepInfra"
+      anthropic: "Anthropic (Claude)",
+      mistral: "Mistral AI",
+      aiml: "AIML API"
     }
     return names[provider] || provider
   }
@@ -86,7 +87,7 @@ export class AIConfig {
     totalConfigured: number
     message: string
   }> {
-    const allProviders: AIProvider[] = ["groq", "openai", "gemini", "aiml", "deepinfra"]
+    const allProviders: AIProvider[] = ["groq", "openai", "gemini", "anthropic", "mistral", "aiml"]
     const available = await this.getAvailableProviders()
     const unavailable = allProviders.filter(p => !available.includes(p))
 

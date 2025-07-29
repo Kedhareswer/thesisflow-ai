@@ -1,4 +1,4 @@
-import type { AIProvider } from "./ai-providers"
+import { AIProvider } from "./ai-providers"
 
 export interface ProviderAvailability {
   provider: AIProvider
@@ -33,17 +33,24 @@ export class AIProviderDetector {
         priority: 3, // Good quality and free tier
       },
       {
+        provider: "anthropic",
+        available: !!process.env.ANTHROPIC_API_KEY?.trim(),
+        envKey: "ANTHROPIC_API_KEY",
+        priority: 4, // High quality reasoning
+      },
+      {
+        provider: "mistral",
+        available: !!process.env.MISTRAL_API_KEY?.trim(),
+        envKey: "MISTRAL_API_KEY",
+        priority: 5, // Good performance
+      },
+      {
         provider: "aiml",
         available: !!process.env.AIML_API_KEY?.trim(),
         envKey: "AIML_API_KEY",
-        priority: 4, // Good alternative
+        priority: 6, // Good alternative
       },
-      {
-        provider: "deepinfra",
-        available: !!process.env.DEEPINFRA_API_KEY?.trim(),
-        envKey: "DEEPINFRA_API_KEY",
-        priority: 5, // Cost-effective option
-      },
+      
     ]
 
     return providers.filter(p => p.available).sort((a, b) => a.priority - b.priority)
@@ -80,8 +87,9 @@ export class AIProviderDetector {
       { provider: "groq" as AIProvider, envKey: "GROQ_API_KEY" },
       { provider: "openai" as AIProvider, envKey: "OPENAI_API_KEY" },
       { provider: "gemini" as AIProvider, envKey: "GEMINI_API_KEY" },
+      { provider: "anthropic" as AIProvider, envKey: "ANTHROPIC_API_KEY" },
+      { provider: "mistral" as AIProvider, envKey: "MISTRAL_API_KEY" },
       { provider: "aiml" as AIProvider, envKey: "AIML_API_KEY" },
-      { provider: "deepinfra" as AIProvider, envKey: "DEEPINFRA_API_KEY" },
     ]
 
     const status: Record<string, { available: boolean; envKey: string }> = {}

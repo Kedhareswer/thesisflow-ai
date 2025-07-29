@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS user_api_keys (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    provider VARCHAR(50) NOT NULL CHECK (provider IN ('openai', 'groq', 'gemini', 'anthropic', 'mistral', 'aiml', 'deepinfra')),
+    provider VARCHAR(50) NOT NULL CHECK (provider IN ('openai', 'groq', 'gemini', 'anthropic', 'mistral', 'aiml')),
     api_key TEXT NOT NULL,
     is_active BOOLEAN DEFAULT true,
     last_tested_at TIMESTAMP WITH TIME ZONE,

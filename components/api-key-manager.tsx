@@ -78,6 +78,14 @@ const AI_PROVIDERS = [
     placeholder: "...",
     keyFormat: "32+ characters, alphanumeric",
   },
+  {
+    id: "aiml",
+    name: "AIML API",
+    description: "Multiple AI models including GPT-4 and Claude",
+    docsUrl: "https://aiml.com/api-keys",
+    placeholder: "...",
+    keyFormat: "10+ characters, alphanumeric",
+  },
 ]
 
 export function ApiKeyManager() {

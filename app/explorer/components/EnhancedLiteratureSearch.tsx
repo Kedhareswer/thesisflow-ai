@@ -185,9 +185,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
   const searchTime = paperSearch.data?.search_time || 0
   const sources = paperSearch.data?.sources || []
   
-  // Check if we're using mock data
-  const hasMockData = papers.some((paper: ResearchPaper) => paper.id?.includes('mock-'))
-  const hasLimitedData = sources.length === 0 || papers.length === 0
+
 
   return (
     <div className={className}>
@@ -373,22 +371,21 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       {paperSearch.loading && <SkeletonList count={3} />}
 
       {/* Show status alerts */}
-      {papers.length > 0 && hasMockData && (
-        <Alert className="border-orange-200 bg-orange-50">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Demo Mode:</strong> Academic APIs are currently unavailable. Showing demonstration results. 
-            The export and filtering features are fully functional for testing purposes.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {papers.length > 0 && !hasMockData && sources.length > 0 && (
+      {papers.length > 0 && sources.length > 0 && (
         <Alert className="border-blue-200 bg-blue-50">
           <Info className="h-4 w-4" />
           <AlertDescription>
             Found {totalPapers} papers from {sources.join(', ')} in {searchTime}ms. 
             Citation data enhanced where available.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {papers.length === 0 && !paperSearch.loading && !paperSearch.error && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No papers found from available sources. Try different keywords or check if search services are available.
           </AlertDescription>
         </Alert>
       )}

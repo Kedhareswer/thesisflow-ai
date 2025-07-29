@@ -54,8 +54,10 @@ export function ConfigurationPanel({
             {selectedProvider === "groq" && " Fast, efficient summaries with high accuracy"}
             {selectedProvider === "openai" && " Advanced reasoning and detailed analysis"}
             {selectedProvider === "gemini" && " Balanced analysis with comprehensive coverage"}
+            {selectedProvider === "anthropic" && " High-quality reasoning and detailed insights"}
+            {selectedProvider === "mistral" && " Fast and efficient AI processing"}
             {selectedProvider === "aiml" && " Specialized AI analysis and insights"}
-            {selectedProvider === "deepinfra" && " High-performance AI processing"}
+
           </p>
         </div>
       )}

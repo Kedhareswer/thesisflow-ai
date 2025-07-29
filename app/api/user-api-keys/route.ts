@@ -19,8 +19,7 @@ function validateApiKey(provider: string, apiKey: string): boolean {
       return apiKey.length >= 20 && !apiKey.includes(' ')
     case 'aiml':
       return apiKey.length >= 20 && !apiKey.includes(' ')
-    case 'deepinfra':
-      return apiKey.length >= 20 && !apiKey.includes(' ')
+
     default:
       return apiKey.length >= 10 && !apiKey.includes(' ')
   }
