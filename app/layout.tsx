@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import { AuthErrorBoundary } from "@/components/auth-error-boundary"
+import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
@@ -29,13 +30,15 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthErrorBoundary>
             <SupabaseAuthProvider>
-              <div className="min-h-screen bg-gray-50">
-                <MainNav />
-                <main className="flex-1">{children}</main>
-              </div>
-              <Toaster />
-              <AuthDebug />
-              <Analytics />
+              <ResearchSessionProvider>
+                <div className="min-h-screen bg-gray-50">
+                  <MainNav />
+                  <main className="flex-1">{children}</main>
+                </div>
+                <Toaster />
+                <AuthDebug />
+                <Analytics />
+              </ResearchSessionProvider>
             </SupabaseAuthProvider>
           </AuthErrorBoundary>
         </ThemeProvider>

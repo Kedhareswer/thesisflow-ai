@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Plus, FileText, Folder, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, FileText, Folder, ChevronDown, ChevronRight, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { DocumentService } from "@/lib/services/document.service" // Corrected import to named export
+import DocumentService, { Document } from "@/lib/services/document.service"
 import { useToast } from "@/hooks/use-toast"
-import type { Document } from "@/lib/types" // Assuming Document type is here
+import { supabase } from "@/lib/supabase"
 
 interface DocumentListProps {
   activeDocumentId?: string
@@ -22,28 +22,86 @@ export default function DocumentList({ activeDocumentId }: DocumentListProps) {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
   const { toast } = useToast()
 
+  // Check authentication status
   useEffect(() => {
-    const fetchDocuments = async () => {
+    const checkAuth = async () => {
       try {
-        setLoading(true)
-        const fetchedDocs = await DocumentService.getInstance().getDocuments({ document_type: "paper" })
-        setDocuments(fetchedDocs)
+        const { data: { user } } = await supabase.auth.getUser()
+        setIsAuthenticated(!!user)
       } catch (err) {
-        console.error("Failed to fetch documents:", err)
-        setError("Failed to load documents.")
-        toast({
-          title: "Error",
-          description: "Failed to load documents.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
+        console.error("Auth check failed:", err)
+        setIsAuthenticated(false)
       }
     }
+    
+    checkAuth()
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session?.user)
+    })
+    
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const fetchDocuments = useCallback(async () => {
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
+    
+    try {
+      setLoading(true)
+      const fetchedDocs = await DocumentService.getInstance().getDocuments({ document_type: "paper" })
+      setDocuments(fetchedDocs)
+      setError(null)
+    } catch (err) {
+      console.error("Failed to fetch documents:", err)
+      setError("Failed to load documents.")
+      // Show toast without making it a dependency
+      toast({
+        title: "Error",
+        description: "Failed to load documents.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [isAuthenticated]) // Remove toast dependency
+
+  useEffect(() => {
     fetchDocuments()
-  }, [toast])
+  }, [fetchDocuments])
+
+  const handleDeleteDocument = async (docId: string, docTitle: string) => {
+    if (!isAuthenticated) return
+    
+    try {
+      setDeletingDocId(docId)
+      await DocumentService.getInstance().deleteDocument(docId)
+      
+      // Remove from local state
+      setDocuments(prev => prev.filter(doc => doc.id !== docId))
+      
+      toast({
+        title: "Document deleted",
+        description: `"${docTitle}" has been deleted.`,
+      })
+    } catch (err) {
+      console.error("Failed to delete document:", err)
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingDocId(null)
+    }
+  }
 
   const handleToggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
@@ -76,18 +134,33 @@ export default function DocumentList({ activeDocumentId }: DocumentListProps) {
   })
 
   const renderDocumentItem = (doc: Document) => (
-    <Link
+    <div
       key={doc.id}
-      href={`/writer?id=${doc.id}`}
       className={cn(
-        "flex items-center gap-2 py-1.5 px-3 rounded-md text-sm transition-colors",
+        "flex items-center justify-between py-1.5 px-3 rounded-md text-sm transition-colors group",
         "hover:bg-gray-100 dark:hover:bg-gray-800",
         activeDocumentId === doc.id ? "bg-gray-200 dark:bg-gray-700 font-medium" : "text-gray-700 dark:text-gray-300",
       )}
     >
-      <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-      <span className="truncate">{doc.title || "Untitled document"}</span>
-    </Link>
+      <Link
+        href={`/writer?id=${doc.id}`}
+        className="flex items-center gap-2 flex-1 min-w-0"
+      >
+        <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+        <span className="truncate">{doc.title || "Untitled document"}</span>
+      </Link>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleDeleteDocument(doc.id, doc.title || "Untitled document")}
+        disabled={deletingDocId === doc.id}
+        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
+      >
+        <Trash2 className="h-3 w-3" />
+        <span className="sr-only">Delete {doc.title || "Untitled document"}</span>
+      </Button>
+    </div>
   )
 
   const renderFolder = (folderId: string, folderName: string) => {
@@ -137,7 +210,16 @@ export default function DocumentList({ activeDocumentId }: DocumentListProps) {
       </div>
 
       <ScrollArea className="flex-1 p-4">
-        {loading ? (
+        {!isAuthenticated ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              Please log in to view your documents
+            </p>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+          </div>
+        ) : loading ? (
           <div className="space-y-2">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />

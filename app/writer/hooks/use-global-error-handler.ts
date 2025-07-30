@@ -73,4 +73,7 @@ export function useGlobalErrorHandler() {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection)
     }
   }, [handleError, handleUnhandledRejection])
+
+  // Return the handleError function so it can be used elsewhere
+  return { handleError, handleUnhandledRejection }
 }

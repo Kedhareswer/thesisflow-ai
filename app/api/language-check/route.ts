@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 /**
  * API route for checking text using LanguageTool
  * This proxies requests to the LanguageTool public API
- *
+ * 
  * POST /api/language-check
  * Body: { text: string, language?: string, chunkSize?: number }
  */
@@ -253,26 +253,26 @@ async function checkChunkWithLanguageTool(text: string, language: string) {
     throw new Error(`Chunk too large (${Math.round(textSize / 1024)}KB) for LanguageTool API`)
   }
 
-  const response = await fetch("https://api.languagetool.org/v2/check", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+    const response = await fetch("https://api.languagetool.org/v2/check", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      text: text,
-      language: language,
-      enabledOnly: "false",
-    }).toString(),
-  })
+      },
+      body: new URLSearchParams({
+        text: text,
+        language: language,
+        enabledOnly: "false",
+      }).toString(),
+    })
 
-  if (!response.ok) {
+    if (!response.ok) {
     if (response.status === 413) {
       throw new Error(`Chunk too large (${Math.round(textSize / 1024)}KB) for LanguageTool API`)
     }
-    throw new Error(`LanguageTool API error: ${response.status}`)
-  }
+      throw new Error(`LanguageTool API error: ${response.status}`)
+    }
 
-  const data = await response.json()
+    const data = await response.json()
   return data.matches || []
 }

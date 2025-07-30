@@ -31,26 +31,37 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { ResearchService } from "@/lib/services/research.service"
-import { DocumentService } from "@/lib/services/document.service" // Corrected import to named export
+import DocumentService, { Document } from "@/lib/services/document.service"
 import DocumentList from "./components/document-list"
 import RichTextEditor from "./components/rich-text-editor"
 import CitationManager from "./components/citation-manager"
 import AiWritingAssistant from "./components/ai-writing-assistant"
-import VisualContentRenderer from "./components/visual-content-renderer"
+import { VisualContentRenderer } from "./components/visual-content-renderer"
 import { useDebouncedState } from "./hooks/use-debounced-state"
 import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
 import { UserProfileAvatar } from "@/components/user-profile-avatar" // For user editing indicator
-import type { Document } from "@/lib/types" // Assuming Document type is here
+import { supabase } from "@/lib/supabase"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
   const documentId = searchParams.get("id")
   const { toast } = useToast()
-  const { handleError } = useGlobalErrorHandler()
+  const { handleError: globalErrorHandler } = useGlobalErrorHandler()
+
+  // Create a proper error handler for async operations
+  const handleError = useCallback((error: any, message: string) => {
+    console.error(message, error)
+    toast({
+      title: "Error",
+      description: message,
+      variant: "destructive",
+    })
+  }, [toast])
 
   const [document, setDocument] = useState<Document | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false)
   const [isCitationManagerOpen, setIsCitationManagerOpen] = useState(false)
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
@@ -67,11 +78,54 @@ export default function WriterPage() {
 
   const [documentTitle, setDocumentTitle] = useState("Untitled document")
   const [documentContent, setDocumentContent] = useState("")
-  const debouncedDocumentContent = useDebouncedState(documentContent, 1000)
-  const debouncedDocumentTitle = useDebouncedState(documentTitle, 1000)
+  const [debouncedDocumentContent, setDebouncedDocumentContent] = useState("")
+  const [debouncedDocumentTitle, setDebouncedDocumentTitle] = useState("Untitled document")
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setIsAuthenticated(!!user)
+      } catch (err) {
+        console.error("Auth check failed:", err)
+        setIsAuthenticated(false)
+      }
+    }
+    
+    checkAuth()
+    
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
+      setIsAuthenticated(!!session?.user)
+    })
+    
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // Debounce document content changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedDocumentContent(documentContent)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [documentContent])
+
+  // Debounce document title changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedDocumentTitle(documentTitle)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [documentTitle])
 
   const fetchDocument = useCallback(
     async (id: string) => {
+      if (!isAuthenticated) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
         const fetchedDoc = await DocumentService.getInstance().getDocument(id)
@@ -87,10 +141,15 @@ export default function WriterPage() {
         setLoading(false)
       }
     },
-    [handleError],
+    [handleError, isAuthenticated],
   )
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
+    
     if (documentId) {
       fetchDocument(documentId)
     } else {
@@ -100,48 +159,52 @@ export default function WriterPage() {
       setDocumentContent("")
       setLoading(false)
     }
-  }, [documentId, fetchDocument])
+  }, [documentId, fetchDocument, isAuthenticated])
+
+  const saveDocument = useCallback(async () => {
+    if (!isAuthenticated) return // Don't save if not authenticated
+    
+    if (!document && !debouncedDocumentContent && debouncedDocumentTitle === "Untitled document") return // No document and no content to save
+
+    setSaving(true)
+    try {
+      let updatedDoc: Document
+      if (document) {
+        // Update existing document
+        updatedDoc = await DocumentService.getInstance().updateDocument(document.id, {
+          title: debouncedDocumentTitle,
+          content: debouncedDocumentContent,
+        })
+      } else {
+        // Create new document if none exists
+        updatedDoc = await DocumentService.getInstance().createDocument({
+          title: debouncedDocumentTitle || "Untitled document",
+          content: debouncedDocumentContent,
+          document_type: "paper", // Default type for writer page
+        })
+        // Update URL to reflect the new document ID
+        window.history.pushState({}, "", `/writer?id=${updatedDoc.id}`)
+      }
+      setDocument(updatedDoc)
+      toast({
+        title: "Document saved",
+        description: "Your changes have been automatically saved.",
+      })
+    } catch (err) {
+      handleError(err, "Failed to save document")
+      toast({
+        title: "Save failed",
+        description: "Could not save your changes. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }, [document, debouncedDocumentContent, debouncedDocumentTitle, isAuthenticated])
 
   useEffect(() => {
-    const saveDocument = async () => {
-      if (!document && !debouncedDocumentContent && debouncedDocumentTitle === "Untitled document") return // No document and no content to save
-
-      setSaving(true)
-      try {
-        let updatedDoc: Document
-        if (document) {
-          // Update existing document
-          updatedDoc = await DocumentService.getInstance().updateDocument(document.id, {
-            title: debouncedDocumentTitle,
-            content: debouncedDocumentContent,
-          })
-        } else {
-          // Create new document if none exists
-          updatedDoc = await DocumentService.getInstance().createDocument({
-            title: debouncedDocumentTitle || "Untitled document",
-            content: debouncedDocumentContent,
-            document_type: "paper", // Default type for writer page
-          })
-          // Update URL to reflect the new document ID
-          window.history.pushState({}, "", `/writer?id=${updatedDoc.id}`)
-        }
-        setDocument(updatedDoc)
-        toast({
-          title: "Document saved",
-          description: "Your changes have been automatically saved.",
-        })
-      } catch (err) {
-        handleError(err, "Failed to save document")
-        toast({
-          title: "Save failed",
-          description: "Could not save your changes. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setSaving(false)
-      }
-    }
-
+    if (!isAuthenticated) return // Don't save if not authenticated
+    
     // Only save if there's a document or content, and content/title has changed
     if (
       (document && (debouncedDocumentContent !== document.content || debouncedDocumentTitle !== document.title)) ||
@@ -149,9 +212,18 @@ export default function WriterPage() {
     ) {
       saveDocument()
     }
-  }, [debouncedDocumentContent, debouncedDocumentTitle, document, toast, handleError])
+  }, [debouncedDocumentContent, debouncedDocumentTitle, document, saveDocument, isAuthenticated])
 
   const handleNewDocument = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to create a new document.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     try {
       setLoading(true)
       const newDoc = await DocumentService.getInstance().createDocument({
@@ -249,14 +321,14 @@ export default function WriterPage() {
       </div>
     )
   }
-
+  
   return (
     <TooltipProvider>
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col">
           <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">Acme Inc</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">Doc Editor</h1>
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -280,13 +352,6 @@ export default function WriterPage() {
           </div>
           <div className="p-4 space-y-2 border-b border-gray-200 dark:border-gray-800">
             <Link
-              href="/inbox"
-              className="flex items-center gap-2 py-1.5 px-3 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Inbox
-            </Link>
-            <Link
               href="/ai-assistant"
               className="flex items-center gap-2 py-1.5 px-3 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
@@ -305,14 +370,14 @@ export default function WriterPage() {
               {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
               {!saving && <CheckCircle className="h-4 w-4 text-green-500" />}
               <span className="text-sm text-gray-500 dark:text-gray-400">{saving ? "Saving..." : "Saved"}</span>
-            </div>
+                  </div>
             <div className="flex items-center gap-4">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon">
                     <Share2 className="h-4 w-4" />
                     <span className="sr-only">Share</span>
-                  </Button>
+                </Button>
                 </TooltipTrigger>
                 <TooltipContent>Share</TooltipContent>
               </Tooltip>
@@ -347,14 +412,17 @@ export default function WriterPage() {
                 <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex items-center gap-2">
                     <Lightbulb className="h-5 w-5" /> AI Writing Assistant
-                  </div>
+        </div>
                   {isAiAssistantOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
                   <Card>
-                    <CardContent className="p-4">
+              <CardContent className="p-4">
                       <AiWritingAssistant
+                        selectedProvider="default"
+                        selectedModel="default"
                         onInsertText={(text) => setDocumentContent((prev) => prev + text)}
+                        documentTemplate="general"
                         currentDocumentContent={documentContent}
                       />
                     </CardContent>
@@ -373,9 +441,9 @@ export default function WriterPage() {
                 <CollapsibleContent className="mt-4">
                   <Card>
                     <CardContent className="p-4">
-                      <CitationManager />
-                    </CardContent>
-                  </Card>
+                      <CitationManager selectedTemplate="ieee" />
+              </CardContent>
+            </Card>
                 </CollapsibleContent>
               </Collapsible>
 
@@ -390,17 +458,17 @@ export default function WriterPage() {
                 <CollapsibleContent className="mt-4">
                   <Card>
                     <CardContent className="p-4 space-y-4">
-                      <Button
+                        <Button 
                         onClick={handleAiDetect}
                         disabled={!documentContent || aiDetectionResult === "Detecting..."}
                       >
                         {aiDetectionResult === "Detecting..." ? "Detecting..." : "Run AI Detection"}
-                      </Button>
+                        </Button>
                       {aiDetectionResult && (
                         <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
                           <p className="text-sm font-medium">Result:</p>
                           <p className="text-lg font-bold">{aiDetectionResult}</p>
-                        </div>
+                    </div>
                       )}
                     </CardContent>
                   </Card>
@@ -429,9 +497,9 @@ export default function WriterPage() {
                             variant="outline"
                             size="sm"
                             className="mt-2 bg-transparent"
-                            onClick={() => {
+                                  onClick={() => {
                               setDocumentContent(humanizedText)
-                              toast({
+                                    toast({
                                 title: "Text updated",
                                 description: "Document content replaced with humanized text.",
                               })
@@ -441,10 +509,10 @@ export default function WriterPage() {
                           </Button>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
+                      </CardContent>
+                    </Card>
+                      </CollapsibleContent>
+                    </Collapsible>
 
               {/* Plagiarism Check */}
               <Collapsible open={isPlagiarismCheckOpen} onOpenChange={setIsPlagiarismCheckOpen} className="mb-6">
@@ -453,7 +521,7 @@ export default function WriterPage() {
                     <Gavel className="h-5 w-5" /> Plagiarism Check
                   </div>
                   {isPlagiarismCheckOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </CollapsibleTrigger>
+                      </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
                   <Card>
                     <CardContent className="p-4 space-y-4">
@@ -473,7 +541,7 @@ export default function WriterPage() {
                               <AlertTriangle className="inline-block h-4 w-4 mr-1" />
                               <span className="font-bold">
                                 Plagiarism Detected ({plagiarismCheckResult.percentage}% match)!
-                              </span>
+                            </span>
                               <p className="text-sm mt-1">{plagiarismCheckResult.details}</p>
                             </div>
                           ) : (
@@ -481,14 +549,14 @@ export default function WriterPage() {
                               <CheckCircle className="inline-block h-4 w-4 mr-1" />
                               <span className="font-bold">No obvious plagiarism detected.</span>
                               <p className="text-sm mt-1">{plagiarismCheckResult.details}</p>
-                            </div>
+                          </div>
                           )}
                         </div>
                       )}
                     </CardContent>
                   </Card>
-                </CollapsibleContent>
-              </Collapsible>
+                      </CollapsibleContent>
+                    </Collapsible>
 
               {/* Visual Content Renderer (for Mermaid charts, etc.) */}
               <Collapsible className="mb-6">
@@ -500,7 +568,7 @@ export default function WriterPage() {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
                   <Card>
-                    <CardContent className="p-4">
+              <CardContent className="p-4">
                       <VisualContentRenderer content={documentContent} />
                       {/* Example of embedding MermaidChart directly if needed */}
                       {/* <MermaidChart chartDefinition="graph TD; A-->B" /> */}
@@ -511,7 +579,7 @@ export default function WriterPage() {
             </div>
           </ScrollArea>
         </main>
-      </div>
+    </div>
     </TooltipProvider>
   )
 }
