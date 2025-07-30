@@ -1,17 +1,32 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import { Sparkles, Lightbulb, ArrowRight, PenLine, Check, Loader2, Settings } from 'lucide-react'
-import { useResearchSession } from '@/components/research-session-provider'
-import { AI_PROVIDERS, type AIProvider } from '@/lib/ai-providers'
-import { Label } from '@/components/ui/label'
+import { useState, useCallback } from "react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
+import { useResearchSession } from "@/components/research-session-provider"
+import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers"
+import { Label } from "@/components/ui/label"
+import { supabase } from "@/lib/supabase"
+import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+import { 
+  Sparkles, 
+  ChevronUp, 
+  ChevronDown, 
+  Settings, 
+  AlertTriangle,
+  Loader2,
+  CheckCircle,
+  Copy,
+  Download,
+  PenLine,
+  ArrowRight
+} from "lucide-react"
 
 interface AIWritingAssistantProps {
   selectedProvider: string
@@ -19,6 +34,9 @@ interface AIWritingAssistantProps {
   onInsertText: (text: string) => void
   documentTemplate: string
   currentDocumentContent?: string // Add current document content for better context
+  isAuthenticated?: boolean // Add authentication state
+  onProviderChange?: (provider: AIProvider) => void
+  onModelChange?: (model: string) => void
 }
 
 export function AIWritingAssistant({ 
@@ -26,15 +44,16 @@ export function AIWritingAssistant({
   selectedModel, 
   onInsertText,
   documentTemplate,
-  currentDocumentContent = ""
+  currentDocumentContent = "",
+  isAuthenticated = false,
+  onProviderChange,
+  onModelChange
 }: AIWritingAssistantProps) {
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedText, setGeneratedText] = useState('')
   const [writingTask, setWritingTask] = useState<string>('continue')
   const [showSettings, setShowSettings] = useState(false)
-  const [currentProvider, setCurrentProvider] = useState<AIProvider>('openai')
-  const [currentModel, setCurrentModel] = useState('gpt-4')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string>('')
   
@@ -104,7 +123,7 @@ export function AIWritingAssistant({
       context += `\nCurrent Document Content (preview):\n${contentPreview}${currentDocumentContent.length > 500 ? '...' : ''}\n`
     }
     
-    context += `Using: ${currentProvider} with ${currentModel}\n`
+    context += `Using: ${selectedProvider} with ${selectedModel}\n`
     context += `Template: ${documentTemplate || 'Standard Academic'}\n`
     
     return context
@@ -114,8 +133,24 @@ export function AIWritingAssistant({
   const generateText = async () => {
     if (isGenerating) return
     
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to use the AI Writing Assistant. Your API keys are stored securely in your account.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     try {
       setIsGenerating(true)
+      
+      // Get current Supabase session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error("No valid session found")
+      }
       
       const templateStyle = getTemplateStyle()
       const researchContext = getResearchContext()
@@ -125,58 +160,47 @@ export function AIWritingAssistant({
       systemPrompt += `Focus on producing coherent, well-structured text that would be suitable for a scholarly publication. `
       systemPrompt += `Always maintain academic integrity and provide well-reasoned arguments.`
       
-      // Add task-specific instructions
       let taskPrompt = ''
+      
       switch (writingTask) {
+        case 'continue':
+          taskPrompt = `Continue writing the document from where it left off. Maintain the same style, tone, and academic rigor.`
+          break
         case 'introduction':
-          taskPrompt = 'Write an engaging introduction that contextualizes the research, states the problem being addressed, and outlines the approach. Include relevant background information and clearly state the research objectives.'
+          taskPrompt = `Write a compelling introduction for this research document. Include background context, research question, and significance.`
           break
         case 'conclusion':
-          taskPrompt = 'Write a conclusion that summarizes the key findings, discusses their implications, and suggests future research directions. Connect back to the research objectives and highlight the significance of the work.'
+          taskPrompt = `Write a comprehensive conclusion that summarizes key findings, discusses implications, and suggests future research directions.`
           break
         case 'abstract':
-          taskPrompt = 'Write a concise abstract summarizing the research objectives, methodology, results, and conclusions in 200-250 words. Use clear, precise language and avoid jargon when possible.'
+          taskPrompt = `Write a concise abstract (150-250 words) that summarizes the research problem, methodology, key findings, and conclusions.`
           break
         case 'methodology':
-          taskPrompt = 'Write a methodology section that clearly describes the research approach, data collection methods, and analytical techniques used. Include sufficient detail for reproducibility while maintaining clarity.'
+          taskPrompt = `Write a detailed methodology section describing the research design, data collection methods, and analysis procedures.`
           break
         case 'results':
-          taskPrompt = 'Write a results section that presents the findings in a clear, logical manner, using appropriate academic language. Organize the results systematically and include relevant statistical information where applicable.'
+          taskPrompt = `Write a results section presenting the key findings with appropriate statistical analysis and data interpretation.`
           break
         case 'analyze':
-          if (!currentDocumentContent || currentDocumentContent.trim().length < 50) {
-            throw new Error('Please add more content to your document before analyzing.')
-          }
-          taskPrompt = `Analyze the following document content and provide specific suggestions for improvement. Focus on:
-1. Structure and organization
-2. Clarity and readability
-3. Academic tone and style
-4. Logical flow and coherence
-5. Specific areas that need expansion or clarification
-
-Document content to analyze:
-${currentDocumentContent.slice(0, 2000)}${currentDocumentContent.length > 2000 ? '...' : ''}`
+          taskPrompt = `Analyze the current document content for structure, clarity, academic tone, and coherence. Provide specific suggestions for improvement.`
           break
-        case 'continue':
-        case 'custom':
         default:
-          taskPrompt = prompt || 'Continue the writing in a coherent and logical manner, maintaining the academic tone and style of the document.'
-          break
+          taskPrompt = `Continue writing the document in a professional academic style.`
       }
       
-      // Combine system prompt, research context, and task prompt
       const fullPrompt = `${systemPrompt}\n\n${researchContext}\n\nTask: ${taskPrompt}`
       
-      // Call the AI generation API
+      // Call the AI generation API with authentication
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           prompt: fullPrompt,
-          provider: currentProvider,
-          model: currentModel,
+          provider: selectedProvider,
+          model: selectedModel,
           maxTokens: 1000,
           temperature: 0.7
         })
@@ -197,7 +221,7 @@ ${currentDocumentContent.slice(0, 2000)}${currentDocumentContent.length > 2000 ?
       
       toast({
         title: "Content generated",
-        description: `AI writing assistant has generated ${writingTask} content using ${data.provider || currentProvider}.`,
+        description: `AI writing assistant has generated ${writingTask} content using ${data.provider || selectedProvider}.`,
       })
     } catch (error) {
       console.error("Error generating text:", error)
@@ -257,38 +281,15 @@ ${currentDocumentContent.slice(0, 2000)}${currentDocumentContent.length > 2000 ?
       {showSettings && (
         <Card>
           <CardContent className="pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium">AI Provider</Label>
-                <Select value={currentProvider} onValueChange={(value: AIProvider) => setCurrentProvider(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(AI_PROVIDERS).map((provider) => (
-                      <SelectItem key={provider} value={provider}>
-                        {AI_PROVIDERS[provider as AIProvider].name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Model</Label>
-                <Select value={currentModel} onValueChange={setCurrentModel}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableModels(currentProvider).map((model) => (
-                      <SelectItem key={model} value={model}>
-                        {model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <MinimalAIProviderSelector
+              selectedProvider={selectedProvider as AIProvider}
+              selectedModel={selectedModel}
+              onProviderChange={onProviderChange || (() => {})}
+              onModelChange={onModelChange || (() => {})}
+              variant="compact"
+              showModelSelector={true}
+              showConfigLink={false}
+            />
           </CardContent>
         </Card>
       )}
@@ -305,20 +306,25 @@ ${currentDocumentContent.slice(0, 2000)}${currentDocumentContent.length > 2000 ?
       )}
       
       <div className="flex gap-2">
-        <Button 
-          onClick={generateText} 
-          disabled={isGenerating}
-          className="flex-1"
+        <Button
+          onClick={generateText}
+          disabled={isGenerating || !isAuthenticated}
+          className="w-full bg-black hover:bg-gray-800 text-white"
         >
           {isGenerating ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {writingTask === 'analyze' ? 'Analyzing...' : 'Generating...'}
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          ) : !isAuthenticated ? (
+            <>
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Login Required
             </>
           ) : (
             <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              {writingTask === 'analyze' ? 'Analyze Document' : 'Generate'}
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate
             </>
           )}
         </Button>
@@ -343,7 +349,7 @@ ${currentDocumentContent.slice(0, 2000)}${currentDocumentContent.length > 2000 ?
             {writingTask !== 'analyze' && (
               <div className="mt-3 flex justify-end">
                 <Button size="sm" variant="ghost" onClick={handleInsert}>
-                  <Check className="h-3 w-3 mr-1" />
+                  <CheckCircle className="h-3 w-3 mr-1" />
                   Insert
                 </Button>
               </div>
@@ -353,7 +359,16 @@ ${currentDocumentContent.slice(0, 2000)}${currentDocumentContent.length > 2000 ?
       )}
       
       <div className="text-xs text-muted-foreground mt-2">
-        Using {AI_PROVIDERS[currentProvider]?.name || currentProvider} / {currentModel} with {documentTemplate || 'standard'} template style
+        {isAuthenticated ? (
+          <>
+            Using {AI_PROVIDERS[selectedProvider as AIProvider]?.name || selectedProvider} / {selectedModel} with {documentTemplate || 'standard'} template style
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-amber-600">
+            <AlertTriangle className="h-3 w-3" />
+            <span>Please log in to use AI features. Your API keys are stored securely in your account.</span>
+          </div>
+        )}
       </div>
     </div>
   )

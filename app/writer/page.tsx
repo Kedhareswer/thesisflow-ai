@@ -41,6 +41,7 @@ import { useDebouncedState } from "./hooks/use-debounced-state"
 import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
 import { UserProfileAvatar } from "@/components/user-profile-avatar" // For user editing indicator
 import { supabase } from "@/lib/supabase"
+import type { AIProvider } from "@/lib/ai-providers"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -80,6 +81,10 @@ export default function WriterPage() {
   const [documentContent, setDocumentContent] = useState("")
   const [debouncedDocumentContent, setDebouncedDocumentContent] = useState("")
   const [debouncedDocumentTitle, setDebouncedDocumentTitle] = useState("Untitled document")
+
+  // AI Provider state management (similar to Summarizer)
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>()
+  const [selectedModel, setSelectedModel] = useState<string>()
 
   // Check authentication status
   useEffect(() => {
@@ -419,11 +424,14 @@ export default function WriterPage() {
                   <Card>
               <CardContent className="p-4">
                       <AiWritingAssistant
-                        selectedProvider="default"
-                        selectedModel="default"
+                        selectedProvider={selectedProvider || "groq"}
+                        selectedModel={selectedModel || "llama-3.3-70b-versatile"}
                         onInsertText={(text) => setDocumentContent((prev) => prev + text)}
                         documentTemplate="general"
                         currentDocumentContent={documentContent}
+                        isAuthenticated={isAuthenticated}
+                        onProviderChange={setSelectedProvider}
+                        onModelChange={setSelectedModel}
                       />
                     </CardContent>
                   </Card>

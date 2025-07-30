@@ -3,9 +3,10 @@ import { getAuthUser, createSupabaseAdmin } from '@/lib/auth-utils'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await getAuthUser(request, "documents")
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -19,7 +20,7 @@ export async function GET(
     const { data: document, error } = await supabaseAdmin
       .from("documents")
       .select("*")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("owner_id", user.id)
       .single()
 
@@ -40,9 +41,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await getAuthUser(request, "documents")
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -70,7 +72,7 @@ export async function PUT(
     const { data: document, error } = await supabaseAdmin
       .from("documents")
       .update(updateData)
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("owner_id", user.id)
       .select()
       .single()
@@ -92,9 +94,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await getAuthUser(request, "documents")
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -108,7 +111,7 @@ export async function DELETE(
     const { error } = await supabaseAdmin
       .from("documents")
       .delete()
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("owner_id", user.id)
 
     if (error) {

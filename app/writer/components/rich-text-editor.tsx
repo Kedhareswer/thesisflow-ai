@@ -6,6 +6,7 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useSafeDOM } from "../hooks/use-safe-dom"
+import { useToast } from "@/hooks/use-toast"
 import {
   Eye,
   Edit3,
@@ -35,84 +36,62 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
   const [viewMode, setViewMode] = useState<"split" | "edit" | "preview">("split")
   const [isFullscreen, setIsFullscreen] = useState(false)
   const editorRef = useRef<any>(null)
+  const { toast } = useToast()
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen)
   }
 
   const insertMarkdown = useCallback((syntax: string, placeholder = "") => {
-    // Use setTimeout to ensure DOM is ready and avoid conflicts with React reconciliation
-    setTimeout(() => {
-      try {
-        const textarea = document.querySelector(".w-md-editor-text-textarea") as HTMLTextAreaElement
-        if (!textarea) {
-          console.warn("Textarea not found for markdown insertion")
-          return
-        }
-
-        const start = textarea.selectionStart
-        const end = textarea.selectionEnd
-        const selectedText = value.substring(start, end)
-        const replacement = selectedText || placeholder
-
-        let newText = ""
-        let cursorOffset = 0
-        
-        if (syntax === "bold") {
-          newText = `**${replacement}**`
-          cursorOffset = replacement ? 0 : 2 // Position cursor inside bold markers if no text selected
-        } else if (syntax === "italic") {
-          newText = `*${replacement}*`
-          cursorOffset = replacement ? 0 : 1 // Position cursor inside italic markers if no text selected
-        } else if (syntax === "link") {
-          newText = `[${replacement || "link text"}](url)`
-          cursorOffset = replacement ? 0 : -4 // Position cursor at URL part
-        } else if (syntax === "image") {
-          newText = `![${replacement || "alt text"}](image-url)`
-          cursorOffset = replacement ? 0 : -9 // Position cursor at image URL part
-        } else if (syntax === "code") {
-          newText = `\`${replacement}\``
-          cursorOffset = replacement ? 0 : 1 // Position cursor inside code markers if no text selected
-        } else if (syntax === "list") {
-          // If at start of line or empty line, add list item
-          const beforeCursor = value.substring(0, start)
-          const lastNewline = beforeCursor.lastIndexOf('\n')
-          const lineStart = lastNewline === -1 ? 0 : lastNewline + 1
-          const currentLine = value.substring(lineStart, start)
-          
-          if (currentLine.trim() === '') {
-            // Empty line, add new list item
-            newText = `- ${replacement || "list item"}`
-          } else {
-            // Add list item to current line
-            newText = `- ${replacement || "list item"}`
-          }
-        } else if (syntax === "heading") {
-          // Add heading syntax
-          newText = `# ${replacement || "Heading"}`
-          cursorOffset = replacement ? 0 : -7 // Position cursor after heading level
-        } else if (syntax === "quote") {
-          newText = `> ${replacement || "Quote"}`
-          cursorOffset = replacement ? 0 : -6 // Position cursor after quote marker
-        }
-
-        const newValue = value.substring(0, start) + newText + value.substring(end)
-        onChange(newValue)
-        
-        // Set cursor position after insertion
-        setTimeout(() => {
-          const newTextarea = document.querySelector(".w-md-editor-text-textarea") as HTMLTextAreaElement
-          if (newTextarea) {
-            const newCursorPos = start + newText.length + cursorOffset
-            newTextarea.setSelectionRange(newCursorPos, newCursorPos)
-            newTextarea.focus()
-          }
-        }, 10)
-      } catch (error) {
-        console.warn("Error inserting markdown:", error)
+    try {
+      // Get current cursor position from the editor value
+      // Since we can't directly access the textarea, we'll work with the current value
+      const currentValue = value
+      
+      // For now, we'll append the formatted text to the end of the document
+      // This is a simpler approach that will work reliably
+      let newText = ""
+      
+      if (syntax === "bold") {
+        newText = `**${placeholder}**`
+      } else if (syntax === "italic") {
+        newText = `*${placeholder}*`
+      } else if (syntax === "heading") {
+        newText = `# ${placeholder}`
+      } else if (syntax === "list") {
+        newText = `- ${placeholder}`
+      } else if (syntax === "quote") {
+        newText = `> ${placeholder}`
+      } else if (syntax === "link") {
+        newText = `[${placeholder}](url)`
+      } else if (syntax === "image") {
+        newText = `![${placeholder}](image-url)`
+      } else if (syntax === "code") {
+        newText = `\`${placeholder}\``
       }
-    }, 0)
-  }, [value, onChange])
+      
+      // Add newline before the new text if the document isn't empty
+      const separator = currentValue.endsWith('\n') || currentValue === '' ? '' : '\n'
+      const newValue = currentValue + separator + newText
+      
+      // Update the document content
+      onChange(newValue)
+      
+      // Show toast notification
+      toast({
+        title: "Formatting applied",
+        description: `${syntax.charAt(0).toUpperCase() + syntax.slice(1)} formatting added to document.`,
+      })
+      
+    } catch (error) {
+      console.error("Error inserting markdown:", error)
+      toast({
+        title: "Error",
+        description: "Failed to apply formatting. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }, [value, onChange, toast])
 
   // Add keyboard shortcuts
   useEffect(() => {
@@ -195,7 +174,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("bold", "bold text")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Bold (Ctrl+B)"
               >
                 <Bold className="h-4 w-4" />
@@ -204,7 +183,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("italic", "italic text")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Italic (Ctrl+I)"
               >
                 <Italic className="h-4 w-4" />
@@ -214,7 +193,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("heading", "Heading")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Heading"
               >
                 <Heading1 className="h-4 w-4" />
@@ -223,7 +202,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("list")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="List"
               >
                 <List className="h-4 w-4" />
@@ -232,7 +211,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("quote", "Quote")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Quote"
               >
                 <Quote className="h-4 w-4" />
@@ -242,7 +221,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("link")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Link"
               >
                 <Link className="h-4 w-4" />
@@ -251,7 +230,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("image")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Image"
               >
                 <ImageIcon className="h-4 w-4" />
@@ -260,7 +239,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown("code", "code")}
-                className="h-8 w-8 p-0 hover:bg-gray-200"
+                className="h-8 w-8 p-0 hover:bg-gray-200 active:bg-gray-300 transition-colors"
                 title="Inline Code"
               >
                 <Code className="h-4 w-4" />

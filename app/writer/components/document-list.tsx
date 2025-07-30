@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Plus, FileText, Folder, ChevronDown, ChevronRight, Trash2 } from "lucide-react"
+import { FileText, Folder, ChevronDown, ChevronRight, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
@@ -195,11 +195,7 @@ export default function DocumentList({ activeDocumentId }: DocumentListProps) {
     <div className="flex flex-col h-full bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800">
       <div className="p-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Pages</h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Plus className="h-4 w-4" />
-            <span className="sr-only">New document</span>
-          </Button>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Saved</h2>
         </div>
         <Input
           placeholder="Search documents..."
