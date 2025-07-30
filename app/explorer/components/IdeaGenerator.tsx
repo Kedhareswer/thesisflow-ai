@@ -8,12 +8,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Lightbulb, TrendingUp, Info, Save } from "lucide-react"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
-import { useAsync } from "@/lib/hooks/useAsync"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useResearchIdeas, useResearchContext, useResearchTopics } from "@/components/research-session-provider"
 import type { AIProvider } from "@/lib/ai-providers"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 // Enhanced research service for idea generation
 class IdeaGenerationService {
@@ -80,19 +83,21 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   
   // Update topic field when currentTopic changes, but only if different and not currently generating
   useEffect(() => {
-    if (currentTopic && currentTopic !== ideaTopic && !ideaGeneration.loading) {
+    if (currentTopic && currentTopic !== ideaTopic && !ideaGenerationLoading) {
       setIdeaTopic(currentTopic)
     }
   }, [currentTopic])
   
-  const ideaGeneration = useAsync<{
+  const [ideaGenerationData, setIdeaGenerationData] = useState<{
     content: string
     ideas: string[]
     topic: string
     context: string
     count: number
     timestamp: string
-  }>(IdeaGenerationService.generateIdeas)
+  } | null>(null)
+  const [ideaGenerationLoading, setIdeaGenerationLoading] = useState(false)
+  const [ideaGenerationError, setIdeaGenerationError] = useState<string | null>(null)
 
   const handleIdeaGeneration = async () => {
     if (!ideaTopic.trim()) {
@@ -104,13 +109,17 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       return
     }
 
+    setIdeaGenerationLoading(true)
+    setIdeaGenerationError(null)
+
     try {
       // Build enhanced context if using session context
       const enhancedContext = useSessionContext ? 
         `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
         ideaContext
 
-      await ideaGeneration.execute(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
+      const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
+      setIdeaGenerationData(generatedData)
       
       // Ideas will be added to session via useEffect when data is available
       
@@ -119,18 +128,21 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         description: `Generated ${ideaCount} AI-powered research ideas and saved to your research session.`,
       })
     } catch (error) {
+      setIdeaGenerationError(error instanceof Error ? error.message : "Failed to generate ideas. Please try again.")
       toast({
         title: "Generation Failed",
         description: error instanceof Error ? error.message : "Failed to generate ideas. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIdeaGenerationLoading(false)
     }
   }
 
   // Add ideas to session when generation data is available
   useEffect(() => {
-    if (ideaGeneration.data && ideaGeneration.data.ideas) {
-      const newIdeas = ideaGeneration.data.ideas.map((ideaText: string) => {
+    if (ideaGenerationData && ideaGenerationData.ideas) {
+      const newIdeas = ideaGenerationData.ideas.map((ideaText: string) => {
         // Parse the idea text to extract title and description
         const lines = ideaText.split('\n')
         const title = lines[0].replace(/^\d+\.\s*/, '').trim()
@@ -146,7 +158,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       
       addIdeas(newIdeas)
     }
-  }, [ideaGeneration.data, ideaTopic, addIdeas])
+  }, [ideaGenerationData, ideaTopic, addIdeas])
 
   const extractContent = (data: any): string => {
     if (typeof data === "string") {
@@ -185,7 +197,8 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           </AlertDescription>
         </Alert>
       )}
-      {/* AI Provider/Model Selector (now below Research Context) */}
+      
+      {/* AI Provider/Model Selector */}
       <div className="mb-4 flex justify-center">
         <MinimalAIProviderSelector
           selectedProvider={selectedProvider}
@@ -196,91 +209,121 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         />
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5" />
-            Research Idea Generator
-          </CardTitle>
-          <CardDescription>
-            Generate innovative research ideas with AI assistance based on your topic and context. Ideas are automatically saved to your research session.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <FormField
-            label="Research Topic"
-            value={ideaTopic}
-            onChange={setIdeaTopic}
-            placeholder="e.g., Sustainable Energy, Digital Education"
-            required
-          />
-
-          <TextareaField
-            label="Context (Optional)"
-            value={ideaContext}
-            onChange={setIdeaContext}
-            placeholder="Provide additional context, constraints, or focus areas..."
-            rows={3}
-          />
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Number of Ideas</label>
-            <div className="flex items-center space-x-2">
-              <input
-                type="range"
-                min="3"
-                max="10"
-                value={ideaCount}
-                onChange={(e) => setIdeaCount(Number(e.target.value))}
-                className="flex-1"
-              />
-              <span className="text-sm font-medium w-8">{ideaCount}</span>
-            </div>
+      {/* Redesigned Form Card */}
+      <Card className="bg-white shadow-sm border-gray-200">
+        <CardContent className="p-6">
+          {/* Header */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Idea Generation</h2>
+            <p className="text-gray-600 text-sm">Generate innovative research ideas for your topic</p>
           </div>
 
-          {hasContext && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="use-session-context"
-                checked={useSessionContext}
-                onCheckedChange={(checked) => setUseSessionContext(checked as boolean)}
-              />
-              <label htmlFor="use-session-context" className="text-sm font-medium">
-                Use research session context for enhanced idea generation
-              </label>
+          {/* Form Fields */}
+          <div className="space-y-6">
+            {/* Research Topic and Number of Ideas - Side by Side */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <Label htmlFor="research-topic" className="text-sm font-semibold text-gray-900 mb-2 block">
+                  Research Topic
+                </Label>
+                <Input
+                  id="research-topic"
+                  value={ideaTopic}
+                  onChange={(e) => setIdeaTopic(e.target.value)}
+                  placeholder="e.g., Quantum Computing"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor="idea-count" className="text-sm font-semibold text-gray-900 mb-2 block">
+                  Number of Ideas
+                </Label>
+                <Select value={ideaCount.toString()} onValueChange={(value) => setIdeaCount(Number(value))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">3 Ideas</SelectItem>
+                    <SelectItem value="5">5 Ideas</SelectItem>
+                    <SelectItem value="7">7 Ideas</SelectItem>
+                    <SelectItem value="10">10 Ideas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          )}
 
-          <Button
-            type="button"
-            onClick={handleIdeaGeneration}
-            disabled={ideaGeneration.loading}
-            className="w-full"
-          >
-            {ideaGeneration.loading ? <LoadingSpinner className="mr-2" /> : <TrendingUp className="h-4 w-4 mr-2" />}
-            Generate Ideas
-          </Button>
+            {/* Additional Context */}
+            <div>
+              <Label htmlFor="additional-context" className="text-sm font-semibold text-gray-900 mb-2 block">
+                Additional Context (Optional)
+              </Label>
+              <Textarea
+                id="additional-context"
+                value={ideaContext}
+                onChange={(e) => setIdeaContext(e.target.value)}
+                placeholder="Provide any additional context, constraints, or focus areas..."
+                className="w-full resize-none"
+                rows={4}
+              />
+            </div>
 
-          {ideaGeneration.error && (
-            <div className="text-red-500 mt-2">
-              {ideaGeneration.error.includes("AI provider configuration") ? (
+            {/* Session Context Checkbox */}
+            {hasContext && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="use-session-context"
+                  checked={useSessionContext}
+                  onCheckedChange={(checked) => setUseSessionContext(checked as boolean)}
+                />
+                <label htmlFor="use-session-context" className="text-sm text-gray-700">
+                  Use research session context for enhanced idea generation
+                </label>
+              </div>
+            )}
+
+            {/* Generate Button */}
+            <Button
+              type="button"
+              onClick={handleIdeaGeneration}
+              disabled={ideaGenerationLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
+            >
+              {ideaGenerationLoading ? (
                 <>
-                  No AI providers are configured. Please add at least one API key in{" "}
-                  <Link href="/settings" className="underline">
-                    Settings
-                  </Link>
-                  .
+                  <LoadingSpinner className="mr-2" />
+                  Generating Ideas...
                 </>
               ) : (
-                ideaGeneration.error
+                <>
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  Generate Ideas
+                </>
               )}
-            </div>
-          )}
+            </Button>
+
+            {/* Error Display */}
+            {ideaGenerationError && (
+              <div className="text-red-600 text-sm mt-2">
+                {ideaGenerationError.includes("AI provider configuration") ? (
+                  <>
+                    No AI providers are configured. Please add at least one API key in{" "}
+                    <Link href="/settings" className="underline">
+                      Settings
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  ideaGenerationError
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {ideaGeneration.data && (
-        <Card className="mt-6">
+      {/* Generated Ideas Display */}
+      {ideaGenerationData && (
+        <Card className="mt-6 bg-white shadow-sm border-gray-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
@@ -291,7 +334,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
             <div className="prose max-w-none">
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <div className="space-y-4">
-                  {ideaGeneration.data.ideas.map((idea: string, index: number) => {
+                  {ideaGenerationData.ideas.map((idea: string, index: number) => {
                     const lines = idea.split('\n')
                     const title = lines[0].replace(/^\d+\.\s*/, '').trim()
                     const description = lines.slice(1).join('\n').trim()
@@ -314,10 +357,10 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         </Card>
       )}
 
-      {ideaGeneration.error && (
+      {ideaGenerationError && (
         <Card className="border-red-200 mt-6">
           <CardContent className="pt-6">
-            <p className="text-red-600">{ideaGeneration.error}</p>
+            <p className="text-red-600">{ideaGenerationError}</p>
           </CardContent>
         </Card>
       )}

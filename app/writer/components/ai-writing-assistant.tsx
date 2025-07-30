@@ -256,18 +256,18 @@ export function AIWritingAssistant({
     <div className="space-y-4">
       {/* Settings Toggle */}
       <div className="flex justify-between items-center">
-        <div className="flex flex-wrap gap-2">
-          {writingTasks.map(task => (
-            <Badge 
-              key={task.id}
-              variant={writingTask === task.id ? "default" : "outline"}
+      <div className="flex flex-wrap gap-2">
+        {writingTasks.map(task => (
+          <Badge 
+            key={task.id}
+            variant={writingTask === task.id ? "default" : "outline"}
               className="cursor-pointer hover:bg-primary/10"
-              onClick={() => setWritingTask(task.id)}
-            >
-              {task.name}
-            </Badge>
-          ))}
-        </div>
+            onClick={() => setWritingTask(task.id)}
+          >
+            {task.name}
+          </Badge>
+        ))}
+      </div>
         <Button
           variant="ghost"
           size="sm"
@@ -306,8 +306,8 @@ export function AIWritingAssistant({
       )}
       
       <div className="flex gap-2">
-        <Button
-          onClick={generateText}
+        <Button 
+          onClick={generateText} 
           disabled={isGenerating || !isAuthenticated}
           className="w-full bg-black hover:bg-gray-800 text-white"
         >
@@ -347,12 +347,12 @@ export function AIWritingAssistant({
               {generatedText}
             </div>
             {writingTask !== 'analyze' && (
-              <div className="mt-3 flex justify-end">
-                <Button size="sm" variant="ghost" onClick={handleInsert}>
+            <div className="mt-3 flex justify-end">
+              <Button size="sm" variant="ghost" onClick={handleInsert}>
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  Insert
-                </Button>
-              </div>
+                Insert
+              </Button>
+            </div>
             )}
           </CardContent>
         </Card>
