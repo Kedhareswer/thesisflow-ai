@@ -1,50 +1,43 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-/**
- * API route for humanizing text
- * POST /api/humanize
- * Body: { text: string }
- */
-export async function POST(req: NextRequest) {
+export const runtime = "edge" // Use the edge runtime for humanization
+
+export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { text } = body
+    const { text } = await req.json()
 
-    if (!text) {
-      return NextResponse.json({ error: "Text is required" }, { status: 400 })
+    if (!text || typeof text !== "string") {
+      return NextResponse.json({ error: "Invalid text provided" }, { status: 400 })
     }
 
     // Simulate humanization logic
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate network delay
+    // A very basic example: replace some common AI-like phrases or simplify complex sentences
+    let humanized_text = text
+      .replace(/utilize/g, "use")
+      .replace(/leverage/g, "use")
+      .replace(/paradigm/g, "approach")
+      .replace(/synergy/g, "cooperation")
+      .replace(/delve into/g, "explore")
+      .replace(/furthermore/g, "also")
+      .replace(/however/g, "but")
+      .replace(/therefore/g, "so")
+      .replace(/in order to/g, "to")
+      .replace(/It is important to note that/g, "Note that")
+      .replace(/This highlights the fact that/g, "This shows that")
 
-    // Simple mock humanization: add some common phrases, vary sentence structure
-    let humanizedText = text
-    humanizedText = humanizedText.replace(/In conclusion,/, "To sum up,")
-    humanizedText = humanizedText.replace(/Furthermore,/, "What's more,")
-    humanizedText = humanizedText.replace(/However,/, "But,")
-    humanizedText = humanizedText.replace(/Therefore,/, "So,")
-    humanizedText = humanizedText.replace(/It is important to note that/, "Keep in mind that")
-    humanizedText = humanizedText.replace(/This study demonstrates/, "We found that")
-    humanizedText = humanizedText.replace(/The implications are significant/, "This means a lot")
+    // Add some random human-like imperfections or variations
+    const humanTouches = ["You know,", "I think it's fair to say,", "To be honest,", "It's kind of like,", "Basically,"]
+    const sentences = humanized_text.split(/(?<=[.!?])\s+/)
+    if (sentences.length > 1) {
+      const randomIndex = Math.floor(Math.random() * sentences.length)
+      sentences[randomIndex] =
+        humanTouches[Math.floor(Math.random() * humanTouches.length)] + " " + sentences[randomIndex]
+    }
+    humanized_text = sentences.join(" ")
 
-    // Add some conversational filler
-    const fillers = ["You know,", "I think,", "Actually,", "It's interesting to note that,"]
-    const sentences = humanizedText.split(/(?<=[.!?])\s+/)
-    const humanizedSentences = sentences.map((s, i) => {
-      if (i % 3 === 0 && i > 0) {
-        return fillers[Math.floor(Math.random() * fillers.length)] + " " + s.charAt(0).toLowerCase() + s.slice(1)
-      }
-      return s
-    })
-    humanizedText = humanizedSentences.join(" ")
-
-    return NextResponse.json({
-      original_text: text,
-      humanized_text: humanizedText,
-      message: "Text humanized successfully.",
-    })
+    return NextResponse.json({ humanized_text })
   } catch (error) {
     console.error("Error in humanize API:", error)
-    return NextResponse.json({ error: "Failed to humanize text" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

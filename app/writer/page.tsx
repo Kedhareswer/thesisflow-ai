@@ -1,1393 +1,517 @@
 "use client"
 
-import { useEffect } from "react"
+import Link from "next/link"
+
+import { useState, useEffect, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import {
-  PenLine,
-  BookOpen,
-  Check,
-  AlertCircle,
-  FileCode,
-  Sparkles,
-  Quote,
-  Zap,
-  Eye,
+  Edit,
+  CheckCircle,
+  History,
+  Share2,
+  Users,
+  Lightbulb,
   FileText,
-  Save,
-  Download,
+  Copy,
+  Gavel,
+  BookOpen,
+  MessageSquare,
   ChevronDown,
   ChevronUp,
-  Settings,
-  BarChart3,
-  Brain,
-  BotIcon as Robot,
-  User,
-  ClipboardCopy,
   Loader2,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MarkdownEditor } from "./components/rich-text-editor"
-import CitationManager from "./components/citation-manager"
-import { AIWritingModal } from "./components/ai-writing-modal"
-import { DocumentManager } from "./components/document-manager"
-import { useToast } from "@/hooks/use-toast"
-import { ResearchSessionProvider, useResearchContext } from "@/components/research-session-provider"
-import { RouteGuard } from "@/components/route-guard"
-import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
-import type { AIProvider } from "@/lib/ai-providers"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { supabase } from "@/lib/supabase"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import DocumentService, { type Document } from "@/lib/services/document.service"
-import { useSafeDOM } from "./hooks/use-safe-dom"
-import { useSafeState, useSafeCallback } from "./hooks/use-safe-state"
+import { Card, CardContent } from "@/components/ui/card"
+import { useToast } from "@/hooks/use-toast"
+import { ResearchService } from "@/lib/services/research.service"
+import { DocumentService } from "@/lib/services/document.service" // Corrected import to named export
+import DocumentList from "./components/document-list"
+import RichTextEditor from "./components/rich-text-editor"
+import CitationManager from "./components/citation-manager"
+import AiWritingAssistant from "./components/ai-writing-assistant"
+import VisualContentRenderer from "./components/visual-content-renderer"
 import { useDebouncedState } from "./hooks/use-debounced-state"
-import { WriterErrorBoundary } from "./components/error-boundary"
-import { SafeDOMWrapper } from "./components/safe-dom-wrapper"
 import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
-import { ResearchService } from "@/lib/services/research.service" // Import ResearchService
-
-// Supported publisher templates with enhanced metadata
-const publisherTemplates = [
-  {
-    id: "ieee",
-    name: "IEEE",
-    description: "IEEE Conference/Journal Template",
-    wordLimit: 8000,
-    sections: [
-      "Title",
-      "Authors",
-      "Abstract",
-      "Keywords",
-      "Introduction",
-      "Related Work",
-      "Methods",
-      "Results",
-      "Discussion",
-      "Conclusion",
-      "Acknowledgments",
-      "References",
-    ],
-  },
-  {
-    id: "acm",
-    name: "ACM",
-    description: "ACM Conference/Journal Template",
-    wordLimit: 10000,
-    sections: [
-      "Title",
-      "Authors",
-      "Abstract",
-      "Keywords",
-      "Introduction",
-      "Related Work",
-      "Methods",
-      "Results",
-      "Discussion",
-      "Conclusion",
-      "Acknowledgments",
-      "References",
-    ],
-  },
-  {
-    id: "springer",
-    name: "Springer",
-    description: "Springer Conference/Journal Template",
-    wordLimit: 12000,
-    sections: [
-      "Title",
-      "Authors",
-      "Abstract",
-      "Keywords",
-      "Introduction",
-      "Literature Review",
-      "Materials and Methods",
-      "Results",
-      "Discussion",
-      "Conclusion",
-      "Acknowledgments",
-      "References",
-    ],
-  },
-  {
-    id: "elsevier",
-    name: "Elsevier",
-    description: "Elsevier Journal Template",
-    wordLimit: 15000,
-    sections: [
-      "Title",
-      "Authors",
-      "Abstract",
-      "Keywords",
-      "Introduction",
-      "Materials and Methods",
-      "Results",
-      "Discussion",
-      "Conclusion",
-      "Acknowledgments",
-      "References",
-    ],
-  },
-  {
-    id: "general",
-    name: "General Academic",
-    description: "Standard Academic Paper Template",
-    wordLimit: 10000,
-    sections: [
-      "Title",
-      "Authors",
-      "Abstract",
-      "Keywords",
-      "Introduction",
-      "Body",
-      "Conclusion",
-      "Acknowledgments",
-      "References",
-    ],
-  },
-]
-
-// Enhanced writer personalities with detailed descriptions
-const personalities = [
-  {
-    key: "academic",
-    name: "Academic",
-    description: "Formal, precise and scholarly writing style with proper citations.",
-    systemPrompt:
-      "You are an academic writing assistant. Use formal language, proper citations, and logical structure. Maintain scholarly tone throughout.",
-    icon: BookOpen,
-    color: "text-gray-900", // Monochromatic adjustment
-    bgColor: "bg-gray-50",
-    borderColor: "border-gray-200",
-  },
-  {
-    key: "technical",
-    name: "Technical",
-    description: "Clear, concise technical writing with detailed explanations.",
-    systemPrompt:
-      "You are a technical writing assistant. Focus on clarity, precision, and detailed explanations. Use technical terminology appropriately.",
-    icon: FileCode,
-    color: "text-gray-900", // Monochromatic adjustment
-    bgColor: "bg-gray-50",
-    borderColor: "border-gray-200",
-  },
-  {
-    key: "creative",
-    name: "Creative",
-    description: "Engaging, vivid academic writing while maintaining standards.",
-    systemPrompt:
-      "You are a creative academic writing assistant. Write engaging content while maintaining scholarly standards. Use varied sentence structures.",
-    icon: Sparkles,
-    color: "text-gray-900", // Monochromatic adjustment
-    bgColor: "bg-gray-50",
-    borderColor: "border-gray-200",
-  },
-]
-
-function getTemplatePrompt(templateId: string): string {
-  switch (templateId) {
-    case "ieee":
-      return "Format the writing according to IEEE guidelines, including section headings and citation style. Use clear, concise language with technical precision. Ensure content is suitable for an IEEE conference or journal."
-    case "acm":
-      return "Follow ACM formatting and structure. Emphasize computational aspects and technical contributions. Ensure content is suitable for an ACM conference or journal."
-    case "springer":
-      return "Use concise, formal academic writing as per Springer requirements. Focus on research methodology and findings. Ensure content is suitable for a Springer conference or journal."
-    case "elsevier":
-      return "Structure the writing for Elsevier journals, with clear sections and formal tone. Include detailed methodology. Ensure content is suitable for an Elsevier journal."
-    case "general":
-    default:
-      return "Use standard academic formatting with clear structure and appropriate scholarly tone. Do not adhere to any specific publisher guidelines."
-  }
-}
-
-function WriterPageContent() {
-  const { toast } = useToast()
-  const { hasContext, contextSummary, buildContext } = useResearchContext()
-  const { safeDownload } = useSafeDOM()
-
-  // Add global error handler
-  useGlobalErrorHandler()
-
-  // AI provider selection state
-  const [selectedProvider, setSelectedProvider] = useSafeState<AIProvider | undefined>(undefined)
-  const [selectedModel, setSelectedModel] = useSafeState<string | undefined>(undefined)
-  const [selectedPersonality, setSelectedPersonality] = useSafeState(personalities[0])
-
-  // Document state with debouncing
-  const [selectedTemplate, setSelectedTemplate] = useSafeState(publisherTemplates[0].id)
-  const [documentText, setDocumentText] = useDebouncedState("", 500) // Debounce text changes
-  const [documentTitle, setDocumentTitle] = useDebouncedState("Untitled Document", 300)
-  const [languageToolSuggestions, setLanguageToolSuggestions] = useSafeState<any[]>([])
-  const [isChecking, setIsChecking] = useSafeState(false)
-  const [checkProgress, setCheckProgress] = useSafeState<string>("")
-  const [aiModalOpen, setAiModalOpen] = useSafeState(false)
-  const [supabaseToken, setSupabaseToken] = useSafeState<string | null>(null)
-  const [lastSaved, setLastSaved] = useSafeState<Date>(new Date())
-  const [isAutoSaving, setIsAutoSaving] = useSafeState(false)
-
-  // New states for AI Detection, Humanizer, and Plagiarism
-  const [aiDetectionResult, setAiDetectionResult] = useSafeState<{
-    is_ai: boolean
-    ai_probability: number
-    message: string
-  } | null>(null)
-  const [isDetectingAI, setIsDetectingAI] = useSafeState(false)
-  const [humanizedText, setHumanizedText] = useSafeState<string>("")
-  const [isHumanizing, setIsHumanizing] = useSafeState(false)
-  const [plagiarismResult, setPlagiarismResult] = useSafeState<{
-    plagiarism_percentage: number
-    sources: { url: string; match: string }[]
-    message: string
-  } | null>(null)
-  const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useSafeState(false)
-
-  // Document management state
-  const [currentDocument, setCurrentDocument] = useSafeState<Document | null>(null)
-  const [documentManagerOpen, setDocumentManagerOpen] = useSafeState(false)
-  const documentService = DocumentService.getInstance()
-
-  // Sidebar state for collapsible sections
-  const [activeTab, setActiveTab] = useSafeState("assistant")
-  const [isAIConfigOpen, setIsAIConfigOpen] = useSafeState(true)
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useSafeState(true)
-  const [isCitationsOpen, setIsCitationsOpen] = useSafeState(true)
-  // New collapsible states
-  const [isAIDetectionOpen, setIsAIDetectionOpen] = useSafeState(false)
-  const [isHumanizerOpen, setIsHumanizerOpen] = useSafeState(false)
-  const [isPlagiarismOpen, setIsPlagiarismOpen] = useSafeState(false)
-
-  // Fetch Supabase session/token on mount
-  useEffect(() => {
-    let isMounted = true
-
-    async function fetchToken() {
-      try {
-        const { data } = await supabase.auth.getSession()
-        if (isMounted) {
-          setSupabaseToken(data.session?.access_token || null)
-        }
-      } catch (error) {
-        console.error("Error fetching token:", error)
-      }
-    }
-
-    fetchToken()
-
-    // Listen for auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (isMounted) {
-        setSupabaseToken(session?.access_token || null)
-      }
-    })
-
-    return () => {
-      isMounted = false
-      listener?.subscription.unsubscribe()
-    }
-  }, [])
-
-  // Auto-save functionality with safe cleanup
-  useEffect(() => {
-    let isMounted = true
-    let autoSaveInterval: NodeJS.Timeout | null = null
-
-    const performAutoSave = async () => {
-      if (!isMounted || !documentText.trim() || !documentTitle.trim()) return
-
-      try {
-        setIsAutoSaving(true)
-        await documentService.autoSaveDocument(documentTitle, documentText, "paper")
-        if (isMounted) {
-          setLastSaved(new Date())
-        }
-      } catch (error) {
-        console.error("Auto-save failed:", error)
-      } finally {
-        if (isMounted) {
-          setIsAutoSaving(false)
-        }
-      }
-    }
-
-    autoSaveInterval = setInterval(performAutoSave, 30000) // Auto-save every 30 seconds
-
-    return () => {
-      isMounted = false
-      if (autoSaveInterval) {
-        clearInterval(autoSaveInterval)
-      }
-    }
-  }, [documentText, documentTitle])
-
-  // Document management functions with safe callbacks
-  const handleDocumentSelect = useSafeCallback((document: Document) => {
-    setCurrentDocument(document)
-    setDocumentTitle(document.title)
-    setDocumentText(document.content)
-    setDocumentManagerOpen(false)
-  })
-
-  const handleDocumentLoad = useSafeCallback((content: string) => {
-    setDocumentText(content)
-  })
-
-  const handleSaveDocument = useSafeCallback(async () => {
-    try {
-      if (!documentTitle.trim()) {
-        toast({
-          title: "Error",
-          description: "Please enter a document title",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (currentDocument) {
-        await documentService.updateDocument(currentDocument.id, {
-          title: documentTitle,
-          content: documentText,
-        })
-      } else {
-        const newDoc = await documentService.createDocument({
-          title: documentTitle,
-          content: documentText,
-          document_type: "paper",
-        })
-        setCurrentDocument(newDoc)
-      }
-
-      setLastSaved(new Date())
-      toast({
-        title: "Success",
-        description: "Document saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving document:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save document",
-        variant: "destructive",
-      })
-    }
-  })
-
-  // Check text for grammar/style issues using LanguageTool
-  const checkText = useSafeCallback(async () => {
-    if (!documentText.trim()) {
-      toast({
-        title: "No text to check",
-        description: "Please write some text before checking grammar and style.",
-        variant: "default",
-      })
-      return
-    }
-
-    // Check text size before sending to API
-    const textSizeInBytes = new TextEncoder().encode(documentText).length
-    const maxSizeInBytes = 25000 // Same limit as API
-
-    if (textSizeInBytes > maxSizeInBytes) {
-      // Estimate number of chunks needed
-      const estimatedChunks = Math.ceil(textSizeInBytes / maxSizeInBytes)
-      toast({
-        title: "Large document detected",
-        description: `Your document (${Math.round(textSizeInBytes / 1024)}KB) will be processed sequentially in approximately ${estimatedChunks} chunks. This may take a few moments.`,
-        variant: "default",
-      })
-      // Continue with processing - the API will handle chunking
-    }
-    setIsChecking(true)
-    setCheckProgress("Analyzing document...")
-    try {
-      const response = await fetch("/api/language-check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: documentText }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        if (response.status === 413) {
-          toast({
-            title: "Text too large",
-            description:
-              errorData.message ||
-              "Your document is too large to check. Please try checking a smaller portion of your text.",
-            variant: "destructive",
-          })
-          return
-        }
-        throw new Error("Failed to check text")
-      }
-
-      const data = await response.json()
-      setLanguageToolSuggestions(data.matches || [])
-      setCheckProgress("")
-
-      if (data.chunked) {
-        toast({
-          title: `Found ${data.matches?.length || 0} suggestions`,
-          description: `Processed your large document sequentially in ${data.totalChunks} chunks. Review and apply suggestions to improve your text.`,
-          variant: "default",
-        })
-      } else {
-        toast({
-          title: `Found ${data.matches?.length || 0} suggestions`,
-          description: data.matches?.length
-            ? "Review and apply suggestions to improve your text."
-            : "No issues found in your text.",
-          variant: "default",
-        })
-      }
-    } catch (error) {
-      console.error("Error checking text:", error)
-      toast({
-        title: "Error checking text",
-        description: "There was a problem checking your text. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsChecking(false)
-      setCheckProgress("")
-    }
-  })
-
-  // New function: Handle AI Detection
-  const handleDetectAI = useSafeCallback(async () => {
-    if (!documentText.trim()) {
-      toast({
-        title: "No text to analyze",
-        description: "Please write some text before checking for AI content.",
-        variant: "default",
-      })
-      return
-    }
-    setIsDetectingAI(true)
-    setAiDetectionResult(null)
-    try {
-      const result = await ResearchService.detectAI(documentText)
-      setAiDetectionResult(result)
-      toast({
-        title: "AI Detection Complete",
-        description: result.message,
-      })
-    } catch (error) {
-      console.error("Error detecting AI:", error)
-      toast({
-        title: "AI Detection Failed",
-        description: "There was an error detecting AI content. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsDetectingAI(false)
-    }
-  })
-
-  // New function: Handle Humanize Text
-  const handleHumanizeText = useSafeCallback(async () => {
-    if (!documentText.trim()) {
-      toast({
-        title: "No text to humanize",
-        description: "Please write some text before humanizing.",
-        variant: "default",
-      })
-      return
-    }
-    setIsHumanizing(true)
-    setHumanizedText("")
-    try {
-      const result = await ResearchService.humanizeText(documentText)
-      setHumanizedText(result.humanized_text)
-      toast({
-        title: "Text Humanized",
-        description: "Your text has been humanized.",
-      })
-    } catch (error) {
-      console.error("Error humanizing text:", error)
-      toast({
-        title: "Humanization Failed",
-        description: "There was an error humanizing your text. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsHumanizing(false)
-    }
-  })
-
-  // New function: Handle Plagiarism Check
-  const handleCheckPlagiarism = useSafeCallback(async () => {
-    if (!documentText.trim()) {
-      toast({
-        title: "No text to check",
-        description: "Please write some text before checking for plagiarism.",
-        variant: "default",
-      })
-      return
-    }
-    setIsCheckingPlagiarism(true)
-    setPlagiarismResult(null)
-    try {
-      const result = await ResearchService.checkPlagiarism(documentText)
-      setPlagiarismResult(result)
-      toast({
-        title: "Plagiarism Check Complete",
-        description: result.message,
-      })
-    } catch (error) {
-      console.error("Error checking plagiarism:", error)
-      toast({
-        title: "Plagiarism Check Failed",
-        description: "There was an error checking for plagiarism. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCheckingPlagiarism(false)
-    }
-  })
-
-  // Manual save function
-  const handleSave = useSafeCallback(async () => {
-    setIsAutoSaving(true)
-    // Simulate save
-    setTimeout(() => {
-      setLastSaved(new Date())
-      setIsAutoSaving(false)
-      toast({
-        title: "Document saved",
-        description: "Your document has been saved successfully.",
-        duration: 2000,
-      })
-    }, 500)
-  })
-
-  // Export functions
-  const handleExport = useSafeCallback((format: "markdown" | "pdf" | "docx") => {
-    const blob = new Blob([documentText], { type: "text/markdown" })
-    const filename = `${documentTitle.replace(/\s+/g, "_")}.${format === "markdown" ? "md" : format}`
-
-    safeDownload(blob, filename)
-
-    toast({
-      title: `Exported as ${format.toUpperCase()}`,
-      description: `Your document has been exported successfully.`,
-      duration: 2000,
-    })
-  })
-
-  // Only allow opening modal if token is present
-  const handleOpenAIModal = useSafeCallback(() => {
-    if (!supabaseToken) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in again to use AI features.",
-        variant: "destructive",
-      })
-      return
-    }
-    setAiModalOpen(true)
-  })
-
-  // Calculate document statistics
-  const wordCount = documentText
-    .trim()
-    .split(/\s+/)
-    .filter((word) => word.length > 0).length
-  const charCount = documentText.length
-  const charCountNoSpaces = documentText.replace(/\s/g, "").length
-  const paragraphCount = documentText.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length
-  const readingTime = Math.ceil(wordCount / 200) // Average reading speed: 200 words per minute
-
-  // Get current template info
-  const currentTemplate = publisherTemplates.find((t) => t.id === selectedTemplate) || publisherTemplates[0]
-  const wordProgress = (wordCount / currentTemplate.wordLimit) * 100
-
-  // Format last saved time
-  const formatLastSaved = (date: Date) => {
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-
-    if (minutes < 1) return "just now"
-    if (minutes < 60) return `${minutes}m ago`
-    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
-    return date.toLocaleDateString()
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Enhanced Header with Document Controls */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left: Document Title Editor */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={documentTitle}
-                  onChange={(e) => setDocumentTitle(e.target.value)}
-                  className="text-lg font-medium text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded transition-colors"
-                  placeholder="Document title..."
-                  aria-label="Document title"
-                />
-                <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-300">
-                  {currentTemplate.name}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Right: Actions and Status */}
-            <div className="flex items-center space-x-4">
-              {/* Research Context Badge */}
-              {hasContext && (
-                <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300 px-3 py-1.5">
-                  <BookOpen className="h-3 w-3 mr-1.5" />
-                  <span className="text-xs font-medium">{contextSummary}</span>
-                </Badge>
-              )}
-
-              {/* Document Stats */}
-              <div className="hidden md:flex items-center space-x-4 text-sm text-gray-500">
-                <div className="flex items-center space-x-1">
-                  <FileText className="h-4 w-4" />
-                  <span>{wordCount.toLocaleString()} words</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Eye className="h-4 w-4" />
-                  <span>{readingTime}min read</span>
-                </div>
-              </div>
-
-              {/* Save Status */}
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                {isAutoSaving ? (
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse" />
-                    <span>Saving...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-black rounded-full" />
-                    <span>Saved {formatLastSaved(lastSaved)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDocumentManagerOpen(true)}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Documents
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveDocument}
-                  disabled={isAutoSaving}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save
-                </Button>
-
-                <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
-                  <SelectTrigger className="h-9 px-4 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
-                    <Download className="h-4 w-4 mr-1" />
-                    Export
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-gray-200 shadow-lg">
-                    <SelectItem value="markdown">Export as Markdown</SelectItem>
-                    <SelectItem value="pdf">Export as PDF</SelectItem>
-                    <SelectItem value="docx">Export as DOCX</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <div className="max-w-[1600px] mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Main Editor Column */}
-          <div className="xl:col-span-3 space-y-6">
-            {/* Document Progress Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-black rounded-full" />
-                    <span className="text-sm font-medium text-gray-900">Writing Progress</span>
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {wordCount.toLocaleString()} / {currentTemplate.wordLimit.toLocaleString()} words
-                  </span>
-                </div>
-                <Progress value={Math.min(wordProgress, 100)} className="h-2 bg-gray-200 [&>*]:bg-black" />
-                <div className="flex justify-between text-xs text-gray-500 mt-2">
-                  <span>{Math.round(wordProgress)}% complete</span>
-                  <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
-                    {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} words remaining`}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Document Editor Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <PenLine className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-medium text-gray-900">Document Editor</CardTitle>
-                      <p className="text-sm text-gray-500 mt-0.5">Write and edit your research document</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                      <SelectTrigger className="w-48 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200 shadow-lg">
-                        {publisherTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
-                            <div>
-                              <div className="font-medium">{template.name}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{template.description}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                {template.wordLimit.toLocaleString()} words • {template.sections.length} sections
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-0">
-                <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-0 rounded-none" />
-
-                {/* Enhanced Action Bar */}
-                <div className="p-6 border-t border-gray-100 bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        onClick={checkText}
-                        variant="outline"
-                        size="sm"
-                        disabled={isChecking || !documentText.trim()}
-                        className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
-                      >
-                        <Check className="h-4 w-4 mr-2" />
-                        {isChecking ? checkProgress || "Checking..." : "Grammar Check"}
-                      </Button>
-
-                      <Button
-                        onClick={handleOpenAIModal}
-                        size="sm"
-                        disabled={!selectedProvider || !selectedModel || !supabaseToken}
-                        className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        AI Assistant
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      {languageToolSuggestions.length > 0 && (
-                        <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">
-                          {languageToolSuggestions.length} suggestions
-                        </Badge>
-                      )}
-                      <div className="flex items-center space-x-2">
-                        <span>{charCount.toLocaleString()} characters</span>
-                        <span>•</span>
-                        <span>{paragraphCount} paragraphs</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Grammar Suggestions Card */}
-            {languageToolSuggestions.length > 0 && (
-              <Card className="bg-white border-gray-200 shadow-sm">
-                <CardHeader className="pb-4 border-b border-gray-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <AlertCircle className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-medium text-gray-900">
-                        Writing Suggestions ({languageToolSuggestions.length})
-                      </CardTitle>
-                      <p className="text-sm text-gray-500 mt-0.5">Grammar and style improvements</p>
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {languageToolSuggestions.slice(0, 5).map((sugg, idx) => {
-                      const before = sugg.context?.text?.slice(0, sugg.context?.offset) || ""
-                      const error =
-                        sugg.context?.text?.slice(sugg.context?.offset, sugg.context?.offset + sugg.context?.length) ||
-                        ""
-                      const after = sugg.context?.text?.slice(sugg.context?.offset + sugg.context?.length) || ""
-
-                      return (
-                        <div
-                          key={idx}
-                          className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="text-sm font-medium text-gray-900">{sugg.message}</div>
-                            <Badge variant="outline" className="text-xs bg-white border-gray-300">
-                              {sugg.rule?.category?.name || "Style"}
-                            </Badge>
-                          </div>
-
-                          <div className="text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
-                            <span>{before}</span>
-                            <span className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
-                            <span>{after}</span>
-                          </div>
-
-                          {sugg.replacements && sugg.replacements.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              <span className="text-xs text-gray-500 font-medium">Suggestions:</span>
-                              {sugg.replacements.slice(0, 3).map((rep: any, i: number) => (
-                                <button
-                                  key={i}
-                                  className="inline-block bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors duration-200"
-                                  onClick={() => {
-                                    // Apply suggestion logic would go here
-                                    toast({
-                                      title: "Suggestion applied",
-                                      description: `Replaced with "${rep.value}"`,
-                                      duration: 2000,
-                                    })
-                                  }}
-                                >
-                                  {rep.value}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-
-                    {languageToolSuggestions.length > 5 && (
-                      <div className="text-center pt-4">
-                        <Button variant="outline" size="sm" className="border-gray-300 text-gray-700 bg-transparent">
-                          Show {languageToolSuggestions.length - 5} more suggestions
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
-                    Powered by{" "}
-                    <a
-                      href="https://languagetool.org/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-gray-900 hover:underline font-medium"
-                    >
-                      LanguageTool
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Redesigned Compact Sidebar */}
-          <div className="xl:col-span-1 space-y-4">
-            {/* Tabbed Interface for Main Tools */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-gray-50 p-1 rounded-lg">
-                  <TabsTrigger
-                    value="assistant"
-                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    <Brain className="h-3 w-3" />
-                    <span className="hidden sm:inline">AI</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="analytics"
-                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    <BarChart3 className="h-3 w-3" />
-                    <span className="hidden sm:inline">Stats</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="citations"
-                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    <Quote className="h-3 w-3" />
-                    <span className="hidden sm:inline">Refs</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* AI Writing Assistant Tab */}
-                <TabsContent value="assistant" className="mt-4 space-y-4">
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Zap className="h-4 w-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-900">AI Writing Assistant</h3>
-                    </div>
-
-                    {/* Collapsible AI Configuration */}
-                    <Collapsible open={isAIConfigOpen} onOpenChange={setIsAIConfigOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <Settings className="h-3 w-3" />
-                            <span>Configuration</span>
-                          </span>
-                          {isAIConfigOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-3 mt-2">
-                        <div>
-                          <Label className="text-xs font-medium text-gray-700 mb-2 block">Provider</Label>
-                          <MinimalAIProviderSelector
-                            selectedProvider={selectedProvider}
-                            onProviderChange={setSelectedProvider}
-                            selectedModel={selectedModel}
-                            onModelChange={setSelectedModel}
-                            variant="compact"
-                            showModelSelector={true}
-                            showConfigLink={false}
-                          />
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* Writing Style Selection */}
-                    <div>
-                      <Label className="text-xs font-medium text-gray-700 mb-2 block">Writing Style</Label>
-                      <div className="space-y-1">
-                        {personalities.map((personality) => (
-                          <button
-                            key={personality.key}
-                            className={`w-full p-2 rounded-md border text-left transition-all duration-200 ${
-                              selectedPersonality.key === personality.key
-                                ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
-                                : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                            }`}
-                            onClick={() => setSelectedPersonality(personality)}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <personality.icon className="h-3 w-3" />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium">{personality.name}</div>
-                                <div className="text-xs opacity-75 truncate">{personality.description}</div>
-                              </div>
-                              {selectedPersonality.key === personality.key && (
-                                <div className="w-1.5 h-1.5 bg-black rounded-full flex-shrink-0" />
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* AI Status */}
-                    <div className="mt-4 p-2 bg-gray-50 rounded-md border border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              selectedProvider && selectedModel && supabaseToken ? "bg-black" : "bg-gray-400"
-                            }`}
-                          />
-                          <span className="text-xs text-gray-600 font-medium">
-                            {selectedProvider && selectedModel && supabaseToken ? "Ready" : "Setup Required"}
-                          </span>
-                        </div>
-                        {selectedProvider && selectedModel && supabaseToken && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-gray-100 text-gray-700 border-gray-300 px-2 py-0.5"
-                          >
-                            Connected
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Quick AI Action */}
-                    <Button
-                      onClick={handleOpenAIModal}
-                      disabled={!selectedProvider || !selectedModel || !supabaseToken}
-                      className="w-full mt-3 bg-gray-900 text-white hover:bg-gray-800 h-8 text-xs"
-                    >
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      Generate Content
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                {/* Document Analytics Tab */}
-                <TabsContent value="analytics" className="mt-4 space-y-4">
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Eye className="h-4 w-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-900">Document Analytics</h3>
-                    </div>
-
-                    {/* Key Metrics Grid */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="text-lg font-bold text-gray-900">{wordCount.toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">Words</div>
-                      </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="text-lg font-bold text-gray-900">{readingTime}</div>
-                        <div className="text-xs text-gray-500">Min Read</div>
-                      </div>
-                    </div>
-
-                    {/* Detailed Stats */}
-                    <Collapsible open={isAnalyticsOpen} onOpenChange={setIsAnalyticsOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span>Detailed Statistics</span>
-                          {isAnalyticsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <div className="space-y-2 text-xs">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Characters</span>
-                            <span className="font-medium text-gray-900">{charCount.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Characters (no spaces)</span>
-                            <span className="font-medium text-gray-900">{charCountNoSpaces.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Paragraphs</span>
-                            <span className="font-medium text-gray-900">{paragraphCount}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Grammar Issues</span>
-                            <span
-                              className={`font-medium ${
-                                languageToolSuggestions.length > 0 ? "text-red-600" : "text-black"
-                              }`}
-                            >
-                              {languageToolSuggestions.length}
-                            </span>
-                          </div>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* New: AI Detection Section */}
-                    <Collapsible open={isAIDetectionOpen} onOpenChange={setIsAIDetectionOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <Robot className="h-3 w-3" />
-                            <span>AI Detection</span>
-                          </span>
-                          {isAIDetectionOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <Button
-                          onClick={handleDetectAI}
-                          disabled={isDetectingAI || !documentText.trim()}
-                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
-                        >
-                          {isDetectingAI ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Detecting AI...
-                            </>
-                          ) : (
-                            "Detect AI Content"
-                          )}
-                        </Button>
-                        {aiDetectionResult && (
-                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
-                            <p className="font-medium mb-1">Result:</p>
-                            <p className={aiDetectionResult.is_ai ? "text-red-600" : "text-green-600"}>
-                              {aiDetectionResult.message}
-                            </p>
-                            <p className="text-gray-600 mt-1">
-                              AI Probability: {aiDetectionResult.ai_probability.toFixed(2)}%
-                            </p>
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* New: Humanizer Section */}
-                    <Collapsible open={isHumanizerOpen} onOpenChange={setIsHumanizerOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <User className="h-3 w-3" />
-                            <span>Humanizer</span>
-                          </span>
-                          {isHumanizerOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <Button
-                          onClick={handleHumanizeText}
-                          disabled={isHumanizing || !documentText.trim()}
-                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
-                        >
-                          {isHumanizing ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Humanizing...
-                            </>
-                          ) : (
-                            "Humanize Text"
-                          )}
-                        </Button>
-                        {humanizedText && (
-                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
-                            <p className="font-medium mb-1">Humanized Version:</p>
-                            <div className="whitespace-pre-wrap text-gray-700">{humanizedText}</div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="mt-2 w-full h-7 text-xs"
-                              onClick={() => setDocumentText(humanizedText)}
-                            >
-                              <Check className="h-3 w-3 mr-1" /> Apply to Document
-                            </Button>
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* New: Plagiarism Detection Section */}
-                    <Collapsible open={isPlagiarismOpen} onOpenChange={setIsPlagiarismOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <ClipboardCopy className="h-3 w-3" />
-                            <span>Plagiarism Check</span>
-                          </span>
-                          {isPlagiarismOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <Button
-                          onClick={handleCheckPlagiarism}
-                          disabled={isCheckingPlagiarism || !documentText.trim()}
-                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
-                        >
-                          {isCheckingPlagiarism ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Checking Plagiarism...
-                            </>
-                          ) : (
-                            "Check Plagiarism"
-                          )}
-                        </Button>
-                        {plagiarismResult && (
-                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
-                            <p className="font-medium mb-1">Result:</p>
-                            <p
-                              className={
-                                plagiarismResult.plagiarism_percentage > 20 ? "text-red-600" : "text-green-600"
-                              }
-                            >
-                              {plagiarismResult.message}
-                            </p>
-                            <p className="text-gray-600 mt-1">
-                              Plagiarism Score: {plagiarismResult.plagiarism_percentage.toFixed(2)}%
-                            </p>
-                            {plagiarismResult.sources.length > 0 && (
-                              <div className="mt-2">
-                                <p className="font-medium mb-1">Potential Sources:</p>
-                                <ul className="list-disc list-inside space-y-1">
-                                  {plagiarismResult.sources.map((source, idx) => (
-                                    <li key={idx}>
-                                      <a
-                                        href={source.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:underline"
-                                      >
-                                        {source.url}
-                                      </a>
-                                      <p className="text-gray-500 italic">Match: "{source.match}"</p>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    {/* Template Progress */}
-                    <Separator className="my-3" />
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-600">Template Progress</span>
-                        <Badge variant="outline" className="text-xs bg-gray-50 border-gray-300">
-                          {currentTemplate.name}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1">
-                        <Progress value={Math.min(wordProgress, 100)} className="h-1.5 bg-gray-200 [&>*]:bg-black" />
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>{Math.round(wordProgress)}% complete</span>
-                          <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
-                            {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} remaining`}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Citations & References Tab */}
-                <TabsContent value="citations" className="mt-4 space-y-4">
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Quote className="h-4 w-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-900">Citations & References</h3>
-                    </div>
-
-                    {/* Compact Citation Manager */}
-                    <CitationManager
-                      selectedTemplate={selectedTemplate}
-                      onTemplateChange={setSelectedTemplate}
-                      compact={true}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </Card>
-
-            {/* Quick Actions Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Zap className="h-4 w-4 text-gray-600" />
-                  <h3 className="text-sm font-medium text-gray-900">Quick Actions</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={checkText}
-                    variant="outline"
-                    size="sm"
-                    disabled={isChecking || !documentText.trim()}
-                    className="h-8 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  >
-                    <Check className="h-3 w-3 mr-1" />
-                    {isChecking ? "Checking..." : "Grammar"}
-                  </Button>
-                  <Button
-                    onClick={handleSave}
-                    variant="outline"
-                    size="sm"
-                    disabled={isAutoSaving}
-                    className="h-8 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  >
-                    <Save className="h-3 w-3 mr-1" />
-                    Save
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Enhanced AI Writing Modal */}
-      <AIWritingModal
-        open={aiModalOpen}
-        onOpenChange={setAiModalOpen}
-        selectedProvider={selectedProvider || ""}
-        selectedModel={selectedModel || ""}
-        supabaseToken={supabaseToken}
-        writingStylePrompt={selectedPersonality.systemPrompt}
-        templatePrompt={getTemplatePrompt(selectedTemplate)}
-        researchContext={buildContext()}
-        onGenerateContent={(text) => {
-          setDocumentText((prev) => prev + "\n\n" + text)
-          toast({
-            title: "Content Added",
-            description: "AI-generated content has been added to your document.",
-            duration: 3000,
-          })
-        }}
-      />
-
-      {/* Document Manager Dialog */}
-      <Dialog open={documentManagerOpen} onOpenChange={setDocumentManagerOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Document Management</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            <DocumentManager
-              onDocumentSelect={handleDocumentSelect}
-              onDocumentLoad={handleDocumentLoad}
-              currentDocumentId={currentDocument?.id}
-              className="h-full"
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+import { UserProfileAvatar } from "@/components/user-profile-avatar" // For user editing indicator
+import type { Document } from "@/lib/types" // Assuming Document type is here
 
 export default function WriterPage() {
+  const searchParams = useSearchParams()
+  const documentId = searchParams.get("id")
+  const { toast } = useToast()
+  const { handleError } = useGlobalErrorHandler()
+
+  const [document, setDocument] = useState<Document | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false)
+  const [isCitationManagerOpen, setIsCitationManagerOpen] = useState(false)
+  const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
+  const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
+  const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
+
+  const [aiDetectionResult, setAiDetectionResult] = useState<string | null>(null)
+  const [humanizedText, setHumanizedText] = useState<string | null>(null)
+  const [plagiarismCheckResult, setPlagiarismCheckResult] = useState<{
+    detected: boolean
+    details: string
+    percentage: number
+  } | null>(null)
+
+  const [documentTitle, setDocumentTitle] = useState("Untitled document")
+  const [documentContent, setDocumentContent] = useState("")
+  const debouncedDocumentContent = useDebouncedState(documentContent, 1000)
+  const debouncedDocumentTitle = useDebouncedState(documentTitle, 1000)
+
+  const fetchDocument = useCallback(
+    async (id: string) => {
+      try {
+        setLoading(true)
+        const fetchedDoc = await DocumentService.getInstance().getDocument(id)
+        setDocument(fetchedDoc)
+        setDocumentTitle(fetchedDoc.title || "Untitled document")
+        setDocumentContent(fetchedDoc.content || "")
+      } catch (err) {
+        handleError(err, "Failed to fetch document")
+        setDocument(null)
+        setDocumentTitle("Untitled document")
+        setDocumentContent("")
+      } finally {
+        setLoading(false)
+      }
+    },
+    [handleError],
+  )
+
+  useEffect(() => {
+    if (documentId) {
+      fetchDocument(documentId)
+    } else {
+      // If no documentId, create a new unsaved document
+      setDocument(null)
+      setDocumentTitle("Untitled document")
+      setDocumentContent("")
+      setLoading(false)
+    }
+  }, [documentId, fetchDocument])
+
+  useEffect(() => {
+    const saveDocument = async () => {
+      if (!document && !debouncedDocumentContent && debouncedDocumentTitle === "Untitled document") return // No document and no content to save
+
+      setSaving(true)
+      try {
+        let updatedDoc: Document
+        if (document) {
+          // Update existing document
+          updatedDoc = await DocumentService.getInstance().updateDocument(document.id, {
+            title: debouncedDocumentTitle,
+            content: debouncedDocumentContent,
+          })
+        } else {
+          // Create new document if none exists
+          updatedDoc = await DocumentService.getInstance().createDocument({
+            title: debouncedDocumentTitle || "Untitled document",
+            content: debouncedDocumentContent,
+            document_type: "paper", // Default type for writer page
+          })
+          // Update URL to reflect the new document ID
+          window.history.pushState({}, "", `/writer?id=${updatedDoc.id}`)
+        }
+        setDocument(updatedDoc)
+        toast({
+          title: "Document saved",
+          description: "Your changes have been automatically saved.",
+        })
+      } catch (err) {
+        handleError(err, "Failed to save document")
+        toast({
+          title: "Save failed",
+          description: "Could not save your changes. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setSaving(false)
+      }
+    }
+
+    // Only save if there's a document or content, and content/title has changed
+    if (
+      (document && (debouncedDocumentContent !== document.content || debouncedDocumentTitle !== document.title)) ||
+      (!document && (debouncedDocumentContent || debouncedDocumentTitle !== "Untitled document"))
+    ) {
+      saveDocument()
+    }
+  }, [debouncedDocumentContent, debouncedDocumentTitle, document, toast, handleError])
+
+  const handleNewDocument = async () => {
+    try {
+      setLoading(true)
+      const newDoc = await DocumentService.getInstance().createDocument({
+        title: "Untitled document",
+        content: "",
+        document_type: "paper",
+      })
+      window.history.pushState({}, "", `/writer?id=${newDoc.id}`)
+      setDocument(newDoc)
+      setDocumentTitle("Untitled document")
+      setDocumentContent("")
+      toast({
+        title: "New document created",
+        description: "Start writing your new masterpiece!",
+      })
+    } catch (err) {
+      handleError(err, "Failed to create new document")
+      toast({
+        title: "Error",
+        description: "Failed to create new document.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAiDetect = async () => {
+    if (!documentContent) {
+      toast({ title: "No content", description: "Please write some text to detect.", variant: "destructive" })
+      return
+    }
+    setAiDetectionResult("Detecting...")
+    try {
+      const result = await ResearchService.detectAI(documentContent)
+      setAiDetectionResult(result.message) // Use result.message from the API
+    } catch (err) {
+      handleError(err, "AI Detection failed")
+      setAiDetectionResult("Error detecting AI content.")
+    }
+  }
+
+  const handleHumanize = async () => {
+    if (!documentContent) {
+      toast({ title: "No content", description: "Please write some text to humanize.", variant: "destructive" })
+      return
+    }
+    setHumanizedText("Humanizing...")
+    try {
+      const result = await ResearchService.humanizeText(documentContent)
+      setHumanizedText(result.humanized_text)
+    } catch (err) {
+      handleError(err, "Humanization failed")
+      setHumanizedText("Error humanizing text.")
+    }
+  }
+
+  const handlePlagiarismCheck = async () => {
+    if (!documentContent) {
+      toast({
+        title: "No content",
+        description: "Please write some text to check for plagiarism.",
+        variant: "destructive",
+      })
+      return
+    }
+    setPlagiarismCheckResult({ detected: false, details: "Checking...", percentage: 0 })
+    try {
+      const result = await ResearchService.checkPlagiarism(documentContent)
+      setPlagiarismCheckResult({
+        detected: result.detected,
+        details: result.message, // Use result.message from the API
+        percentage: result.plagiarism_percentage,
+      })
+    } catch (err) {
+      handleError(err, "Plagiarism check failed")
+      setPlagiarismCheckResult({ detected: false, details: "Error performing plagiarism check.", percentage: 0 })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+        <div className="w-64 border-r border-gray-200 dark:border-gray-800 p-4">
+          <div className="h-8 w-full bg-gray-200 dark:bg-gray-800 rounded mb-4 animate-pulse"></div>
+          <div className="h-8 w-full bg-gray-200 dark:bg-gray-800 rounded mb-2 animate-pulse"></div>
+          <div className="h-8 w-full bg-gray-200 dark:bg-gray-800 rounded mb-2 animate-pulse"></div>
+          <div className="h-8 w-full bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+        </div>
+        <div className="flex-1 flex flex-col p-8">
+          <div className="h-10 w-1/2 bg-gray-200 dark:bg-gray-800 rounded mb-6 animate-pulse"></div>
+          <div className="h-6 w-1/4 bg-gray-200 dark:bg-gray-800 rounded mb-8 animate-pulse"></div>
+          <div className="flex-1 bg-gray-100 dark:bg-gray-900 rounded animate-pulse"></div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <RouteGuard requireAuth={true}>
-      <ResearchSessionProvider>
-        <WriterErrorBoundary>
-          <SafeDOMWrapper>
-            <WriterPageContent />
-          </SafeDOMWrapper>
-        </WriterErrorBoundary>
-      </ResearchSessionProvider>
-    </RouteGuard>
+    <TooltipProvider>
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col">
+          <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">Acme Inc</h1>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleNewDocument}>
+                    <Edit className="h-4 w-4" />
+                    <span className="sr-only">New document</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>New document</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <History className="h-4 w-4" />
+                    <span className="sr-only">History</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>History</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+          <div className="p-4 space-y-2 border-b border-gray-200 dark:border-gray-800">
+            <Link
+              href="/inbox"
+              className="flex items-center gap-2 py-1.5 px-3 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Inbox
+            </Link>
+            <Link
+              href="/ai-assistant"
+              className="flex items-center gap-2 py-1.5 px-3 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <Lightbulb className="w-4 h-4" />
+              Create with AI
+            </Link>
+          </div>
+          <DocumentList activeDocumentId={documentId || undefined} />
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
+          {/* Top Bar */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+              {!saving && <CheckCircle className="h-4 w-4 text-green-500" />}
+              <span className="text-sm text-gray-500 dark:text-gray-400">{saving ? "Saving..." : "Saved"}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Share2 className="h-4 w-4" />
+                    <span className="sr-only">Share</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Share</TooltipContent>
+              </Tooltip>
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <UserProfileAvatar className="h-6 w-6" /> {/* Using UserProfileAvatar for user editing */}
+                <span>1 user editing</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Document Editor and Tools */}
+          <ScrollArea className="flex-1 p-8 overflow-y-auto">
+            <div className="max-w-3xl mx-auto pb-16">
+              <Input
+                className="text-4xl font-bold mb-4 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto bg-transparent"
+                placeholder="Untitled document"
+                value={documentTitle}
+                onChange={(e) => setDocumentTitle(e.target.value)}
+              />
+              <p className="text-gray-500 dark:text-gray-400 mb-8">Try mentioning a user with @</p>
+
+              <RichTextEditor
+                value={documentContent}
+                onChange={setDocumentContent}
+                className="min-h-[500px] border-none focus-within:ring-0 focus-within:ring-offset-0"
+              />
+
+              <Separator className="my-8" />
+
+              {/* AI Writing Assistant */}
+              <Collapsible open={isAiAssistantOpen} onOpenChange={setIsAiAssistantOpen} className="mb-6">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5" /> AI Writing Assistant
+                  </div>
+                  {isAiAssistantOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <AiWritingAssistant
+                        onInsertText={(text) => setDocumentContent((prev) => prev + text)}
+                        currentDocumentContent={documentContent}
+                      />
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Citation Manager */}
+              <Collapsible open={isCitationManagerOpen} onOpenChange={setIsCitationManagerOpen} className="mb-6">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" /> Citation Manager
+                  </div>
+                  {isCitationManagerOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <CitationManager />
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* AI Detection */}
+              <Collapsible open={isAiDetectOpen} onOpenChange={setIsAiDetectOpen} className="mb-6">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" /> AI Content Detection
+                  </div>
+                  {isAiDetectOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardContent className="p-4 space-y-4">
+                      <Button
+                        onClick={handleAiDetect}
+                        disabled={!documentContent || aiDetectionResult === "Detecting..."}
+                      >
+                        {aiDetectionResult === "Detecting..." ? "Detecting..." : "Run AI Detection"}
+                      </Button>
+                      {aiDetectionResult && (
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                          <p className="text-sm font-medium">Result:</p>
+                          <p className="text-lg font-bold">{aiDetectionResult}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Humanize Text */}
+              <Collapsible open={isHumanizeOpen} onOpenChange={setIsHumanizeOpen} className="mb-6">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5" /> Humanize Text
+                  </div>
+                  {isHumanizeOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardContent className="p-4 space-y-4">
+                      <Button onClick={handleHumanize} disabled={!documentContent || humanizedText === "Humanizing..."}>
+                        {humanizedText === "Humanizing..." ? "Humanizing..." : "Humanize Text"}
+                      </Button>
+                      {humanizedText && (
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                          <p className="text-sm font-medium">Humanized Version:</p>
+                          <Textarea value={humanizedText} readOnly className="mt-2 min-h-[150px]" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 bg-transparent"
+                            onClick={() => {
+                              setDocumentContent(humanizedText)
+                              toast({
+                                title: "Text updated",
+                                description: "Document content replaced with humanized text.",
+                              })
+                            }}
+                          >
+                            <Copy className="h-4 w-4 mr-2" /> Use Humanized Text
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Plagiarism Check */}
+              <Collapsible open={isPlagiarismCheckOpen} onOpenChange={setIsPlagiarismCheckOpen} className="mb-6">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Gavel className="h-5 w-5" /> Plagiarism Check
+                  </div>
+                  {isPlagiarismCheckOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardContent className="p-4 space-y-4">
+                      <Button
+                        onClick={handlePlagiarismCheck}
+                        disabled={!documentContent || plagiarismCheckResult?.details === "Checking..."}
+                      >
+                        {plagiarismCheckResult?.details === "Checking..." ? "Checking..." : "Run Plagiarism Check"}
+                      </Button>
+                      {plagiarismCheckResult && (
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                          <p className="text-sm font-medium">Result:</p>
+                          {plagiarismCheckResult.details === "Checking..." ? (
+                            <p className="text-gray-600 dark:text-gray-400">Checking for plagiarism...</p>
+                          ) : plagiarismCheckResult.detected ? (
+                            <div className="text-red-600 dark:text-red-400">
+                              <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                              <span className="font-bold">
+                                Plagiarism Detected ({plagiarismCheckResult.percentage}% match)!
+                              </span>
+                              <p className="text-sm mt-1">{plagiarismCheckResult.details}</p>
+                            </div>
+                          ) : (
+                            <div className="text-green-600 dark:text-green-400">
+                              <CheckCircle className="inline-block h-4 w-4 mr-1" />
+                              <span className="font-bold">No obvious plagiarism detected.</span>
+                              <p className="text-sm mt-1">{plagiarismCheckResult.details}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Visual Content Renderer (for Mermaid charts, etc.) */}
+              <Collapsible className="mb-6">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5" /> Visual Content
+                  </div>
+                  <ChevronDown className="h-5 w-5" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <VisualContentRenderer content={documentContent} />
+                      {/* Example of embedding MermaidChart directly if needed */}
+                      {/* <MermaidChart chartDefinition="graph TD; A-->B" /> */}
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          </ScrollArea>
+        </main>
+      </div>
+    </TooltipProvider>
   )
 }

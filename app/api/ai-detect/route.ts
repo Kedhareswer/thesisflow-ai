@@ -1,33 +1,27 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-/**
- * API route for AI content detection
- * POST /api/ai-detect
- * Body: { text: string }
- */
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { text } = body
+    const { text } = await req.json()
 
-    if (!text) {
-      return NextResponse.json({ error: "Text is required" }, { status: 400 })
+    if (!text || typeof text !== "string") {
+      return NextResponse.json({ error: "Invalid text provided" }, { status: 400 })
     }
 
     // Simulate AI detection logic
-    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate network delay
+    const is_ai = Math.random() > 0.5
+    const ai_probability = Number.parseFloat((Math.random() * 100).toFixed(2))
 
-    // Simple mock logic: longer text or text with common AI phrases might have higher AI probability
-    const aiProbability = Math.min(100, Math.max(0, Math.floor(text.length / 500) * 5 + Math.random() * 20))
-    const isAI = aiProbability > 50
+    let message = ""
+    if (is_ai) {
+      message = `AI content detected with ${ai_probability}% probability.`
+    } else {
+      message = `Human-written content detected with ${100 - ai_probability}% probability.`
+    }
 
-    return NextResponse.json({
-      is_ai: isAI,
-      ai_probability: aiProbability,
-      message: isAI ? "This text likely contains AI-generated content." : "This text appears to be human-written.",
-    })
+    return NextResponse.json({ is_ai, ai_probability, message })
   } catch (error) {
-    console.error("Error in AI detection API:", error)
-    return NextResponse.json({ error: "Failed to perform AI detection" }, { status: 500 })
+    console.error("Error in AI detect API:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
