@@ -1,47 +1,37 @@
 "use client"
 
+import { SidebarGroupContent } from "@/components/ui/sidebar"
+
 import { useEffect } from "react"
 import {
-  PenLine,
   BookOpen,
   Check,
   AlertCircle,
   FileCode,
   Sparkles,
   Quote,
-  Zap,
-  Eye,
-  FileText,
-  Save,
-  Download,
   ChevronDown,
   ChevronUp,
-  Settings,
   BarChart3,
-  Brain,
   BotIcon as Robot,
   User,
   ClipboardCopy,
   Loader2,
+  Edit,
+  CheckCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MarkdownEditor } from "./components/rich-text-editor"
 import CitationManager from "./components/citation-manager"
 import { AIWritingModal } from "./components/ai-writing-modal"
-import { DocumentManager } from "./components/document-manager"
+import { DocumentList } from "./components/document-list" // Updated import
 import { useToast } from "@/hooks/use-toast"
 import { ResearchSessionProvider, useResearchContext } from "@/components/research-session-provider"
 import { RouteGuard } from "@/components/route-guard"
-import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import type { AIProvider } from "@/lib/ai-providers"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import DocumentService, { type Document } from "@/lib/services/document.service"
@@ -51,7 +41,22 @@ import { useDebouncedState } from "./hooks/use-debounced-state"
 import { WriterErrorBoundary } from "./components/error-boundary"
 import { SafeDOMWrapper } from "./components/safe-dom-wrapper"
 import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
-import { ResearchService } from "@/lib/services/research.service" // Import ResearchService
+import { ResearchService } from "@/lib/services/research.service"
+import {
+  Sidebar,
+  SidebarProvider,
+  SidebarHeader,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  SidebarTrigger,
+  SidebarSeparator,
+} from "@/components/ui/sidebar" // Import sidebar components
+import { UserProfileAvatar } from "@/components/user-profile-avatar" // For user editing indicator
 
 // Supported publisher templates with enhanced metadata
 const publisherTemplates = [
@@ -222,7 +227,7 @@ function WriterPageContent() {
   // Document state with debouncing
   const [selectedTemplate, setSelectedTemplate] = useSafeState(publisherTemplates[0].id)
   const [documentText, setDocumentText] = useDebouncedState("", 500) // Debounce text changes
-  const [documentTitle, setDocumentTitle] = useDebouncedState("Untitled Document", 300)
+  const [documentTitle, setDocumentTitle] = useDebouncedState("Untitled document", 300) // Default title
   const [languageToolSuggestions, setLanguageToolSuggestions] = useSafeState<any[]>([])
   const [isChecking, setIsChecking] = useSafeState(false)
   const [checkProgress, setCheckProgress] = useSafeState<string>("")
@@ -249,7 +254,7 @@ function WriterPageContent() {
 
   // Document management state
   const [currentDocument, setCurrentDocument] = useSafeState<Document | null>(null)
-  const [documentManagerOpen, setDocumentManagerOpen] = useSafeState(false)
+  const [documentManagerOpen, setDocumentManagerOpen] = useSafeState(false) // Still used for the dialog
   const documentService = DocumentService.getInstance()
 
   // Sidebar state for collapsible sections
@@ -330,7 +335,7 @@ function WriterPageContent() {
     setCurrentDocument(document)
     setDocumentTitle(document.title)
     setDocumentText(document.content)
-    setDocumentManagerOpen(false)
+    // No need to close dialog here, as DocumentList is now in sidebar
   })
 
   const handleDocumentLoad = useSafeCallback((content: string) => {
@@ -397,7 +402,9 @@ function WriterPageContent() {
       const estimatedChunks = Math.ceil(textSizeInBytes / maxSizeInBytes)
       toast({
         title: "Large document detected",
-        description: `Your document (${Math.round(textSizeInBytes / 1024)}KB) will be processed sequentially in approximately ${estimatedChunks} chunks. This may take a few moments.`,
+        description: `Your document (${Math.round(
+          textSizeInBytes / 1024,
+        )}KB) will be processed sequentially in approximately ${estimatedChunks} chunks. This may take a few moments.`,
         variant: "default",
       })
       // Continue with processing - the API will handle chunking
@@ -515,6 +522,7 @@ function WriterPageContent() {
         description: "There was an error humanizing your text. Please try again.",
         variant: "destructive",
       })
+      setHumanizedText("Failed to humanize text. Please try again.")
     } finally {
       setIsHumanizing(false)
     }
@@ -620,722 +628,415 @@ function WriterPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Enhanced Header with Document Controls */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Left: Document Title Editor */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={documentTitle}
-                  onChange={(e) => setDocumentTitle(e.target.value)}
-                  className="text-lg font-medium text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded transition-colors"
-                  placeholder="Document title..."
-                  aria-label="Document title"
-                />
-                <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-300">
-                  {currentTemplate.name}
-                </Badge>
-              </div>
+    <SidebarProvider defaultOpen={true}>
+      <div className="min-h-screen bg-gray-50 flex">
+        {/* Left Sidebar */}
+        <Sidebar side="left" collapsible="icon" variant="sidebar" className="bg-white border-r border-gray-200">
+          <SidebarHeader className="flex items-center justify-between p-4 pb-2">
+            <div className="flex items-center space-x-2">
+              <img src="/placeholder-logo.svg" alt="Acme Inc Logo" className="h-6 w-6" />
+              <span className="text-lg font-semibold text-gray-900">Acme Inc</span>
             </div>
+            <SidebarTrigger className="h-7 w-7" />
+          </SidebarHeader>
 
-            {/* Right: Actions and Status */}
+          <SidebarContent className="p-2 space-y-4">
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton className="flex items-center space-x-2">
+                  <Edit className="h-4 w-4" />
+                  <span>Inbox</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton className="flex items-center space-x-2">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Create with AI</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+
+            <SidebarSeparator />
+
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                Pages
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <DocumentList onDocumentSelect={handleDocumentSelect} currentDocumentId={currentDocument?.id || null} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+
+        {/* Main Content Area */}
+        <SidebarInset className="flex-1 flex flex-col bg-white">
+          {/* Top Bar */}
+          <div className="flex items-center justify-between px-8 py-4 border-b border-gray-200">
             <div className="flex items-center space-x-4">
-              {/* Research Context Badge */}
-              {hasContext && (
-                <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300 px-3 py-1.5">
-                  <BookOpen className="h-3 w-3 mr-1.5" />
-                  <span className="text-xs font-medium">{contextSummary}</span>
-                </Badge>
+              <input
+                type="text"
+                value={documentTitle}
+                onChange={(e) => setDocumentTitle(e.target.value)}
+                className="text-2xl font-bold text-gray-900 bg-transparent border-none outline-none focus:bg-gray-50 px-2 py-1 rounded transition-colors"
+                placeholder="Untitled document"
+                aria-label="Document title"
+              />
+              {/* Placeholder for checkmark/save status */}
+              {isAutoSaving ? (
+                <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />
+              ) : (
+                <CheckCircle className="h-5 w-5 text-green-500" />
               )}
-
-              {/* Document Stats */}
-              <div className="hidden md:flex items-center space-x-4 text-sm text-gray-500">
-                <div className="flex items-center space-x-1">
-                  <FileText className="h-4 w-4" />
-                  <span>{wordCount.toLocaleString()} words</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Eye className="h-4 w-4" />
-                  <span>{readingTime}min read</span>
-                </div>
-              </div>
-
-              {/* Save Status */}
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                {isAutoSaving ? (
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse" />
-                    <span>Saving...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-black rounded-full" />
-                    <span>Saved {formatLastSaved(lastSaved)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDocumentManagerOpen(true)}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Documents
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveDocument}
-                  disabled={isAutoSaving}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save
-                </Button>
-
-                <Select onValueChange={(value) => handleExport(value as "markdown" | "pdf" | "docx")}>
-                  <SelectTrigger className="h-9 px-4 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
-                    <Download className="h-4 w-4 mr-1" />
-                    Export
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-gray-200 shadow-lg">
-                    <SelectItem value="markdown">Export as Markdown</SelectItem>
-                    <SelectItem value="pdf">Export as PDF</SelectItem>
-                    <SelectItem value="docx">Export as DOCX</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <UserProfileAvatar className="h-8 w-8" />
+              <span className="text-sm text-gray-600">1 user editing</span>
             </div>
           </div>
-        </div>
-      </header>
 
-      {/* Main Content Area */}
-      <div className="max-w-[1600px] mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Main Editor Column */}
-          <div className="xl:col-span-3 space-y-6">
-            {/* Document Progress Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-black rounded-full" />
-                    <span className="text-sm font-medium text-gray-900">Writing Progress</span>
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {wordCount.toLocaleString()} / {currentTemplate.wordLimit.toLocaleString()} words
-                  </span>
-                </div>
-                <Progress value={Math.min(wordProgress, 100)} className="h-2 bg-gray-200 [&>*]:bg-black" />
-                <div className="flex justify-between text-xs text-gray-500 mt-2">
-                  <span>{Math.round(wordProgress)}% complete</span>
-                  <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
-                    {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} words remaining`}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Document Editor */}
+          <div className="flex-1 p-8 max-w-4xl mx-auto w-full">
+            <MarkdownEditor value={documentText} onChange={setDocumentText} className="min-h-[calc(100vh-250px)]" />
 
-            {/* Document Editor Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <PenLine className="h-4 w-4 text-gray-600" />
+            {/* AI Assistant & Grammar Check Buttons */}
+            <div className="mt-8 flex items-center justify-between">
+              <Button
+                onClick={handleOpenAIModal}
+                disabled={!selectedProvider || !selectedModel || !supabaseToken}
+                className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI Assistant
+              </Button>
+              <Button
+                onClick={checkText}
+                variant="outline"
+                disabled={isChecking || !documentText.trim()}
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                {isChecking ? checkProgress || "Checking..." : "Grammar Check"}
+              </Button>
+            </div>
+
+            {/* Collapsible Sections for Analytics, AI Tools, Citations */}
+            <div className="mt-12 space-y-6">
+              {/* Document Analytics */}
+              <Collapsible open={isAnalyticsOpen} onOpenChange={setIsAnalyticsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between text-base font-semibold px-4 py-3">
+                    <span className="flex items-center space-x-2">
+                      <BarChart3 className="h-5 w-5 text-gray-600" />
+                      <span>Document Analytics</span>
+                    </span>
+                    {isAnalyticsOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 p-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="text-xl font-bold text-gray-900">{wordCount.toLocaleString()}</div>
+                      <div className="text-sm text-gray-500">Words</div>
                     </div>
-                    <div>
-                      <CardTitle className="text-lg font-medium text-gray-900">Document Editor</CardTitle>
-                      <p className="text-sm text-gray-500 mt-0.5">Write and edit your research document</p>
+                    <div className="text-center p-3 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="text-xl font-bold text-gray-900">{readingTime}</div>
+                      <div className="text-sm text-gray-500">Min Read</div>
                     </div>
                   </div>
-
-                  <div className="flex items-center space-x-3">
-                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                      <SelectTrigger className="w-48 h-9 text-sm border-gray-300 bg-white focus:border-gray-900 focus:ring-1 focus:ring-gray-900">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200 shadow-lg">
-                        {publisherTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.id} className="text-sm hover:bg-gray-50 p-3">
-                            <div>
-                              <div className="font-medium">{template.name}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{template.description}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                {template.wordLimit.toLocaleString()} words • {template.sections.length} sections
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-0">
-                <MarkdownEditor value={documentText} onChange={setDocumentText} className="border-0 rounded-none" />
-
-                {/* Enhanced Action Bar */}
-                <div className="p-6 border-t border-gray-100 bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        onClick={checkText}
-                        variant="outline"
-                        size="sm"
-                        disabled={isChecking || !documentText.trim()}
-                        className="border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-200 bg-transparent"
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Characters</span>
+                      <span className="font-medium text-gray-900">{charCount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Characters (no spaces)</span>
+                      <span className="font-medium text-gray-900">{charCountNoSpaces.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Paragraphs</span>
+                      <span className="font-medium text-gray-900">{paragraphCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Grammar Issues</span>
+                      <span
+                        className={`font-medium ${languageToolSuggestions.length > 0 ? "text-red-600" : "text-black"}`}
                       >
-                        <Check className="h-4 w-4 mr-2" />
-                        {isChecking ? checkProgress || "Checking..." : "Grammar Check"}
-                      </Button>
-
-                      <Button
-                        onClick={handleOpenAIModal}
-                        size="sm"
-                        disabled={!selectedProvider || !selectedModel || !supabaseToken}
-                        className="bg-gray-900 text-white hover:bg-gray-800 shadow-sm transition-all duration-200 disabled:opacity-50"
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        AI Assistant
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      {languageToolSuggestions.length > 0 && (
-                        <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">
-                          {languageToolSuggestions.length} suggestions
-                        </Badge>
-                      )}
-                      <div className="flex items-center space-x-2">
-                        <span>{charCount.toLocaleString()} characters</span>
-                        <span>•</span>
-                        <span>{paragraphCount} paragraphs</span>
-                      </div>
+                        {languageToolSuggestions.length}
+                      </span>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Grammar Suggestions Card */}
-            {languageToolSuggestions.length > 0 && (
-              <Card className="bg-white border-gray-200 shadow-sm">
-                <CardHeader className="pb-4 border-b border-gray-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <AlertCircle className="h-4 w-4 text-gray-600" />
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Template Progress</span>
+                      <Badge variant="outline" className="text-sm bg-gray-50 border-gray-300">
+                        {currentTemplate.name}
+                      </Badge>
                     </div>
-                    <div>
-                      <CardTitle className="text-lg font-medium text-gray-900">
-                        Writing Suggestions ({languageToolSuggestions.length})
-                      </CardTitle>
-                      <p className="text-sm text-gray-500 mt-0.5">Grammar and style improvements</p>
+                    <Progress value={Math.min(wordProgress, 100)} className="h-2 bg-gray-200 [&>*]:bg-black" />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>{Math.round(wordProgress)}% complete</span>
+                      <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
+                        {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} remaining`}
+                      </span>
                     </div>
                   </div>
-                </CardHeader>
+                </CollapsibleContent>
+              </Collapsible>
 
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {languageToolSuggestions.slice(0, 5).map((sugg, idx) => {
-                      const before = sugg.context?.text?.slice(0, sugg.context?.offset) || ""
-                      const error =
-                        sugg.context?.text?.slice(sugg.context?.offset, sugg.context?.offset + sugg.context?.length) ||
-                        ""
-                      const after = sugg.context?.text?.slice(sugg.context?.offset + sugg.context?.length) || ""
-
-                      return (
-                        <div
-                          key={idx}
-                          className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="text-sm font-medium text-gray-900">{sugg.message}</div>
-                            <Badge variant="outline" className="text-xs bg-white border-gray-300">
-                              {sugg.rule?.category?.name || "Style"}
-                            </Badge>
-                          </div>
-
-                          <div className="text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
-                            <span>{before}</span>
-                            <span className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded font-medium">{error}</span>
-                            <span>{after}</span>
-                          </div>
-
-                          {sugg.replacements && sugg.replacements.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              <span className="text-xs text-gray-500 font-medium">Suggestions:</span>
-                              {sugg.replacements.slice(0, 3).map((rep: any, i: number) => (
-                                <button
-                                  key={i}
-                                  className="inline-block bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors duration-200"
-                                  onClick={() => {
-                                    // Apply suggestion logic would go here
-                                    toast({
-                                      title: "Suggestion applied",
-                                      description: `Replaced with "${rep.value}"`,
-                                      duration: 2000,
-                                    })
-                                  }}
-                                >
-                                  {rep.value}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-
-                    {languageToolSuggestions.length > 5 && (
-                      <div className="text-center pt-4">
-                        <Button variant="outline" size="sm" className="border-gray-300 text-gray-700 bg-transparent">
-                          Show {languageToolSuggestions.length - 5} more suggestions
-                        </Button>
-                      </div>
+              {/* AI Detection Section */}
+              <Collapsible open={isAIDetectionOpen} onOpenChange={setIsAIDetectionOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between text-base font-semibold px-4 py-3">
+                    <span className="flex items-center space-x-2">
+                      <Robot className="h-5 w-5" />
+                      <span>AI Detection</span>
+                    </span>
+                    {isAIDetectionOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 p-4 border-t border-gray-200">
+                  <Button
+                    onClick={handleDetectAI}
+                    disabled={isDetectingAI || !documentText.trim()}
+                    className="w-full h-10 text-sm bg-gray-900 text-white hover:bg-gray-800"
+                  >
+                    {isDetectingAI ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Detecting AI...
+                      </>
+                    ) : (
+                      "Detect AI Content"
                     )}
-                  </div>
-
-                  <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
-                    Powered by{" "}
-                    <a
-                      href="https://languagetool.org/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-gray-900 hover:underline font-medium"
-                    >
-                      LanguageTool
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Redesigned Compact Sidebar */}
-          <div className="xl:col-span-1 space-y-4">
-            {/* Tabbed Interface for Main Tools */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-gray-50 p-1 rounded-lg">
-                  <TabsTrigger
-                    value="assistant"
-                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    <Brain className="h-3 w-3" />
-                    <span className="hidden sm:inline">AI</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="analytics"
-                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    <BarChart3 className="h-3 w-3" />
-                    <span className="hidden sm:inline">Stats</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="citations"
-                    className="flex items-center space-x-1 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    <Quote className="h-3 w-3" />
-                    <span className="hidden sm:inline">Refs</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* AI Writing Assistant Tab */}
-                <TabsContent value="assistant" className="mt-4 space-y-4">
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Zap className="h-4 w-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-900">AI Writing Assistant</h3>
+                  </Button>
+                  {aiDetectionResult && (
+                    <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm">
+                      <p className="font-medium mb-1">Result:</p>
+                      <p className={aiDetectionResult.is_ai ? "text-red-600" : "text-green-600"}>
+                        {aiDetectionResult.message}
+                      </p>
+                      <p className="text-gray-600 mt-1">
+                        AI Probability: {aiDetectionResult.ai_probability.toFixed(2)}%
+                      </p>
                     </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
 
-                    {/* Collapsible AI Configuration */}
-                    <Collapsible open={isAIConfigOpen} onOpenChange={setIsAIConfigOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <Settings className="h-3 w-3" />
-                            <span>Configuration</span>
-                          </span>
-                          {isAIConfigOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-3 mt-2">
-                        <div>
-                          <Label className="text-xs font-medium text-gray-700 mb-2 block">Provider</Label>
-                          <MinimalAIProviderSelector
-                            selectedProvider={selectedProvider}
-                            onProviderChange={setSelectedProvider}
-                            selectedModel={selectedModel}
-                            onModelChange={setSelectedModel}
-                            variant="compact"
-                            showModelSelector={true}
-                            showConfigLink={false}
-                          />
+              {/* Humanizer Section */}
+              <Collapsible open={isHumanizerOpen} onOpenChange={setIsHumanizerOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between text-base font-semibold px-4 py-3">
+                    <span className="flex items-center space-x-2">
+                      <User className="h-5 w-5" />
+                      <span>Humanizer</span>
+                    </span>
+                    {isHumanizerOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 p-4 border-t border-gray-200">
+                  <Button
+                    onClick={handleHumanizeText}
+                    disabled={isHumanizing || !documentText.trim()}
+                    className="w-full h-10 text-sm bg-gray-900 text-white hover:bg-gray-800"
+                  >
+                    {isHumanizing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Humanizing...
+                      </>
+                    ) : (
+                      "Humanize Text"
+                    )}
+                  </Button>
+                  {humanizedText && (
+                    <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm">
+                      <p className="font-medium mb-1">Humanized Version:</p>
+                      <div className="whitespace-pre-wrap text-gray-700">{humanizedText}</div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="mt-3 w-full h-8 text-sm"
+                        onClick={() => setDocumentText(humanizedText)}
+                      >
+                        <Check className="h-4 w-4 mr-1" /> Apply to Document
+                      </Button>
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Plagiarism Detection Section */}
+              <Collapsible open={isPlagiarismOpen} onOpenChange={setIsPlagiarismOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between text-base font-semibold px-4 py-3">
+                    <span className="flex items-center space-x-2">
+                      <ClipboardCopy className="h-5 w-5" />
+                      <span>Plagiarism Check</span>
+                    </span>
+                    {isPlagiarismOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 p-4 border-t border-gray-200">
+                  <Button
+                    onClick={handleCheckPlagiarism}
+                    disabled={isCheckingPlagiarism || !documentText.trim()}
+                    className="w-full h-10 text-sm bg-gray-900 text-white hover:bg-gray-800"
+                  >
+                    {isCheckingPlagiarism ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Checking Plagiarism...
+                      </>
+                    ) : (
+                      "Check Plagiarism"
+                    )}
+                  </Button>
+                  {plagiarismResult && (
+                    <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm">
+                      <p className="font-medium mb-1">Result:</p>
+                      <p className={plagiarismResult.plagiarism_percentage > 20 ? "text-red-600" : "text-green-600"}>
+                        {plagiarismResult.message}
+                      </p>
+                      <p className="text-gray-600 mt-1">
+                        Plagiarism Score: {plagiarismResult.plagiarism_percentage.toFixed(2)}%
+                      </p>
+                      {plagiarismResult.sources.length > 0 && (
+                        <div className="mt-2">
+                          <p className="font-medium mb-1">Potential Sources:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            {plagiarismResult.sources.map((source, idx) => (
+                              <li key={idx}>
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  {source.url}
+                                </a>
+                                <p className="text-gray-500 italic">Match: "{source.match}"</p>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* Writing Style Selection */}
-                    <div>
-                      <Label className="text-xs font-medium text-gray-700 mb-2 block">Writing Style</Label>
-                      <div className="space-y-1">
-                        {personalities.map((personality) => (
-                          <button
-                            key={personality.key}
-                            className={`w-full p-2 rounded-md border text-left transition-all duration-200 ${
-                              selectedPersonality.key === personality.key
-                                ? `${personality.bgColor} ${personality.borderColor} ${personality.color}`
-                                : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                            }`}
-                            onClick={() => setSelectedPersonality(personality)}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <personality.icon className="h-3 w-3" />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium">{personality.name}</div>
-                                <div className="text-xs opacity-75 truncate">{personality.description}</div>
-                              </div>
-                              {selectedPersonality.key === personality.key && (
-                                <div className="w-1.5 h-1.5 bg-black rounded-full flex-shrink-0" />
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                      )}
                     </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
 
-                    {/* AI Status */}
-                    <div className="mt-4 p-2 bg-gray-50 rounded-md border border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              selectedProvider && selectedModel && supabaseToken ? "bg-black" : "bg-gray-400"
-                            }`}
-                          />
-                          <span className="text-xs text-gray-600 font-medium">
-                            {selectedProvider && selectedModel && supabaseToken ? "Ready" : "Setup Required"}
-                          </span>
-                        </div>
-                        {selectedProvider && selectedModel && supabaseToken && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-gray-100 text-gray-700 border-gray-300 px-2 py-0.5"
-                          >
-                            Connected
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Quick AI Action */}
-                    <Button
-                      onClick={handleOpenAIModal}
-                      disabled={!selectedProvider || !selectedModel || !supabaseToken}
-                      className="w-full mt-3 bg-gray-900 text-white hover:bg-gray-800 h-8 text-xs"
-                    >
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      Generate Content
+              {/* Grammar Suggestions Card (moved here) */}
+              {languageToolSuggestions.length > 0 && (
+                <Collapsible open={true} onOpenChange={() => {}}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between text-base font-semibold px-4 py-3">
+                      <span className="flex items-center space-x-2">
+                        <AlertCircle className="h-5 w-5 text-gray-600" />
+                        <span>Writing Suggestions ({languageToolSuggestions.length})</span>
+                      </span>
+                      <ChevronUp className="h-5 w-5" />
                     </Button>
-                  </div>
-                </TabsContent>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 p-4 border-t border-gray-200">
+                    <div className="space-y-4">
+                      {languageToolSuggestions.slice(0, 5).map((sugg, idx) => {
+                        const before = sugg.context?.text?.slice(0, sugg.context?.offset) || ""
+                        const error =
+                          sugg.context?.text?.slice(
+                            sugg.context?.offset,
+                            sugg.context?.offset + sugg.context?.length,
+                          ) || ""
+                        const after = sugg.context?.text?.slice(sugg.context?.offset + sugg.context?.length) || ""
 
-                {/* Document Analytics Tab */}
-                <TabsContent value="analytics" className="mt-4 space-y-4">
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Eye className="h-4 w-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-900">Document Analytics</h3>
-                    </div>
+                        return (
+                          <div
+                            key={idx}
+                            className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="text-sm font-medium text-gray-900">{sugg.message}</div>
+                              <Badge variant="outline" className="text-xs bg-white border-gray-300">
+                                {sugg.rule?.category?.name || "Style"}
+                              </Badge>
+                            </div>
 
-                    {/* Key Metrics Grid */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="text-lg font-bold text-gray-900">{wordCount.toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">Words</div>
-                      </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="text-lg font-bold text-gray-900">{readingTime}</div>
-                        <div className="text-xs text-gray-500">Min Read</div>
-                      </div>
-                    </div>
+                            <div className="text-gray-700 mb-4 p-3 bg-white rounded border font-mono text-xs">
+                              <span>{before}</span>
+                              <span className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded font-medium">
+                                {error}
+                              </span>
+                              <span>{after}</span>
+                            </div>
 
-                    {/* Detailed Stats */}
-                    <Collapsible open={isAnalyticsOpen} onOpenChange={setIsAnalyticsOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span>Detailed Statistics</span>
-                          {isAnalyticsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <div className="space-y-2 text-xs">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Characters</span>
-                            <span className="font-medium text-gray-900">{charCount.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Characters (no spaces)</span>
-                            <span className="font-medium text-gray-900">{charCountNoSpaces.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Paragraphs</span>
-                            <span className="font-medium text-gray-900">{paragraphCount}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Grammar Issues</span>
-                            <span
-                              className={`font-medium ${
-                                languageToolSuggestions.length > 0 ? "text-red-600" : "text-black"
-                              }`}
-                            >
-                              {languageToolSuggestions.length}
-                            </span>
-                          </div>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* New: AI Detection Section */}
-                    <Collapsible open={isAIDetectionOpen} onOpenChange={setIsAIDetectionOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <Robot className="h-3 w-3" />
-                            <span>AI Detection</span>
-                          </span>
-                          {isAIDetectionOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <Button
-                          onClick={handleDetectAI}
-                          disabled={isDetectingAI || !documentText.trim()}
-                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
-                        >
-                          {isDetectingAI ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Detecting AI...
-                            </>
-                          ) : (
-                            "Detect AI Content"
-                          )}
-                        </Button>
-                        {aiDetectionResult && (
-                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
-                            <p className="font-medium mb-1">Result:</p>
-                            <p className={aiDetectionResult.is_ai ? "text-red-600" : "text-green-600"}>
-                              {aiDetectionResult.message}
-                            </p>
-                            <p className="text-gray-600 mt-1">
-                              AI Probability: {aiDetectionResult.ai_probability.toFixed(2)}%
-                            </p>
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* New: Humanizer Section */}
-                    <Collapsible open={isHumanizerOpen} onOpenChange={setIsHumanizerOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <User className="h-3 w-3" />
-                            <span>Humanizer</span>
-                          </span>
-                          {isHumanizerOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <Button
-                          onClick={handleHumanizeText}
-                          disabled={isHumanizing || !documentText.trim()}
-                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
-                        >
-                          {isHumanizing ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Humanizing...
-                            </>
-                          ) : (
-                            "Humanize Text"
-                          )}
-                        </Button>
-                        {humanizedText && (
-                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
-                            <p className="font-medium mb-1">Humanized Version:</p>
-                            <div className="whitespace-pre-wrap text-gray-700">{humanizedText}</div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="mt-2 w-full h-7 text-xs"
-                              onClick={() => setDocumentText(humanizedText)}
-                            >
-                              <Check className="h-3 w-3 mr-1" /> Apply to Document
-                            </Button>
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    <Separator className="my-3" />
-
-                    {/* New: Plagiarism Detection Section */}
-                    <Collapsible open={isPlagiarismOpen} onOpenChange={setIsPlagiarismOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-8 text-xs">
-                          <span className="flex items-center space-x-2">
-                            <ClipboardCopy className="h-3 w-3" />
-                            <span>Plagiarism Check</span>
-                          </span>
-                          {isPlagiarismOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-2 mt-2">
-                        <Button
-                          onClick={handleCheckPlagiarism}
-                          disabled={isCheckingPlagiarism || !documentText.trim()}
-                          className="w-full h-8 text-xs bg-gray-900 text-white hover:bg-gray-800"
-                        >
-                          {isCheckingPlagiarism ? (
-                            <>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Checking Plagiarism...
-                            </>
-                          ) : (
-                            "Check Plagiarism"
-                          )}
-                        </Button>
-                        {plagiarismResult && (
-                          <div className="p-2 bg-gray-50 rounded-md border border-gray-200 text-xs">
-                            <p className="font-medium mb-1">Result:</p>
-                            <p
-                              className={
-                                plagiarismResult.plagiarism_percentage > 20 ? "text-red-600" : "text-green-600"
-                              }
-                            >
-                              {plagiarismResult.message}
-                            </p>
-                            <p className="text-gray-600 mt-1">
-                              Plagiarism Score: {plagiarismResult.plagiarism_percentage.toFixed(2)}%
-                            </p>
-                            {plagiarismResult.sources.length > 0 && (
-                              <div className="mt-2">
-                                <p className="font-medium mb-1">Potential Sources:</p>
-                                <ul className="list-disc list-inside space-y-1">
-                                  {plagiarismResult.sources.map((source, idx) => (
-                                    <li key={idx}>
-                                      <a
-                                        href={source.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:underline"
-                                      >
-                                        {source.url}
-                                      </a>
-                                      <p className="text-gray-500 italic">Match: "{source.match}"</p>
-                                    </li>
-                                  ))}
-                                </ul>
+                            {sugg.replacements && sugg.replacements.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                <span className="text-xs text-gray-500 font-medium">Suggestions:</span>
+                                {sugg.replacements.slice(0, 3).map((rep: any, i: number) => (
+                                  <button
+                                    key={i}
+                                    className="inline-block bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors duration-200"
+                                    onClick={() => {
+                                      // Apply suggestion logic would go here
+                                      toast({
+                                        title: "Suggestion applied",
+                                        description: `Replaced with "${rep.value}"`,
+                                        duration: 2000,
+                                      })
+                                    }}
+                                  >
+                                    {rep.value}
+                                  </button>
+                                ))}
                               </div>
                             )}
                           </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
+                        )
+                      })}
 
-                    {/* Template Progress */}
-                    <Separator className="my-3" />
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-600">Template Progress</span>
-                        <Badge variant="outline" className="text-xs bg-gray-50 border-gray-300">
-                          {currentTemplate.name}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1">
-                        <Progress value={Math.min(wordProgress, 100)} className="h-1.5 bg-gray-200 [&>*]:bg-black" />
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>{Math.round(wordProgress)}% complete</span>
-                          <span className={wordProgress > 100 ? "text-red-600" : "text-gray-500"}>
-                            {wordProgress > 100 ? "Over limit" : `${currentTemplate.wordLimit - wordCount} remaining`}
-                          </span>
+                      {languageToolSuggestions.length > 5 && (
+                        <div className="text-center pt-4">
+                          <Button variant="outline" size="sm" className="border-gray-300 text-gray-700 bg-transparent">
+                            Show {languageToolSuggestions.length - 5} more suggestions
+                          </Button>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Citations & References Tab */}
-                <TabsContent value="citations" className="mt-4 space-y-4">
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <Quote className="h-4 w-4 text-gray-600" />
-                      <h3 className="text-sm font-medium text-gray-900">Citations & References</h3>
+                      )}
                     </div>
 
-                    {/* Compact Citation Manager */}
-                    <CitationManager
-                      selectedTemplate={selectedTemplate}
-                      onTemplateChange={setSelectedTemplate}
-                      compact={true}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </Card>
+                    <div className="text-xs text-gray-400 mt-6 pt-4 border-t border-gray-200 text-center">
+                      Powered by{" "}
+                      <a
+                        href="https://languagetool.org/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-900 hover:underline font-medium"
+                      >
+                        LanguageTool
+                      </a>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
 
-            {/* Quick Actions Card */}
-            <Card className="bg-white border-gray-200 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Zap className="h-4 w-4 text-gray-600" />
-                  <h3 className="text-sm font-medium text-gray-900">Quick Actions</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={checkText}
-                    variant="outline"
-                    size="sm"
-                    disabled={isChecking || !documentText.trim()}
-                    className="h-8 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  >
-                    <Check className="h-3 w-3 mr-1" />
-                    {isChecking ? "Checking..." : "Grammar"}
+              {/* Citations & References Section */}
+              <Collapsible open={isCitationsOpen} onOpenChange={setIsCitationsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between text-base font-semibold px-4 py-3">
+                    <span className="flex items-center space-x-2">
+                      <Quote className="h-5 w-5" />
+                      <span>Citations & References</span>
+                    </span>
+                    {isCitationsOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                   </Button>
-                  <Button
-                    onClick={handleSave}
-                    variant="outline"
-                    size="sm"
-                    disabled={isAutoSaving}
-                    className="h-8 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  >
-                    <Save className="h-3 w-3 mr-1" />
-                    Save
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 p-4 border-t border-gray-200">
+                  <CitationManager selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
           </div>
-        </div>
+        </SidebarInset>
       </div>
 
       {/* Enhanced AI Writing Modal */}
@@ -1358,23 +1059,24 @@ function WriterPageContent() {
         }}
       />
 
-      {/* Document Manager Dialog */}
+      {/* Document Manager Dialog (kept for potential future use or other document types) */}
       <Dialog open={documentManagerOpen} onOpenChange={setDocumentManagerOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>Document Management</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
-            <DocumentManager
+            {/* This DocumentManager is still here but not actively used for the main document list */}
+            {/* It could be used for other document types or a more advanced management view */}
+            <DocumentList
               onDocumentSelect={handleDocumentSelect}
-              onDocumentLoad={handleDocumentLoad}
               currentDocumentId={currentDocument?.id}
               className="h-full"
             />
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </SidebarProvider>
   )
 }
 
