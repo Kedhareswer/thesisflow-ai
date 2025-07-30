@@ -1,43 +1,7 @@
 import { API_BASE_URL } from "@/lib/utils/api"
 
-interface AIDetectionResult {
-  is_ai: boolean
-  ai_probability: number
-  message: string
-}
-
-interface HumanizeResult {
-  humanized_text: string
-  message: string
-}
-
-interface PlagiarismResult {
-  plagiarism_percentage: number
-  sources: { url: string; match: string }[]
-  message: string
-}
-
 export class ResearchService {
-  private static instance: ResearchService
-
-  private constructor() {}
-
-  public static getInstance(): ResearchService {
-    if (!ResearchService.instance) {
-      ResearchService.instance = new ResearchService()
-    }
-    return ResearchService.instance
-  }
-
-  // Existing methods (omitted for brevity)
-  // public async searchPapers(query: string): Promise<any> { ... }
-  // public async searchWeb(query: string): Promise<any> { ... }
-  // public async extractFileContent(file: File): Promise<any> { ... }
-  // public async fetchUrlContent(url: string): Promise<any> { ... }
-  // public async generateIdeas(prompt: string): Promise<any> { ... }
-  // public async summarizeText(text: string, options: any): Promise<any> { ... }
-
-  public async detectAI(text: string): Promise<AIDetectionResult> {
+  static async detectAI(text: string): Promise<{ is_ai: boolean; ai_probability: number; message: string }> {
     const response = await fetch(`${API_BASE_URL}/ai-detect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,7 +14,7 @@ export class ResearchService {
     return response.json()
   }
 
-  public async humanizeText(text: string): Promise<HumanizeResult> {
+  static async humanizeText(text: string): Promise<{ humanized_text: string }> {
     const response = await fetch(`${API_BASE_URL}/humanize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,7 +27,12 @@ export class ResearchService {
     return response.json()
   }
 
-  public async checkPlagiarism(text: string): Promise<PlagiarismResult> {
+  static async checkPlagiarism(text: string): Promise<{
+    plagiarism_percentage: number
+    detected: boolean
+    message: string
+    sources: { url: string; match: string }[]
+  }> {
     const response = await fetch(`${API_BASE_URL}/plagiarism-check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

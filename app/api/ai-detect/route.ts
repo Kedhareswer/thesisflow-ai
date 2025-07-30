@@ -9,24 +9,19 @@ export async function POST(req: Request) {
     }
 
     // Simulate AI detection logic
-    // In a real application, this would call an external AI detection API
-    const aiProbability = Math.random() * 100 // Random probability
-    const isAI = aiProbability > 50 // Simple threshold
+    const is_ai = Math.random() > 0.5
+    const ai_probability = Number.parseFloat((Math.random() * 100).toFixed(2))
 
     let message = ""
-    if (isAI) {
-      message = `This text is likely AI-generated with a probability of ${aiProbability.toFixed(2)}%.`
+    if (is_ai) {
+      message = `AI content detected with ${ai_probability}% probability.`
     } else {
-      message = `This text appears human-written with a probability of ${(100 - aiProbability).toFixed(2)}%.`
+      message = `Human-written content detected with ${100 - ai_probability}% probability.`
     }
 
-    return NextResponse.json({
-      is_ai: isAI,
-      ai_probability: Number.parseFloat(aiProbability.toFixed(2)),
-      message,
-    })
+    return NextResponse.json({ is_ai, ai_probability, message })
   } catch (error) {
-    console.error("AI detection API error:", error)
-    return NextResponse.json({ error: "Failed to process AI detection" }, { status: 500 })
+    console.error("Error in AI detect API:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
