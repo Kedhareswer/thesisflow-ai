@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/ui/empty-state"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers"
@@ -25,7 +26,9 @@ import {
   Copy,
   Download,
   PenLine,
-  ArrowRight
+  ArrowRight,
+  Lightbulb,
+  MessageSquare
 } from "lucide-react"
 
 interface AIWritingAssistantProps {
@@ -254,6 +257,36 @@ export function AIWritingAssistant({
   
   return (
     <div className="space-y-4">
+      {/* Show EmptyState when no content and not authenticated */}
+      {!isAuthenticated && (
+        <EmptyState
+          title="AI Writing Assistant"
+          description="Log in to access AI-powered writing assistance and get intelligent suggestions for your documents."
+          icons={[Lightbulb, MessageSquare]}
+          action={{
+            label: "Go to Login",
+            onClick: () => window.location.href = '/login'
+          }}
+        />
+      )}
+      
+      {/* Show EmptyState when authenticated but no content */}
+      {isAuthenticated && !currentDocumentContent.trim() && (
+        <EmptyState
+          title="No Content to Work With"
+          description="Start writing in the editor above to get AI-powered suggestions and improvements."
+          icons={[PenLine, Lightbulb]}
+          action={{
+            label: "Start Writing",
+            onClick: () => {
+              // Focus the editor (this would need to be passed as a prop)
+              const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
+              if (editor) editor.focus()
+            }
+          }}
+        />
+      )}
+      
       {/* Settings Toggle */}
       <div className="flex justify-between items-center">
       <div className="flex flex-wrap gap-2">

@@ -10,6 +10,7 @@ import { FileText, Plus, Trash2, Download, BookOpen, ChevronDown, ChevronUp } fr
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { EmptyState } from "@/components/ui/empty-state"
 import { useSafeDOM } from "../hooks/use-safe-dom"
 
 // Citation format types
@@ -374,9 +375,16 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4 bg-gray-50 rounded border border-gray-200">
-                  <FileText className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                  <p className="text-xs text-gray-500">No manual citations</p>
+                <div className="p-4">
+                  <EmptyState
+                    title="No Manual Citations"
+                    description="Add manual citations to include them in your references."
+                    icons={[FileText, Plus]}
+                    action={{
+                      label: "Add Citation",
+                      onClick: addManualCitation
+                    }}
+                  />
                 </div>
               )}
             </CollapsibleContent>
@@ -541,10 +549,16 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
             ))}
           </div>
         ) : (
-          <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
-            <BookOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">No papers selected from research session</p>
-            <p className="text-xs text-gray-400 mt-1">Add papers from the Explorer to include them here</p>
+          <div className="p-4">
+            <EmptyState
+              title="No Research Papers"
+              description="Add papers from the Explorer to include them in your citations."
+              icons={[BookOpen, Plus]}
+              action={{
+                label: "Go to Explorer",
+                onClick: () => window.location.href = '/explorer'
+              }}
+            />
           </div>
         )}
       </div>
@@ -652,10 +666,16 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
             ))}
           </div>
         ) : (
-          <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
-            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">No manual citations added</p>
-            <p className="text-xs text-gray-400 mt-1">Click "Add" to create manual citations</p>
+          <div className="p-4">
+            <EmptyState
+              title="No Manual Citations"
+              description="Add manual citations to include them in your references."
+              icons={[FileText, Plus]}
+              action={{
+                label: "Add Citation",
+                onClick: addManualCitation
+              }}
+            />
           </div>
         )}
       </div>

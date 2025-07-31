@@ -17,6 +17,7 @@ import {
   Clock,
   Save,
   Loader2,
+  FileQuestion,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { EmptyState } from "@/components/ui/empty-state"
 import { useToast } from "@/hooks/use-toast"
 import DocumentService, { Document, CreateDocumentData } from "@/lib/services/document.service"
 import { useSafeDOM } from "../hooks/use-safe-dom"
@@ -243,10 +245,28 @@ export function DocumentManager({
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
             ) : filteredDocuments.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No documents found</p>
-                <p className="text-sm">Create your first document to get started</p>
+              <div className="p-8">
+                {searchTerm ? (
+                  <EmptyState
+                    title="No Documents Found"
+                    description="Try adjusting your search terms or create a new document."
+                    icons={[Search, FileQuestion]}
+                    action={{
+                      label: "Create New Document",
+                      onClick: () => setShowCreateDialog(true)
+                    }}
+                  />
+                ) : (
+                  <EmptyState
+                    title="No Documents Created"
+                    description="Start writing by creating your first document."
+                    icons={[FileText, Edit, Plus]}
+                    action={{
+                      label: "Create Document",
+                      onClick: () => setShowCreateDialog(true)
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
