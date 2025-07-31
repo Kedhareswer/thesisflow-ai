@@ -1,242 +1,310 @@
 "use client"
+
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import { getAvailableAIProviders, getAvailableModelsForProvider, type AIProvider } from "@/lib/ai-providers"
-import { motion, AnimatePresence } from "framer-motion"
-import { Check, ChevronDown, Bot } from "lucide-react"
-import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { type AIProvider, AI_PROVIDERS } from "@/lib/ai-providers"
+import { supabase } from "@/integrations/supabase/client"
+import { Loader2, Settings, Zap } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface MinimalAIProviderSelectorProps {
-  selectedProvider?: AIProvider
-  onProviderChange?: (provider: AIProvider) => void
+  selectedProvider: AIProvider | undefined
+  onProviderChange: (provider: AIProvider) => void
   selectedModel?: string
   onModelChange?: (model: string) => void
-  variant?: "default" | "inline"
+  variant?: "inline" | "compact" | "full"
   showModelSelector?: boolean
   showConfigLink?: boolean
   className?: string
 }
 
-const OPENAI_ICON = (
-  <>
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 256 260"
-      aria-label="OpenAI Icon"
-      className="w-4 h-4 dark:hidden block"
-    >
-      <title>OpenAI Icon Light</title>
-      <path d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L99.98 99.808V74.587a.716.716 0 0 1 .307-.665l52.233-30.133a48.652 48.652 0 0 1 72.236 50.391v.205ZM88.061 139.097l-21.845-12.585a.87.87 0 0 1-.41-.614V65.685a48.652 48.652 0 0 1 79.757-37.346l-1.535.87-51.67 29.825a8.595 8.595 0 0 0-4.246 7.367l-.051 72.697Zm11.868-25.58 28.138-16.217 28.188 16.218v32.434l-28.086 16.218-28.188-16.218-.052-32.434Z" />
-    </svg>
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 256 260"
-      aria-label="OpenAI Icon"
-      className="w-4 h-4 hidden dark:block"
-    >
-      <title>OpenAI Icon Dark</title>
-      <path
-        fill="#fff"
-        d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L99.98 99.808V74.587a.716.716 0 0 1 .307-.665l52.233-30.133a48.652 48.652 0 0 1 72.236 50.391v.205ZM88.061 139.097l-21.845-12.585a.87.87 0 0 1-.41-.614V65.685a48.652 48.652 0 0 1 79.757-37.346l-1.535.87-51.67 29.825a8.595 8.595 0 0 0-4.246 7.367l-.051 72.697Zm11.868-25.58 28.138-16.217 28.188 16.218v32.434l-28.086 16.218-28.188-16.218-.052-32.434Z"
-      />
-    </svg>
-  </>
-)
-
-const GEMINI_ICON = (
-  <svg height="1em" className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <title>Gemini</title>
-    <defs>
-      <linearGradient id="lobe-icons-gemini-fill" x1="0%" x2="68.73%" y1="100%" y2="30.395%">
-        <stop offset="0%" stopColor="#1C7DFF" />
-        <stop offset="52.021%" stopColor="#1C69FF" />
-        <stop offset="100%" stopColor="#F0DCD6" />
-      </linearGradient>
-    </defs>
-    <path
-      d="M12 24A14.304 14.304 0 000 12 14.304 14.304 0 0012 0a14.305 14.305 0 0012 12 14.305 14.305 0 00-12 12"
-      fill="url(#lobe-icons-gemini-fill)"
-      fillRule="nonzero"
-    />
-  </svg>
-)
-
-const ANTHROPIC_ICON = (
-  <>
-    <svg
-      fill="#000"
-      fillRule="evenodd"
-      className="w-4 h-4 dark:hidden block"
-      viewBox="0 0 24 24"
-      width="1em"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <title>Anthropic Icon Light</title>
-      <path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z" />
-    </svg>
-    <svg
-      fill="#fff"
-      fillRule="evenodd"
-      className="w-4 h-4 hidden dark:block"
-      viewBox="0 0 24 24"
-      width="1em"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <title>Anthropic Icon Dark</title>
-      <path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z" />
-    </svg>
-  </>
-)
-
-const getModelIcon = (modelName: string) => {
-  if (modelName.toLowerCase().includes("gpt") || modelName.toLowerCase().includes("o3")) {
-    return OPENAI_ICON
-  }
-  if (modelName.toLowerCase().includes("gemini")) {
-    return GEMINI_ICON
-  }
-  if (modelName.toLowerCase().includes("claude")) {
-    return ANTHROPIC_ICON
-  }
-  return <Bot className="w-4 h-4 opacity-50" /> // Default icon
-}
-
 export default function MinimalAIProviderSelector({
-  selectedProvider: propSelectedProvider,
+  selectedProvider,
   onProviderChange,
-  selectedModel: propSelectedModel,
+  selectedModel,
   onModelChange,
-  variant = "default",
+  variant = "compact",
   showModelSelector = true,
   showConfigLink = true,
-  className,
+  className = "",
 }: MinimalAIProviderSelectorProps) {
-  const [providers, setProviders] = useState<AIProvider[]>([])
-  const [models, setModels] = useState<string[]>([])
-  const [currentProvider, setCurrentProvider] = useState<AIProvider | undefined>(propSelectedProvider)
-  const [currentModel, setCurrentModel] = useState<string | undefined>(propSelectedModel)
+  const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchProviders = async () => {
-      const availableProviders = await getAvailableAIProviders()
-      setProviders(availableProviders)
-      if (!currentProvider && availableProviders.length > 0) {
-        setCurrentProvider(availableProviders[0])
-        onProviderChange?.(availableProviders[0])
+  const loadProviders = async () => {
+    try {
+      setLoading(true)
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
       }
-    }
-    fetchProviders()
-  }, [currentProvider, onProviderChange])
 
-  useEffect(() => {
-    if (currentProvider) {
-      const availableModels = getAvailableModelsForProvider(currentProvider)
-      setModels(availableModels)
-      if (!currentModel || !availableModels.includes(currentModel)) {
-        setCurrentModel(availableModels[0])
-        onModelChange?.(availableModels[0])
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`
       }
-    }
-  }, [currentProvider, currentModel, onModelChange])
 
-  const handleProviderChange = (providerId: string) => {
-    const provider = providers.find((p) => p.id === providerId)
-    if (provider) {
-      setCurrentProvider(provider)
-      onProviderChange?.(provider)
+      const response = await fetch("/api/ai/providers", {
+        method: "GET",
+        credentials: "include",
+        headers,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      setAvailableProviders(data.availableProviders || [])
+
+      // Auto-select first available provider if none selected
+      if (!selectedProvider && data.availableProviders?.length > 0) {
+        onProviderChange(data.availableProviders[0])
+      }
+    } catch (error) {
+      console.error("Error loading providers:", error)
+      setAvailableProviders([])
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleModelChange = (modelName: string) => {
-    setCurrentModel(modelName)
-    onModelChange?.(modelName)
+  useEffect(() => {
+    loadProviders()
+  }, [])
+
+  const getProviderStatus = (provider: AIProvider) => {
+    return availableProviders.includes(provider) ? "available" : "unavailable"
   }
 
-  return (
-    <div className={cn("flex items-center gap-2", className)}>
-      {/* Provider Selector */}
-      <Select value={currentProvider?.id || ""} onValueChange={handleProviderChange}>
-        <SelectTrigger className={cn("w-[180px]", variant === "inline" && "h-8 text-xs rounded-md px-2")}>
-          <SelectValue placeholder="Select Provider" />
-        </SelectTrigger>
-        <SelectContent>
-          {providers.map((provider) => (
-            <SelectItem key={provider.id} value={provider.id}>
-              {provider.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+  const getProviderBadgeColor = (provider: AIProvider) => {
+    return availableProviders.includes(provider)
+      ? "bg-green-100 text-green-700 border-green-200"
+      : "bg-gray-100 text-gray-500 border-gray-300"
+  }
 
-      {showModelSelector && currentProvider && (
-        <>
-          {variant === "inline" && <div className="h-4 w-px bg-black/10 dark:bg-white/10 mx-0.5" />}
-          {/* Model Selector with new UI */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className={cn(
-                  "flex items-center gap-1 h-10 pl-1 pr-2 text-sm rounded-md dark:text-white hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:ring-blue-500",
-                  variant === "inline" && "h-8 text-xs",
-                )}
-              >
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentModel}
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center gap-1"
-                  >
-                    {getModelIcon(currentModel || "")}
-                    {currentModel || "Select Model"}
-                    <ChevronDown className="w-3 h-3 opacity-50" />
-                  </motion.div>
-                </AnimatePresence>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className={cn(
-                "min-w-[10rem]",
-                "border-black/10 dark:border-white/10",
-                "bg-gradient-to-b from-white via-white to-neutral-100 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-800",
-              )}
-            >
-              {models.map((model) => (
-                <DropdownMenuItem
-                  key={model}
-                  onSelect={() => handleModelChange(model)}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <div className="flex items-center gap-2">
-                    {getModelIcon(model)}
-                    <span>{model}</span>
-                  </div>
-                  {currentModel === model && <Check className="w-4 h-4 text-blue-500" />}
-                </DropdownMenuItem>
+  if (loading) {
+    return (
+      <div className={`flex items-center gap-2 ${className}`}>
+        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+        <span className="text-sm text-gray-500">Loading AI providers...</span>
+      </div>
+    )
+  }
+
+  // Inline variant - single line with provider and model
+  if (variant === "inline") {
+    return (
+      <div className={`flex items-center gap-3 ${className}`}>
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-gray-700">AI:</span>
+        </div>
+
+        <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+          <SelectTrigger className="w-32 h-8 text-xs border-gray-200">
+            <SelectValue placeholder="Select" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(AI_PROVIDERS).map(([key, config]) => (
+              <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
+                <div className="flex items-center gap-2">
+                  <span>{config.name}</span>
+                  {!availableProviders.includes(key as AIProvider) && (
+                    <Badge variant="outline" className="text-xs">
+                      Setup Required
+                    </Badge>
+                  )}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {selectedProvider && showModelSelector && onModelChange && (
+          <Select value={selectedModel} onValueChange={onModelChange}>
+            <SelectTrigger className="w-40 h-8 text-xs border-gray-200">
+              <SelectValue placeholder="Model" />
+            </SelectTrigger>
+            <SelectContent>
+              {AI_PROVIDERS[selectedProvider].models.map((model) => (
+                <SelectItem key={model} value={model}>
+                  {model}
+                </SelectItem>
               ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </>
-      )}
+            </SelectContent>
+          </Select>
+        )}
 
-      {showConfigLink && (
-        <Link
-          href="/settings"
-          className={cn("text-sm text-blue-600 hover:underline", variant === "inline" && "text-xs")}
-        >
-          Configure AI
-        </Link>
-      )}
+        {showConfigLink && availableProviders.length === 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open("/settings", "_blank")}
+            className="h-8 text-xs"
+          >
+            <Settings className="h-3 w-3 mr-1" />
+            Setup
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  // Compact variant - minimal card layout
+  if (variant === "compact") {
+    return (
+      <div className={`bg-white border border-gray-200 rounded-lg p-4 ${className}`}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-gray-900">AI Provider</span>
+          </div>
+          {availableProviders.length > 0 && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+              {availableProviders.length} Available
+            </Badge>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label className="text-xs text-gray-600 mb-1 block">Provider</Label>
+            <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(AI_PROVIDERS).map(([key, config]) => (
+                  <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>{config.name}</span>
+                      <Badge variant="outline" className={`ml-2 text-xs ${getProviderBadgeColor(key as AIProvider)}`}>
+                        {getProviderStatus(key as AIProvider)}
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedProvider && showModelSelector && onModelChange && (
+            <div>
+              <Label className="text-xs text-gray-600 mb-1 block">Model</Label>
+              <Select value={selectedModel} onValueChange={onModelChange}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_PROVIDERS[selectedProvider].models.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {showConfigLink && availableProviders.length === 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("/settings", "_blank")}
+              className="w-full h-8 text-xs"
+            >
+              <Settings className="h-3 w-3 mr-1" />
+              Configure AI Providers
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Full variant - detailed layout (fallback)
+  return (
+    <div className={`bg-white border border-gray-200 rounded-lg p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-blue-600" />
+          <h3 className="text-lg font-medium text-gray-900">AI Provider</h3>
+        </div>
+        {availableProviders.length > 0 && (
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            {availableProviders.length} Available
+          </Badge>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <Label className="text-sm text-gray-700 mb-2 block">Provider</Label>
+          <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select AI provider" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(AI_PROVIDERS).map(([key, config]) => (
+                <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-medium">{config.name}</span>
+                    <Badge variant="outline" className={`ml-2 ${getProviderBadgeColor(key as AIProvider)}`}>
+                      {getProviderStatus(key as AIProvider)}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedProvider && showModelSelector && onModelChange && (
+          <div>
+            <Label className="text-sm text-gray-700 mb-2 block">Model</Label>
+            <Select value={selectedModel} onValueChange={onModelChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_PROVIDERS[selectedProvider].models.map((model) => (
+                  <SelectItem key={model} value={model}>
+                    <span className="font-medium">{model}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {selectedProvider && (
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="text-xs text-gray-600 space-y-1">
+              <div>Max Tokens: {AI_PROVIDERS[selectedProvider].maxTokens.toLocaleString()}</div>
+              <div>Models: {AI_PROVIDERS[selectedProvider].models.length}</div>
+            </div>
+          </div>
+        )}
+
+        {showConfigLink && availableProviders.length === 0 && (
+          <div className="pt-4 border-t border-gray-100">
+            <Button variant="outline" onClick={() => window.open("/settings", "_blank")} className="w-full">
+              <Settings className="h-4 w-4 mr-2" />
+              Configure AI Providers
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

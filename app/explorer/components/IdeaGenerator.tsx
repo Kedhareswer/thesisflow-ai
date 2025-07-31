@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Lightbulb, TrendingUp, Info } from "lucide-react"
+import { Lightbulb, TrendingUp, Info, Save } from "lucide-react"
+import { FormField, TextareaField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
@@ -35,7 +36,7 @@ class IdeaGenerationService {
   }> {
     try {
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-
+      
       const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count, provider, model)
       const ideaObjects = researchResults.ideas
 
@@ -72,21 +73,21 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const { ideas: sessionIdeas, selectedIdeas, addIdeas, selectIdea } = useResearchIdeas()
   const { hasContext, contextSummary, buildContext, currentTopic } = useResearchContext()
   const { topics } = useResearchTopics()
-
+  
   const [ideaTopic, setIdeaTopic] = useState(() => currentTopic || "")
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
   const [useSessionContext, setUseSessionContext] = useState(hasContext)
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
-
+  
   // Update topic field when currentTopic changes, but only if different and not currently generating
   useEffect(() => {
     if (currentTopic && currentTopic !== ideaTopic && !ideaGenerationLoading) {
       setIdeaTopic(currentTopic)
     }
   }, [currentTopic])
-
+  
   const [ideaGenerationData, setIdeaGenerationData] = useState<{
     content: string
     ideas: string[]
@@ -113,21 +114,15 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
 
     try {
       // Build enhanced context if using session context
-      const enhancedContext = useSessionContext
-        ? `${ideaContext}\n\nResearch Session Context:\n${buildContext()}`
-        : ideaContext
+      const enhancedContext = useSessionContext ? 
+        `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
+        ideaContext
 
-      const generatedData = await IdeaGenerationService.generateIdeas(
-        ideaTopic,
-        enhancedContext,
-        ideaCount,
-        selectedProvider,
-        selectedModel,
-      )
+      const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
       setIdeaGenerationData(generatedData)
-
+      
       // Ideas will be added to session via useEffect when data is available
-
+      
       toast({
         title: "Ideas Generated",
         description: `Generated ${ideaCount} AI-powered research ideas and saved to your research session.`,
@@ -149,18 +144,18 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
     if (ideaGenerationData && ideaGenerationData.ideas) {
       const newIdeas = ideaGenerationData.ideas.map((ideaText: string) => {
         // Parse the idea text to extract title and description
-        const lines = ideaText.split("\n")
-        const title = lines[0].replace(/^\d+\.\s*/, "").trim()
-        const description = lines.slice(1).join("\n").trim() || title
-
+        const lines = ideaText.split('\n')
+        const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+        const description = lines.slice(1).join('\n').trim() || title
+        
         return {
           title,
           description,
           topic: ideaTopic,
-          source: "generated" as const,
+          source: 'generated' as const
         }
       })
-
+      
       addIdeas(newIdeas)
     }
   }, [ideaGenerationData, ideaTopic, addIdeas])
@@ -173,15 +168,13 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         return data.content as string
       } else if ("ideas" in data && Array.isArray(data.ideas)) {
         // Format ideas nicely with titles and descriptions
-        return data.ideas
-          .map((idea: string, index: number) => {
-            const lines = idea.split("\n")
-            const title = lines[0].replace(/^\d+\.\s*/, "").trim()
-            const description = lines.slice(1).join("\n").trim()
-
-            return `${index + 1}. **${title}**\n${description || title}`
-          })
-          .join("\n\n")
+        return data.ideas.map((idea: string, index: number) => {
+          const lines = idea.split('\n')
+          const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+          const description = lines.slice(1).join('\n').trim()
+          
+          return `${index + 1}. **${title}**\n${description || title}`
+        }).join("\n\n")
       } else {
         return JSON.stringify(data, null, 2)
       }
@@ -204,7 +197,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           </AlertDescription>
         </Alert>
       )}
-
+      
       {/* AI Provider/Model Selector */}
       <div className="mb-4 flex justify-center">
         <MinimalAIProviderSelector
@@ -215,7 +208,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           variant="inline"
         />
       </div>
-
+      
       {/* Redesigned Form Card */}
       <Card className="bg-white shadow-sm border-gray-200">
         <CardContent className="p-6">
@@ -342,16 +335,18 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <div className="space-y-4">
                   {ideaGenerationData.ideas.map((idea: string, index: number) => {
-                    const lines = idea.split("\n")
-                    const title = lines[0].replace(/^\d+\.\s*/, "").trim()
-                    const description = lines.slice(1).join("\n").trim()
-
+                    const lines = idea.split('\n')
+                    const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+                    const description = lines.slice(1).join('\n').trim()
+                    
                     return (
                       <div key={index} className="border-l-4 border-blue-200 pl-4 py-2">
                         <h4 className="font-semibold text-gray-900 mb-2">
                           {index + 1}. {title}
                         </h4>
-                        <p className="text-gray-700 text-sm leading-relaxed">{description || title}</p>
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {description || title}
+                        </p>
                       </div>
                     )
                   })}
