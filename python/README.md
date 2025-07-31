@@ -47,30 +47,30 @@ The Python backend provides advanced literature search capabilities through mult
 
 ### 1. Install Python Dependencies
 
-```bash
+\`\`\`bash
 # Install enhanced dependencies (recommended)
 pip install -r requirements-improved.txt
 
 # Or install basic dependencies
 pip install -r requirements.txt
-```
+\`\`\`
 
 ### 2. For Windows Users
 
-```bash
+\`\`\`bash
 # Run the Windows setup script
 setup.bat
-```
+\`\`\`
 
 ### 3. Run the Application
 
-```bash
+\`\`\`bash
 # Run the improved version (recommended)
 python improved_app.py
 
 # Or run the basic version
 python app.py
-```
+\`\`\`
 
 The service will be available at `http://localhost:5000`
 
@@ -80,7 +80,7 @@ The Python backend requires the following environment variables:
 
 ### Required Environment Variables
 
-```bash
+\`\`\`bash
 # OpenAlex API (optional but recommended)
 OPENALEX_API_KEY=your_openalex_api_key
 
@@ -89,16 +89,16 @@ SEMANTIC_SCHOLAR_API_KEY=your_semantic_scholar_api_key
 
 # arXiv API (optional)
 ARXIV_API_KEY=your_arxiv_api_key
-```
+\`\`\`
 
 ### Optional Configuration
 
-```bash
+\`\`\`bash
 # Flask configuration
 FLASK_ENV=development
 FLASK_DEBUG=1
 PORT=5000
-```
+\`\`\`
 
 ## Search Sources
 
@@ -121,23 +121,23 @@ PORT=5000
 
 ### Search Papers
 
-```bash
+\`\`\`bash
 curl "http://localhost:5000/search?query=machine+learning&limit=10"
-```
+\`\`\`
 
 ### Get Paper Details
 
-```bash
+\`\`\`bash
 curl "http://localhost:5000/papers?id=paper_id"
-```
+\`\`\`
 
 ### Enhance Paper Data
 
-```bash
+\`\`\`bash
 curl -X POST "http://localhost:5000/enhance" \
   -H "Content-Type: application/json" \
   -d '{"paper_id": "paper_id", "doi": "10.1000/example"}'
-```
+\`\`\`
 
 ## Output
 
@@ -145,7 +145,7 @@ Search results are stored in `search_output/` directory with JSON format for ana
 
 ### Output Structure
 
-```json
+\`\`\`json
 {
   "papers": [
     {
@@ -163,29 +163,29 @@ Search results are stored in `search_output/` directory with JSON format for ana
   "total_results": 100,
   "search_time": 2.5
 }
-```
+\`\`\`
 
 ## Development
 
 ### Running Tests
 
-```bash
+\`\`\`bash
 # Run basic tests
 python -m pytest tests/
 
 # Run with coverage
 python -m pytest --cov=app tests/
-```
+\`\`\`
 
 ### Code Style
 
-```bash
+\`\`\`bash
 # Format code with black
 black .
 
 # Lint with flake8
 flake8 .
-```
+\`\`\`
 
 ## Troubleshooting
 
@@ -198,10 +198,10 @@ flake8 .
 
 ### Debug Mode
 
-```bash
+\`\`\`bash
 # Run with debug logging
 FLASK_DEBUG=1 python improved_app.py
-```
+\`\`\`
 
 ## Performance
 
