@@ -7,8 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Send, Users, Minimize2 } from "lucide-react"
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
-import { useSocket } from '@/components/socket-provider'
 import { useToast } from "@/hooks/use-toast"
+import { useSocket, SocketEvent } from '@/lib/services/socket.service'
 
 interface User {
   id: string
@@ -50,7 +50,7 @@ interface TeamChatProps {
 
 export function TeamChat({ team, onClose }: TeamChatProps) {
   const { user } = useSupabaseAuth()
-  const { socket } = useSocket()
+  const socket = useSocket(user?.id || null)
   const { toast } = useToast()
   
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -172,21 +172,21 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     }
 
     // Join team room
-    socket.emit('join-team', { teamId: team.id, userId: user?.id })
+    socket.emit(SocketEvent.JOIN_TEAM, { teamId: team.id, userId: user?.id })
 
     // Subscribe to events
-    socket.on('new-message', handleNewMessage)
-    socket.on('user-typing', handleTyping)
+    socket.on(SocketEvent.NEW_MESSAGE, handleNewMessage)
+    socket.on(SocketEvent.TYPING, handleTyping)
     socket.on('member-joined', handleMemberUpdate)
     socket.on('member-left', handleMemberUpdate)
 
     return () => {
       // Leave team room
-      socket.emit('leave-team', { teamId: team.id, userId: user?.id })
+      socket.emit(SocketEvent.LEAVE_TEAM, { teamId: team.id, userId: user?.id })
       
       // Unsubscribe from events
-      socket.off('new-message', handleNewMessage)
-      socket.off('user-typing', handleTyping)
+      socket.off(SocketEvent.NEW_MESSAGE, handleNewMessage)
+      socket.off(SocketEvent.TYPING, handleTyping)
       socket.off('member-joined', handleMemberUpdate)
       socket.off('member-left', handleMemberUpdate)
       
@@ -211,11 +211,9 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       
       // Send typing indicator (stopped typing)
       if (socket) {
-        socket.emit('typing', {
+        socket.emit(SocketEvent.STOP_TYPING, {
           teamId: team.id,
           userId: user.id,
-          userName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-          isTyping: false
         })
       }
       
@@ -249,11 +247,9 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const handleTypingIndicator = () => {
     if (!user || !team?.id || !socket) return
     
-    socket.emit('typing', {
+    socket.emit(SocketEvent.TYPING, {
       teamId: team.id,
       userId: user.id,
-      userName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-      isTyping: true
     })
   }
   

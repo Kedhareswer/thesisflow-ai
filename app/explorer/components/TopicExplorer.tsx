@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Search, Brain, Info } from "lucide-react"
@@ -18,12 +17,15 @@ import Link from "next/link"
 import { useResearchTopics, useResearchContext } from "@/components/research-session-provider"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
   static async exploreTopics(
     topic: string,
     depth = 3,
+    additionalContext?: string,
     selectedProvider?: AIProvider,
     selectedModel?: string,
   ): Promise<{
@@ -35,7 +37,9 @@ class EnhancedResearchService {
     try {
       console.log("EnhancedResearchService: Starting topic exploration for:", topic)
 
-      const prompt = `Research overview: "${topic}" | Depth: ${depth}/5
+      const contextPrompt = additionalContext ? `\n\nAdditional Context: ${additionalContext}` : ""
+      
+      const prompt = `Research overview: "${topic}" | Depth: ${depth}/5${contextPrompt}
 
 ## Key Concepts
 [Core definitions, terminology]
@@ -118,14 +122,10 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
   const { hasContext, contextSummary } = useResearchContext()
 
   const [topic, setTopic] = useState(() => currentTopic || "")
-  const [depth, setDepth] = useState(3)
+  const [depth, setDepth] = useState("3")
+  const [additionalContext, setAdditionalContext] = useState("")
   const [localProvider, setLocalProvider] = useState<AIProvider | undefined>(selectedProvider)
   const [localModel, setLocalModel] = useState<string | undefined>(selectedModel)
-
-  // Memoize the slider callback to prevent re-renders
-  const handleDepthChange = useCallback((value: number[]) => {
-    setDepth(value[0])
-  }, [])
 
   // Update topic field when currentTopic changes, but only if different and not currently editing
   useEffect(() => {
@@ -152,14 +152,15 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
     }
 
     try {
-      await topicExploration.execute(topic, depth, localProvider, localModel)
+      const depthNumber = parseInt(depth, 10)
+      await topicExploration.execute(topic, depthNumber, additionalContext, localProvider, localModel)
 
       // Add topic to research session after successful execution
       // The insights will be added separately when the data is available
       addTopic({
         name: topic,
-        description: `Explored at depth ${depth}/5`,
-        confidence: depth / 5, // Convert depth to confidence score
+        description: `Explored at depth ${depthNumber}/5`,
+        confidence: depthNumber / 5, // Convert depth to confidence score
       })
 
       toast({
@@ -244,21 +245,46 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <FormField
-            label="Research Topic"
-            value={topic}
-            onChange={setTopic}
-            placeholder="e.g., Machine Learning in Healthcare"
-            required
-          />
-
-          <div className="space-y-3">
-            <Label>Exploration Depth</Label>
-            <Slider value={[depth]} onValueChange={handleDepthChange} max={5} min={1} step={1} className="w-full" />
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>Basic</span>
-              <span>Comprehensive</span>
+          {/* Research Topic and Number of Ideas in a row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="topic" className="font-semibold">Research Topic *</Label>
+              <input
+                id="topic"
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g., AI and ML"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
             </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="depth" className="font-semibold">Exploration Depth</Label>
+              <Select value={depth} onValueChange={setDepth}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select depth" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Simple</SelectItem>
+                  <SelectItem value="3">Detailed</SelectItem>
+                  <SelectItem value="5">Comprehensive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Additional Context */}
+          <div className="space-y-2">
+            <Label htmlFor="context" className="font-semibold">Additional Context (Optional)</Label>
+            <Textarea
+              id="context"
+              value={additionalContext}
+              onChange={(e) => setAdditionalContext(e.target.value)}
+              placeholder="Provide any additional context, constraints, or focus areas..."
+              className="min-h-[100px] resize-none"
+            />
           </div>
 
           <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">

@@ -72,10 +72,10 @@ The web search feature integrates with Google Custom Search API for high-quality
 2. Get an [API key from Google Cloud](https://console.cloud.google.com/apis/credentials)
 3. Configure the following environment variables in your `.env.local` file:
 
-\`\`\`bash
+```bash
 GOOGLE_SEARCH_API_KEY=your_google_api_key_here
 GOOGLE_SEARCH_CSE_ID=your_custom_search_engine_id_here
-\`\`\`
+```
 
 ### Fallback Search
 

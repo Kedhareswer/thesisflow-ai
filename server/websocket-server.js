@@ -154,52 +154,40 @@ io.on('connection', async (socket) => {
   socket.join(`user:${socket.userId}`);
 
   // Handle joining team rooms
-  socket.on('join-team', async (teamId) => {
+  socket.on('join_team', (data) => {
     try {
+      const { teamId } = data;
+      
       // Verify team membership
-      const isMember = await checkTeamMembership(socket.userId, teamId);
-      if (!isMember) {
-        socket.emit('error', { message: 'Not a member of this team' });
-        return;
-      }
-
-      // Join team room
-      socket.join(`team:${teamId}`);
-      
-      // Track team membership
-      const connection = activeConnections.get(socket.id);
-      connection.teamIds.add(teamId);
-      
-      // Update team presence
-      if (!teamPresence.has(teamId)) {
-        teamPresence.set(teamId, new Set());
-      }
-      teamPresence.get(teamId).add(socket.userId);
-
-      // Notify other team members
-      socket.to(`team:${teamId}`).emit('user-joined', {
-        userId: socket.userId,
-        user: userProfile,
-        teamId
-      });
-
-      // Send current team presence to the joining user
-      const presenceList = Array.from(teamPresence.get(teamId) || []);
-      const presenceData = [];
-      
-      for (const userId of presenceList) {
-        const profile = await getUserProfile(userId);
-        if (profile) {
-          presenceData.push(profile);
+      checkTeamMembership(socket.userId, teamId).then(isMember => {
+        if (!isMember) {
+          socket.emit('error', { message: 'Not a member of this team' });
+          return;
         }
-      }
 
-      socket.emit('team-presence', {
-        teamId,
-        users: presenceData
+        // Join the team room
+        socket.join(`team:${teamId}`);
+        
+        // Update tracking
+        const connection = activeConnections.get(socket.id);
+        if (connection) {
+          connection.teamIds.add(teamId);
+        }
+
+        // Update team presence
+        if (!teamPresence.has(teamId)) {
+          teamPresence.set(teamId, new Set());
+        }
+        teamPresence.get(teamId).add(socket.userId);
+
+        // Notify other team members
+        socket.to(`team:${teamId}`).emit('user-joined', {
+          userId: socket.userId,
+          teamId
+        });
+
+        console.log(`User ${socket.userId} joined team ${teamId}`);
       });
-
-      console.log(`User ${socket.userId} joined team ${teamId}`);
     } catch (error) {
       console.error('Error joining team:', error);
       socket.emit('error', { message: 'Failed to join team' });
@@ -207,7 +195,8 @@ io.on('connection', async (socket) => {
   });
 
   // Handle leaving team rooms
-  socket.on('leave-team', (teamId) => {
+  socket.on('leave_team', (data) => {
+    const { teamId } = data;
     socket.leave(`team:${teamId}`);
     
     // Update tracking
@@ -244,7 +233,7 @@ io.on('connection', async (socket) => {
   });
 
   // Handle chat messages
-  socket.on('send-message', async (data) => {
+  socket.on('new_message', async (data) => {
     try {
       const { teamId, content, type = 'text', mentions = [] } = data;
 
@@ -284,7 +273,7 @@ io.on('connection', async (socket) => {
       }
 
       // Broadcast message to team members
-      io.to(`team:${teamId}`).emit('new-message', {
+      io.to(`team:${teamId}`).emit('new_message', {
         id: message.id,
         content: message.content,
         type: message.message_type,
@@ -321,18 +310,19 @@ io.on('connection', async (socket) => {
   });
 
   // Handle typing indicators
-  socket.on('typing-start', ({ teamId }) => {
-    socket.to(`team:${teamId}`).emit('user-typing', {
+  socket.on('typing', ({ teamId }) => {
+    socket.to(`team:${teamId}`).emit('typing', {
       userId: socket.userId,
-      user: userProfile,
-      teamId
+      teamId,
+      isTyping: true
     });
   });
 
-  socket.on('typing-stop', ({ teamId }) => {
-    socket.to(`team:${teamId}`).emit('user-stopped-typing', {
+  socket.on('stop_typing', ({ teamId }) => {
+    socket.to(`team:${teamId}`).emit('typing', {
       userId: socket.userId,
-      teamId
+      teamId,
+      isTyping: false
     });
   });
 
