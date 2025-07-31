@@ -1,29 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import {
-  BookOpen,
-  Brain,
-  Lightbulb,
-  MessageCircle,
-  Database,
-  Smile,
-  Briefcase,
-  Zap,
-  AlertTriangle,
-  Sparkles,
-} from "lucide-react"
+import { BookOpen, Brain, Lightbulb, MessageCircle, Database, Smile, Briefcase, Zap, AlertTriangle, Sparkles } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import type { AIProvider } from "@/lib/ai-providers"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
 import { ResearchChatbot } from "@/components/research-chatbot"
 import { EnhancedLiteratureSearch } from "./components/EnhancedLiteratureSearch"
 import { TopicExplorer } from "./components/TopicExplorer"
 import { IdeaGenerator } from "./components/IdeaGenerator"
 import { RouteGuard } from "@/components/route-guard"
+import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
 import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { ResearchSessionManager } from "@/components/research-session-manager"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const containerStyle = "container mx-auto px-4 py-8 max-w-6xl"
 const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
@@ -31,42 +23,42 @@ const sectionDescriptionStyle = "text-gray-600"
 
 const personalities = [
   {
-    key: "friendly",
-    name: "Friendly",
-    description: "Warm, supportive, and encouraging.",
-    systemPrompt: "You are a friendly, supportive research assistant. Use positive language and emojis.",
+    key: 'friendly',
+    name: 'Friendly',
+    description: 'Warm, supportive, and encouraging.',
+    systemPrompt: 'You are a friendly, supportive research assistant. Use positive language and emojis.',
     icon: Smile,
     color: [34, 197, 94] as [number, number, number],
   },
   {
-    key: "formal",
-    name: "Formal",
-    description: "Professional, concise, and academic.",
-    systemPrompt: "You are a formal, academic research assistant. Use professional and concise language.",
+    key: 'formal',
+    name: 'Formal',
+    description: 'Professional, concise, and academic.',
+    systemPrompt: 'You are a formal, academic research assistant. Use professional and concise language.',
     icon: Briefcase,
     color: [59, 130, 246] as [number, number, number],
   },
   {
-    key: "motivational",
-    name: "Motivational",
-    description: "Inspires and motivates you to keep going.",
-    systemPrompt: "You are a motivational coach. Encourage the user and celebrate their progress.",
+    key: 'motivational',
+    name: 'Motivational',
+    description: 'Inspires and motivates you to keep going.',
+    systemPrompt: 'You are a motivational coach. Encourage the user and celebrate their progress.',
     icon: Zap,
     color: [245, 158, 11] as [number, number, number],
   },
   {
-    key: "critical",
-    name: "Critical",
-    description: "Provides constructive criticism and challenges ideas.",
-    systemPrompt: "You are a critical thinker. Challenge assumptions and provide constructive feedback.",
+    key: 'critical',
+    name: 'Critical',
+    description: 'Provides constructive criticism and challenges ideas.',
+    systemPrompt: 'You are a critical thinker. Challenge assumptions and provide constructive feedback.',
     icon: AlertTriangle,
     color: [239, 68, 68] as [number, number, number],
   },
   {
-    key: "playful",
-    name: "Playful",
-    description: "Light-hearted, uses humor and playful language.",
-    systemPrompt: "You are a playful assistant. Use humor, jokes, and playful language.",
+    key: 'playful',
+    name: 'Playful',
+    description: 'Light-hearted, uses humor and playful language.',
+    systemPrompt: 'You are a playful assistant. Use humor, jokes, and playful language.',
     icon: Sparkles,
     color: [168, 85, 247] as [number, number, number],
   },
@@ -79,6 +71,9 @@ export default function ResearchExplorer() {
   const [chatTopic, setChatTopic] = useState("")
   const [chatPapers, setChatPapers] = useState<any[]>([])
   const [chatIdeas, setChatIdeas] = useState("")
+
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
 
   return (
@@ -121,7 +116,7 @@ export default function ResearchExplorer() {
                   <EnhancedLiteratureSearch />
                 </TabsContent>
                 <TabsContent value="explore">
-                  <TopicExplorer />
+                  <TopicExplorer selectedProvider={selectedProvider} selectedModel={selectedModel} />
                 </TabsContent>
                 <TabsContent value="ideas">
                   <IdeaGenerator />
