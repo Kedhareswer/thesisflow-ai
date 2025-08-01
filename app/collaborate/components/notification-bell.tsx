@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { TeamInvitation } from "@/components/ui/team-invitation"
 import {
   DropdownMenu,
   DropdownMenuItem,
@@ -291,6 +292,38 @@ export default function NotificationBell() {
     }
   }
 
+  // Handle invitation response
+  const handleInvitationResponse = async (invitationId: string, action: 'accept' | 'reject') => {
+    try {
+      const data = await apiCall('/api/collaborate/invitations', {
+        method: 'PUT',
+        body: JSON.stringify({
+          invitationId,
+          action,
+        }),
+      })
+
+      if (data.success) {
+        // Remove the notification after response
+        setNotifications(prev => prev.filter(n => 
+          !(n.type === 'team_invitation' && n.data?.invitation_id === invitationId)
+        ))
+        
+        toast({
+          title: `Invitation ${action}ed`,
+          description: data.message,
+        })
+      }
+    } catch (error) {
+      console.error('Error responding to invitation:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to respond to invitation",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Navigate to notification action
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read if not already
@@ -463,48 +496,82 @@ export default function NotificationBell() {
             </div>
           ) : notifications.length > 0 ? (
             <div className="max-h-96 overflow-y-auto">
-              {notifications.map((notification) => (
-                <DropdownMenuItem
-                  key={notification.id}
-                  className={`p-0 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <div className="w-full p-3 flex items-start gap-3">
-                    <div className="text-lg">
-                      {getNotificationIcon(notification.type)}
+              {notifications.map((notification) => {
+                // Special handling for team invitations
+                if (notification.type === 'team_invitation' && notification.data) {
+                  const invitation = {
+                    id: notification.data.invitation_id,
+                    team: {
+                      id: notification.data.team_id,
+                      name: notification.data.team_name,
+                      description: notification.data.team_description
+                    },
+                    inviter: {
+                      id: notification.data.inviter_id || '',
+                      full_name: notification.data.inviter_name,
+                      avatar_url: notification.data.inviter_avatar_url
+                    },
+                    role: notification.data.role,
+                    personal_message: notification.data.personal_message,
+                    created_at: notification.created_at
+                  };
+
+                  return (
+                    <div key={notification.id} className="p-3">
+                      <TeamInvitation
+                        invitation={invitation}
+                        onAccept={(invitationId) => handleInvitationResponse(invitationId, 'accept')}
+                        onDecline={(invitationId) => handleInvitationResponse(invitationId, 'reject')}
+                        className="w-full"
+                      />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-sm truncate">
-                          {notification.title}
-                        </p>
-                        <div className="flex items-center gap-1 ml-2">
-                          {!notification.is_read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              deleteNotification(notification.id)
-                            }}
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
+                  );
+                }
+
+                // Default notification rendering
+                return (
+                  <DropdownMenuItem
+                    key={notification.id}
+                    className={`p-0 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                    <div className="w-full p-3 flex items-start gap-3">
+                      <div className="text-lg">
+                        {getNotificationIcon(notification.type)}
                       </div>
-                      <p className="text-xs text-gray-600 mt-1 truncate">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {formatTime(notification.created_at)}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm truncate">
+                            {notification.title}
+                          </p>
+                          <div className="flex items-center gap-1 ml-2">
+                            {!notification.is_read && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteNotification(notification.id)
+                              }}
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1 truncate">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {formatTime(notification.created_at)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </DropdownMenuItem>
-              ))}
+                  </DropdownMenuItem>
+                );
+              })}
               
               {notifications.some(n => n.is_read) && (
                 <>

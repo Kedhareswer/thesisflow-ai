@@ -45,6 +45,7 @@ import { RouteGuard } from "@/components/route-guard"
 import { TeamSettings } from "./components/team-settings"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
+import { DevelopmentNotice } from "@/components/ui/development-notice"
 
 // Type definitions
 interface User {
@@ -97,6 +98,12 @@ export default function CollaboratePage() {
   const [isInviting, setIsInviting] = useState(false)
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false)
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
+  const [invitationDialog, setInvitationDialog] = useState<{
+    open: boolean
+    invitation?: any
+    action?: 'accept' | 'reject'
+  }>({ open: false })
+  const [isRespondingToInvitation, setIsRespondingToInvitation] = useState(false)
   const [newTeam, setNewTeam] = useState({
     name: "",
     description: "",
@@ -216,6 +223,55 @@ export default function CollaboratePage() {
     }
   }, [selectedTeamId, loadMessages])
 
+  // Handle invitation URL parameter
+  useEffect(() => {
+    const handleInvitation = async () => {
+      const urlParams = new URLSearchParams(window.location.search)
+      const invitationId = urlParams.get('invitation')
+      
+      if (invitationId && user) {
+        try {
+          // Fetch all invitations and find the specific one
+          const invitationData = await apiCall('/api/collaborate/invitations')
+          
+          if (invitationData.success && invitationData.invitations) {
+            const invitation = invitationData.invitations.find((inv: any) => inv.id === invitationId)
+            
+            if (invitation) {
+              // Show invitation response dialog
+              setInvitationDialog({
+                open: true,
+                invitation: invitation,
+                action: 'accept' // Default to accept
+              })
+              
+              // Clear the URL parameter
+              const newUrl = window.location.pathname
+              window.history.replaceState({}, '', newUrl)
+            } else {
+              toast({
+                title: "Error",
+                description: "Invitation not found or already processed",
+                variant: "destructive",
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error handling invitation:', error)
+          toast({
+            title: "Error",
+            description: "Failed to load invitation details",
+            variant: "destructive",
+          })
+        }
+      }
+    }
+
+    if (user && session) {
+      handleInvitation()
+    }
+  }, [user, session, apiCall, toast])
+
   // Handlers
   const handleCreateTeam = async () => {
     if (!newTeam.name.trim()) return
@@ -319,6 +375,40 @@ export default function CollaboratePage() {
       })
     } finally {
       setIsInviting(false)
+    }
+  }
+
+  const handleInvitationResponse = async (action: 'accept' | 'reject') => {
+    if (!invitationDialog.invitation) return
+
+    try {
+      setIsRespondingToInvitation(true)
+      
+      const data = await apiCall('/api/collaborate/invitations', {
+        method: 'PUT',
+        body: JSON.stringify({
+          invitationId: invitationDialog.invitation.id,
+          action: action,
+        }),
+      })
+
+      if (data.success) {
+        toast({
+          title: `Invitation ${action}ed`,
+          description: data.message,
+        })
+        
+        setInvitationDialog({ open: false })
+        loadTeams() // Refresh teams to show the new team if accepted
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to respond to invitation",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRespondingToInvitation(false)
     }
   }
 
@@ -1030,6 +1120,63 @@ export default function CollaboratePage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Invitation Response Dialog */}
+        <Dialog open={invitationDialog.open} onOpenChange={(open) => setInvitationDialog({ ...invitationDialog, open })}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Team Invitation
+              </DialogTitle>
+            </DialogHeader>
+            {invitationDialog.invitation && (
+              <div className="space-y-6 mt-6">
+                <div className="text-center">
+                  <div className="text-lg font-semibold mb-2">
+                    {invitationDialog.invitation.inviter?.full_name || 'Someone'} invited you to join
+                  </div>
+                  <div className="text-xl font-bold text-primary mb-2">
+                    {invitationDialog.invitation.team?.name}
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-4">
+                    as <span className="font-medium">{invitationDialog.invitation.role}</span>
+                  </div>
+                  {invitationDialog.invitation.personal_message && (
+                    <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                      "{invitationDialog.invitation.personal_message}"
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleInvitationResponse('reject')}
+                    disabled={isRespondingToInvitation}
+                  >
+                    Decline
+                  </Button>
+                  <Button 
+                    onClick={() => handleInvitationResponse('accept')}
+                    disabled={isRespondingToInvitation}
+                  >
+                    {isRespondingToInvitation ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Accepting...
+                      </>
+                    ) : (
+                      'Accept Invitation'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Development Notice Popup */}
+        <DevelopmentNotice />
       </div>
     </RouteGuard>
   )

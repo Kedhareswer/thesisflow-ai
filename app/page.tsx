@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import DisplayCards from "@/components/ui/display-cards"
 
 export default function HomePage() {
   const { user } = useSupabaseAuth()
@@ -168,20 +169,40 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {benefits.map((benefit, index) => (
-              <div
-                key={benefit.title}
-                className="text-center space-y-4 animate-fade-in"
-                style={{ animationDelay: `${index * 150}ms` }}
-              >
-                <div className="mx-auto w-12 h-12 bg-accent rounded-xl flex items-center justify-center">
-                  <benefit.icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-title">{benefit.title}</h3>
-                <p className="text-body text-muted-foreground">{benefit.description}</p>
-              </div>
-            ))}
+          <div className="flex min-h-[350px] w-full items-center justify-center">
+            <div className="w-full max-w-2xl">
+              <DisplayCards 
+                cards={[
+                  {
+                    icon: <Zap className="size-4 text-blue-300" />,
+                    title: "Accelerated Research",
+                    description: "Reduce research time by 60% with AI-powered tools and automation.",
+                    iconClassName: "text-blue-500",
+                    titleClassName: "text-blue-500",
+                    className:
+                      "[grid-area:stack] hover:-translate-y-8 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-border before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-background/50 grayscale-[100%] hover:before:opacity-0 before:transition-opacity before:duration-700 hover:grayscale-0 before:left-0 before:top-0",
+                  },
+                  {
+                    icon: <Shield className="size-4 text-blue-300" />,
+                    title: "Enterprise Security",
+                    description: "Bank-grade security with encrypted data and secure API handling.",
+                    iconClassName: "text-blue-500",
+                    titleClassName: "text-blue-500",
+                    className:
+                      "[grid-area:stack] translate-x-12 translate-y-8 hover:-translate-y-1 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-border before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-background/50 grayscale-[100%] hover:before:opacity-0 before:transition-opacity before:duration-700 hover:grayscale-0 before:left-0 before:top-0",
+                  },
+                  {
+                    icon: <Globe className="size-4 text-blue-300" />,
+                    title: "Global Collaboration",
+                    description: "Connect with researchers worldwide through real-time collaboration tools.",
+                    iconClassName: "text-blue-500",
+                    titleClassName: "text-blue-500",
+                    className:
+                      "[grid-area:stack] translate-x-24 translate-y-16 hover:translate-y-8",
+                  },
+                ]} 
+              />
+            </div>
           </div>
         </div>
       </section>
