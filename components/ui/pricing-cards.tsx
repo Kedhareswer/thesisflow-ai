@@ -1,4 +1,4 @@
-import { Check, MoveRight, PhoneCall, Sparkles, Users, Zap, Shield } from "lucide-react";
+import { Check, MoveRight, PhoneCall, Sparkles, Users, Zap, Shield, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -24,71 +24,71 @@ function Pricing() {
             </p>
           </div>
           <div className="grid pt-20 text-left grid-cols-1 lg:grid-cols-3 w-full gap-8">
-            <Card className="w-full rounded-md">
-              <CardHeader>
-                <CardTitle>
-                  <span className="flex flex-row gap-4 items-center font-normal">
-                    <Sparkles className="h-5 w-5 text-blue-500" />
-                    Starter
-                  </span>
-                </CardTitle>
-                <CardDescription>
-                  Perfect for individuals and small teams getting started with AI-powered project planning.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-8 justify-start">
-                  <p className="flex flex-row items-center gap-2 text-xl">
-                    <span className="text-4xl">$9</span>
-                    <span className="text-sm text-muted-foreground">
-                      {" "}
-                      / month
-                    </span>
-                  </p>
-                  <div className="flex flex-col gap-4 justify-start">
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>AI Project Planning</p>
-                        <p className="text-muted-foreground text-sm">
-                          Generate project plans with AI assistance
-                        </p>
+                         <Card className="w-full rounded-md">
+               <CardHeader>
+                 <CardTitle>
+                   <span className="flex flex-row gap-4 items-center font-normal">
+                     <Sparkles className="h-5 w-5 text-blue-500" />
+                     Free
+                   </span>
+                 </CardTitle>
+                 <CardDescription>
+                   Limited access to core features for individual researchers and students.
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <div className="flex flex-col gap-8 justify-start">
+                   <p className="flex flex-row items-center gap-2 text-xl">
+                     <span className="text-4xl">$0</span>
+                     <span className="text-sm text-muted-foreground">
+                       {" "}
+                       / month
+                     </span>
+                   </p>
+                   <div className="flex flex-col gap-4 justify-start">
+                                           <div className="flex flex-row gap-4">
+                        <Check className="w-4 h-4 mt-2 text-green-500" />
+                        <div className="flex flex-col">
+                          <p>Explorer Access</p>
+                          <p className="text-muted-foreground text-sm">
+                            Limited, rate-limited access to research explorer
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Basic Collaboration</p>
-                        <p className="text-muted-foreground text-sm">
-                          Up to 3 team members per project
-                        </p>
+                      <div className="flex flex-row gap-4">
+                        <Check className="w-4 h-4 mt-2 text-green-500" />
+                        <div className="flex flex-col">
+                          <p>Summarizer Tool</p>
+                          <p className="text-muted-foreground text-sm">
+                            Rate-limited access to AI summarizer
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Research Tools</p>
-                        <p className="text-muted-foreground text-sm">
-                          Access to literature search and AI summarizer
-                        </p>
+                      <div className="flex flex-row gap-4">
+                        <Check className="w-4 h-4 mt-2 text-green-500" />
+                        <div className="flex flex-col">
+                          <p>Documentation</p>
+                          <p className="text-muted-foreground text-sm">
+                            Access to platform documentation and guides
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Document Management</p>
-                        <p className="text-muted-foreground text-sm">
-                          Store and organize up to 10 documents
-                        </p>
+                                           <div className="flex flex-row gap-4">
+                        <X className="w-4 h-4 mt-2 text-red-500" />
+                        <div className="flex flex-col">
+                          <p>Team Access</p>
+                          <p className="text-muted-foreground text-sm">
+                            No access to teams or collaboration features
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <Button variant="outline" className="gap-4">
-                    Get Started <MoveRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                   </div>
+                   <Button variant="outline" className="gap-4">
+                     Get Started <MoveRight className="w-4 h-4" />
+                   </Button>
+                 </div>
+               </CardContent>
+             </Card>
             <Card className="w-full shadow-2xl rounded-md border-2 border-primary/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -115,53 +115,71 @@ function Pricing() {
                       / month
                     </span>
                   </p>
-                  <div className="flex flex-col gap-4 justify-start">
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Everything in Starter</p>
-                        <p className="text-muted-foreground text-sm">
-                          All basic features included
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Advanced Collaboration</p>
-                        <p className="text-muted-foreground text-sm">
-                          Up to 10 team members with real-time chat
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>AI Writing Assistant</p>
-                        <p className="text-muted-foreground text-sm">
-                          Advanced content generation and editing
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Unlimited Documents</p>
-                        <p className="text-muted-foreground text-sm">
-                          Store and manage unlimited project files
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Priority Support</p>
-                        <p className="text-muted-foreground text-sm">
-                          Faster response times and dedicated help
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                                       <div className="flex flex-col gap-4 justify-start">
+                       <div className="flex flex-row gap-4">
+                         <Check className="w-4 h-4 mt-2 text-green-500" />
+                         <div className="flex flex-col">
+                           <p>Everything in Free</p>
+                           <p className="text-muted-foreground text-sm">
+                             All basic features included
+                           </p>
+                         </div>
+                       </div>
+                       <div className="flex flex-row gap-4">
+                         <Check className="w-4 h-4 mt-2 text-green-500" />
+                         <div className="flex flex-col">
+                           <p>Advanced Collaboration</p>
+                           <p className="text-muted-foreground text-sm">
+                             Up to 10 team members with real-time chat
+                           </p>
+                         </div>
+                       </div>
+                       <div className="flex flex-row gap-4">
+                         <Check className="w-4 h-4 mt-2 text-green-500" />
+                         <div className="flex flex-col">
+                           <p>AI Writing Assistant</p>
+                           <p className="text-muted-foreground text-sm">
+                             Advanced content generation and editing
+                           </p>
+                         </div>
+                       </div>
+                       <div className="flex flex-row gap-4">
+                         <Check className="w-4 h-4 mt-2 text-green-500" />
+                         <div className="flex flex-col">
+                           <p>Unlimited Documents</p>
+                           <p className="text-muted-foreground text-sm">
+                             Store and manage unlimited project files
+                           </p>
+                         </div>
+                       </div>
+                       <div className="flex flex-row gap-4">
+                         <Check className="w-4 h-4 mt-2 text-green-500" />
+                         <div className="flex flex-col">
+                           <p>Priority Support</p>
+                           <p className="text-muted-foreground text-sm">
+                             Faster response times and dedicated help
+                           </p>
+                         </div>
+                       </div>
+                       <div className="flex flex-row gap-4">
+                         <X className="w-4 h-4 mt-2 text-red-500" />
+                         <div className="flex flex-col">
+                           <p>Custom AI Models</p>
+                           <p className="text-muted-foreground text-sm">
+                             Not available in Professional plan
+                           </p>
+                         </div>
+                       </div>
+                       <div className="flex flex-row gap-4">
+                         <X className="w-4 h-4 mt-2 text-red-500" />
+                         <div className="flex flex-col">
+                           <p>Unlimited Team Members</p>
+                           <p className="text-muted-foreground text-sm">
+                             Limited to 10 team members
+                           </p>
+                         </div>
+                       </div>
+                     </div>
                   <Button className="gap-4">
                     Start Free Trial <MoveRight className="w-4 h-4" />
                   </Button>
@@ -189,53 +207,54 @@ function Pricing() {
                       pricing
                     </span>
                   </p>
-                  <div className="flex flex-col gap-4 justify-start">
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Everything in Professional</p>
-                        <p className="text-muted-foreground text-sm">
-                          All advanced features included
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Unlimited Team Members</p>
-                        <p className="text-muted-foreground text-sm">
-                          Scale your team without limits
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Custom AI Models</p>
-                        <p className="text-muted-foreground text-sm">
-                          Tailored AI solutions for your industry
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Advanced Security</p>
-                        <p className="text-muted-foreground text-sm">
-                          SSO, audit logs, and compliance features
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-row gap-4">
-                      <Check className="w-4 h-4 mt-2 text-primary" />
-                      <div className="flex flex-col">
-                        <p>Dedicated Support</p>
-                        <p className="text-muted-foreground text-sm">
-                          24/7 phone and email support
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                                     <div className="flex flex-col gap-4 justify-start">
+                     <div className="flex flex-row gap-4">
+                       <Check className="w-4 h-4 mt-2 text-green-500" />
+                       <div className="flex flex-col">
+                         <p>Everything in Professional</p>
+                         <p className="text-muted-foreground text-sm">
+                           All advanced features included
+                         </p>
+                       </div>
+                     </div>
+                     <div className="flex flex-row gap-4">
+                       <Check className="w-4 h-4 mt-2 text-green-500" />
+                       <div className="flex flex-col">
+                         <p>Unlimited Team Members</p>
+                         <p className="text-muted-foreground text-sm">
+                           Scale your team without limits
+                         </p>
+                       </div>
+                     </div>
+                     <div className="flex flex-row gap-4">
+                       <Check className="w-4 h-4 mt-2 text-green-500" />
+                       <div className="flex flex-col">
+                         <p>Custom AI Models</p>
+                         <p className="text-muted-foreground text-sm">
+                           Tailored AI solutions for your industry
+                         </p>
+                       </div>
+                     </div>
+                     <div className="flex flex-row gap-4">
+                       <Check className="w-4 h-4 mt-2 text-green-500" />
+                       <div className="flex flex-col">
+                         <p>Advanced Security</p>
+                         <p className="text-muted-foreground text-sm">
+                           SSO, audit logs, and compliance features
+                         </p>
+                       </div>
+                     </div>
+                     <div className="flex flex-row gap-4">
+                       <Check className="w-4 h-4 mt-2 text-green-500" />
+                       <div className="flex flex-col">
+                         <p>Dedicated Support</p>
+                         <p className="text-muted-foreground text-sm">
+                           24/7 phone and email support
+                         </p>
+                       </div>
+                     </div>
+                     
+                   </div>
                   <Button variant="outline" className="gap-4">
                     Contact Sales <PhoneCall className="w-4 h-4" />
                   </Button>
