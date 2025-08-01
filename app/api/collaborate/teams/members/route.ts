@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { socketService } from '@/lib/services/socket.service';
 
+// Type definition for the find_user_by_email function return
+type UserByEmail = {
+  id: string
+  full_name: string
+  avatar_url: string | null
+  email: string
+}
+
 // POST /api/collaborate/teams/members - Add member to team
 export async function POST(request: NextRequest) {
   try {
@@ -23,42 +31,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
     }
 
-    // Find user by email
+    // Find user by email using the database function
     const { data: user, error: userError } = await supabase
-      .from('user_profiles')
-      .select('id, email, full_name')
-      .eq('email', email)
+      .rpc('find_user_by_email', { user_email: email })
       .single();
 
-    // If user doesn't exist, create a placeholder user
-    let userId;
-    let userName;
+    // If user doesn't exist, return error
+    let userId: string;
+    let userName: string;
     
     if (userError || !user) {
-      // Generate a name from the email
-      const generatedName = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1);
-      
-      // Create a new user profile
-      const { data: newUser, error: createError } = await supabase
-        .from('user_profiles')
-        .insert({
-          email,
-          full_name: generatedName,
-          status: 'offline',
-          last_active: new Date().toISOString(),
-        })
-        .select('id, full_name')
-        .single();
-
-      if (createError || !newUser) {
-        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
-      }
-
-      userId = newUser.id;
-      userName = newUser.full_name;
+      return NextResponse.json({ 
+        error: 'User not found. The user must have an account to be added to the team.' 
+      }, { status: 404 });
     } else {
-      userId = user.id;
-      userName = user.full_name;
+      // Type assertion since we know the function returns the correct structure
+      const userData = user as UserByEmail;
+      userId = userData.id;
+      userName = userData.full_name;
     }
 
     // Check if user is already a member

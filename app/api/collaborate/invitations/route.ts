@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, requireAuth, createSupabaseAdmin } from '@/lib/auth-utils'
 
+// Type definition for the find_user_by_email function return
+type UserByEmail = {
+  id: string
+  full_name: string
+  avatar_url: string | null
+  email: string
+}
+
 // Invitation API endpoints
 // Handles: Send invitations, Accept/Reject, View invitations, Cancel invitations
 
@@ -24,9 +32,7 @@ export async function GET(request: NextRequest) {
       .from('team_invitations')
       .select(`
         *,
-        team:teams!team_invitations_team_id_fkey(id, name, description, is_public, category),
-        inviter:user_profiles!team_invitations_inviter_id_fkey(id, full_name, avatar_url),
-        invitee:user_profiles!team_invitations_invitee_id_fkey(id, full_name, avatar_url)
+        team:teams!team_invitations_team_id_fkey(id, name, description, is_public, category)
       `)
       .order('created_at', { ascending: false })
 
@@ -121,14 +127,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find the invitee user
+    // Find the invitee user by joining with auth.users table
     const { data: inviteeUser, error: userError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('id, full_name, avatar_url')
-      .eq('email', inviteeEmail)
-      .single()
+      .rpc('find_user_by_email', { user_email: inviteeEmail })
 
-    if (userError && userError.code !== 'PGRST116') {
+    if (userError) {
       console.error('Error finding user:', userError)
       return NextResponse.json(
         { error: "Database error" },
@@ -143,12 +146,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Type assertion for the user data
+    const userData = inviteeUser as UserByEmail
+
     // Check if user is already a team member
     const { data: existingMember } = await supabaseAdmin
       .from('team_members')
       .select('id')
       .eq('team_id', teamId)
-      .eq('user_id', inviteeUser.id)
+      .eq('user_id', userData.id)
       .single()
 
     if (existingMember) {
@@ -163,7 +169,7 @@ export async function POST(request: NextRequest) {
       .from('team_invitations')
       .select('id, status')
       .eq('team_id', teamId)
-      .eq('invitee_id', inviteeUser.id)
+      .eq('invitee_id', userData.id)
       .eq('status', 'pending')
       .single()
 
@@ -174,19 +180,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check invitation limits (max 2 teams per day)
-    const { data: canInvite } = await supabaseAdmin
-      .rpc('check_invitation_limit', {
-        user_uuid: user.id,
-        team_uuid: teamId
-      })
-
-    if (!canInvite) {
-      return NextResponse.json(
-        { error: "You have reached the daily invitation limit (2 teams per day)" },
-        { status: 429 }
-      )
-    }
+    // Rate limiting removed - users can now send unlimited invitations
 
     // Get team information for the invitation
     const { data: team } = await supabaseAdmin
@@ -208,7 +202,7 @@ export async function POST(request: NextRequest) {
       .insert({
         team_id: teamId,
         inviter_id: user.id,
-        invitee_id: inviteeUser.id,
+        invitee_id: userData.id,
         invitee_email: inviteeEmail,
         role: role,
         personal_message: personalMessage,
@@ -216,8 +210,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        team:teams!team_invitations_team_id_fkey(id, name, description),
-        inviter:user_profiles!team_invitations_inviter_id_fkey(id, full_name, avatar_url)
+        team:teams!team_invitations_team_id_fkey(id, name, description)
       `)
       .single()
 
@@ -229,11 +222,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update invitation rate limit
-    await supabaseAdmin.rpc('update_invitation_limit', {
-      user_uuid: user.id,
-      team_uuid: teamId
-    })
+    // Rate limit tracking removed
 
     // Create notification for the invitee
     const notificationData = {
@@ -244,14 +233,20 @@ export async function POST(request: NextRequest) {
       role: role
     }
 
-    await supabaseAdmin.rpc('create_notification', {
-      target_user_id: inviteeUser.id,
+    // Create notification for the invitee
+    const { data: notificationResult, error: notificationError } = await supabaseAdmin.rpc('create_notification', {
+      target_user_id: userData.id,
       notification_type: 'team_invitation',
       notification_title: `Team Invitation: ${team.name}`,
       notification_message: `${notificationData.inviter_name} invited you to join "${team.name}" as ${role}`,
       notification_data: notificationData,
       action_url: `/collaborate?invitation=${invitation.id}`
     })
+
+    if (notificationError) {
+      console.error('Error creating notification:', notificationError)
+      // Don't fail the invitation if notification fails
+    }
 
     return NextResponse.json({
       success: true,
@@ -301,8 +296,7 @@ export async function PUT(request: NextRequest) {
       .from('team_invitations')
       .select(`
         *,
-        team:teams!team_invitations_team_id_fkey(id, name, description),
-        inviter:user_profiles!team_invitations_inviter_id_fkey(id, full_name)
+        team:teams!team_invitations_team_id_fkey(id, name, description)
       `)
       .eq('id', invitationId)
       .single()
