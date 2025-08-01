@@ -412,5 +412,5 @@ We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a> | 
     <a href="https://github.com/Kedhareswer/ai-project-planner/discussions">Join Discussion</a>
   </p>
-  <p>Last Updated: January 2025</p>
+  <p>Last Updated: August 2025</p>
 </div>
