@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import DisplayCards from "@/components/ui/display-cards"
+import { Pricing } from "@/components/ui/pricing-cards"
 
 export default function HomePage() {
   const { user } = useSupabaseAuth()
@@ -206,6 +207,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Pricing Section */}
+      <Pricing />
 
       {/* CTA Section */}
       <section className="section-spacing bg-foreground text-background">
