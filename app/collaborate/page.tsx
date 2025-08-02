@@ -1210,8 +1210,8 @@ export default function CollaboratePage() {
         
         {/* Plan Restriction Notice for Free Users */}
         {!isProfessionalOrHigher() && (
-          <div className="fixed top-4 right-4 z-40">
-            <Card className="border-orange-200 bg-orange-50">
+          <div className="fixed top-20 right-4 z-50">
+            <Card className="border-orange-200 bg-orange-50 shadow-lg">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <Crown className="h-4 w-4 text-orange-600" />
