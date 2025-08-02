@@ -257,6 +257,43 @@ export async function POST(request: NextRequest) {
     
     const { name, description, category = 'Research', isPublic = false } = await request.json();
 
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Check plan restrictions
+    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { user_id: user.id });
+    
+    if (!planData || planData.length === 0) {
+      // User doesn't have a plan, assign them to free plan
+      await supabaseAdmin
+        .from('user_plans')
+        .insert({
+          user_id: user.id,
+          plan_type: 'free',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+    }
+
+    // Check if user can use team features
+    const { data: canUseTeams } = await supabaseAdmin.rpc('can_use_feature', { 
+      user_id: user.id, 
+      feature_name: 'team_members' 
+    });
+
+    if (!canUseTeams || canUseTeams.length === 0 || !canUseTeams[0].can_use) {
+      return NextResponse.json(
+        { error: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to create teams." },
+        { status: 403 }
+      );
+    }
+
     if (!name?.trim()) {
       return NextResponse.json(
         { error: "Team name is required" },
@@ -270,14 +307,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid category" },
         { status: 400 }
-      );
-    }
-
-    const supabaseAdmin = createSupabaseAdmin();
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: "Service configuration error" },
-        { status: 500 }
       );
     }
 

@@ -281,6 +281,16 @@ export default function CollaboratePage() {
   const handleCreateTeam = async () => {
     if (!newTeam.name.trim()) return
 
+    // Check plan restrictions
+    if (!canUseFeature('team_members')) {
+      toast({
+        title: "Plan Restriction",
+        description: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to create teams.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setIsCreatingTeam(true)
       
@@ -347,6 +357,16 @@ export default function CollaboratePage() {
 
   const handleInviteMember = async () => {
     if (!inviteEmail.trim() || !selectedTeamId) return
+
+    // Check plan restrictions
+    if (!canUseFeature('team_members')) {
+      toast({
+        title: "Plan Restriction",
+        description: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to invite team members.",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       setIsInviting(true)
@@ -529,18 +549,23 @@ export default function CollaboratePage() {
                       onClick={() => setIsCreateTeamOpen(true)}
                       className="w-full justify-start gap-3 h-12"
                       variant="outline"
+                      disabled={!canUseFeature('team_members')}
+                      title={!canUseFeature('team_members') ? "Upgrade to Professional plan to create teams" : ""}
                     >
                       <Plus className="h-4 w-4" />
                       Create Team
+                      {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
                     </Button>
                     <Button
                       onClick={() => setIsInviteDialogOpen(true)}
                       className="w-full justify-start gap-3 h-12"
                       variant="outline"
-                      disabled={!selectedTeam}
+                      disabled={!selectedTeam || !canUseFeature('team_members')}
+                      title={!canUseFeature('team_members') ? "Upgrade to Professional plan to invite team members" : ""}
                     >
                       <UserPlus className="h-4 w-4" />
                       Invite Member
+                      {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
                     </Button>
                     <Button
                       className="w-full justify-start gap-3 h-12"
