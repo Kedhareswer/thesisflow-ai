@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Crown, Zap, Users, FileText, Search, Sparkles, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { Crown, Zap, Users, FileText, Search, Sparkles, AlertCircle, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 import { useUserPlan } from "@/hooks/use-user-plan"
 
 interface PlanStatusProps {
@@ -15,8 +15,9 @@ interface PlanStatusProps {
 }
 
 export function PlanStatus({ className, showDetails = false }: PlanStatusProps) {
-  const { planData, loading, getPlanType, getUsageForFeature, isProfessionalOrHigher } = useUserPlan()
+  const { planData, loading, getPlanType, getUsageForFeature, isProfessionalOrHigher, refreshPlanData } = useUserPlan()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   if (loading) {
     return (
@@ -108,9 +109,23 @@ export function PlanStatus({ className, showDetails = false }: PlanStatusProps) 
               {config.icon}
               Plan Status
             </div>
-            <Badge className={`${config.color} text-white`}>
-              {config.name}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  setRefreshing(true)
+                  await refreshPlanData()
+                  setRefreshing(false)
+                }}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
+              <Badge className={`${config.color} text-white`}>
+                {config.name}
+              </Badge>
+            </div>
           </CardTitle>
           <CardDescription>
             {config.description}

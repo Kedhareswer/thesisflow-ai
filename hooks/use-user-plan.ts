@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from '@/hooks/use-toast'
+import { createClient } from '@supabase/supabase-js'
 
 interface UserPlan {
   plan_type: 'free' | 'professional' | 'enterprise'
@@ -27,6 +28,9 @@ export function useUserPlan() {
   const [planData, setPlanData] = useState<PlanData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const subscriptionRef = useRef<any>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchPlanData = useCallback(async () => {
     if (!user || !session) return
@@ -128,7 +132,67 @@ export function useUserPlan() {
     return getPlanType() === 'enterprise'
   }, [getPlanType])
 
+  // Setup real-time subscription for usage updates
   useEffect(() => {
+    if (!user || !session) {
+      // Cleanup existing subscription
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe()
+        subscriptionRef.current = null
+      }
+      return
+    }
+
+    // Initialize Supabase client if not already done
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+    }
+
+    // Subscribe to user_usage table changes for this user
+    subscriptionRef.current = supabaseRef.current
+      .channel('user_usage_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_usage',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Usage updated:', payload)
+          // Refresh plan data when usage changes
+          fetchPlanData()
+        }
+      )
+      .subscribe()
+
+    // Setup polling as fallback (every 30 seconds)
+    pollingIntervalRef.current = setInterval(() => {
+      fetchPlanData()
+    }, 30000)
+
+    // Initial fetch
+    fetchPlanData()
+
+    // Cleanup subscription and polling on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe()
+        subscriptionRef.current = null
+      }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [user, session, fetchPlanData])
+
+  // Add a manual refresh function
+  const refreshPlanData = useCallback(() => {
     fetchPlanData()
   }, [fetchPlanData])
 
@@ -137,6 +201,7 @@ export function useUserPlan() {
     loading,
     error,
     fetchPlanData,
+    refreshPlanData,
     incrementUsage,
     canUseFeature,
     getUsageForFeature,
