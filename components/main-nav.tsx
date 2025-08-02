@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine } from "lucide-react"
+import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine, Crown } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -176,6 +176,12 @@ export function MainNav() {
                   <Link href="/settings" className="flex items-center w-full">
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/plan" className="flex items-center w-full">
+                    <Crown className="mr-2 h-4 w-4" />
+                    Plan
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

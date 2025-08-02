@@ -46,6 +46,8 @@ import { TeamSettings } from "./components/team-settings"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
 import { DevelopmentNotice } from "@/components/ui/development-notice"
+import { useUserPlan } from "@/hooks/use-user-plan"
+import { PlanStatus } from "@/components/ui/plan-status"
 
 // Type definitions
 interface User {
@@ -82,6 +84,9 @@ interface ChatMessage {
 }
 
 export default function CollaboratePage() {
+  // Plan system
+  const { canUseFeature, isProfessionalOrHigher } = useUserPlan()
+  
   // State management
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1177,6 +1182,23 @@ export default function CollaboratePage() {
 
         {/* Development Notice Popup */}
         <DevelopmentNotice />
+        
+        {/* Plan Restriction Notice for Free Users */}
+        {!isProfessionalOrHigher() && (
+          <div className="fixed top-4 right-4 z-40">
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-orange-600" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">Team Collaboration</p>
+                    <p className="text-xs text-orange-700">Upgrade to Professional to access team features</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </RouteGuard>
   )

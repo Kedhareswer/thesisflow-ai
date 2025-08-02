@@ -20,6 +20,8 @@ import type { ResearchPaper, SearchFilters } from "@/lib/types/common"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useResearchPapers, useResearchContext } from "@/components/research-session-provider"
 import { createClient } from '@supabase/supabase-js'
+import { useUserPlan } from "@/hooks/use-user-plan"
+import { PlanStatus } from "@/components/ui/plan-status"
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -34,6 +36,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
   const { toast } = useToast()
   const { papers: sessionPapers, selectedPapers: sessionSelectedPapers, selectPaper, addPapers } = useResearchPapers()
   const { hasContext, contextSummary } = useResearchContext()
+  const { canUseFeature, incrementUsage, getUsageForFeature } = useUserPlan()
   
   const [showFilters, setShowFilters] = useState(false)
   const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set(sessionSelectedPapers.map(p => p.id)))
@@ -59,6 +62,16 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) return
+
+    // Check if user can perform literature search
+    if (!canUseFeature('literature_searches')) {
+      toast({
+        title: "Usage Limit Exceeded",
+        description: "You've reached your monthly limit for literature searches. Please upgrade your plan to continue.",
+        variant: "destructive",
+      })
+      return
+    }
 
     setLastSearchQuery(query.trim())
     
@@ -118,21 +131,24 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       // Update state with search results
       setPaperSearch(prev => ({ ...prev, data: searchResult, loading: false, error: null }))
 
-      // Add papers to research session
-      if (searchResult.papers.length > 0) {
-        addPapers(searchResult.papers, query.trim(), filters)
-        
-        toast({
-          title: "Search Complete",
-          description: `Found ${searchResult.papers.length} papers from ${searchResult.sources.join(', ') || 'academic databases'} (${searchResult.search_time}ms)${data.fallback ? ' - using demo data' : ''}`,
-        })
-      } else {
-        toast({
-          title: "No Results",
-          description: "No papers found for your search. Try different keywords or check your filters.",
-          variant: "destructive",
-        })
-      }
+             // Add papers to research session
+       if (searchResult.papers.length > 0) {
+         addPapers(searchResult.papers, query.trim(), filters)
+         
+         // Increment usage after successful search
+         await incrementUsage('literature_searches')
+         
+         toast({
+           title: "Search Complete",
+           description: `Found ${searchResult.papers.length} papers from ${searchResult.sources.join(', ') || 'academic databases'} (${searchResult.search_time}ms)${data.fallback ? ' - using demo data' : ''}`,
+         })
+       } else {
+         toast({
+           title: "No Results",
+           description: "No papers found for your search. Try different keywords or check your filters.",
+           variant: "destructive",
+         })
+       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to search papers. Please try again."
       setPaperSearch(prev => ({ ...prev, loading: false, error: errorMessage }))
@@ -211,6 +227,11 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
 
   return (
     <div className={className}>
+      {/* Plan Status */}
+      <div className="mb-4">
+        <PlanStatus showDetails={true} />
+      </div>
+      
       {/* Research Context Status */}
       {hasContext && (
         <Alert className="mb-4 border-blue-200 bg-blue-50">
