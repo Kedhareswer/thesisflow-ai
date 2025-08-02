@@ -275,20 +275,32 @@ class ProjectService {
 
   async createTask(taskData: Omit<Task, "id" | "created_at" | "updated_at">): Promise<{ task?: Task; error?: string }> {
     try {
-      const { data: task, error } = await supabase.from("tasks").insert(taskData).select().single()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return { error: "Not authenticated" }
 
-      if (error) {
-        console.error("Error creating task:", error)
-        return { error: error.message }
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify(taskData),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error("Error creating task:", result.error)
+        return { error: result.error || "Failed to create task" }
       }
 
       // Update project progress
       await this.updateProjectProgress(taskData.project_id)
 
       // Log activity
-      await this.logActivity("created", "task", task.id, { title: task.title, project_id: taskData.project_id })
+      await this.logActivity("created", "task", result.task.id, { title: result.task.title, project_id: taskData.project_id })
 
-      return { task }
+      return { task: result.task }
     } catch (error) {
       console.error("Unexpected error creating task:", error)
       return { error: "Failed to create task" }
@@ -297,30 +309,34 @@ class ProjectService {
 
   async updateTask(id: string, updates: Partial<Task>): Promise<{ task?: Task; error?: string }> {
     try {
-      const { data: task, error } = await supabase
-        .from("tasks")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return { error: "Not authenticated" }
 
-      if (error) {
-        console.error("Error updating task:", error)
-        return { error: error.message }
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify(updates),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error("Error updating task:", result.error)
+        return { error: result.error || "Failed to update task" }
       }
 
       // Update project progress if status changed
       if (updates.status) {
-        await this.updateProjectProgress(task.project_id)
+        await this.updateProjectProgress(result.task.project_id)
       }
 
       // Log activity
       await this.logActivity("updated", "task", id, updates)
 
-      return { task }
+      return { task: result.task }
     } catch (error) {
       console.error("Unexpected error updating task:", error)
       return { error: "Failed to update task" }
@@ -329,14 +345,24 @@ class ProjectService {
 
   async deleteTask(id: string): Promise<{ success: boolean; error?: string }> {
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return { success: false, error: "Not authenticated" }
+
       // Get task info before deletion for project progress update
       const { data: task } = await supabase.from("tasks").select("project_id").eq("id", id).single()
 
-      const { error } = await supabase.from("tasks").delete().eq("id", id)
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      })
 
-      if (error) {
-        console.error("Error deleting task:", error)
-        return { success: false, error: error.message }
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error("Error deleting task:", result.error)
+        return { success: false, error: result.error || "Failed to delete task" }
       }
 
       // Update project progress
