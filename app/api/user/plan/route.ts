@@ -25,24 +25,34 @@ export async function GET(request: NextRequest) {
       .from('user_plans')
       .select('*')
       .eq('user_id', user.id)
-      .eq('status', 'active')
       .single()
 
     if (planError && planError.code !== 'PGRST116') {
+      console.error('Plan error:', planError)
       return NextResponse.json({ error: 'Failed to get plan' }, { status: 500 })
     }
 
-    // Get usage summary
+    // Get usage summary using the function
     const { data: usage, error: usageError } = await supabaseAdmin
-      .rpc('get_user_usage_summary', { user_uuid: user.id })
+      .rpc('get_user_usage_summary', { p_user_uuid: user.id })
 
     if (usageError) {
+      console.error('Usage error:', usageError)
       return NextResponse.json({ error: 'Failed to get usage' }, { status: 500 })
     }
 
+    // Transform usage data to match expected format
+    const transformedUsage = (usage || []).map((item: any) => ({
+      feature: item.feature_name,
+      usage_count: item.usage_count,
+      limit_count: item.limit_count,
+      remaining: item.remaining,
+      is_unlimited: item.is_unlimited
+    }))
+
     return NextResponse.json({
       plan: plan || { plan_type: 'free', status: 'active' },
-      usage: usage || []
+      usage: transformedUsage
     })
   } catch (error) {
     console.error('Error getting user plan:', error)
@@ -73,9 +83,10 @@ export async function POST(request: NextRequest) {
 
     // Check if user can use the feature
     const { data: canUse, error: checkError } = await supabaseAdmin
-      .rpc('can_use_feature', { user_uuid: user.id, feature_name: feature })
+      .rpc('can_use_feature', { p_user_uuid: user.id, p_feature_name: feature })
 
     if (checkError) {
+      console.error('Check error:', checkError)
       return NextResponse.json({ error: 'Failed to check usage' }, { status: 500 })
     }
 
@@ -88,9 +99,10 @@ export async function POST(request: NextRequest) {
 
     // Increment usage
     const { data: incremented, error: incrementError } = await supabaseAdmin
-      .rpc('increment_usage', { user_uuid: user.id, feature_name: feature })
+      .rpc('increment_usage', { p_user_uuid: user.id, p_feature_name: feature, p_amount: 1 })
 
     if (incrementError) {
+      console.error('Increment error:', incrementError)
       return NextResponse.json({ error: 'Failed to increment usage' }, { status: 500 })
     }
 
