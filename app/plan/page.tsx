@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star } from "lucide-react"
+import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall } from "lucide-react"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { useToast } from "@/hooks/use-toast"
 import { RouteGuard } from "@/components/route-guard"
@@ -80,12 +80,45 @@ export default function PlanPage() {
     }
   }
 
-  const handleUpgrade = () => {
+  const handleGetStarted = () => {
+    // For free users, this could redirect to a signup or onboarding flow
     toast({
-      title: "Upgrade Feature",
-      description: "Contact support to upgrade your plan. This feature is coming soon!",
+      title: "Get Started",
+      description: "You're already on the Free plan! Explore our features to get the most out of Bolt Research Hub.",
     })
-    setShowUpgradeDialog(false)
+  }
+
+  const handleStartFreeTrial = () => {
+    // This would typically integrate with a payment processor like Stripe
+    toast({
+      title: "Start Free Trial",
+      description: "Redirecting to Professional plan setup... This feature will be available soon!",
+    })
+    // In a real implementation, this would redirect to Stripe or payment setup
+    // window.open('https://stripe.com/connect/oauth/authorize', '_blank')
+  }
+
+  const handleContactSales = () => {
+    // Open email client or contact form
+    const subject = encodeURIComponent("Enterprise Plan Inquiry - Bolt Research Hub")
+    const body = encodeURIComponent(`Hello,
+
+I'm interested in learning more about the Enterprise plan for Bolt Research Hub.
+
+Please provide information about:
+- Custom pricing options
+- Enterprise features and benefits
+- Implementation timeline
+- Support and training options
+
+Thank you!`)
+    
+    window.open(`mailto:sales@boltresearchhub.com?subject=${subject}&body=${body}`, '_blank')
+    
+    toast({
+      title: "Contact Sales",
+      description: "Email client opened. We'll get back to you within 24 hours!",
+    })
   }
 
   if (loading) {
@@ -194,59 +227,85 @@ export default function PlanPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Free Plan */}
-                <div className={`p-4 rounded-lg border ${planType === 'free' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-blue-500" />
-                      <span className="font-semibold">Free</span>
-                    </div>
-                    <span className="text-lg font-bold">$0</span>
-                  </div>
-                  <ul className="text-sm space-y-1 text-gray-600">
-                    <li>• 50 literature searches/month</li>
-                    <li>• 20 document summaries/month</li>
-                    <li>• 10 document uploads/month</li>
-                    <li>• 30 AI generations/month</li>
-                    <li className="text-red-500">• No team collaboration</li>
-                  </ul>
-                </div>
+                                 {/* Free Plan */}
+                 <div className={`p-4 rounded-lg border ${planType === 'free' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                   <div className="flex items-center justify-between mb-2">
+                     <div className="flex items-center gap-2">
+                       <Zap className="h-4 w-4 text-blue-500" />
+                       <span className="font-semibold">Free</span>
+                     </div>
+                     <span className="text-lg font-bold">$0</span>
+                   </div>
+                   <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                     <li>• 50 literature searches/month</li>
+                     <li>• 20 document summaries/month</li>
+                     <li>• 10 document uploads/month</li>
+                     <li>• 30 AI generations/month</li>
+                     <li className="text-red-500">• No team collaboration</li>
+                   </ul>
+                   <Button 
+                     variant="outline" 
+                     className="w-full" 
+                     onClick={handleGetStarted}
+                   >
+                     Get Started
+                     <ArrowRight className="h-4 w-4 ml-2" />
+                   </Button>
+                 </div>
 
-                {/* Professional Plan */}
-                <div className={`p-4 rounded-lg border ${planType === 'professional' ? 'border-purple-500 bg-purple-50' : 'border-gray-200'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-purple-500" />
-                      <span className="font-semibold">Professional</span>
-                    </div>
-                    <span className="text-lg font-bold">$29</span>
-                  </div>
-                  <ul className="text-sm space-y-1 text-gray-600">
-                    <li>• 500 literature searches/month</li>
-                    <li>• 200 document summaries/month</li>
-                    <li>• 100 document uploads/month</li>
-                    <li>• 300 AI generations/month</li>
-                    <li>• Team collaboration (up to 10 members)</li>
-                  </ul>
-                </div>
+                                 {/* Professional Plan */}
+                 <div className={`p-4 rounded-lg border ${planType === 'professional' ? 'border-purple-500 bg-purple-50' : 'border-gray-200'} relative`}>
+                   <Badge className="absolute -top-2 right-4 bg-gray-600 text-white text-xs">
+                     Most Popular
+                   </Badge>
+                   <div className="flex items-center justify-between mb-2">
+                     <div className="flex items-center gap-2">
+                       <Crown className="h-4 w-4 text-purple-500" />
+                       <span className="font-semibold">Professional</span>
+                     </div>
+                     <span className="text-lg font-bold">$29</span>
+                   </div>
+                   <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                     <li>• 500 literature searches/month</li>
+                     <li>• 200 document summaries/month</li>
+                     <li>• 100 document uploads/month</li>
+                     <li>• 300 AI generations/month</li>
+                     <li>• Team collaboration (up to 10 members)</li>
+                   </ul>
+                   <Button 
+                     className="w-full" 
+                     onClick={handleStartFreeTrial}
+                   >
+                     Start Free Trial
+                     <ArrowRight className="h-4 w-4 ml-2" />
+                   </Button>
+                 </div>
 
-                {/* Enterprise Plan */}
-                <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-pink-500" />
-                      <span className="font-semibold">Enterprise</span>
-                    </div>
-                    <span className="text-lg font-bold">Custom</span>
-                  </div>
-                  <ul className="text-sm space-y-1 text-gray-600">
-                    <li>• Unlimited literature searches</li>
-                    <li>• Unlimited document summaries</li>
-                    <li>• Unlimited document uploads</li>
-                    <li>• Unlimited AI generations</li>
-                    <li>• Unlimited team collaboration</li>
-                  </ul>
-                </div>
+                                 {/* Enterprise Plan */}
+                 <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
+                   <div className="flex items-center justify-between mb-2">
+                     <div className="flex items-center gap-2">
+                       <Sparkles className="h-4 w-4 text-pink-500" />
+                       <span className="font-semibold">Enterprise</span>
+                     </div>
+                     <span className="text-lg font-bold">Custom</span>
+                   </div>
+                   <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                     <li>• Unlimited literature searches</li>
+                     <li>• Unlimited document summaries</li>
+                     <li>• Unlimited document uploads</li>
+                     <li>• Unlimited AI generations</li>
+                     <li>• Unlimited team collaboration</li>
+                   </ul>
+                   <Button 
+                     variant="outline" 
+                     className="w-full" 
+                     onClick={handleContactSales}
+                   >
+                     Contact Sales
+                     <PhoneCall className="h-4 w-4 ml-2" />
+                   </Button>
+                 </div>
 
                 {!isProfessionalOrHigher() && (
                   <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
@@ -286,8 +345,8 @@ export default function PlanPage() {
                           <span>300 AI generations per month</span>
                         </div>
                         <div className="pt-4">
-                          <Button onClick={handleUpgrade} className="w-full">
-                            Contact Support to Upgrade
+                          <Button onClick={handleStartFreeTrial} className="w-full">
+                            Start Free Trial
                           </Button>
                         </div>
                       </div>
