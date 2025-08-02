@@ -1,5 +1,5 @@
 Flask==2.3.3
-Flask-CORS==4.0.0
+Flask-CORS==6.0.0
 requests==2.31.0
 pygetpapers>=1.2.5
 # Note: pygetpapers requires Java Runtime Environment (JRE)
