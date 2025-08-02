@@ -137,7 +137,9 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const signUp = async (email: string, password: string, metadata?: any) => {
     try {
       setIsLoading(true)
-      const { error } = await supabase.auth.signUp({
+      
+      // First, attempt the auth signup
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -147,11 +149,56 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
       if (error) throw error
 
+      // NEW: Manually create user profile and plan after successful auth signup
+      if (data.user) {
+        console.log("Auth signup successful, creating user profile and plan...");
+        
+        // Try RPC function first
+        const { error: profileError } = await supabase.rpc('create_user_profile_and_plan', {
+          user_id: data.user.id,
+          user_email: email,
+          user_full_name: metadata?.full_name || ''
+        })
+        
+        if (profileError) {
+          console.error('RPC failed, trying API fallback:', profileError);
+          
+          // Fallback to API route
+          try {
+            const response = await fetch('/api/auth/create-user-profile', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                user_id: data.user.id,
+                email: email,
+                full_name: metadata?.full_name || ''
+              })
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('API fallback failed:', errorData);
+            } else {
+              console.log("User profile and plan created via API fallback");
+            }
+          } catch (apiError) {
+            console.error('API fallback error:', apiError);
+            // Don't fail the signup, just log the error and continue
+            // The user can still verify their email and we can create the profile later
+          }
+        } else {
+          console.log("User profile and plan created successfully via RPC");
+        }
+      }
+
       toast({
         title: "Account created",
         description: "Please check your email for verification link",
       })
     } catch (error) {
+      console.error("Signup error:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to sign up",
