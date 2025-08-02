@@ -195,12 +195,12 @@ export default function CollaboratePage() {
         const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
           id: msg.id,
           senderId: msg.sender_id,
-          senderName: msg.sender?.full_name || 'Unknown User',
-          senderAvatar: msg.sender?.avatar_url,
+          senderName: msg.sender_full_name || 'Unknown User',
+          senderAvatar: msg.sender_avatar_url,
           content: msg.content,
           timestamp: msg.created_at,
           teamId: msg.team_id,
-          type: msg.type || 'text'
+          type: msg.message_type || 'text'
         }))
         
         setMessages(formattedMessages)
@@ -420,7 +420,7 @@ export default function CollaboratePage() {
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.description.toLowerCase().includes(searchTerm.toLowerCase()),
   )
-  const teamMessages = messages.filter((m) => m.teamId === selectedTeamId)
+  const teamMessages = messages.filter((m) => m.teamId === selectedTeamId);
 
   // Utility functions
   const getStatusColor = (status: User["status"]) => {

@@ -44,30 +44,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build query
-    let query = supabaseAdmin
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:user_profiles(
-          id,
-          full_name,
-          avatar_url
-        )
-      `)
-      .eq('team_id', teamId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    // Use raw SQL query for better reliability
+    const { data: messages, error } = await supabaseAdmin
+      .rpc('get_team_messages', {
+        p_team_id: teamId,
+        p_limit: limit,
+        p_before: before || null,
+        p_after: after || null
+      });
 
-    // Add pagination
-    if (before) {
-      query = query.lt('created_at', before);
-    } else if (after) {
-      query = query.gt('created_at', after);
-      query = query.order('created_at', { ascending: true });
-    }
 
-    const { data: messages, error } = await query;
 
 
 
@@ -80,7 +66,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Format messages
-    const formattedMessages = (messages || []).map(msg => ({
+    const formattedMessages = (messages || []).map((msg: any) => ({
       id: msg.id,
       content: msg.content,
       type: msg.message_type,
@@ -89,13 +75,15 @@ export async function GET(request: NextRequest) {
       senderId: msg.sender_id,
       senderName: msg.sender_id === 'system' 
         ? 'System' 
-        : msg.sender?.full_name || 'Unknown User',
+        : msg.sender_full_name || 'Unknown User',
       senderAvatar: msg.sender_id === 'system'
         ? null
-        : msg.sender?.avatar_url || null,
+        : msg.sender_avatar_url || null,
       mentions: msg.mentions || [],
       metadata: msg.metadata || {}
     }));
+
+
 
     // If we were fetching older messages (before), reverse to maintain chronological order
     if (before) {
@@ -197,14 +185,7 @@ export async function POST(request: NextRequest) {
         metadata: {},
         created_at: new Date().toISOString()
       })
-      .select(`
-        *,
-        sender:user_profiles(
-          id,
-          full_name,
-          avatar_url
-        )
-      `)
+      .select('*')
       .single();
 
     if (messageError) {

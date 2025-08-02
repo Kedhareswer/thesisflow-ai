@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
 import { EnhancedSearchService } from "@/app/explorer/enhanced-search"
 import type { SearchFilters } from "@/lib/types/common"
+import { createClient } from '@supabase/supabase-js'
+
+// Initialize Supabase client for server-side operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: Request) {
   try {
@@ -18,6 +24,36 @@ export async function GET(request: Request) {
         },
         { status: 400 },
       )
+    }
+
+    // Get user email from authentication header or session
+    let userEmail = null
+    try {
+      // Extract authorization header
+      const authHeader = request.headers.get('authorization')
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        
+        // Verify the JWT token and get user info
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+        
+        if (user && !error) {
+          // Get user email from auth.users table
+          const { data: userData, error: userError } = await supabaseAdmin
+            .from('auth.users')
+            .select('email')
+            .eq('id', user.id)
+            .single()
+          
+          if (userData && !userError) {
+            userEmail = userData.email
+            console.log("API: Found user email for Unpaywall:", userEmail)
+          }
+        }
+      }
+    } catch (authError) {
+      console.warn("API: Could not get user email for Unpaywall:", authError)
+      // Continue without user email - will use fallback
     }
 
     // Parse filters from query parameters
@@ -45,9 +81,15 @@ export async function GET(request: Request) {
 
     try {
       console.log("API: Using Enhanced Search Service with filters:", filters)
+      console.log("API: User email for Unpaywall:", userEmail)
       
-      // Use the enhanced search service
-      const searchResult = await EnhancedSearchService.searchPapers(query.trim(), filters, limit)
+      // Use the enhanced search service with user email
+      const searchResult = await EnhancedSearchService.searchPapers(
+        query.trim(), 
+        filters, 
+        limit,
+        userEmail // Pass user email to the service
+      )
 
       console.log(`API: Enhanced search returned ${searchResult.papers.length} papers from ${searchResult.sources.join(', ')} in ${searchResult.search_time}ms`)
 

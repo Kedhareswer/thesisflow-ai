@@ -19,6 +19,12 @@ import { CitationExportService } from "@/lib/services/citation-export.service"
 import type { ResearchPaper, SearchFilters } from "@/lib/types/common"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useResearchPapers, useResearchContext } from "@/components/research-session-provider"
+import { createClient } from '@supabase/supabase-js'
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface EnhancedLiteratureSearchProps {
   className?: string
@@ -76,7 +82,23 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       if (filters.sort_order) searchParams.set('sort_order', filters.sort_order)
       if (filters.field_of_study && filters.field_of_study.length > 0) searchParams.set('field_of_study', filters.field_of_study.join(','))
 
-      const response = await fetch(`/api/search/papers?${searchParams.toString()}`)
+      // Get the current session token for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      const authToken = session?.access_token
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      
+      // Add authorization header if we have a token
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+      
+      const response = await fetch(`/api/search/papers?${searchParams.toString()}`, {
+        method: 'GET',
+        headers
+      })
       
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`)

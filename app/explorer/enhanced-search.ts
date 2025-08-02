@@ -2,15 +2,73 @@ import { fetchOpenAlexWorks } from './openalex'
 import { searchSemanticScholar, transformSemanticScholarPaper, getCitationData } from './semantic-scholar'
 import type { ResearchPaper, SearchFilters } from '@/lib/types/common'
 
-// Sci-Hub integration for accessing papers
-async function searchSciHub(query: string, limit = 10): Promise<ResearchPaper[]> {
+// Enhanced DOI resolution and paper access using multiple sources
+async function searchSciHub(query: string, limit = 10, userEmail?: string | null): Promise<ResearchPaper[]> {
   try {
-    // Sci-Hub doesn't have a public search API, so we'll use it for DOI resolution
-    // This will be used when we have DOIs from other sources
-    console.log('[SciHub] Sci-Hub integration ready for DOI resolution')
-    return []
+    console.log('[SciHub] Searching for papers with DOI resolution:', query)
+    
+    // Use Unpaywall API for open access paper discovery
+    // Priority: user email > environment variable > fallback
+    const UNPAYWALL_EMAIL = userEmail || process.env.UNPAYWALL_EMAIL || 'research@example.com'
+    console.log('[SciHub] Using email for Unpaywall:', UNPAYWALL_EMAIL)
+    
+    // Search for papers with DOIs that might be accessible
+    const papers: ResearchPaper[] = []
+    const now = new Date()
+    
+    // Try to find DOIs in the query or search for papers with DOIs
+    const doiPattern = /10\.\d{4,}\/[-._;()\/:A-Z0-9]+/i
+    const foundDois = query.match(doiPattern)
+    
+    if (foundDois) {
+      for (const doi of foundDois.slice(0, limit)) {
+        try {
+          // Check Unpaywall for open access status
+          const unpaywallUrl = `https://api.unpaywall.org/v2/${encodeURIComponent(doi)}?email=${encodeURIComponent(UNPAYWALL_EMAIL)}`
+          
+          const response = await fetch(unpaywallUrl)
+          if (response.ok) {
+            const data = await response.json()
+            
+            if (data.is_oa && data.best_oa_location) {
+              papers.push({
+                id: `unpaywall-${doi.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}`,
+                createdAt: now,
+                updatedAt: now,
+                title: data.title || 'Paper with DOI',
+                authors: data.z_authors?.map((author: any) => author.given + ' ' + author.family) || ['Unknown Author'],
+                abstract: data.abstract || 'No abstract available',
+                year: data.year || now.getFullYear(),
+                url: data.best_oa_location.url_for_pdf || data.doi_url,
+                journal: data.host_venue?.name || 'Unknown Journal',
+                doi: doi,
+                pdf_url: data.best_oa_location.url_for_pdf || data.doi_url,
+                source: 'scihub',
+                venue_type: 'journal'
+              })
+            }
+          }
+        } catch (error) {
+          console.warn(`[SciHub] Failed to resolve DOI ${doi}:`, error)
+        }
+      }
+    }
+    
+    // If no DOIs found, try to search for papers that might have open access versions
+    if (papers.length === 0) {
+      // Use Google Scholar-like search to find papers with potential open access
+      const searchTerms = query.split(' ').slice(0, 3).join(' ')
+      const searchQuery = `${searchTerms} "open access" "full text" filetype:pdf`
+      
+      // This would typically use a search API, but for now we'll return empty
+      // as we don't want to implement web scraping without proper permissions
+      console.log('[SciHub] No DOIs found, would search for open access papers')
+    }
+    
+    console.log(`[SciHub] Found ${papers.length} accessible papers`)
+    return papers
   } catch (error) {
-    console.warn('[SciHub] Sci-Hub search failed:', error)
+    console.warn('[SciHub] Search failed:', error)
     return []
   }
 }
@@ -92,16 +150,28 @@ async function searchArxiv(query: string, limit = 10): Promise<ResearchPaper[]> 
   }
 }
 
-// White Rose eTheses integration
+// White Rose eTheses integration with proper OAI-PMH implementation
 async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper[]> {
   try {
-    // White Rose eTheses uses OAI-PMH protocol
-    const url = `https://etheses.whiterose.ac.uk/cgi/oai2?verb=ListRecords&metadataPrefix=oai_dc&set=etheses&from=2020-01-01&until=2024-12-31`
+    console.log('[WhiteRose] Searching for:', query)
+    
+    // Use OAI-PMH ListRecords with proper filtering
+    const baseUrl = 'https://etheses.whiterose.ac.uk/cgi/oai2'
+    const params = new URLSearchParams({
+      verb: 'ListRecords',
+      metadataPrefix: 'oai_dc',
+      set: 'etheses',
+      from: '2020-01-01',
+      until: new Date().toISOString().split('T')[0] // Today's date
+    })
+    
+    const url = `${baseUrl}?${params.toString()}`
+    console.log('[WhiteRose] Fetching from:', url)
     
     const response = await fetch(url, {
       headers: {
-        'Accept': 'application/xml',
-        'User-Agent': 'ResearchHub/1.0 (research@example.com)'
+        'User-Agent': 'ResearchHub/1.0 (research@example.com)',
+        'Accept': 'application/xml'
       }
     })
 
@@ -110,54 +180,77 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
     }
 
     const xml = await response.text()
-    
-    // Parse XML response
     const parser = new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
-    const records = Array.from(doc.getElementsByTagName('record'))
     
-    const now = new Date()
-    const papers: ResearchPaper[] = []
+    // Check for OAI errors
+    const errors = doc.getElementsByTagName('error')
+    if (errors.length > 0) {
+      throw new Error(`OAI Error: ${errors[0].textContent}`)
+    }
 
-    for (const record of records) {
-      const metadata = record.getElementsByTagName('metadata')[0]
+    const records = Array.from(doc.getElementsByTagName('record'))
+    const papers: ResearchPaper[] = []
+    const now = new Date()
+
+    for (const record of records.slice(0, limit)) {
+      const metadata = record.getElementsByTagName('oai_dc:dc')[0]
       if (!metadata) continue
 
-      const dc = metadata.getElementsByTagName('dc')[0]
-      if (!dc) continue
-
       const getText = (tag: string) => {
-        const elements = dc.getElementsByTagName(tag)
-        return elements.length > 0 ? elements[0].textContent?.trim() || '' : ''
+        const elements = metadata.getElementsByTagName(tag)
+        return Array.from(elements).map(el => el.textContent?.trim() || '').filter(Boolean)
       }
 
-      const title = getText('title')
-      const creators = Array.from(dc.getElementsByTagName('creator')).map(el => el.textContent?.trim() || '').filter(Boolean)
-      const description = getText('description')
-      const date = getText('date')
-      const year = date ? parseInt(date.slice(0, 4)) : now.getFullYear()
-      const identifier = getText('identifier')
-      const url = getText('relation')
+      const titles = getText('dc:title')
+      const creators = getText('dc:creator')
+      const descriptions = getText('dc:description')
+      const dates = getText('dc:date')
+      const subjects = getText('dc:subject')
+      const identifiers = getText('dc:identifier')
+      const types = getText('dc:type')
 
-      if (title && title.toLowerCase().includes(query.toLowerCase())) {
-        papers.push({
-          id: `whiterose-${identifier || title.replace(/\s+/g, '-')}`,
-          createdAt: now,
-          updatedAt: now,
-          title,
-          authors: creators,
-          abstract: description || 'No abstract available',
-          year,
-          url: url || '',
-          journal: 'White Rose eTheses',
-          doi: identifier,
-          pdf_url: url,
-          source: 'whiterose',
-          venue_type: 'repository'
-        })
-}
+      // Filter for thesis/dissertation types and match query
+      const isThesis = types.some(type => 
+        type.toLowerCase().includes('thesis') || 
+        type.toLowerCase().includes('dissertation')
+      )
 
-      if (papers.length >= limit) break
+      if (!isThesis) continue
+
+      // Check if any title or subject matches the query
+      const allText = [...titles, ...subjects, ...descriptions].join(' ').toLowerCase()
+      const queryLower = query.toLowerCase()
+      
+      if (!allText.includes(queryLower) && !queryLower.split(' ').some(word => allText.includes(word))) {
+        continue
+      }
+
+      const title = titles[0] || 'Untitled Thesis'
+      const authors = creators
+      const abstract = descriptions[0] || 'No abstract available'
+      const year = dates[0] ? parseInt(dates[0].slice(0, 4)) : now.getFullYear()
+      
+      // Find the thesis URL
+      const thesisUrl = identifiers.find(id => id.includes('etheses.whiterose.ac.uk')) || 
+                       identifiers.find(id => id.startsWith('http')) ||
+                       `https://etheses.whiterose.ac.uk/`
+
+      papers.push({
+        id: `whiterose-${title.replace(/\s+/g, '-')}-${Date.now()}`,
+        createdAt: now,
+        updatedAt: now,
+        title,
+        authors,
+        abstract,
+        year,
+        url: thesisUrl,
+        journal: 'White Rose eTheses',
+        doi: undefined,
+        pdf_url: thesisUrl,
+        source: 'whiterose',
+        venue_type: 'repository'
+      })
     }
 
     console.log(`[WhiteRose] Found ${papers.length} theses`)
@@ -168,15 +261,66 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
   }
 }
 
-// Manchester Phrasebank integration
+// Manchester Phrasebank integration with Google Search API
 async function searchManchesterPhrasebank(query: string, limit = 10): Promise<ResearchPaper[]> {
   try {
-    // Manchester Phrasebank doesn't have a search API, but we can search their content
-    // This would typically involve scraping their website or using their API if available
-    console.log('[ManchesterPhrasebank] Manchester Phrasebank integration ready')
-    return []
+    console.log('[Manchester] Searching for academic phrases related to:', query)
+    
+    // Use Google Custom Search API to find academic writing resources
+    const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY
+    const GOOGLE_SEARCH_CSE_ID = process.env.GOOGLE_SEARCH_CSE_ID
+    
+    if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_CSE_ID) {
+      console.warn('[Manchester] Google Search API credentials not configured')
+      return []
+    }
+    
+    // Search for academic writing resources and phrasebank content
+    const searchQuery = `${query} "academic writing" "phrasebank" site:phrasebank.manchester.ac.uk OR site:academic-englishuk.com OR site:writingcenter.unc.edu`
+    
+    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_SEARCH_API_KEY}&cx=${GOOGLE_SEARCH_CSE_ID}&q=${encodeURIComponent(searchQuery)}&num=${limit}`
+    
+    const response = await fetch(url)
+    
+    if (!response.ok) {
+      throw new Error(`Google Search API returned ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const papers: ResearchPaper[] = []
+    const now = new Date()
+    
+    if (data.items && Array.isArray(data.items)) {
+      for (const item of data.items) {
+        const title = item.title || 'Academic Writing Resource'
+        const snippet = item.snippet || 'No description available'
+        const itemUrl = item.link || ''
+        
+        // Extract domain for source identification
+        const domain = new URL(itemUrl).hostname
+        
+        papers.push({
+          id: `manchester-${title.replace(/\s+/g, '-')}-${Date.now()}`,
+          createdAt: now,
+          updatedAt: now,
+          title,
+          authors: ['Academic Writing Resource'],
+          abstract: snippet,
+          year: now.getFullYear(),
+          url: itemUrl,
+          journal: domain,
+          doi: undefined,
+          pdf_url: itemUrl,
+          source: 'manchester',
+          venue_type: 'other'
+        })
+      }
+    }
+    
+    console.log(`[Manchester] Found ${papers.length} academic writing resources`)
+    return papers
   } catch (error) {
-    console.warn('[ManchesterPhrasebank] Search failed:', error)
+    console.warn('[Manchester] Search failed:', error)
     return []
   }
 }
@@ -201,7 +345,8 @@ export class EnhancedSearchService {
   static async searchPapers(
     query: string, 
     filters: SearchFilters = {},
-    limit = 20
+    limit = 20,
+    userEmail?: string | null
   ): Promise<EnhancedSearchResult> {
     const startTime = Date.now()
     const sources: string[] = []
@@ -213,7 +358,7 @@ export class EnhancedSearchService {
         this.searchOpenAlexWithFilters(query, filters, limit),
         searchArxiv(query, limit),
         searchWhiteRose(query, limit),
-        searchSciHub(query, limit),
+        searchSciHub(query, limit, userEmail), // Pass user email to Sci-Hub
         searchManchesterPhrasebank(query, limit)
       ]
 
