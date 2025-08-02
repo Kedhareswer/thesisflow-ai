@@ -236,21 +236,21 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
                        identifiers.find(id => id.startsWith('http')) ||
                        `https://etheses.whiterose.ac.uk/`
 
-      papers.push({
+        papers.push({
         id: `whiterose-${title.replace(/\s+/g, '-')}-${Date.now()}`,
-        createdAt: now,
-        updatedAt: now,
-        title,
+          createdAt: now,
+          updatedAt: now,
+          title,
         authors,
         abstract,
-        year,
+          year,
         url: thesisUrl,
-        journal: 'White Rose eTheses',
+          journal: 'White Rose eTheses',
         doi: undefined,
         pdf_url: thesisUrl,
-        source: 'whiterose',
-        venue_type: 'repository'
-      })
+          source: 'whiterose',
+          venue_type: 'repository'
+        })
     }
 
     console.log(`[WhiteRose] Found ${papers.length} theses`)
@@ -272,7 +272,7 @@ async function searchManchesterPhrasebank(query: string, limit = 10): Promise<Re
     
     if (!GOOGLE_SEARCH_API_KEY || !GOOGLE_SEARCH_CSE_ID) {
       console.warn('[Manchester] Google Search API credentials not configured')
-      return []
+    return []
     }
     
     // Search for academic writing resources and phrasebank content
