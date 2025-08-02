@@ -12,7 +12,7 @@ function validateApiKey(provider: string, apiKey: string): boolean {
     case 'groq':
       return apiKey.startsWith('gsk_') && apiKey.length >= 20
     case 'gemini':
-      return apiKey.length >= 20 && !apiKey.includes(' ')
+      return apiKey.startsWith('AIza') && apiKey.length >= 35
     case 'anthropic':
       return apiKey.startsWith('sk-ant-') && apiKey.length >= 20
     case 'mistral':
@@ -113,8 +113,10 @@ export async function POST(request: NextRequest) {
     console.log("User API Keys POST: Authenticated user:", user.id)
 
     const { provider, apiKey, testKey } = await request.json()
+    console.log("User API Keys POST: Provider:", provider, "API Key length:", apiKey?.length)
 
     if (!provider || !apiKey) {
+      console.log("User API Keys POST: Missing provider or API key")
       return NextResponse.json(
         { error: "Provider and API key are required", success: false },
         { status: 400 }
@@ -142,11 +144,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate API key format
+    console.log("User API Keys POST: Validating API key format for provider:", provider)
     if (!validateApiKey(provider, apiKey)) {
+      console.log("User API Keys POST: API key validation failed for provider:", provider)
       return NextResponse.json({ 
         error: `Invalid API key format for ${provider}. Please check your key and try again.` 
       }, { status: 400 })
     }
+
+    console.log("User API Keys POST: API key validation passed")
 
     const supabaseAdmin = createSupabaseAdmin()
     if (!supabaseAdmin) {
@@ -157,25 +163,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log("User API Keys POST: Attempting to save API key to database...")
+
     // Insert or update the API key (stored as plain text)
-        const { error: upsertError } = await supabaseAdmin
-          .from('user_api_keys')
-          .upsert({
-            user_id: user.id,
-            provider,
+    const { error: upsertError } = await supabaseAdmin
+      .from('user_api_keys')
+      .upsert({
+        user_id: user.id,
+        provider,
         api_key: apiKey, // Store as plain text
-            is_active: true,
-            last_tested_at: null,
-            test_status: 'valid', // Set as valid for new keys
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'user_id,provider'
-          })
+        is_active: true,
+        last_tested_at: null,
+        test_status: 'valid', // Set as valid for new keys
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,provider'
+      })
 
     if (upsertError) {
       console.error('Error saving API key:', upsertError)
-      return NextResponse.json({ error: 'Failed to save API key' }, { status: 500 })
+      return NextResponse.json({ 
+        error: 'Failed to save API key',
+        details: upsertError.message 
+      }, { status: 500 })
     }
+
+    console.log("User API Keys POST: API key saved successfully")
 
     return NextResponse.json({ 
       success: true, 
