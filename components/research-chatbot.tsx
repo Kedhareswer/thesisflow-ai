@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Info, Brain, BookOpen, Lightbulb, Settings } from 'lucide-react'
+import { Info, Brain, BookOpen, Lightbulb, Settings, Trash2 } from 'lucide-react'
 import { useResearchSession, useResearchContext } from '@/components/research-session-provider'
 import { UserProfileAvatar } from '@/components/user-profile-avatar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/animate-ui/base/toggle-group'
@@ -79,7 +79,8 @@ export function ResearchChatbot({ topic, papers, ideas, context, personality: in
   const { 
     session, 
     addChatMessage, 
-    buildResearchContext
+    buildResearchContext,
+    clearChatHistory
   } = useResearchSession()
   const { hasContext, contextSummary, currentTopic } = useResearchContext()
   const { toast } = useToast()
@@ -288,39 +289,95 @@ Please provide a comprehensive, helpful response that addresses the user's quest
     }
   }
 
+  // Clear chat function
+  const handleClearChat = () => {
+    // Show confirmation dialog
+    if (!confirm('Are you sure you want to clear all chat messages? This action cannot be undone.')) {
+      return
+    }
+    
+    // Clear messages from state
+    setMessages([])
+    
+    // Clear chat history from research session
+    clearChatHistory()
+    
+    // Reset response count
+    setResponseCount(0)
+    
+    toast({
+      title: "Chat Cleared",
+      description: "All chat messages have been cleared.",
+    })
+  }
+
+  // Keyboard shortcut for clearing chat
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+Shift+C to clear chat
+      if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+        event.preventDefault()
+        handleClearChat()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
     <Card className="h-full flex flex-col">
       <CardContent className="flex-1 p-0 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b bg-muted/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Brain className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Research Assistant</h3>
-                <p className="text-sm text-muted-foreground">
-                  Get AI-powered assistance for your research questions
-                </p>
-              </div>
+        {/* Chat Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <MessageCircle className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Research Assistant</h3>
+              <p className="text-sm text-gray-600">Get AI-powered assistance for your research questions.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Message Count and Clear Chat Button */}
+            <div className="flex items-center gap-2">
+              {messages.length > 0 && (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  {messages.length} message{messages.length !== 1 ? 's' : ''}
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearChat}
+                className="text-gray-600 hover:text-red-600 hover:border-red-300 transition-colors"
+                disabled={messages.length === 0}
+                title="Clear all chat messages (Ctrl+Shift+C)"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Clear Chat
+              </Button>
             </div>
             
             {/* Personality Selector */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Personality:</span>
+              <span className="text-sm font-medium text-gray-700">Personality:</span>
               <ToggleGroup
                 value={[selectedPersonality]}
                 onValueChange={(value) => {
-                  if (value && value.length > 0) setSelectedPersonality(value[0])
+                  if (value && value.length > 0) {
+                    setSelectedPersonality(value[0])
+                  }
                 }}
-                className="bg-background border rounded-lg p-1"
+                className="bg-gray-50 rounded-lg p-1"
               >
-                {PERSONALITIES.map(p => (
+                {PERSONALITIES.map((p) => (
                   <ToggleGroupItem key={p.key} value={p.key}>
                     <div className="relative group">
-                      <p.icon 
-                        className="h-4 w-4" 
+                      <p.icon
+                        className="h-4 w-4"
                         style={{ color: `rgb(${p.color.join(',')})` }}
                       />
                       <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
@@ -362,15 +419,27 @@ Please provide a comprehensive, helpful response that addresses the user's quest
           </div>
         )}
 
-        {/* Enhanced Chat Interface */}
-        <div className="flex-1">
+        {/* Chat Interface */}
+        <div className="flex-1 flex flex-col">
           <EnhancedChat
-            messages={messages}
+            className="flex-1"
             onSendMessage={handleSendMessage}
+            messages={messages}
             isLoading={isLoading}
             placeholder="Ask a question about your research..."
             showAgentPlan={true}
           />
+          
+          {/* Empty State */}
+          {messages.length === 0 && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center text-gray-500">
+                <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium mb-2">No messages yet</h3>
+                <p className="text-sm">Start a conversation with your AI research assistant</p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
