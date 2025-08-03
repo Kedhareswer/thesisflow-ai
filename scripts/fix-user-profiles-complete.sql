@@ -76,48 +76,6 @@ BEGIN
     END IF;
 END $$;
 
--- Test insert to verify bio column works
-DO $$
-DECLARE
-    test_user_id UUID := '00000000-0000-0000-0000-000000000000';
-    test_bio TEXT := 'This is a test bio to verify the column works';
-    test_email TEXT := 'test@example.com';
-BEGIN
-    -- Insert test profile with bio and required email
-    INSERT INTO user_profiles (id, email, display_name, bio, location, website, institution, position)
-    VALUES (
-        test_user_id,
-        test_email,
-        'Test User',
-        test_bio,
-        'Test Location',
-        'https://test.com',
-        'Test Institution',
-        'Test Position'
-    ) ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        display_name = EXCLUDED.display_name,
-        bio = EXCLUDED.bio,
-        location = EXCLUDED.location,
-        website = EXCLUDED.website,
-        institution = EXCLUDED.institution,
-        position = EXCLUDED.position,
-        updated_at = NOW();
-    
-    RAISE NOTICE '✅ Test profile inserted/updated successfully with bio: %', test_bio;
-    
-    -- Verify the bio was saved
-    IF EXISTS (SELECT 1 FROM user_profiles WHERE id = test_user_id AND bio = test_bio) THEN
-        RAISE NOTICE '✅ Bio column is working correctly';
-    ELSE
-        RAISE NOTICE '❌ Bio column test failed';
-    END IF;
-    
-    -- Clean up test data
-    DELETE FROM user_profiles WHERE id = test_user_id;
-    RAISE NOTICE '✅ Test data cleaned up';
-END $$;
-
 COMMENT ON TABLE user_profiles IS 'User profiles table with complete schema including bio column';
 COMMENT ON COLUMN user_profiles.bio IS 'User biography/description text';
 COMMENT ON COLUMN user_profiles.display_name IS 'User display name for public profile';

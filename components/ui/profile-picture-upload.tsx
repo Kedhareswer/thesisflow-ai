@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/integrations/supabase/client'
+import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 
 interface ProfilePictureUploadProps {
   currentAvatarUrl?: string
@@ -23,6 +24,7 @@ export function ProfilePictureUpload({
   size = 'lg'
 }: ProfilePictureUploadProps) {
   const { toast } = useToast()
+  const { user } = useSupabaseAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -56,6 +58,15 @@ export function ProfilePictureUpload({
       toast({
         title: "Invalid file",
         description: validationError,
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!user?.email) {
+      toast({
+        title: "Upload failed",
+        description: "User email not found. Please try logging out and back in.",
         variant: "destructive"
       })
       return
@@ -97,11 +108,12 @@ export function ProfilePictureUpload({
 
       const avatarUrl = `${urlData.publicUrl}?v=${Date.now()}`
 
-      // Update user profile with new avatar URL
+      // Update user profile with new avatar URL - include email field
       const { error: updateError } = await supabase
         .from('user_profiles')
         .upsert({
           id: userId,
+          email: user.email, // Include the required email field
           avatar_url: avatarUrl,
           updated_at: new Date().toISOString()
         })
@@ -192,7 +204,7 @@ export function ProfilePictureUpload({
   }, [])
 
   const removeAvatar = async () => {
-    if (!currentAvatarUrl) return
+    if (!currentAvatarUrl || !user?.email) return
 
     try {
       setIsUploading(true)
@@ -205,7 +217,7 @@ export function ProfilePictureUpload({
           .remove([`${userId}/${fileName}`])
       }
 
-      // Update profile to remove avatar URL
+      // Update profile to remove avatar URL - include email field
       const { error } = await supabase
         .from('user_profiles')
         .update({

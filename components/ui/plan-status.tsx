@@ -48,7 +48,7 @@ export function PlanStatus({ className, showDetails = false }: PlanStatusProps) 
       name: "Free",
       icon: <Zap className="h-4 w-4" />,
       color: "bg-blue-500",
-      description: "Limited access to core features"
+      description: "Unlimited AI generations with BYOK (Bring Your Own Key)"
     },
     professional: {
       name: "Professional",
@@ -182,10 +182,14 @@ export function PlanStatus({ className, showDetails = false }: PlanStatusProps) 
                   <DialogHeader>
                     <DialogTitle>Upgrade Your Plan</DialogTitle>
                     <DialogDescription>
-                      Get more features and higher limits with our Professional plan.
+                      Your Free plan includes unlimited AI generations with BYOK. Upgrade to Professional for more features and higher limits.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>Unlimited AI generations (BYOK)</span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
                       <span>500 literature searches per month</span>

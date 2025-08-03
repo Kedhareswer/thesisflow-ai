@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, Mail, Calendar, MapPin, LinkIcon, Save, Edit, BookOpen, Lightbulb, Users, Activity } from "lucide-react"
+import { User, Mail, Calendar, MapPin, LinkIcon, Save, Edit, BookOpen, Lightbulb, Users, Activity, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
@@ -57,6 +57,58 @@ export default function ProfilePage() {
     }
   }, [user])
 
+  // Real-time subscriptions for activity updates
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase
+      .channel('activity_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'documents',
+          filter: `owner_id=eq.${user.id}`
+        },
+        () => {
+          console.log('Documents updated, refreshing activity')
+          loadActivity()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'research_ideas',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          console.log('Research ideas updated, refreshing activity')
+          loadActivity()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_members',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          console.log('Team members updated, refreshing activity')
+          loadActivity()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
   const loadProfile = async () => {
     if (!user) return
 
@@ -95,6 +147,8 @@ export default function ProfilePage() {
     if (!user) return;
     setActivityLoading(true)
     try {
+      console.log("Loading activity data for user:", user.id)
+      
       const [papersRes, ideasRes, collabRes] = await Promise.all([
         supabase
           .from('documents')
@@ -104,18 +158,27 @@ export default function ProfilePage() {
         supabase
           .from('research_ideas')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id),
+          .eq('user_id', user.id)
+          .eq('status', 'active'),
         supabase
           .from('team_members')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id),
       ])
+
+      console.log("Activity data loaded:", {
+        papers: papersRes.count,
+        ideas: ideasRes.count,
+        collaborations: collabRes.count
+      })
+
       setActivity({
         papersExplored: papersRes.count ?? 0,
         ideasGenerated: ideasRes.count ?? 0,
         collaborations: collabRes.count ?? 0,
       })
     } catch (e) {
+      console.error("Error loading activity:", e)
       setActivity({ papersExplored: 0, ideasGenerated: 0, collaborations: 0 })
     } finally {
       setActivityLoading(false)
@@ -356,9 +419,20 @@ export default function ProfilePage() {
           {/* Quick Stats */}
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Activity Overview
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Activity Overview
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadActivity}
+                  disabled={activityLoading}
+                  className="h-6 w-6 p-0"
+                >
+                  <RefreshCw className={`h-4 w-4 ${activityLoading ? 'animate-spin' : ''}`} />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
