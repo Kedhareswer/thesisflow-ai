@@ -63,6 +63,7 @@
     "dotenv": "latest",
     "embla-carousel-react": "latest",
     "file-saver": "latest",
+    "framer-motion": "^12.23.12",
     "fs": "latest",
     "http": "latest",
     "immer": "latest",

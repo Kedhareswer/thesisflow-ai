@@ -82,8 +82,8 @@ export function ResearchSessionProvider({ children }: ResearchSessionProviderPro
       parts.push(`${session.selectedPapers.length} papers`)
     }
     
-    if (session.selectedIdeas.length > 0) {
-      parts.push(`${session.selectedIdeas.length} ideas`)
+    if (session.ideas.length > 0) {
+      parts.push(`${session.ideas.length} ideas`)
     }
     
     if (session.searchSessions.length > 0) {
@@ -91,7 +91,7 @@ export function ResearchSessionProvider({ children }: ResearchSessionProviderPro
     }
     
     return parts.length > 0 ? parts.join(' • ') : 'No research context yet'
-  }, [session.currentTopic, session.selectedPapers.length, session.selectedIdeas.length, session.searchSessions.length])
+  }, [session.currentTopic, session.selectedPapers.length, session.ideas.length, session.searchSessions.length])
 
   // Memoize the bound functions to prevent recreation on every render
   const stableActions = useMemo(() => ({

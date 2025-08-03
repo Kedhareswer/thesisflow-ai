@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { BookOpen, Download, Filter, ExternalLink, FileText, Eye, Calendar, Users, Quote, AlertCircle, Info, Save } from "lucide-react"
+import { BookOpen, Download, Filter, ExternalLink, FileText, Eye, Calendar, Users, Quote, AlertCircle, Info, Save, Crown } from "lucide-react"
 import { SearchInput } from "@/components/common/SearchInput"
 import { SkeletonList } from "@/components/common/SkeletonCard"
 import { useAsync } from "@/lib/hooks/useAsync"
@@ -21,7 +21,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useResearchPapers, useResearchContext } from "@/components/research-session-provider"
 import { createClient } from '@supabase/supabase-js'
 import { useUserPlan } from "@/hooks/use-user-plan"
-import { PlanStatus } from "@/components/ui/plan-status"
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -227,10 +226,34 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
 
   return (
     <div className={className}>
-      {/* Plan Status */}
-      <div className="mb-4">
-        <PlanStatus showDetails={true} />
-      </div>
+      {/* Upgrade Banner - Only show when user has hit limits */}
+      {!canUseFeature('literature_searches') && (
+        <div className="mb-4">
+          <Card className="border-orange-200 bg-orange-50 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <Crown className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">Upgrade to Pro</p>
+                    <p className="text-xs text-orange-700">You've reached your monthly limit. Upgrade for unlimited searches.</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                  onClick={() => window.location.href = '/settings'}
+                >
+                  Upgrade
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
       {/* Research Context Status */}
       {hasContext && (
