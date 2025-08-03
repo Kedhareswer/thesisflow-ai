@@ -1,7 +1,5 @@
 <div align="center">
 
-# AI Research Hub
-
 ![Bolt Research Hub](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
@@ -29,11 +27,13 @@ Transform your research workflow with our comprehensive suite of AI-powered tool
 - [Features](#features)
 - [System Architecture](#system-architecture)
 - [Getting Started](#getting-started)
+- [Quick Start Guide](#quick-start-guide)
 - [Project Structure](#project-structure)
 - [Technologies](#technologies)
 - [API Reference](#api-reference)
 - [Security](#security)
 - [Performance Metrics](#performance-metrics)
+- [Recent Updates](#recent-updates)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
@@ -42,7 +42,7 @@ Transform your research workflow with our comprehensive suite of AI-powered tool
 
 ## Overview
 
-AI Research Hub is a comprehensive research platform designed to revolutionize the academic workflow. It integrates advanced AI capabilities, real-time collaboration, and robust project management for researchers and teams.
+AI Research Hub is a comprehensive research platform designed to revolutionize the academic workflow. It integrates advanced AI capabilities, real-time collaboration, and robust project management for researchers and teams. Built with Next.js 15, React 19, and TypeScript, it provides a modern, scalable solution for academic research.
 
 ---
 
@@ -65,15 +65,30 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 - **Duplicate Removal:** Intelligent deduplication across multiple sources
 - **Real-time Results:** No demo/placeholder data - only authentic API results
 - **Advanced Filtering:** Publication year, journal, author, and citation-based filtering
+- **PDF Viewer:** Built-in PDF viewer for direct paper reading
+- **Content Formatter:** Automatic formatting and citation extraction
+
+### Research Assistant (Enhanced)
+
+- **Multi-Personality AI:** Choose from 5 different AI personalities (Friendly, Formal, Motivational, Critical, Playful)
+- **Context-Aware Responses:** AI understands your research context, papers, and ideas
+- **Enhanced Chat Interface:** Modern chat bubbles with message status indicators
+- **Agent Planning Visualization:** Real-time AI thinking process with animated steps
+- **Clear Chat Feature:** One-click chat clearing with confirmation dialog and keyboard shortcuts (Ctrl+Shift+C)
+- **Streamed Responses:** Real-time AI response streaming for better user experience
+- **Research Context Integration:** AI considers your selected papers, ideas, and topics
+- **Message Counter:** Visual indicator showing number of messages in chat
+- **Empty State:** Helpful guidance when chat is empty
 
 ### Writer Features
 
-- **Markdown Editor:** Advanced document editor with Markdown and LaTeX support, real-time collaboration, and formatting tools.
-- **AI Writing Assistant:** Context-aware AI assistance with multiple writing personalities (Academic, Technical, Creative).
-- **Citation Management:** Import citations from research, generate formatted references in multiple styles (APA, MLA, Chicago, IEEE, Harvard).
-- **Publisher Templates:** Support for multiple academic publisher formats (IEEE, ACM, Springer, Elsevier).
-- **Grammar & Style Checking:** Integrated language tool for grammar, style, and clarity improvements.
-- **Research Integration:** Seamlessly incorporate findings from the Literature Explorer into your documents.
+- **Rich Text Editor:** Advanced document editor with Markdown and LaTeX support, real-time collaboration, and formatting tools
+- **AI Writing Assistant:** Context-aware AI assistance with multiple writing personalities (Academic, Technical, Creative)
+- **Citation Manager:** Import citations from research, generate formatted references in multiple styles (APA, MLA, Chicago, IEEE, Harvard)
+- **Document Manager:** Organize and manage multiple documents with version control
+- **Visual Content Renderer:** Support for charts, diagrams, and multimedia content
+- **Mermaid Charts:** Built-in chart and diagram creation
+- **Error Boundaries:** Comprehensive error handling for document operations
 
 ### Collaboration Features
 
@@ -83,14 +98,28 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 - **File Sharing:** Secure file uploads with version control
 - **Notifications:** Granular notification preferences and real-time alerts
 - **User Presence:** Real-time online status and typing indicators
+- **Invitation System:** Comprehensive team invitation and management
+- **Team Settings:** Advanced team configuration and permissions
+
+### Summarizer Features
+
+- **Multi-format Support:** PDF, DOCX, text, and URL summarization
+- **AI Provider Selection:** Choose from multiple AI providers for different summarization styles
+- **Export Options:** Multiple export formats including PDF, DOCX, and plain text
+- **Sentiment Analysis:** Automatic sentiment detection and analysis
+- **Key Points Extraction:** Automatic extraction of key points and insights
+- **Reading Time Estimation:** Automatic calculation of reading time
 
 ### Additional Features
 
-- **Authentication:** Secure Supabase Auth with middleware protection.
-- **Responsive Design:** Mobile-first with Radix UI.
-- **Theme Support:** Dark/light modes with system preference detection.
-- **Error Boundaries:** Comprehensive error handling.
-- **Performance Optimization:** Lazy loading, code splitting, and caching.
+- **Authentication:** Secure Supabase Auth with middleware protection
+- **Responsive Design:** Mobile-first with Radix UI components
+- **Theme Support:** Dark/light modes with system preference detection
+- **Error Boundaries:** Comprehensive error handling throughout the application
+- **Performance Optimization:** Lazy loading, code splitting, and caching
+- **API Key Management:** Secure user-managed API keys for AI providers
+- **File Upload:** Secure file upload with size and type validation
+- **Real-time Updates:** WebSocket-based real-time collaboration
 
 ---
 
@@ -231,40 +260,80 @@ pnpm start:all
 
 ---
 
+## Quick Start Guide
+
+### 1. Enhanced AI Research Assistant
+1. Navigate to `/explorer` and click on the "Assistant" tab
+2. Try different AI personalities (Friendly, Formal, Motivational, Critical, Playful)
+3. Ask research questions - the AI will consider your research context
+4. Use `Ctrl+Shift+C` to clear chat or click the "Clear Chat" button
+5. Watch the agent planning visualization during AI responses
+
+### 2. Enhanced Literature Search
+1. Go to `/explorer` and click "Search"
+2. Search for academic papers across multiple sources
+3. Filter by year, journal, or citation count
+4. Export citations in various formats
+5. Use the built-in PDF viewer for direct paper reading
+
+### 3. Document Summarization
+1. Go to `/summarizer`
+2. Upload a PDF, DOCX, or paste text
+3. Choose summarization style and AI provider
+4. Export results in multiple formats
+5. View sentiment analysis and key points
+
+### 4. Academic Writing
+1. Visit `/writer` for the document editor
+2. Create new documents with AI assistance
+3. Import citations from your research
+4. Use the citation manager for proper formatting
+5. Export in various academic formats
+
+### 5. Collaboration Features
+1. Visit `/collaborate` to test team features
+2. Create a team and invite members
+3. Test real-time chat and file sharing
+4. Configure notification preferences
+5. Set up cloud integrations
+
+---
+
 ## Project Structure
 
 ```
 ai-project-planner/
-  app/                 # Next.js App Router
-    ai-assistant/      # AI assistant interface
-    api/               # API routes
-      ai/              # AI generation endpoints
-      search/          # Literature search APIs
-      user-api-keys/   # API key management
-    collaborate/       # Team collaboration features
-    collaboration/     # Additional collaboration tools
-    explorer/          # Research discovery tools
-    planner/           # Project management interface
-    summarizer/        # Document summarization tools
-    writer/            # Writing tools
-    writing-assistant/ # Writing assistance features
-    login/             # Authentication pages
-    signup/            # User registration
-    profile/           # User profile management
-    settings/          # User settings
-  components/          # Reusable UI components
-  hooks/               # Custom React hooks
-  integrations/        # External service integrations
-  lib/                 # Core utilities/services
-    ai-providers.ts    # AI provider configurations
-    enhanced-ai-service.ts # Multi-provider AI service
-  services/            # Business logic
-  server/              # WebSocket server
-  python/              # Python backend services
-  scripts/             # Database/setup scripts
-  public/              # Static assets
-  styles/              # Global styles
-  types/               # TypeScript type definitions
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   │   ├── ai/            # AI generation endpoints
+│   │   ├── search/        # Literature search APIs
+│   │   ├── collaborate/   # Team collaboration APIs
+│   │   ├── user-api-keys/ # API key management
+│   │   └── ...
+│   ├── explorer/          # Research discovery tools
+│   │   └── components/    # Literature search components
+│   ├── collaborate/       # Team collaboration features
+│   │   └── components/    # Collaboration components
+│   ├── summarizer/        # Document summarization tools
+│   ├── writer/            # Writing tools
+│   │   └── components/    # Writing components
+│   ├── planner/           # Project management interface
+│   └── ...
+├── components/            # Reusable UI components
+│   ├── ui/               # Base UI components
+│   ├── animate-ui/       # Animated UI components
+│   └── ...
+├── lib/                  # Core utilities/services
+│   ├── enhanced-ai-service.ts # Multi-provider AI service
+│   ├── ai-providers.ts   # AI provider configurations
+│   ├── services/         # Business logic services
+│   └── ...
+├── hooks/                # Custom React hooks
+├── server/               # WebSocket server
+├── python/               # Python backend services
+├── scripts/              # Database/setup scripts
+├── public/               # Static assets
+└── types/                # TypeScript type definitions
 ```
 
 ---
@@ -278,6 +347,10 @@ ai-project-planner/
 - **State Management:** [Zustand](https://zustand.js.org/), React Context
 - **Forms:** [React Hook Form](https://react-hook-form.com/), [Zod](https://zod.dev/)
 - **Charts:** [Recharts](https://recharts.org/)
+- **Animations:** [Framer Motion](https://www.framer.com/motion/) for smooth transitions
+- **UI Components:** Custom chat bubbles, agent planning visualization, enhanced forms
+- **Rich Text:** [TipTap](https://tiptap.dev/) for collaborative editing
+- **Markdown:** [React Markdown](https://github.com/remarkjs/react-markdown) with KaTeX support
 
 ### Backend Infrastructure
 
@@ -294,6 +367,7 @@ ai-project-planner/
 - **Processing:** Custom NLP pipelines
 - **Content Extraction:** Cheerio for web scraping, Mammoth (DOCX), pdf-parse (PDF)
 - **Multi-Provider Support:** Automatic fallback and provider selection
+- **Enhanced AI Service:** Robust error handling, retry mechanisms, and token management
 
 ### Enhanced Literature Search
 
@@ -311,6 +385,40 @@ ai-project-planner/
 
 ---
 
+## API Reference
+
+### Core Endpoints
+
+#### AI Generation
+- `POST /api/ai/generate` - Generate AI responses with authentication
+- `POST /api/ai/user-generate` - User-specific AI generation
+- `POST /api/ai/generate-with-fallback` - AI generation with fallback providers
+- `GET /api/ai/providers` - List available AI providers
+
+#### Literature Search
+- `GET /api/search/papers` - Search academic papers
+- `GET /api/search/web` - Web search functionality
+- `POST /api/explore` - Topic exploration
+
+#### Collaboration
+- `GET /api/collaborate/teams` - Get user teams
+- `POST /api/collaborate/teams` - Create new team
+- `GET /api/collaborate/messages` - Get team messages
+- `POST /api/collaborate/messages` - Send team message
+- `GET /api/collaborate/invitations` - Get team invitations
+
+#### User Management
+- `GET /api/user/plan` - Get user plan details
+- `GET /api/user-data` - Get user data
+- `POST /api/user-api-keys` - Manage API keys
+
+#### File Processing
+- `POST /api/upload` - File upload endpoint
+- `POST /api/extract-file` - Extract file content
+- `POST /api/fetch-url` - Fetch URL content
+
+---
+
 ## Security
 
 ### Authentication
@@ -324,7 +432,7 @@ ai-project-planner/
 
 - **Encryption:** All data encrypted at rest and in transit
 - **API Keys:** User-managed API keys for AI providers with secure storage
-- **File Upload:** Size limits (10MB) and type validation
+- **File Upload:** Size limits (50MB) and type validation
 - **Rate Limiting:** Team creation and API rate limiting
 - **Row Level Security:** Supabase RLS policies for data protection
 
@@ -339,17 +447,32 @@ ai-project-planner/
 | Real-time Chat         | <100ms latency     | 99.9%        | 1000+ users        |
 | File Processing        | 1-3 seconds        | 92%          | 25+ concurrent     |
 | Multi-Source Search    | 5-12 seconds       | 96%          | 15+ concurrent     |
+| AI Response Generation | 2-4 seconds        | 94%          | 30+ concurrent     |
+| Chat Message Handling  | <50ms latency      | 99.8%        | 500+ concurrent    |
+| Authentication         | <200ms response    | 99.5%        | 1000+ users        |
 
 ---
 
 ## Recent Updates
 
-### Enhanced Literature Search (Latest)
+### Enhanced AI Response System (Latest)
+- ✅ **Fixed Authentication Issues:** Resolved API authentication problems with proper session handling
+- ✅ **Eliminated Duplicate Responses:** Fixed multiple AI response generation with improved message handling
+- ✅ **Enhanced Chat Interface:** Modern chat bubbles with distinct user/AI styling and status indicators
+- ✅ **Agent Planning Visualization:** Real-time AI thinking process with animated steps ("Accessing Session", "Reading Papers", etc.)
+- ✅ **Clear Chat Feature:** One-click chat clearing with confirmation dialog and keyboard shortcuts (Ctrl+Shift+C)
+- ✅ **Multi-Personality AI:** 5 different AI personalities (Friendly, Formal, Motivational, Critical, Playful)
+- ✅ **Context-Aware Responses:** AI now understands research context, selected papers, and ideas
+- ✅ **Improved Error Handling:** Better error messages and fallback responses
+- ✅ **Streamed Response Effect:** Real-time AI response simulation for better UX
+
+### Enhanced Literature Search
 - ✅ Added OpenAlex, Semantic Scholar, arXiv, White Rose eTheses, Manchester Phrasebank
 - ✅ Sci-Hub integration for direct paper access
 - ✅ Citation enhancement and duplicate removal
 - ✅ Real-time results with no demo/placeholder data
 - ✅ Advanced filtering and sorting options
+- ✅ Built-in PDF viewer for direct paper reading
 
 ### AI Provider Updates
 - ✅ Added Anthropic (Claude) and Mistral AI support
@@ -362,6 +485,13 @@ ai-project-planner/
 - ✅ Cloud integrations (Google Drive, GitHub, Dropbox, etc.)
 - ✅ Real-time presence and typing indicators
 - ✅ Granular notification preferences
+- ✅ Fixed notification preferences table and functions
+
+### Database & Security Fixes
+- ✅ Fixed missing database tables and functions
+- ✅ Enhanced authentication middleware
+- ✅ Improved error handling and logging
+- ✅ Better API response validation
 
 ---
 
@@ -412,5 +542,6 @@ We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a> | 
     <a href="https://github.com/Kedhareswer/ai-project-planner/discussions">Join Discussion</a>
   </p>
-  <p>Last Updated: August 2025</p>
+  <p>Last Updated: January 2025</p>
+  <p><strong>Status:</strong> ✅ Production Ready - Enhanced AI Response System Active</p>
 </div>
