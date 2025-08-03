@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Lightbulb, TrendingUp, Info, Save } from "lucide-react"
+import { Lightbulb, TrendingUp, Info, Save, CheckSquare, Square } from "lucide-react"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { useToast } from "@/hooks/use-toast"
@@ -37,7 +37,7 @@ class IdeaGenerationService {
     try {
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
       
-      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count, provider, model)
+      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count)
       const ideaObjects = researchResults.ideas
 
       // Convert idea objects to strings
@@ -81,6 +81,9 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   
+  // State for tracking selected ideas from current generation
+  const [selectedGeneratedIdeas, setSelectedGeneratedIdeas] = useState<Set<number>>(new Set())
+  
   // Update topic field when currentTopic changes, but only if different and not currently generating
   useEffect(() => {
     if (currentTopic && currentTopic !== ideaTopic && !ideaGenerationLoading) {
@@ -111,6 +114,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
 
     setIdeaGenerationLoading(true)
     setIdeaGenerationError(null)
+    setSelectedGeneratedIdeas(new Set()) // Reset selected ideas
 
     try {
       // Build enhanced context if using session context
@@ -121,11 +125,13 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
       setIdeaGenerationData(generatedData)
       
-      // Ideas will be added to session via useEffect when data is available
+      // Auto-select all ideas by default
+      const allIndices = new Set(generatedData.ideas.map((_, index) => index))
+      setSelectedGeneratedIdeas(allIndices)
       
       toast({
         title: "Ideas Generated",
-        description: `Generated ${ideaCount} AI-powered research ideas and saved to your research session.`,
+        description: `Generated ${ideaCount} AI-powered research ideas. Select the ones you want to save to your research session.`,
       })
     } catch (error) {
       setIdeaGenerationError(error instanceof Error ? error.message : "Failed to generate ideas. Please try again.")
@@ -139,26 +145,67 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
     }
   }
 
-  // Add ideas to session when generation data is available
-  useEffect(() => {
-    if (ideaGenerationData && ideaGenerationData.ideas) {
-      const newIdeas = ideaGenerationData.ideas.map((ideaText: string) => {
-        // Parse the idea text to extract title and description
-        const lines = ideaText.split('\n')
-        const title = lines[0].replace(/^\d+\.\s*/, '').trim()
-        const description = lines.slice(1).join('\n').trim() || title
-        
-        return {
-          title,
-          description,
-          topic: ideaTopic,
-          source: 'generated' as const
-        }
-      })
-      
-      addIdeas(newIdeas)
+  // Handle idea selection
+  const handleIdeaSelection = (index: number, selected: boolean) => {
+    const newSelected = new Set(selectedGeneratedIdeas)
+    if (selected) {
+      newSelected.add(index)
+    } else {
+      newSelected.delete(index)
     }
-  }, [ideaGenerationData, ideaTopic, addIdeas])
+    setSelectedGeneratedIdeas(newSelected)
+  }
+
+  // Handle select all/deselect all
+  const handleSelectAll = () => {
+    if (!ideaGenerationData) return
+    
+    if (selectedGeneratedIdeas.size === ideaGenerationData.ideas.length) {
+      // Deselect all
+      setSelectedGeneratedIdeas(new Set())
+    } else {
+      // Select all
+      const allIndices = new Set(ideaGenerationData.ideas.map((_, index) => index))
+      setSelectedGeneratedIdeas(allIndices)
+    }
+  }
+
+  // Save selected ideas to session
+  const handleSaveSelectedIdeas = () => {
+    if (!ideaGenerationData || selectedGeneratedIdeas.size === 0) {
+      toast({
+        title: "No Ideas Selected",
+        description: "Please select at least one idea to save to your research session.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const ideasToSave = Array.from(selectedGeneratedIdeas).map(index => {
+      const ideaText = ideaGenerationData.ideas[index]
+      const lines = ideaText.split('\n')
+      const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+      const description = lines.slice(1).join('\n').trim() || title
+      
+      return {
+        title,
+        description,
+        topic: ideaTopic,
+        source: 'generated' as const
+      }
+    })
+    
+    addIdeas(ideasToSave)
+    
+    toast({
+      title: "Ideas Saved",
+      description: `Saved ${ideasToSave.length} selected ideas to your research session.`,
+    })
+    
+    // Clear the current generation data after saving
+    setIdeaGenerationData(null)
+    setSelectedGeneratedIdeas(new Set())
+  }
 
   const extractContent = (data: any): string => {
     if (typeof data === "string") {
@@ -325,10 +372,34 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       {ideaGenerationData && (
         <Card className="mt-6 bg-white shadow-sm border-gray-200">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Generated Research Ideas
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Generated Research Ideas
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="text-xs"
+                >
+                  {selectedGeneratedIdeas.size === ideaGenerationData.ideas.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                <Button
+                  onClick={handleSaveSelectedIdeas}
+                  disabled={selectedGeneratedIdeas.size === 0}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Selected ({selectedGeneratedIdeas.size})
+                </Button>
+              </div>
+            </div>
+            <CardDescription>
+              Select the ideas you want to save to your research session. All ideas are selected by default.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="prose max-w-none">
@@ -338,15 +409,31 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                     const lines = idea.split('\n')
                     const title = lines[0].replace(/^\d+\.\s*/, '').trim()
                     const description = lines.slice(1).join('\n').trim()
+                    const isSelected = selectedGeneratedIdeas.has(index)
                     
                     return (
-                      <div key={index} className="border-l-4 border-blue-200 pl-4 py-2">
-                        <h4 className="font-semibold text-gray-900 mb-2">
-                          {index + 1}. {title}
-                        </h4>
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {description || title}
-                        </p>
+                      <div key={index} className={`border-l-4 pl-4 py-3 rounded-r-md transition-colors ${
+                        isSelected ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-gray-50'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleIdeaSelection(index, checked as boolean)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <h4 className={`font-semibold mb-2 ${
+                              isSelected ? 'text-green-800' : 'text-gray-900'
+                            }`}>
+                              {index + 1}. {title}
+                            </h4>
+                            <p className={`text-sm leading-relaxed ${
+                              isSelected ? 'text-green-700' : 'text-gray-700'
+                            }`}>
+                              {description || title}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )
                   })}
