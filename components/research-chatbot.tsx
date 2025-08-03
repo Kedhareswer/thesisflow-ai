@@ -325,7 +325,7 @@ What specific future direction interests you most?`
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Brain className="h-5 w-5 text-primary" />
               </div>
-              <div>
+    <div>
                 <h3 className="font-semibold">Research Assistant</h3>
                 <p className="text-sm text-muted-foreground">
                   Get AI-powered assistance for your research questions
@@ -333,18 +333,18 @@ What specific future direction interests you most?`
               </div>
             </div>
             
-            {/* Personality Selector */}
+      {/* Personality Selector */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Personality:</span>
-                             <ToggleGroup
-                 value={[selectedPersonality]}
+        <ToggleGroup
+          value={[selectedPersonality]}
                  onValueChange={(value) => {
                    if (value && value.length > 0) setSelectedPersonality(value[0])
                  }}
                  className="bg-background border rounded-lg p-1"
-               >
-                {PERSONALITIES.map(p => (
-                  <ToggleGroupItem key={p.key} value={p.key}>
+        >
+          {PERSONALITIES.map(p => (
+            <ToggleGroupItem key={p.key} value={p.key}>
                     <div className="relative group">
                       <p.icon 
                         className="h-4 w-4" 
@@ -354,22 +354,22 @@ What specific future direction interests you most?`
                         {p.name}
                       </div>
                     </div>
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
           </div>
         </div>
 
         {/* Context Banner */}
-        {hasContext && (
+      {hasContext && (
           <div className="p-4 border-b bg-green-50 border-green-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Brain className="h-4 w-4 text-green-600" />
                 </div>
-                <div>
+              <div>
                   <p className="text-sm font-medium text-green-800">
                     Enhanced Context Available: {contextSummary}
                   </p>
@@ -395,9 +395,9 @@ What specific future direction interests you most?`
             messages={messages}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
-            placeholder="Ask a question about your research..."
+              placeholder="Ask a question about your research..."
             showAgentPlan={true}
-          />
+            />
         </div>
       </CardContent>
     </Card>
