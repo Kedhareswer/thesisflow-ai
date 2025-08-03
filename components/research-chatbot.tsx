@@ -11,6 +11,8 @@ import { IconButton } from '@/components/animate-ui/buttons/icon'
 import { Smile, User as UserIcon, Zap, MessageCircle } from 'lucide-react'
 import { EnhancedChat } from '@/components/ui/enhanced-chat'
 import { ChatMessage } from '@/components/ui/chat-bubble'
+import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase'
 
 interface Personality {
   key: string;
@@ -37,7 +39,7 @@ const PERSONALITIES: Personality[] = [
     description: 'Warm, supportive, and encouraging.',
     icon: Smile,
     color: [34,197,94],
-    systemPrompt: 'You are a warm, supportive, and encouraging assistant. Use friendly language and positive reinforcement.'
+    systemPrompt: 'You are a warm, supportive, and encouraging research assistant. Use friendly language, positive reinforcement, and be genuinely helpful. Always provide actionable insights and encourage further exploration.'
   },
   {
     key: 'formal',
@@ -45,7 +47,7 @@ const PERSONALITIES: Personality[] = [
     description: 'Professional, precise, and neutral.',
     icon: UserIcon,
     color: [59,130,246],
-    systemPrompt: 'You are a professional, precise, and neutral assistant. Use formal language and maintain objectivity.'
+    systemPrompt: 'You are a professional, precise, and neutral research assistant. Use formal academic language, maintain objectivity, and provide well-structured, evidence-based responses.'
   },
   {
     key: 'motivational',
@@ -53,7 +55,7 @@ const PERSONALITIES: Personality[] = [
     description: 'Energetic, inspiring, and positive.',
     icon: Zap,
     color: [245,158,11],
-    systemPrompt: 'You are an energetic, inspiring, and positive assistant. Motivate the user and encourage progress.'
+    systemPrompt: 'You are an energetic, inspiring, and positive research assistant. Motivate the user, highlight opportunities, and encourage innovative thinking. Be enthusiastic about research possibilities.'
   },
   {
     key: 'critical',
@@ -61,7 +63,7 @@ const PERSONALITIES: Personality[] = [
     description: 'Analytical, direct, and honest.',
     icon: Brain,
     color: [239,68,68],
-    systemPrompt: 'You are an analytical, direct, and honest assistant. Provide critical feedback and point out flaws constructively.'
+    systemPrompt: 'You are an analytical, direct, and honest research assistant. Provide critical analysis, identify potential issues, and offer constructive feedback. Be thorough in your evaluation.'
   },
   {
     key: 'playful',
@@ -69,7 +71,7 @@ const PERSONALITIES: Personality[] = [
     description: 'Fun, witty, and creative.',
     icon: MessageCircle,
     color: [168,85,247],
-    systemPrompt: 'You are a fun, witty, and creative assistant. Use playful language and humor when appropriate.'
+    systemPrompt: 'You are a fun, witty, and creative research assistant. Use playful language when appropriate, make research engaging, and spark creative thinking while maintaining academic rigor.'
   },
 ]
 
@@ -80,6 +82,7 @@ export function ResearchChatbot({ topic, papers, ideas, context, personality: in
     buildResearchContext
   } = useResearchSession()
   const { hasContext, contextSummary, currentTopic } = useResearchContext()
+  const { toast } = useToast()
   
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     // Initialize with session chat history or default message
@@ -96,7 +99,7 @@ export function ResearchChatbot({ topic, papers, ideas, context, personality: in
     return [{
       id: `msg-${Date.now()}-welcome-${Math.random().toString(36).substr(2, 9)}`,
       role: 'assistant' as const,
-      content: "Hello! I'm your AI research assistant. I can help you with your research questions, analyze papers and provide insights. What would you like to explore today?",
+      content: "Hello! I'm your AI research assistant. I can help you with your research questions, analyze papers, provide insights, and guide your research journey. What would you like to explore today?",
       timestamp: new Date(),
       status: 'sent' as const
     }]
@@ -105,145 +108,12 @@ export function ResearchChatbot({ topic, papers, ideas, context, personality: in
   const [selectedPersonality, setSelectedPersonality] = useState<string>(initialPersonality?.key || 'friendly')
   const [isLoading, setIsLoading] = useState(false)
   const [useFullContext, setUseFullContext] = useState(true)
+  const [responseCount, setResponseCount] = useState(0)
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null)
 
   const selectedPersonalityData = PERSONALITIES.find(p => p.key === selectedPersonality) || PERSONALITIES[0]
 
-  // Enhanced response generation function
-  const generateEnhancedResponse = (userMessage: string, context: string, personality: Personality): string => {
-    const message = userMessage.toLowerCase()
-    
-    // Research-specific responses
-    if (message.includes('explore') || message.includes('further') || message.includes('more')) {
-      return `Great! Let's dive deeper into your research on deep learning in medical imaging. Based on your selected papers, here are some key areas we can explore:
-
-**1. Technical Approaches**
-- Convolutional Neural Networks (CNNs) for image classification
-- Transfer learning from pre-trained models
-- Attention mechanisms for better feature extraction
-
-**2. Medical Applications**
-- MRI analysis and interpretation
-- CT scan processing
-- X-ray image enhancement
-- Pathology slide analysis
-
-**3. Current Challenges**
-- Limited annotated medical datasets
-- Model interpretability in clinical settings
-- Real-time processing requirements
-- Regulatory compliance for medical AI
-
-**4. Research Opportunities**
-- Multi-modal fusion (combining different imaging types)
-- Federated learning for privacy-preserving collaboration
-- Explainable AI for clinical decision support
-
-Would you like me to elaborate on any of these areas or help you formulate specific research questions?`
-    }
-    
-    if (message.includes('method') || message.includes('approach') || message.includes('technique')) {
-      return `Based on your research context, here are the key methodological approaches in deep learning for medical imaging:
-
-**Convolutional Neural Networks (CNNs)**
-- 2D CNNs for slice-based analysis
-- 3D CNNs for volumetric data processing
-- ResNet, DenseNet, and EfficientNet architectures
-
-**Transfer Learning**
-- Pre-training on large datasets (ImageNet)
-- Fine-tuning on medical datasets
-- Domain adaptation techniques
-
-**Attention Mechanisms**
-- Self-attention for capturing long-range dependencies
-- Cross-attention for multi-modal fusion
-- Vision transformers (ViT) for medical images
-
-**Data Augmentation**
-- Geometric transformations
-- Intensity variations
-- Synthetic data generation
-
-**Evaluation Metrics**
-- Dice coefficient for segmentation
-- AUC-ROC for classification
-- Hausdorff distance for boundary accuracy
-
-Which methodological aspect would you like to explore further?`
-    }
-    
-    if (message.includes('challenge') || message.includes('problem') || message.includes('issue')) {
-      return `Excellent question! Here are the major challenges in deep learning for medical imaging:
-
-**Data-Related Challenges**
-- Limited annotated datasets
-- Class imbalance in medical conditions
-- Privacy and regulatory constraints
-- Multi-institutional data sharing
-
-**Technical Challenges**
-- Model interpretability for clinical use
-- Real-time processing requirements
-- Robustness to image quality variations
-- Generalization across different populations
-
-**Clinical Integration Challenges**
-- Regulatory approval (FDA, CE marking)
-- Clinical workflow integration
-- Physician acceptance and trust
-- Cost-effectiveness validation
-
-**Research Gaps**
-- Long-term model performance
-- Multi-modal data fusion
-- Causal inference in medical AI
-- Ethical considerations
-
-Would you like to focus on any specific challenge for your research?`
-    }
-    
-    if (message.includes('future') || message.includes('trend') || message.includes('direction')) {
-      return `Here are the emerging trends and future directions in deep learning for medical imaging:
-
-**Emerging Technologies**
-- Vision Transformers (ViT) for medical images
-- Contrastive learning for self-supervised training
-- Federated learning for privacy-preserving collaboration
-- Neural architecture search (NAS) for optimal models
-
-**Clinical Applications**
-- Point-of-care diagnostics
-- Personalized medicine
-- Predictive analytics for disease progression
-- Automated treatment planning
-
-**Research Frontiers**
-- Multi-modal fusion (imaging + clinical data)
-- Causal inference in medical AI
-- Explainable AI for clinical decision support
-- Real-time processing for emergency care
-
-**Industry Trends**
-- AI-powered medical devices
-- Cloud-based diagnostic platforms
-- Mobile health applications
-- Integration with electronic health records
-
-What specific future direction interests you most?`
-    }
-    
-    // Default response with personality
-    const personalityResponses = {
-      friendly: `Thank you for your question about "${userMessage}"! I'm excited to help you explore this topic. Based on your research context, I can see you're working on deep learning in medical imaging, which is such a fascinating and impactful area. Let me share some insights that might be helpful for your research journey.`,
-      formal: `I've analyzed your query regarding "${userMessage}" in the context of your research on deep learning in medical imaging. Based on the available literature and your current research focus, I can provide the following insights.`,
-      motivational: `What an excellent question about "${userMessage}"! Your research in deep learning for medical imaging has incredible potential to transform healthcare. Let me share some inspiring insights that could help advance your work.`,
-      critical: `Your question about "${userMessage}" raises important considerations for deep learning in medical imaging. Let me provide a critical analysis of the current state and identify key areas that need attention.`,
-      playful: `Oh, "${userMessage}" - that's a fun one to explore! Your deep learning medical imaging research is like solving a really cool puzzle. Let me share some interesting insights that might spark some creative ideas!`
-    }
-    
-    return personalityResponses[personality.key as keyof typeof personalityResponses] || personalityResponses.friendly
-  }
-
+  // Enhanced context building with better structure
   const buildPromptContext = () => {
     const contextParts: string[] = []
     
@@ -270,18 +140,116 @@ What specific future direction interests you most?`
     return contextParts.join('\n')
   }
 
+  // Enhanced AI response generation with proper service integration
+  const generateAIResponse = async (userMessage: string, context: string, personality: Personality): Promise<string> => {
+    try {
+      // Build comprehensive prompt with system instructions
+      const systemPrompt = `${personality.systemPrompt}
+
+You are a specialized research assistant helping with academic research. Your responses should be:
+- Relevant to the user's research context
+- Well-structured and easy to follow
+- Actionable and specific
+- Engaging and helpful
+- Based on the provided research context when available
+
+Current Research Context:
+${context || 'No specific research context provided'}
+
+Recent conversation history:
+${messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n')}
+
+User's question: ${userMessage}
+
+Please provide a comprehensive, helpful response that addresses the user's question while considering their research context and maintaining the specified personality tone.`
+
+      // Get the current session for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      console.log('AI Response: Session check:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        tokenLength: session?.access_token?.length || 0
+      })
+      
+      if (!session?.access_token) {
+        throw new Error('No authentication session found')
+      }
+
+      console.log('AI Response: Making API call with token length:', session.access_token.length)
+
+      // Call AI service with proper authentication
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          prompt: systemPrompt,
+          maxTokens: 800,
+          temperature: 0.7,
+          personality: personality.key
+        })
+      })
+
+      console.log('AI Response: API response status:', response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('AI Response: API error:', errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('AI Response: API response data:', {
+        success: data.success,
+        hasResponse: !!data.response,
+        responseLength: data.response?.length || 0
+      })
+      
+      if (!data.response) {
+        throw new Error('No response content received')
+      }
+      
+      return data.response
+
+    } catch (error) {
+      console.error('Error generating AI response:', error)
+      
+      // Fallback response based on personality
+      const fallbackResponses = {
+        friendly: `I'd love to help you with "${userMessage}"! While I'm having some technical difficulties right now, I can see you're working on some interesting research. Could you tell me more about what specific aspect you'd like to explore?`,
+        formal: `Regarding your query about "${userMessage}", I'm experiencing some technical limitations at the moment. However, I can assist you with your research. Please provide more details about your specific research question.`,
+        motivational: `What an exciting question about "${userMessage}"! I'm having a brief technical moment, but I'm eager to help you advance your research. What specific area would you like to dive into?`,
+        critical: `Your question about "${userMessage}" is important. I'm currently experiencing technical difficulties, but I can provide analytical assistance. Please specify what aspect of your research you'd like to examine.`,
+        playful: `Oh, "${userMessage}" - that's a fun one! I'm having a little technical hiccup right now, but I'm ready to help you explore this creatively. What's the most interesting part of this for you?`
+      }
+      
+      return fallbackResponses[personality.key as keyof typeof fallbackResponses] || fallbackResponses.friendly
+    }
+  }
+
   const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return
+    
+    // Prevent duplicate processing of the same message
+    if (processingMessage === message || isLoading) {
+      return
+    }
+    
     setIsLoading(true)
+    setProcessingMessage(message)
     
     try {
-             // Add user message to chat
-       const userMessage: ChatMessage = {
-         id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
-         role: 'user',
-         content: message,
-         timestamp: new Date(),
-         status: 'sent'
-       }
+      // Add user message to chat
+      const userMessage: ChatMessage = {
+        id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
+        role: 'user',
+        content: message,
+        timestamp: new Date(),
+        status: 'sent'
+      }
       
       setMessages(prev => [...prev, userMessage])
       
@@ -290,28 +258,33 @@ What specific future direction interests you most?`
       
       // Build context for AI
       const context = buildPromptContext()
-      const personalityPrompt = selectedPersonalityData.systemPrompt
       
-             // Enhanced AI response generation
-       setTimeout(() => {
-         const aiResponse = generateEnhancedResponse(message, context, selectedPersonalityData)
-         
-         const aiMessage: ChatMessage = {
-           id: `msg-${Date.now()}-ai-${Math.random().toString(36).substr(2, 9)}`,
-           role: 'assistant',
-           content: aiResponse,
-           timestamp: new Date(),
-           status: 'sent'
-         }
-         
-         setMessages(prev => [...prev, aiMessage])
-         addChatMessage('assistant', aiResponse)
-         setIsLoading(false)
-       }, 2000)
+      // Generate AI response
+      const aiResponse = await generateAIResponse(message, context, selectedPersonalityData)
+      
+      // Create unique AI message ID to prevent duplicates
+      const aiMessage: ChatMessage = {
+        id: `msg-${Date.now()}-ai-${responseCount}-${Math.random().toString(36).substr(2, 9)}`,
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date(),
+        status: 'sent'
+      }
+      
+      setMessages(prev => [...prev, aiMessage])
+      addChatMessage('assistant', aiResponse)
+      setResponseCount(prev => prev + 1)
       
     } catch (error) {
       console.error('Error sending message:', error)
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsLoading(false)
+      setProcessingMessage(null)
     }
   }
 
@@ -325,7 +298,7 @@ What specific future direction interests you most?`
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Brain className="h-5 w-5 text-primary" />
               </div>
-    <div>
+              <div>
                 <h3 className="font-semibold">Research Assistant</h3>
                 <p className="text-sm text-muted-foreground">
                   Get AI-powered assistance for your research questions
@@ -333,18 +306,18 @@ What specific future direction interests you most?`
               </div>
             </div>
             
-      {/* Personality Selector */}
+            {/* Personality Selector */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Personality:</span>
-        <ToggleGroup
-          value={[selectedPersonality]}
-                 onValueChange={(value) => {
-                   if (value && value.length > 0) setSelectedPersonality(value[0])
-                 }}
-                 className="bg-background border rounded-lg p-1"
-        >
-          {PERSONALITIES.map(p => (
-            <ToggleGroupItem key={p.key} value={p.key}>
+              <ToggleGroup
+                value={[selectedPersonality]}
+                onValueChange={(value) => {
+                  if (value && value.length > 0) setSelectedPersonality(value[0])
+                }}
+                className="bg-background border rounded-lg p-1"
+              >
+                {PERSONALITIES.map(p => (
+                  <ToggleGroupItem key={p.key} value={p.key}>
                     <div className="relative group">
                       <p.icon 
                         className="h-4 w-4" 
@@ -354,22 +327,22 @@ What specific future direction interests you most?`
                         {p.name}
                       </div>
                     </div>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           </div>
         </div>
 
         {/* Context Banner */}
-      {hasContext && (
+        {hasContext && (
           <div className="p-4 border-b bg-green-50 border-green-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Brain className="h-4 w-4 text-green-600" />
                 </div>
-              <div>
+                <div>
                   <p className="text-sm font-medium text-green-800">
                     Enhanced Context Available: {contextSummary}
                   </p>
@@ -395,9 +368,9 @@ What specific future direction interests you most?`
             messages={messages}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
-              placeholder="Ask a question about your research..."
+            placeholder="Ask a question about your research..."
             showAgentPlan={true}
-            />
+          />
         </div>
       </CardContent>
     </Card>

@@ -44,18 +44,8 @@ export function EnhancedChat({
   // Handle thinking process completion
   const handleThinkingComplete = () => {
     setIsThinking(false)
-    // Here you would typically start the actual AI response
-    // For now, we'll simulate a response
-    setTimeout(() => {
-      const aiMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: "Thank you for your question! I've analyzed your research context and can provide you with comprehensive insights. Based on your papers and ideas, I can see you're working on deep learning in medical imaging. This is a fascinating area with significant potential for improving healthcare outcomes.",
-        timestamp: new Date(),
-        status: 'sent'
-      }
-      setLocalMessages(prev => [...prev, aiMessage])
-    }, 1000)
+    // The parent component will handle AI response generation
+    // No need to add a hardcoded message here
   }
 
   const handleSendMessage = async () => {
