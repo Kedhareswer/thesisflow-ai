@@ -6,11 +6,20 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, CheckCircle2, Clock, Target, TrendingUp, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon } from "lucide-react"
+import { Calendar, CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon, Activity } from "lucide-react"
 import { ProjectCalendar } from "./components/project-calendar"
 import { GanttChart } from "./components/gantt-chart"
 import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
+import { AnalyticsService, AnalyticsData } from "@/lib/services/analytics.service"
+import { 
+  TaskStatusDistribution, 
+  ProjectProgress, 
+  TaskPriorityAnalysis, 
+  RecentActivity, 
+  PerformanceInsights, 
+  AdvancedAnalytics 
+} from "@/components/planner/analytics-charts"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -45,6 +54,9 @@ export default function PlannerPage() {
   const [newComment, setNewComment] = useState("")
   const [users, setUsers] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d')
   const { user } = useSupabaseAuth()
 
   const userId = user?.id || ""
@@ -79,9 +91,28 @@ export default function PlannerPage() {
     setLoading(false)
   }
 
+  const fetchAnalyticsData = async () => {
+    if (!userId) return
+    
+    setAnalyticsLoading(true)
+    try {
+      const analyticsService = new AnalyticsService(userId)
+      const data = await analyticsService.getAnalyticsData(timeRange)
+      setAnalyticsData(data)
+    } catch (error) {
+      console.error('Error fetching analytics data:', error)
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    fetchAnalyticsData()
+  }, [userId, timeRange])
 
   useEffect(() => {
     // Subscribe to real-time updates for all projects
@@ -579,331 +610,234 @@ export default function PlannerPage() {
                 <p className="text-gray-600">Comprehensive insights into your research productivity and project performance</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Last 30 Days
-                </Button>
-                <Button variant="outline" size="sm">
+                <Select value={timeRange} onValueChange={(value: '7d' | '30d' | '90d') => setTimeRange(value)}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">Last 7 Days</SelectItem>
+                    <SelectItem value="30d">Last 30 Days</SelectItem>
+                    <SelectItem value="90d">Last 90 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={fetchAnalyticsData}
+                  disabled={analyticsLoading}
+                >
                   <Filter className="h-4 w-4 mr-2" />
-                  Filter
+                  {analyticsLoading ? 'Loading...' : 'Refresh'}
                 </Button>
               </div>
             </div>
 
-            {/* Key Metrics Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="relative overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-blue-100 p-2">
-                      <Target className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
-                      <p className="text-sm text-gray-600">Active Projects</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-green-600">+12% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="relative overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-green-100 p-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {tasks.filter((t) => t.status === "completed").length}
-                      </p>
-                      <p className="text-sm text-gray-600">Completed Tasks</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-green-600">+8% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="relative overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-orange-100 p-2">
-                      <Clock className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {tasks.filter((t) => t.status === "todo").length}
-                      </p>
-                      <p className="text-sm text-gray-600">Pending Tasks</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm text-orange-600">+5% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="relative overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-purple-100 p-2">
-                      <TrendingUp className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / Math.max(projects.length, 1))}%
-                      </p>
-                      <p className="text-sm text-gray-600">Avg Progress</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-purple-500" />
-                    <span className="text-sm text-purple-600">+15% from last month</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Charts and Analytics */}
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Task Status Distribution */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Task Status Distribution
-                  </CardTitle>
-                  <CardDescription>Breakdown of tasks by their current status</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      { status: "completed", count: tasks.filter(t => t.status === "completed").length, color: "bg-green-500" },
-                      { status: "in-progress", count: tasks.filter(t => t.status === "in-progress").length, color: "bg-yellow-500" },
-                      { status: "todo", count: tasks.filter(t => t.status === "todo").length, color: "bg-gray-500" }
-                    ].map((item) => {
-                      const total = tasks.length || 1;
-                      const percentage = Math.round((item.count / total) * 100);
-                      return (
-                        <div key={item.status} className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="capitalize font-medium">{item.status.replace('-', ' ')}</span>
-                            <span className="text-gray-600">{item.count} tasks ({percentage}%)</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full transition-all duration-300 ${item.color}`}
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
+            {analyticsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <span className="text-gray-600">Loading analytics...</span>
+                </div>
+              </div>
+            ) : analyticsData ? (
+              <>
+                {/* Key Metrics Cards */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-lg bg-blue-100 p-2">
+                          <Target className="h-5 w-5 text-blue-600" />
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Project Progress Overview */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Project Progress Overview
-                  </CardTitle>
-                  <CardDescription>Progress tracking across all active projects</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {projects.slice(0, 5).map((project) => (
-                      <div key={project.id} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium truncate">{project.title}</span>
-                          <span className="text-gray-600">{project.progress}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="h-2 rounded-full transition-all duration-300 bg-blue-500"
-                            style={{ width: `${project.progress}%` }}
-                          />
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{analyticsData.activeProjects}</p>
+                          <p className="text-sm text-gray-600">Active Projects</p>
                         </div>
                       </div>
-                    ))}
-                    {projects.length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>No projects to display</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Detailed Analytics */}
-            <div className="grid gap-6 md:grid-cols-3">
-              {/* Task Priority Analysis */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Flag className="h-5 w-5" />
-                    Task Priority Analysis
-                  </CardTitle>
-                  <CardDescription>Tasks categorized by priority level</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      { priority: "high", count: tasks.filter(t => t.priority === "high").length, color: "bg-red-500" },
-                      { priority: "medium", count: tasks.filter(t => t.priority === "medium").length, color: "bg-yellow-500" },
-                      { priority: "low", count: tasks.filter(t => t.priority === "low").length, color: "bg-green-500" }
-                    ].map((item) => (
-                      <div key={item.priority} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                          <span className="text-sm capitalize">{item.priority}</span>
-                        </div>
-                        <span className="text-sm font-medium">{item.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Recent Activity
-                  </CardTitle>
-                  <CardDescription>Latest updates and changes</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {tasks.slice(0, 3).map((task) => (
-                      <div key={task.id} className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{task.title}</p>
-                          <p className="text-xs text-gray-500">
-                            {task.status} • {task.priority} priority
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {tasks.length === 0 && (
-                      <div className="text-center py-4 text-gray-500">
-                        <p className="text-sm">No recent activity</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Performance Insights */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Performance Insights
-                  </CardTitle>
-                  <CardDescription>Key performance indicators</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Completion Rate</span>
-                      <span className="text-sm font-medium">
-                        {tasks.length > 0 
-                          ? Math.round((tasks.filter(t => t.status === "completed").length / tasks.length) * 100)
-                          : 0}%
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Avg Task Duration</span>
-                      <span className="text-sm font-medium">3.2 days</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Productivity Score</span>
-                      <span className="text-sm font-medium">85/100</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Advanced Analytics */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Advanced Analytics
-                </CardTitle>
-                <CardDescription>Detailed performance metrics and trends</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {/* Time-based Analytics */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold">Time-based Analytics</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm">Tasks Created This Week</span>
-                        <span className="text-sm font-medium">{tasks.filter(t => {
-                          const taskDate = new Date(t.created_at);
-                          const weekAgo = new Date();
-                          weekAgo.setDate(weekAgo.getDate() - 7);
-                          return taskDate > weekAgo;
-                        }).length}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm">Tasks Completed This Week</span>
-                        <span className="text-sm font-medium">{tasks.filter(t => {
-                          const taskDate = new Date(t.updated_at);
-                          const weekAgo = new Date();
-                          weekAgo.setDate(weekAgo.getDate() - 7);
-                          return taskDate > weekAgo && t.status === "completed";
-                        }).length}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm">Average Project Duration</span>
-                        <span className="text-sm font-medium">14.5 days</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Efficiency Metrics */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold">Efficiency Metrics</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm">Task Completion Rate</span>
-                        <span className="text-sm font-medium">
-                          {tasks.length > 0 
-                            ? Math.round((tasks.filter(t => t.status === "completed").length / tasks.length) * 100)
-                            : 0}%
+                      <div className="mt-4 flex items-center gap-2">
+                        {analyticsData.projectsTrend >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className={`text-sm ${analyticsData.projectsTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {analyticsData.projectsTrend >= 0 ? '+' : ''}{analyticsData.projectsTrend}% from last period
                         </span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm">On-time Delivery</span>
-                        <span className="text-sm font-medium">92%</span>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-lg bg-green-100 p-2">
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{analyticsData.completedTasks}</p>
+                          <p className="text-sm text-gray-600">Completed Tasks</p>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm">Team Productivity</span>
-                        <span className="text-sm font-medium">87/100</span>
+                      <div className="mt-4 flex items-center gap-2">
+                        {analyticsData.completedTasksTrend >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className={`text-sm ${analyticsData.completedTasksTrend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {analyticsData.completedTasksTrend >= 0 ? '+' : ''}{analyticsData.completedTasksTrend}% from last period
+                        </span>
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-lg bg-orange-100 p-2">
+                          <Clock className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{analyticsData.pendingTasks}</p>
+                          <p className="text-sm text-gray-600">Pending Tasks</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center gap-2">
+                        {analyticsData.pendingTasksTrend >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-orange-500" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-green-500" />
+                        )}
+                        <span className={`text-sm ${analyticsData.pendingTasksTrend >= 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                          {analyticsData.pendingTasksTrend >= 0 ? '+' : ''}{analyticsData.pendingTasksTrend}% from last period
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-lg bg-purple-100 p-2">
+                          <TrendingUp className="h-5 w-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-900">{analyticsData.averageProgress}%</p>
+                          <p className="text-sm text-gray-600">Avg Progress</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center gap-2">
+                        {analyticsData.progressTrend >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-purple-500" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className={`text-sm ${analyticsData.progressTrend >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+                          {analyticsData.progressTrend >= 0 ? '+' : ''}{analyticsData.progressTrend}% from last period
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
+
+                {/* Charts and Analytics */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Task Status Distribution */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5" />
+                        Task Status Distribution
+                      </CardTitle>
+                      <CardDescription>Breakdown of tasks by their current status</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <TaskStatusDistribution data={analyticsData.taskStatusDistribution} />
+                    </CardContent>
+                  </Card>
+
+                  {/* Project Progress Overview */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5" />
+                        Project Progress Overview
+                      </CardTitle>
+                      <CardDescription>Progress tracking across all active projects</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ProjectProgress data={analyticsData.projectProgress} />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Task Priority Analysis and Recent Activity */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Flag className="h-5 w-5" />
+                        Task Priority Analysis
+                      </CardTitle>
+                      <CardDescription>Tasks by priority level</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <TaskPriorityAnalysis data={analyticsData.taskPriorityAnalysis} />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="h-5 w-5" />
+                        Recent Activity
+                      </CardTitle>
+                      <CardDescription>Latest updates and changes</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <RecentActivity data={analyticsData.recentActivity} />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Performance Insights and Advanced Analytics */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5" />
+                        Performance Insights
+                      </CardTitle>
+                      <CardDescription>Key performance indicators</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <PerformanceInsights data={analyticsData.performanceInsights} />
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5" />
+                        Advanced Analytics
+                      </CardTitle>
+                      <CardDescription>Detailed performance metrics and trends</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <AdvancedAnalytics data={analyticsData.advancedAnalytics} />
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Analytics Data</h3>
+                  <p className="text-gray-600">Create some projects and tasks to see your analytics here.</p>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

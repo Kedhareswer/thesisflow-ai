@@ -86,7 +86,14 @@ interface ChatMessage {
 
 export default function CollaboratePage() {
   // Plan system
-  const { canUseFeature, isProfessionalOrHigher, refreshPlanData, planData, getUsageForFeature } = useUserPlan()
+  const { canUseFeature, isProfessionalOrHigher, refreshPlanData, planData, getUsageForFeature, loading: planLoading, isPlanDataReady } = useUserPlan()
+  
+  // Debug logging
+  console.log('Collaborate Page - Plan Data:', planData)
+  console.log('Collaborate Page - Plan Loading:', planLoading)
+  console.log('Collaborate Page - Plan Data Ready:', isPlanDataReady())
+  console.log('Collaborate Page - Can Use Team Members:', canUseFeature('team_members'))
+  console.log('Collaborate Page - Is Professional or Higher:', isProfessionalOrHigher())
   
   // State management
   const [isLoading, setIsLoading] = useState(true)
@@ -282,11 +289,31 @@ export default function CollaboratePage() {
   const handleCreateTeam = async () => {
     if (!newTeam.name.trim()) return
 
+    console.log('Creating team - Initial plan data:', planData)
+    console.log('Creating team - Plan loading:', planLoading)
+    console.log('Creating team - Can use team_members before refresh:', canUseFeature('team_members'))
+
+    // Wait for plan data to be ready
+    if (!isPlanDataReady()) {
+      console.log('Creating team - Waiting for plan data to be ready...')
+      // Wait for plan data to load
+      let attempts = 0
+      while (!isPlanDataReady() && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        attempts++
+        console.log(`Creating team - Plan data ready attempt ${attempts}:`, isPlanDataReady())
+      }
+    }
+
     // Force refresh plan data to ensure we have the latest data
     await refreshPlanData()
 
+    console.log('Creating team - Plan data after refresh:', planData)
+    console.log('Creating team - Can use team_members after refresh:', canUseFeature('team_members'))
+
     // Check plan restrictions
     if (!canUseFeature('team_members')) {
+      console.log('Creating team - Plan restriction hit!')
       toast({
         title: "Plan Restriction",
         description: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to create teams.",
@@ -560,22 +587,22 @@ export default function CollaboratePage() {
                       onClick={() => setIsCreateTeamOpen(true)}
                       className="w-full justify-start gap-3 h-12"
                       variant="outline"
-                      disabled={!canUseFeature('team_members')}
+                      disabled={!canUseFeature('team_members') || planLoading}
                       title={!canUseFeature('team_members') ? "Upgrade to Professional plan to create teams" : ""}
                     >
                       <Plus className="h-4 w-4" />
-                      Create Team
+                      {planLoading ? 'Loading...' : 'Create Team'}
                       {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
                     </Button>
                     <Button
                       onClick={() => setIsInviteDialogOpen(true)}
                       className="w-full justify-start gap-3 h-12"
                       variant="outline"
-                      disabled={!selectedTeam || !canUseFeature('team_members')}
+                      disabled={!selectedTeam || !canUseFeature('team_members') || planLoading}
                       title={!canUseFeature('team_members') ? "Upgrade to Professional plan to invite team members" : ""}
                     >
                       <UserPlus className="h-4 w-4" />
-                      Invite Member
+                      {planLoading ? 'Loading...' : 'Invite Member'}
                       {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
                     </Button>
                     <Button

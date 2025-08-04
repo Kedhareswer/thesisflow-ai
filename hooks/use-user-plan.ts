@@ -105,13 +105,17 @@ export function useUserPlan() {
   }, [user, session, fetchPlanData, toast])
 
   const canUseFeature = useCallback((feature: string): boolean => {
+    // If plan data is still loading, we can't make a determination yet
+    if (loading) return false
+    
+    // If no plan data and not loading, assume free plan restrictions
     if (!planData) return false
     
     const usageItem = planData.usage.find(item => item.feature === feature)
     if (!usageItem) return false
     
     return usageItem.is_unlimited || usageItem.remaining > 0
-  }, [planData])
+  }, [planData, loading])
 
   const getUsageForFeature = useCallback((feature: string): UsageItem | null => {
     if (!planData) return null
@@ -131,6 +135,10 @@ export function useUserPlan() {
   const isEnterprise = useCallback((): boolean => {
     return getPlanType() === 'enterprise'
   }, [getPlanType])
+
+  const isPlanDataReady = useCallback((): boolean => {
+    return !loading && planData !== null
+  }, [loading, planData])
 
   // Setup real-time subscription for usage updates
   useEffect(() => {
@@ -208,5 +216,6 @@ export function useUserPlan() {
     getPlanType,
     isProfessionalOrHigher,
     isEnterprise,
+    isPlanDataReady,
   }
 } 
