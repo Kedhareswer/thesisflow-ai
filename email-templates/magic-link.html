@@ -3,86 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Magic Link - Bolt Research Hub</title>
+    <title>Your Magic Link - Bolt Researcher Hub</title>
     <style>
-        * {
+        /* General Styles */
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif;
+            background-color: #e0e6ee; /* Fallback background */
         }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8fafc;
+        table {
+            border-spacing: 0;
         }
-        
-        .container {
-            max-width: 600px;
+        td {
+            padding: 0;
+        }
+        img {
+            border: 0;
+            width: 100%;
+            max-width: 100%;
+        }
+        .wrapper {
+            width: 100%;
+            table-layout: fixed;
+            background-color: #e0e6ee;
+            /* Dynamic Gradient Background */
+            background-image: linear-gradient(45deg, #d5ddec 0%, #f0f2f5 100%);
+            padding: 60px 20px;
+        }
+        .main {
             margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 12px;
+            width: 100%;
+            max-width: 600px;
+            border-spacing: 0;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            /* Glassmorphism Effect */
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); /* For Safari */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
         }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-        }
-        
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-        
-        .tagline {
-            font-size: 16px;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-        
         .content {
-            padding: 40px 30px;
+            padding: 40px;
         }
-        
-        .title {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-        
-        .subtitle {
-            font-size: 16px;
-            color: #6b7280;
-            margin-bottom: 32px;
-            text-align: center;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .button {
+            background-image: linear-gradient(45deg, #4b6cb7 0%, #182848 100%);
+            color: #ffffff;
             text-decoration: none;
             padding: 16px 32px;
-            border-radius: 8px;
-            font-weight: 600;
+            border-radius: 10px;
+            font-weight: bold;
+            display: inline-block;
             font-size: 16px;
-            text-align: center;
-            margin: 24px 0;
-            transition: transform 0.2s ease;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
-        
-        .cta-button:hover {
+        .button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
         }
-        
+        .footer {
+            padding: 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #5a6a85;
+        }
+        .footer a {
+            color: #182848;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 20px 0;
+            color: #1c2a48;
+            line-height: 1.2;
+        }
+        p {
+            font-size: 17px;
+            line-height: 26px;
+            margin: 0 0 25px 0;
+            color: #33425e;
+        }
         .security-note {
             background-color: #fef3c7;
             border: 1px solid #f59e0b;
@@ -92,7 +97,6 @@
             font-size: 14px;
             color: #92400e;
         }
-        
         .info-box {
             background-color: #f0f9ff;
             border: 1px solid #0ea5e9;
@@ -102,107 +106,105 @@
             font-size: 14px;
             color: #0c4a6e;
         }
-        
-        .footer {
-            background-color: #f8fafc;
-            padding: 24px 30px;
-            text-align: center;
-            border-top: 1px solid #e5e7eb;
+        ul {
+            margin: 0;
+            padding: 0;
         }
-        
-        .footer-text {
+        li {
+            list-style: none;
+            padding-bottom: 10px;
+            margin-left: 15px;
+            color: #33425e;
             font-size: 14px;
-            color: #6b7280;
-            margin-bottom: 16px;
+            line-height: 1.6;
         }
-        
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 24px;
+        li:before {
+            content: "⚡️";
+            margin-right: 8px;
         }
-        
-        .footer-links a {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .footer-links a:hover {
-            text-decoration: underline;
-        }
-        
-        .divider {
-            height: 1px;
-            background-color: #e5e7eb;
-            margin: 32px 0;
-        }
-        
-        @media (max-width: 600px) {
-            .container {
-                margin: 0;
-                border-radius: 0;
-            }
-            
-            .header, .content, .footer {
-                padding: 24px 20px;
-            }
-            
-            .title {
-                font-size: 20px;
-            }
-            
-            .cta-button {
-                display: block;
-                width: 100%;
-            }
-        }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">⚡ Bolt Research Hub</div>
-            <div class="tagline">AI-Powered Research & Collaboration Platform</div>
-        </div>
-        
-        <div class="content">
-            <h1 class="title">Your Magic Link is Here!</h1>
-            <p class="subtitle">Click the button below to securely log in to your Bolt Research Hub account.</p>
-            
-            <div style="text-align: center;">
-                <a href="{{ .ConfirmationURL }}" class="cta-button">
-                    Sign In to Bolt Research Hub
-                </a>
-            </div>
-            
-            <div class="security-note">
-                <strong>🔒 Security Note:</strong> This magic link will expire in 1 hour for your security. If you didn't request this login, you can safely ignore this email.
-            </div>
-            
-            <div class="info-box">
-                <strong>💡 What is a Magic Link?</strong><br>
-                A magic link is a secure, passwordless way to sign in to your account. Simply click the button above and you'll be automatically logged in - no password required!
-            </div>
-            
-            <div class="divider"></div>
-            
-            <p style="text-align: center; color: #6b7280; font-size: 14px;">
-                Having trouble? Copy and paste this link into your browser:<br>
-                <a href="{{ .ConfirmationURL }}" style="color: #667eea; word-break: break-all;">{{ .ConfirmationURL }}</a>
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p class="footer-text">
-                You're receiving this email because you requested a magic link to sign in to Bolt Research Hub.
-            </p>
-            <div class="footer-links">
-                <a href="{{ .SiteURL }}">Visit Website</a>
-                <a href="{{ .SiteURL }}/support">Support</a>
-                <a href="{{ .SiteURL }}/privacy">Privacy Policy</a>
-            </div>
-        </div>
-    </div>
+    <center class="wrapper">
+        <table class="main" width="100%">
+            <!-- Hero Illustration -->
+            <tr>
+                <td>
+                    <!-- Free, high-quality image from Pexels.com -->
+                    <img src="https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="A person working on a futuristic laptop interface" style="display: block;">
+                </td>
+            </tr>
+            <tr>
+                <td class="content">
+                    <table width="100%">
+                        <!-- Logo -->
+                        <tr>
+                            <td style="text-align: center; padding-bottom: 30px;">
+                                 <!-- Professional and relevant free-to-use logo -->
+                                <img src="https://i.imgur.com/gL5gI8q.png" alt="Bolt Researcher Hub Logo" style="max-width: 70px; border-radius: 50%;">
+                            </td>
+                        </tr>
+                        <!-- Welcome Text -->
+                        <tr>
+                            <td style="text-align: center;">
+                                <h1>Secure Access to Your Research Hub</h1>
+                                <p>Welcome back to Bolt Researcher Hub! Click the button below to securely access your account and continue your research journey.</p>
+                            </td>
+                        </tr>
+                        <!-- Magic Link Button -->
+                        <tr>
+                            <td style="text-align: center; padding: 20px 0 30px;">
+                                <a href="{{ .ConfirmationURL }}" target="_blank" class="button">Access My Account</a>
+                            </td>
+                        </tr>
+                        <!-- Security Note -->
+                        <tr>
+                            <td>
+                                <div class="security-note">
+                                    <strong>🔒 Security Note:</strong> This magic link will expire in 24 hours for your security. If you didn't request this login, you can safely ignore this email.
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Info Box -->
+                        <tr>
+                            <td>
+                                <div class="info-box">
+                                    <strong>💡 Having trouble?</strong> Copy and paste this link into your browser:<br>
+                                    <a href="{{ .ConfirmationURL }}" style="color: #0ea5e9; word-break: break-all;">{{ .ConfirmationURL }}</a>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Bullet Points -->
+                        <tr>
+                            <td style="padding-top: 20px; text-align: left;">
+                                <p style="font-size: 14px; color: #555; line-height: 1.6;"><strong>What you can do:</strong></p>
+                                <ul>
+                                    <li>Access your research projects and data.</li>
+                                    <li>Continue your collaborative work.</li>
+                                    <li>Explore new research tools and features.</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+        <!-- Footer -->
+        <table class="footer" width="100%">
+            <tr>
+                <td>
+                    <p>If you didn't request this email, you can safely ignore it.</p>
+                    <p>
+                        © 2025 Bolt Researcher Hub. All Rights Reserved.<br>
+                        123 Innovation Drive, Research City, 45678
+                    </p>
+                    <p>
+                        <a href="{{ .SiteURL }}/privacy">Privacy Policy</a> • <a href="{{ .SiteURL }}/contact">Contact Us</a>
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </center>
 </body>
 </html> 

@@ -334,7 +334,7 @@ Please provide a comprehensive, helpful response that addresses the user's quest
             <div className="p-2 bg-blue-100 rounded-lg">
               <MessageCircle className="h-5 w-5 text-blue-600" />
             </div>
-            <div>
+    <div>
               <h3 className="text-lg font-semibold text-gray-900">Research Assistant</h3>
               <p className="text-sm text-gray-600">Get AI-powered assistance for your research questions.</p>
             </div>
@@ -361,11 +361,11 @@ Please provide a comprehensive, helpful response that addresses the user's quest
               </Button>
             </div>
             
-            {/* Personality Selector */}
+      {/* Personality Selector */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-700">Personality:</span>
-              <ToggleGroup
-                value={[selectedPersonality]}
+        <ToggleGroup
+          value={[selectedPersonality]}
                 onValueChange={(value) => {
                   if (value && value.length > 0) {
                     setSelectedPersonality(value[0])
@@ -374,7 +374,7 @@ Please provide a comprehensive, helpful response that addresses the user's quest
                 className="bg-gray-50 rounded-lg p-1"
               >
                 {PERSONALITIES.map((p) => (
-                  <ToggleGroupItem key={p.key} value={p.key}>
+            <ToggleGroupItem key={p.key} value={p.key}>
                     <div className="relative group">
                       <p.icon
                         className="h-4 w-4"
@@ -384,22 +384,22 @@ Please provide a comprehensive, helpful response that addresses the user's quest
                         {p.name}
                       </div>
                     </div>
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
           </div>
         </div>
 
         {/* Context Banner */}
-        {hasContext && (
+      {hasContext && (
           <div className="p-4 border-b bg-green-50 border-green-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Brain className="h-4 w-4 text-green-600" />
                 </div>
-                <div>
+              <div>
                   <p className="text-sm font-medium text-green-800">
                     Enhanced Context Available: {contextSummary}
                   </p>
@@ -438,7 +438,7 @@ Please provide a comprehensive, helpful response that addresses the user's quest
                 <h3 className="text-lg font-medium mb-2">No messages yet</h3>
                 <p className="text-sm">Start a conversation with your AI research assistant</p>
               </div>
-            </div>
+          </div>
           )}
         </div>
       </CardContent>

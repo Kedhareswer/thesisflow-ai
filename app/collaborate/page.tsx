@@ -85,7 +85,7 @@ interface ChatMessage {
 
 export default function CollaboratePage() {
   // Plan system
-  const { canUseFeature, isProfessionalOrHigher } = useUserPlan()
+  const { canUseFeature, isProfessionalOrHigher, refreshPlanData, planData, getUsageForFeature } = useUserPlan()
   
   // State management
   const [isLoading, setIsLoading] = useState(true)
@@ -281,6 +281,9 @@ export default function CollaboratePage() {
   const handleCreateTeam = async () => {
     if (!newTeam.name.trim()) return
 
+    // Force refresh plan data to ensure we have the latest data
+    await refreshPlanData()
+
     // Check plan restrictions
     if (!canUseFeature('team_members')) {
       toast({
@@ -357,6 +360,9 @@ export default function CollaboratePage() {
 
   const handleInviteMember = async () => {
     if (!inviteEmail.trim() || !selectedTeamId) return
+
+    // Force refresh plan data to ensure we have the latest data
+    await refreshPlanData()
 
     // Check plan restrictions
     if (!canUseFeature('team_members')) {
@@ -667,6 +673,29 @@ export default function CollaboratePage() {
 
             {/* Main Content */}
             <div className="lg:col-span-8 xl:col-span-9 animate-fade-in">
+              {/* Debug Section - Only show in development */}
+              {process.env.NODE_ENV === 'development' && planData && (
+                <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h3 className="font-semibold text-yellow-800 mb-2">Debug Info (Development Only)</h3>
+                  <div className="text-sm text-yellow-700">
+                    <p><strong>Plan Type:</strong> {planData.plan?.plan_type}</p>
+                    <p><strong>Can Use Team Members:</strong> {canUseFeature('team_members') ? 'Yes' : 'No'}</p>
+                    <p><strong>Team Members Usage:</strong> {JSON.stringify(getUsageForFeature('team_members'))}</p>
+                    <p><strong>All Usage:</strong> {JSON.stringify(planData.usage)}</p>
+                  </div>
+                  <div className="mt-3">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={refreshPlanData}
+                      className="text-yellow-700 border-yellow-300"
+                    >
+                      Refresh Plan Data
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {selectedTeam ? (
                 <Card className="border-none shadow-sm h-full">
                   <CardHeader className="border-b bg-muted/30">

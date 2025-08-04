@@ -1,29 +1,29 @@
-# Bolt Research Hub - Custom Email Templates
+# Bolt Researcher Hub - Custom Email Templates
 
-This directory contains custom email templates for Bolt Research Hub's authentication system. These templates provide a modern, branded experience for users during signup, login, and other authentication flows.
+This directory contains custom email templates for Bolt Researcher Hub's authentication system. These templates provide a modern, glassmorphic experience for users during signup, login, and other authentication flows.
 
 ## 📧 Available Templates
 
 ### 1. **confirmation.html** - Email Signup Confirmation
 - **Purpose**: Sent when users sign up and need to verify their email
 - **Features**: 
-  - Welcome message with Bolt Research Hub branding
-  - Feature highlights
-  - Security notes
+  - Modern glassmorphism design
+  - Hero illustration with professional imagery
+  - Feature highlights with lightning bolt icons
   - Mobile-responsive design
 
 ### 2. **magic-link.html** - Magic Link Authentication
 - **Purpose**: Sent when users request passwordless login
 - **Features**:
   - Clear explanation of magic links
-  - Security information
+  - Security information with visual indicators
   - Mobile-responsive design
 
 ### 3. **recovery.html** - Password Reset
 - **Purpose**: Sent when users request password reset
 - **Features**:
   - Step-by-step instructions
-  - Security warnings
+  - Security warnings with lock icons
   - Red-themed CTA button for urgency
 
 ### 4. **invite.html** - Team Invitations
@@ -35,26 +35,42 @@ This directory contains custom email templates for Bolt Research Hub's authentic
 
 ## 🎨 Design Features
 
+### **Modern Glassmorphism Design**
+- **Background**: Dynamic gradient background (#d5ddec to #f0f2f5)
+- **Glass Effect**: Semi-transparent white background with backdrop blur
+- **Borders**: Subtle white borders with transparency
+- **Shadows**: Soft shadows for depth and modern feel
+
 ### **Branding**
-- ⚡ Bolt Research Hub logo and branding
-- Consistent gradient header (purple to blue)
-- Professional typography using system fonts
+- 🚀 Bolt Researcher Hub logo and branding
+- Professional hero illustrations from Pexels
+- Consistent typography using system fonts
+- Lightning bolt icons for feature lists
 
 ### **Color Scheme**
-- **Primary**: Purple gradient (#667eea to #764ba2)
+- **Primary**: Blue gradient (#4b6cb7 to #182848)
 - **Success**: Green gradient (#10b981 to #059669)
 - **Warning**: Red gradient (#dc2626 to #b91c1c)
 - **Info**: Blue accents (#0ea5e9)
+- **Text**: Dark blue (#1c2a48) and gray (#33425e)
+
+### **Visual Elements**
+- **Hero Images**: High-quality professional images from Pexels
+- **Logo**: Circular logo with rounded corners
+- **Icons**: Emoji icons for feature lists (⚡️, 🔐, 👥)
+- **Buttons**: Gradient buttons with hover effects
 
 ### **Responsive Design**
 - Mobile-first approach
 - Responsive breakpoints at 600px
 - Optimized for all email clients
+- Table-based layout for maximum compatibility
 
 ### **Security Features**
 - Security notes on all templates
-- Expiration warnings
+- Expiration warnings with visual indicators
 - Clear instructions for suspicious emails
+- Professional security messaging
 
 ## 🚀 How to Apply to Supabase
 
@@ -71,10 +87,10 @@ This directory contains custom email templates for Bolt Research Hub's authentic
    - **Invite user**: Copy content from `invite.html`
 
 3. **Update Email Subjects**
-   - Confirm signup: "Welcome to Bolt Research Hub!"
-   - Magic link: "Your Magic Link - Bolt Research Hub"
-   - Reset password: "Reset Your Password - Bolt Research Hub"
-   - Invite user: "You've Been Invited - Bolt Research Hub"
+   - Confirm signup: "Welcome to the Bolt Researcher Hub!"
+   - Magic link: "Secure Access to Your Research Hub"
+   - Reset password: "Reset Your Password - Bolt Researcher Hub"
+   - Invite user: "You've Been Invited - Bolt Researcher Hub"
 
 ### Option 2: Management API
 
@@ -90,13 +106,13 @@ curl -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "mailer_subjects_confirmation": "Welcome to Bolt Research Hub!",
+    "mailer_subjects_confirmation": "Welcome to the Bolt Researcher Hub!",
     "mailer_templates_confirmation_content": "<!DOCTYPE html>...",
-    "mailer_subjects_magic_link": "Your Magic Link - Bolt Research Hub",
+    "mailer_subjects_magic_link": "Secure Access to Your Research Hub",
     "mailer_templates_magic_link_content": "<!DOCTYPE html>...",
-    "mailer_subjects_recovery": "Reset Your Password - Bolt Research Hub",
+    "mailer_subjects_recovery": "Reset Your Password - Bolt Researcher Hub",
     "mailer_templates_recovery_content": "<!DOCTYPE html>...",
-    "mailer_subjects_invite": "You've Been Invited - Bolt Research Hub",
+    "mailer_subjects_invite": "You've Been Invited - Bolt Researcher Hub",
     "mailer_templates_invite_content": "<!DOCTYPE html>..."
   }'
 ```
@@ -123,17 +139,26 @@ These templates are designed to work with:
 ## 🎯 Customization
 
 ### **Colors**
-To change the color scheme, update the CSS variables in the header:
+To change the color scheme, update the CSS variables:
 ```css
-.header {
-    background: linear-gradient(135deg, #YOUR_COLOR1 0%, #YOUR_COLOR2 100%);
+.wrapper {
+    background-image: linear-gradient(45deg, #YOUR_COLOR1 0%, #YOUR_COLOR2 100%);
+}
+.button {
+    background-image: linear-gradient(45deg, #YOUR_COLOR1 0%, #YOUR_COLOR2 100%);
 }
 ```
 
 ### **Logo**
-Update the logo text in each template:
+Update the logo image URL in each template:
 ```html
-<div class="logo">⚡ Your Brand Name</div>
+<img src="YOUR_LOGO_URL" alt="Your Brand Logo" style="max-width: 70px; border-radius: 50%;">
+```
+
+### **Hero Images**
+Update the hero image URL in each template:
+```html
+<img src="YOUR_HERO_IMAGE_URL" alt="Your hero image description" style="display: block;">
 ```
 
 ### **Features List**
@@ -141,10 +166,11 @@ Customize the features list in the confirmation and invitation templates to matc
 
 ## 🔒 Security Considerations
 
-1. **Link Expiration**: All links have appropriate expiration times
-2. **Security Notes**: Each template includes security warnings
+1. **Link Expiration**: All links have appropriate expiration times (24 hours)
+2. **Security Notes**: Each template includes security warnings with visual indicators
 3. **Fallback Links**: Plain text links provided for accessibility
 4. **No Tracking**: Templates don't include tracking pixels
+5. **Professional Messaging**: Clear, professional security messaging
 
 ## 📊 Testing
 
@@ -161,12 +187,14 @@ After applying the templates:
 - **Images not loading**: Use inline CSS instead of external stylesheets
 - **Links not working**: Ensure `{{ .ConfirmationURL }}` is properly formatted
 - **Mobile display issues**: Test on various email clients
+- **Glassmorphism not supported**: Fallback to solid backgrounds for older clients
 
 ### **Debug Steps**
 1. Check Supabase dashboard for template syntax errors
 2. Test with a real email address
 3. Check spam folder if emails aren't received
 4. Verify SMTP settings in Supabase dashboard
+5. Test glassmorphism effects on different email clients
 
 ## 📞 Support
 
@@ -178,4 +206,4 @@ If you encounter issues with the email templates:
 
 ---
 
-**Note**: These templates are designed specifically for Bolt Research Hub. Customize the branding, colors, and content to match your application's needs. 
+**Note**: These templates feature a modern glassmorphism design specifically for Bolt Researcher Hub. The design includes professional imagery, modern typography, and engaging visual elements while maintaining excellent email client compatibility. 

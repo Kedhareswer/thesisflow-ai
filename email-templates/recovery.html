@@ -3,146 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Reset - Bolt Research Hub</title>
+    <title>Password Reset - Bolt Researcher Hub</title>
     <style>
-        * {
+        /* General Styles */
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif;
+            background-color: #e0e6ee; /* Fallback background */
         }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8fafc;
+        table {
+            border-spacing: 0;
         }
-        
-        .container {
-            max-width: 600px;
+        td {
+            padding: 0;
+        }
+        img {
+            border: 0;
+            width: 100%;
+            max-width: 100%;
+        }
+        .wrapper {
+            width: 100%;
+            table-layout: fixed;
+            background-color: #e0e6ee;
+            /* Dynamic Gradient Background */
+            background-image: linear-gradient(45deg, #d5ddec 0%, #f0f2f5 100%);
+            padding: 60px 20px;
+        }
+        .main {
             margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 12px;
+            width: 100%;
+            max-width: 600px;
+            border-spacing: 0;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            /* Glassmorphism Effect */
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); /* For Safari */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
         }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-        }
-        
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-        
-        .tagline {
-            font-size: 16px;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-        
         .content {
-            padding: 40px 30px;
+            padding: 40px;
         }
-        
-        .title {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-        
-        .subtitle {
-            font-size: 16px;
-            color: #6b7280;
-            margin-bottom: 32px;
-            text-align: center;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-            color: white;
+        .button {
+            background-image: linear-gradient(45deg, #dc2626 0%, #b91c1c 100%);
+            color: #ffffff;
             text-decoration: none;
             padding: 16px 32px;
-            border-radius: 8px;
-            font-weight: 600;
+            border-radius: 10px;
+            font-weight: bold;
+            display: inline-block;
             font-size: 16px;
-            text-align: center;
-            margin: 24px 0;
-            transition: transform 0.2s ease;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
-        
-        .cta-button:hover {
+        .button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
         }
-        
-        .info-box {
-            background-color: #f0f9ff;
-            border: 1px solid #0ea5e9;
-            border-radius: 6px;
-            padding: 20px;
-            margin: 24px 0;
-        }
-        
-        .info-box h3 {
-            font-size: 16px;
-            font-weight: 600;
-            color: #0c4a6e;
-            margin-bottom: 12px;
-        }
-        
-        .info-box ol {
-            color: #0c4a6e;
-            padding-left: 20px;
-        }
-        
-        .info-box li {
-            margin-bottom: 8px;
-        }
-        
         .footer {
-            background-color: #f8fafc;
-            padding: 24px 30px;
+            padding: 30px;
             text-align: center;
-            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #5a6a85;
         }
-        
-        .footer-text {
-            font-size: 14px;
-            color: #6b7280;
-            margin-bottom: 16px;
-        }
-        
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 24px;
-        }
-        
-        .footer-links a {
-            color: #667eea;
+        .footer a {
+            color: #182848;
             text-decoration: none;
-            font-size: 14px;
+            font-weight: bold;
         }
-        
-        .footer-links a:hover {
-            text-decoration: underline;
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 20px 0;
+            color: #1c2a48;
+            line-height: 1.2;
         }
-        
-        .divider {
-            height: 1px;
-            background-color: #e5e7eb;
-            margin: 32px 0;
+        p {
+            font-size: 17px;
+            line-height: 26px;
+            margin: 0 0 25px 0;
+            color: #33425e;
         }
-        
-        .note-box {
+        .security-note {
             background-color: #fef3c7;
             border: 1px solid #f59e0b;
             border-radius: 6px;
@@ -151,78 +97,114 @@
             font-size: 14px;
             color: #92400e;
         }
-        
-        @media (max-width: 600px) {
-            .container {
-                margin: 0;
-                border-radius: 0;
-            }
-            
-            .header, .content, .footer {
-                padding: 24px 20px;
-            }
-            
-            .title {
-                font-size: 20px;
-            }
-            
-            .cta-button {
-                display: block;
-                width: 100%;
-            }
+        .info-box {
+            background-color: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 24px 0;
+            font-size: 14px;
+            color: #0c4a6e;
         }
+        ul {
+            margin: 0;
+            padding: 0;
+        }
+        li {
+            list-style: none;
+            padding-bottom: 10px;
+            margin-left: 15px;
+            color: #33425e;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        li:before {
+            content: "🔐";
+            margin-right: 8px;
+        }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">⚡ Bolt Research Hub</div>
-            <div class="tagline">AI-Powered Research & Collaboration Platform</div>
-        </div>
-        
-        <div class="content">
-            <h1 class="title">Update Your Password</h1>
-            <p class="subtitle">You requested to update your Bolt Research Hub account password. Here's your secure link to complete the process.</p>
-            
-            <div style="text-align: center;">
-                <a href="{{ .ConfirmationURL }}" class="cta-button">
-                    Update Password
-                </a>
-            </div>
-            
-            <div class="note-box">
-                <strong>📧 Account Security:</strong> This link will expire in 1 hour. If you didn't request this update, you can safely ignore this email.
-            </div>
-            
-            <div class="info-box">
-                <h3>📋 Password Update Steps:</h3>
-                <ol>
-                    <li>Click the "Update Password" button above</li>
-                    <li>You'll be taken to our secure password update page</li>
-                    <li>Enter your new password (make it strong and unique)</li>
-                    <li>Confirm your new password</li>
-                    <li>Click "Save Changes" to complete the update</li>
-                </ol>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <p style="text-align: center; color: #6b7280; font-size: 14px;">
-                Having trouble with the button? Copy and paste this link into your browser:<br>
-                <a href="{{ .ConfirmationURL }}" style="color: #667eea; word-break: break-all;">{{ .ConfirmationURL }}</a>
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p class="footer-text">
-                This email was sent because you requested a password update for your Bolt Research Hub account.
-            </p>
-            <div class="footer-links">
-                <a href="{{ .SiteURL }}">Visit Website</a>
-                <a href="{{ .SiteURL }}/support">Support</a>
-                <a href="{{ .SiteURL }}/privacy">Privacy Policy</a>
-            </div>
-        </div>
-    </div>
+    <center class="wrapper">
+        <table class="main" width="100%">
+            <!-- Hero Illustration -->
+            <tr>
+                <td>
+                    <!-- Free, high-quality image from Pexels.com -->
+                    <img src="https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="A person working on a futuristic laptop interface" style="display: block;">
+                </td>
+            </tr>
+            <tr>
+                <td class="content">
+                    <table width="100%">
+                        <!-- Logo -->
+                        <tr>
+                            <td style="text-align: center; padding-bottom: 30px;">
+                                 <!-- Professional and relevant free-to-use logo -->
+                                <img src="https://i.imgur.com/gL5gI8q.png" alt="Bolt Researcher Hub Logo" style="max-width: 70px; border-radius: 50%;">
+                            </td>
+                        </tr>
+                        <!-- Welcome Text -->
+                        <tr>
+                            <td style="text-align: center;">
+                                <h1>Reset Your Password</h1>
+                                <p>We received a request to reset your password for your Bolt Researcher Hub account. Click the button below to securely reset your password and regain access to your research.</p>
+                            </td>
+                        </tr>
+                        <!-- Reset Button -->
+                        <tr>
+                            <td style="text-align: center; padding: 20px 0 30px;">
+                                <a href="{{ .ConfirmationURL }}" target="_blank" class="button">Reset My Password</a>
+                            </td>
+                        </tr>
+                        <!-- Security Note -->
+                        <tr>
+                            <td>
+                                <div class="security-note">
+                                    <strong>🔒 Security Note:</strong> This password reset link will expire in 24 hours for your security. If you didn't request this reset, you can safely ignore this email.
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Info Box -->
+                        <tr>
+                            <td>
+                                <div class="info-box">
+                                    <strong>💡 Having trouble?</strong> Copy and paste this link into your browser:<br>
+                                    <a href="{{ .ConfirmationURL }}" style="color: #0ea5e9; word-break: break-all;">{{ .ConfirmationURL }}</a>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Bullet Points -->
+                        <tr>
+                            <td style="padding-top: 20px; text-align: left;">
+                                <p style="font-size: 14px; color: #555; line-height: 1.6;"><strong>After resetting your password:</strong></p>
+                                <ul>
+                                    <li>You'll be able to access your research projects.</li>
+                                    <li>All your data and collaborations will be preserved.</li>
+                                    <li>You can continue your research journey seamlessly.</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+        <!-- Footer -->
+        <table class="footer" width="100%">
+            <tr>
+                <td>
+                    <p>If you didn't request this email, you can safely ignore it.</p>
+                    <p>
+                        © 2025 Bolt Researcher Hub. All Rights Reserved.<br>
+                        123 Innovation Drive, Research City, 45678
+                    </p>
+                    <p>
+                        <a href="{{ .SiteURL }}/privacy">Privacy Policy</a> • <a href="{{ .SiteURL }}/contact">Contact Us</a>
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </center>
 </body>
 </html> 
