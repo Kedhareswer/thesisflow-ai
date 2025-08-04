@@ -48,6 +48,7 @@ import NotificationBell from "./components/notification-bell"
 import { DevelopmentNotice } from "@/components/ui/development-notice"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { PlanStatus } from "@/components/ui/plan-status"
+import { TeamLimitBanner } from "@/components/ui/smart-upgrade-banner"
 
 // Type definitions
 interface User {
@@ -538,6 +539,10 @@ export default function CollaboratePage() {
         {/* Modern Header */}
         {/* Removed duplicate header here */}
         <div className="container mx-auto px-6 py-8 max-w-7xl">
+          {/* Upgrade Banner for Free Users */}
+          <div className="mb-6">
+            <TeamLimitBanner currentUsage={teams.length} />
+          </div>
           <div className="grid gap-8 lg:grid-cols-12">
             {/* Sidebar */}
             <div className="lg:col-span-4 xl:col-span-3 animate-fade-in">

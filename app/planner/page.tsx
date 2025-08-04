@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Calendar, CheckCircle2, Clock, Target, TrendingUp, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon } from "lucide-react"
 import { ProjectCalendar } from "./components/project-calendar"
 import { GanttChart } from "./components/gantt-chart"
+import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
@@ -513,6 +514,11 @@ export default function PlannerPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Upgrade Banner for Free Users */}
+      <div className="mb-6">
+        <ProjectLimitBanner currentUsage={projects.length} />
+      </div>
+      
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Research Planner</h1>
         <p className="text-gray-600">Organize your research projects, track progress, and manage deadlines</p>
