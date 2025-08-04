@@ -28,7 +28,7 @@ interface Notification {
   type: string
   title: string
   message: string
-  is_read: boolean
+  read: boolean
   action_url?: string
   data?: any
   created_at: string
@@ -171,7 +171,7 @@ export default function NotificationBell() {
       setNotifications(prev => 
         prev.map(notif => 
           notif.id === notificationId 
-            ? { ...notif, is_read: true }
+            ? { ...notif, read: true }
             : notif
         )
       )
@@ -198,7 +198,7 @@ export default function NotificationBell() {
 
       // Update local state
       setNotifications(prev => 
-        prev.map(notif => ({ ...notif, is_read: true }))
+        prev.map(notif => ({ ...notif, read: true }))
       )
       setUnreadCount(0)
       
@@ -227,7 +227,7 @@ export default function NotificationBell() {
       const deletedNotification = notifications.find(n => n.id === notificationId)
       setNotifications(prev => prev.filter(notif => notif.id !== notificationId))
       
-      if (deletedNotification && !deletedNotification.is_read) {
+      if (deletedNotification && !deletedNotification.read) {
         setUnreadCount(prev => Math.max(0, prev - 1))
       }
     } catch (error) {
@@ -248,7 +248,7 @@ export default function NotificationBell() {
       })
 
       // Update local state - remove all read notifications
-      setNotifications(prev => prev.filter(notif => !notif.is_read))
+      setNotifications(prev => prev.filter(notif => !notif.read))
       
       toast({
         title: "Success",
@@ -327,7 +327,7 @@ export default function NotificationBell() {
   // Navigate to notification action
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read if not already
-    if (!notification.is_read) {
+    if (!notification.read) {
       await markAsRead(notification.id)
     }
 
@@ -532,7 +532,7 @@ export default function NotificationBell() {
                 return (
                   <DropdownMenuItem
                     key={notification.id}
-                    className={`p-0 cursor-pointer ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                    className={`p-0 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="w-full p-3 flex items-start gap-3">
@@ -545,7 +545,7 @@ export default function NotificationBell() {
                             {notification.title}
                           </p>
                           <div className="flex items-center gap-1 ml-2">
-                            {!notification.is_read && (
+                            {!notification.read && (
                               <div className="w-2 h-2 bg-blue-500 rounded-full" />
                             )}
                             <Button
@@ -573,7 +573,7 @@ export default function NotificationBell() {
                 );
               })}
               
-              {notifications.some(n => n.is_read) && (
+              {notifications.some(n => n.read) && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={clearAllRead} className="justify-center">
