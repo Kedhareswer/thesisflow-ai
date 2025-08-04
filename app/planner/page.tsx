@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, CheckCircle2, Clock, Target, TrendingUp, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare } from "lucide-react"
+import { Calendar, CheckCircle2, Clock, Target, TrendingUp, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon } from "lucide-react"
 import { ProjectCalendar } from "./components/project-calendar"
+import { GanttChart } from "./components/gantt-chart"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
@@ -518,7 +519,7 @@ export default function PlannerPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-96">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
@@ -526,6 +527,10 @@ export default function PlannerPage() {
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Calendar
+          </TabsTrigger>
+          <TabsTrigger value="gantt" className="flex items-center gap-2">
+            <GanttChartIcon className="h-4 w-4" />
+            Gantt Chart
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -544,6 +549,18 @@ export default function PlannerPage() {
             onEditTask={openEditTask}
             onDeleteTask={handleDeleteTask}
             onCreateTask={openCreateTask}
+          />
+        </TabsContent>
+
+        <TabsContent value="gantt" className="space-y-6">
+          <GanttChart
+            projects={projects}
+            tasks={tasks}
+            onEditTask={openEditTask}
+            onDeleteTask={handleDeleteTask}
+            onCreateTask={openCreateTask}
+            onEditProject={openEditProject}
+            onDeleteProject={handleDeleteProject}
           />
         </TabsContent>
 
