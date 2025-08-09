@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -13,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers"
 import { Label } from "@/components/ui/label"
+import { FileProcessor, type FileProcessingResult } from "@/lib/file-processors"
 import { supabase } from "@/lib/supabase"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { 
@@ -59,6 +61,13 @@ export function AIWritingAssistant({
   const [showSettings, setShowSettings] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string>('')
+  const [ragEnabled, setRagEnabled] = useState<boolean>(true)
+  const [uploadedSources, setUploadedSources] = useState<Array<{ content: string; metadata: FileProcessingResult['metadata']; name: string }>>([])
+  const [ragIndex, setRagIndex] = useState<{
+    chunks: Array<{ text: string; terms: Map<string, number> }>
+    idf: Map<string, number>
+    totalDocs: number
+  } | null>(null)
   
   const { toast } = useToast()
   const { session } = useResearchSession()
@@ -67,10 +76,8 @@ export function AIWritingAssistant({
   const writingTasks = [
     { id: 'continue', name: 'Continue Writing', description: 'Continue from where you left off' },
     { id: 'introduction', name: 'Introduction', description: 'Write an introduction for your document' },
-    { id: 'conclusion', name: 'Conclusion', description: 'Write a conclusion for your document' },
     { id: 'abstract', name: 'Abstract', description: 'Generate a concise abstract' },
-    { id: 'methodology', name: 'Methodology', description: 'Describe research methodology' },
-    { id: 'results', name: 'Results', description: 'Summarize results and findings' },
+    { id: 'literature_review', name: 'Literature Review', description: 'Review and synthesize related work' },
     { id: 'custom', name: 'Custom', description: 'Write based on custom instructions' },
     { id: 'analyze', name: 'Analyze & Improve', description: 'Analyze current content and suggest improvements' },
   ]
@@ -97,6 +104,146 @@ export function AIWritingAssistant({
     }
   }
   
+  // -------- RAG utilities (lightweight, client-side) --------
+  const normalizeText = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+
+  const tokenize = (text: string): string[] => {
+    const stopwords = new Set([
+      'the','is','a','an','and','or','of','to','in','for','on','with','as','by','at','from','that','this','it','be','are','was','were','has','have','had','but','not','if','than','then','into','we','our','their','its'
+    ])
+    return normalizeText(text)
+      .split(' ')
+      .filter((t) => t && !stopwords.has(t))
+  }
+
+  const chunkText = (text: string, targetChars = 1200): string[] => {
+    const paragraphs = text
+      .replace(/\r\n/g, "\n")
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+
+    const chunks: string[] = []
+    let buffer = ''
+    for (const p of paragraphs) {
+      if ((buffer + '\n\n' + p).length > targetChars && buffer) {
+        chunks.push(buffer)
+        buffer = p
+      } else {
+        buffer = buffer ? buffer + '\n\n' + p : p
+      }
+    }
+    if (buffer) chunks.push(buffer)
+
+    // Fallback to sentence-based split if still too large
+    const final: string[] = []
+    for (const c of chunks) {
+      if (c.length <= targetChars * 1.5) {
+        final.push(c)
+      } else {
+        const sentences = c.split(/(?<=[.!?])\s+/)
+        let sBuf = ''
+        for (const s of sentences) {
+          if ((sBuf + ' ' + s).length > targetChars && sBuf) {
+            final.push(sBuf)
+            sBuf = s
+          } else {
+            sBuf = sBuf ? sBuf + ' ' + s : s
+          }
+        }
+        if (sBuf) final.push(sBuf)
+      }
+    }
+    return final
+  }
+
+  const buildRagIndex = (texts: string[]) => {
+    const chunks: Array<{ text: string; terms: Map<string, number> }> = []
+    const df = new Map<string, number>()
+    const addDoc = (doc: string) => {
+      const terms = new Map<string, number>()
+      const seen = new Set<string>()
+      for (const tok of tokenize(doc)) {
+        terms.set(tok, (terms.get(tok) || 0) + 1)
+        if (!seen.has(tok)) {
+          df.set(tok, (df.get(tok) || 0) + 1)
+          seen.add(tok)
+        }
+      }
+      chunks.push({ text: doc, terms })
+    }
+    texts.forEach(addDoc)
+    const totalDocs = chunks.length || 1
+    const idf = new Map<string, number>()
+    for (const [term, count] of df.entries()) {
+      idf.set(term, Math.log((totalDocs + 1) / (count + 1)) + 1)
+    }
+    setRagIndex({ chunks, idf, totalDocs })
+  }
+
+  const cosineSimilarity = (a: Map<string, number>, b: Map<string, number>) => {
+    let dot = 0
+    let aNorm = 0
+    let bNorm = 0
+    const keys = new Set([...a.keys(), ...b.keys()])
+    for (const k of keys) {
+      const av = a.get(k) || 0
+      const bv = b.get(k) || 0
+      dot += av * bv
+      aNorm += av * av
+      bNorm += bv * bv
+    }
+    if (aNorm === 0 || bNorm === 0) return 0
+    return dot / (Math.sqrt(aNorm) * Math.sqrt(bNorm))
+  }
+
+  const makeTfIdf = (terms: Map<string, number>, idf: Map<string, number>) => {
+    const vec = new Map<string, number>()
+    for (const [t, f] of terms.entries()) {
+      vec.set(t, f * (idf.get(t) || 0))
+    }
+    return vec
+  }
+
+  const retrieveTopK = (query: string, k = 8) => {
+    if (!ragEnabled || !ragIndex) return [] as string[]
+    const qTerms = new Map<string, number>()
+    for (const t of tokenize(query)) qTerms.set(t, (qTerms.get(t) || 0) + 1)
+    const qVec = makeTfIdf(qTerms, ragIndex.idf)
+    const scored = ragIndex.chunks.map((c) => ({
+      text: c.text,
+      score: cosineSimilarity(qVec, makeTfIdf(c.terms, ragIndex.idf)),
+    }))
+    scored.sort((x, y) => y.score - x.score)
+    return scored.slice(0, k).map((s) => s.text)
+  }
+
+  const handleFileInput = async (file: File) => {
+    try {
+      // Validate supported types
+      if (!FileProcessor.getSupportedTypes().includes(file.type)) {
+        throw new Error(`Unsupported type: ${file.type}`)
+      }
+      const result = await FileProcessor.processFile(file)
+      setUploadedSources((prev) => [
+        ...prev,
+        { content: result.content, metadata: result.metadata, name: file.name }
+      ])
+      // Build/refresh RAG index
+      const allTexts = [result.content, ...uploadedSources.map((s) => s.content)]
+      const allChunks = allTexts.flatMap((t) => chunkText(t))
+      buildRagIndex(allChunks)
+      toast({ title: "Source added", description: `${file.name} • ${result.metadata.wordCount} words` })
+    } catch (err) {
+      toast({ title: "File processing failed", description: err instanceof Error ? err.message : String(err), variant: "destructive" })
+    }
+  }
+
   // Get research context for AI prompt
   const getResearchContext = () => {
     let context = 'Research Context:\n'
@@ -124,6 +271,20 @@ export function AIWritingAssistant({
     if (currentDocumentContent && currentDocumentContent.trim()) {
       const contentPreview = currentDocumentContent.slice(0, 500) // First 500 characters
       context += `\nCurrent Document Content (preview):\n${contentPreview}${currentDocumentContent.length > 500 ? '...' : ''}\n`
+    }
+
+    // Add RAG retrieved context from uploaded sources
+    if (ragEnabled && ragIndex && uploadedSources.length > 0) {
+      const queryHints = [writingTask, prompt, session?.currentTopic, documentTemplate]
+        .filter(Boolean)
+        .join(' | ')
+      const top = retrieveTopK(queryHints, 8)
+      const joined = top
+        .map((t, i) => `(${i + 1}) ${t.substring(0, 800)}`)
+        .join("\n\n")
+      if (joined) {
+        context += `\nRetrieved Context (from uploaded sources):\n${joined}\n`
+      }
     }
     
     context += `Using: ${selectedProvider} with ${selectedModel}\n`
@@ -158,10 +319,13 @@ export function AIWritingAssistant({
       const templateStyle = getTemplateStyle()
       const researchContext = getResearchContext()
       
-      let systemPrompt = `You are a professional academic writer assisting with a research document in ${templateStyle}. `
+    let systemPrompt = `You are a professional academic writer assisting with a research document in ${templateStyle}. `
       systemPrompt += `Write in a clear, academic style appropriate for publication. `
       systemPrompt += `Focus on producing coherent, well-structured text that would be suitable for a scholarly publication. `
-      systemPrompt += `Always maintain academic integrity and provide well-reasoned arguments.`
+    systemPrompt += `Always maintain academic integrity and provide well-reasoned arguments.`
+    if (ragEnabled && uploadedSources.length > 0) {
+      systemPrompt += ` Use ONLY the provided Retrieved Context and Session Context for factual statements. If the context is insufficient, explicitly state "insufficient context" rather than inventing facts. Quote or paraphrase faithfully and avoid hallucinations.`
+    }
       
       let taskPrompt = ''
       
@@ -172,17 +336,21 @@ export function AIWritingAssistant({
         case 'introduction':
           taskPrompt = `Write a compelling introduction for this research document. Include background context, research question, and significance.`
           break
-        case 'conclusion':
-          taskPrompt = `Write a comprehensive conclusion that summarizes key findings, discusses implications, and suggests future research directions.`
-          break
         case 'abstract':
           taskPrompt = `Write a concise abstract (150-250 words) that summarizes the research problem, methodology, key findings, and conclusions.`
           break
-        case 'methodology':
-          taskPrompt = `Write a detailed methodology section describing the research design, data collection methods, and analysis procedures.`
-          break
-        case 'results':
-          taskPrompt = `Write a results section presenting the key findings with appropriate statistical analysis and data interpretation.`
+        case 'literature_review':
+          taskPrompt = `Write a rigorous Literature Review that critically synthesizes the most relevant, recent (last 3–5 years preferred) and foundational studies. Structure with clear themes, identify gaps, and relate prior findings directly to the current research problem.
+
+Output requirements:
+- Start with a brief overview paragraph that defines the scope and search strategy (databases, keywords, date range if known from context; otherwise state reasonable assumptions).
+- Organize the body into thematic sub-sections with concise, comparative analysis—not summaries.
+- Where appropriate, note methodological differences, datasets, metrics, and limitations.
+- Conclude with gaps, inconsistencies, and how they motivate the present work.
+
+Include a compact Markdown table titled "Comparison of Recent Studies" with columns: Author/Year, Focus, Method/Dataset, Key Findings, Limitations/Relevance. Populate 4–8 rows using only information derivable from the provided context; if uncertain, write "unknown" rather than inventing facts.
+
+Style: objective academic tone, avoid generic filler, do not fabricate citations or DOIs.`
           break
         case 'analyze':
           taskPrompt = `Analyze the current document content for structure, clarity, academic tone, and coherence. Provide specific suggestions for improvement.`
@@ -204,8 +372,13 @@ export function AIWritingAssistant({
           prompt: fullPrompt,
           provider: selectedProvider,
           model: selectedModel,
-          maxTokens: 1000,
-          temperature: 0.7
+          maxTokens: 1200,
+          temperature: 0.5,
+          // pass a hint to the backend for potential server-side retrieval extensions later
+          metadata: {
+            ragEnabled,
+            uploadedSourceCount: uploadedSources.length
+          }
         })
       })
       
@@ -289,7 +462,7 @@ export function AIWritingAssistant({
       
       {/* Settings Toggle */}
       <div className="flex justify-between items-center">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {writingTasks.map(task => (
           <Badge 
             key={task.id}
@@ -300,6 +473,16 @@ export function AIWritingAssistant({
             {task.name}
           </Badge>
         ))}
+        <div className="flex items-center gap-2 ml-2">
+          <Label className="text-xs">RAG</Label>
+          <input
+            type="checkbox"
+            checked={ragEnabled}
+            onChange={(e) => setRagEnabled(e.target.checked)}
+            className="h-4 w-4"
+            aria-label="Toggle retrieval augmented generation"
+          />
+        </div>
       </div>
         <Button
           variant="ghost"
@@ -335,6 +518,15 @@ export function AIWritingAssistant({
             onChange={(e) => setPrompt(e.target.value)}
             className="min-h-[100px]"
           />
+          <div className="flex items-center gap-2">
+            <Input type="file" accept={FileProcessor.getSupportedTypes().join(",")} onChange={(e) => e.target.files && handleFileInput(e.target.files[0])} />
+            <Label className="text-xs text-muted-foreground">Add .docx/.pdf/.txt as context</Label>
+          </div>
+          {uploadedSources.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {uploadedSources.length} source(s) added for context
+            </div>
+          )}
         </div>
       )}
       
