@@ -389,11 +389,11 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
       
       const data = await response.json()
       
-      if (!data.success || !data.content) {
+      if (!data.success || !data.response) {
         throw new Error(data.error || 'No content generated')
       }
       
-      setGeneratedText(data.content)
+      setGeneratedText(data.response)
       
       toast({
         title: "Content generated",
