@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BookOpen } from "lucide-react"
 import { SearchInput } from "@/components/common/SearchInput"
@@ -48,22 +48,39 @@ interface LiteratureSearchProps {
 export function LiteratureSearch({ className }: LiteratureSearchProps) {
   const { toast } = useToast()
   const [searchType, setSearchType] = useState("keyword")
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   const paperSearch = useAsync<any>(PaperSearchService.searchPapers)
 
-  const handlePaperSearch = async (query: string) => {
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handlePaperSearch = useCallback((query: string) => {
     if (!query.trim()) return
 
-    try {
-      await paperSearch.execute(query, searchType)
-    } catch (error) {
-      toast({
-        title: "Search Failed",
-        description: error instanceof Error ? error.message : "Failed to search papers. Please try again.",
-        variant: "destructive",
-      })
+    // Clear any existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
     }
-  }
+
+    // Set new debounce timeout
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        await paperSearch.execute(query, searchType)
+      } catch (error) {
+        toast({
+          title: "Search Failed",
+          description: error instanceof Error ? error.message : "Failed to search papers. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }, 500) // 500ms debounce
+  }, [searchType, paperSearch.execute])
 
   const searchData = paperSearch.data as any
   const papers = searchData?.data?.data || searchData?.papers || []

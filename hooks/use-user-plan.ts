@@ -148,6 +148,10 @@ export function useUserPlan() {
         subscriptionRef.current.unsubscribe()
         subscriptionRef.current = null
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
       return
     }
 
@@ -178,15 +182,10 @@ export function useUserPlan() {
       )
       .subscribe()
 
-    // Setup polling as fallback (every 30 seconds)
-    pollingIntervalRef.current = setInterval(() => {
-      fetchPlanData()
-    }, 30000)
-
     // Initial fetch
     fetchPlanData()
 
-    // Cleanup subscription and polling on unmount
+    // Cleanup subscription on unmount
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe()
@@ -197,7 +196,7 @@ export function useUserPlan() {
         pollingIntervalRef.current = null
       }
     }
-  }, [user, session, fetchPlanData])
+  }, [user?.id, session?.access_token]) // Only re-run when user ID or session token changes
 
   // Add a manual refresh function
   const refreshPlanData = useCallback(() => {

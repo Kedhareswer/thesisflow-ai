@@ -42,27 +42,32 @@ export default function ProfilePage() {
   })
   const [newInterest, setNewInterest] = useState("")
 
-  // Activity overview state
-  const [activity, setActivity] = useState({
-    papersExplored: null as number | null,
-    ideasGenerated: null as number | null,
-    collaborations: null as number | null,
+  // Activity overview state with proper typing
+  const [activity, setActivity] = useState<{
+    papersExplored: number | null
+    ideasGenerated: number | null
+    collaborations: number | null
+  }>({
+    papersExplored: null,
+    ideasGenerated: null,
+    collaborations: null,
   })
   const [activityLoading, setActivityLoading] = useState(false)
 
   useEffect(() => {
     if (user) {
       loadProfile()
+      // Initial load of activity
       loadActivity()
     }
-  }, [user])
+  }, [user?.id]) // Use user.id as dependency to avoid re-renders
 
   // Real-time subscriptions for activity updates
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return
 
     const channel = supabase
-      .channel('activity_updates')
+      .channel(`activity_updates_${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -71,9 +76,10 @@ export default function ProfilePage() {
           table: 'documents',
           filter: `owner_id=eq.${user.id}`
         },
-        () => {
-          console.log('Documents updated, refreshing activity')
-          loadActivity()
+        (payload) => {
+          console.log('Documents updated:', payload)
+          // Debounce the refresh to avoid too many updates
+          setTimeout(() => loadActivity(), 500)
         }
       )
       .on(
@@ -84,9 +90,9 @@ export default function ProfilePage() {
           table: 'research_ideas',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          console.log('Research ideas updated, refreshing activity')
-          loadActivity()
+        (payload) => {
+          console.log('Research ideas updated:', payload)
+          setTimeout(() => loadActivity(), 500)
         }
       )
       .on(
@@ -97,9 +103,9 @@ export default function ProfilePage() {
           table: 'team_members',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          console.log('Team members updated, refreshing activity')
-          loadActivity()
+        (payload) => {
+          console.log('Team members updated:', payload)
+          setTimeout(() => loadActivity(), 500)
         }
       )
       .subscribe()
@@ -107,7 +113,7 @@ export default function ProfilePage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
+  }, [user?.id]) // Use user.id as dependency
 
   const loadProfile = async () => {
     if (!user) return
@@ -145,10 +151,14 @@ export default function ProfilePage() {
 
   const loadActivity = async () => {
     if (!user) return;
+    
+    // Set loading state
     setActivityLoading(true)
+    
     try {
       console.log("Loading activity data for user:", user.id)
       
+      // Fetch all activity data in parallel
       const [papersRes, ideasRes, collabRes] = await Promise.all([
         supabase
           .from('documents')
@@ -169,17 +179,36 @@ export default function ProfilePage() {
       console.log("Activity data loaded:", {
         papers: papersRes.count,
         ideas: ideasRes.count,
-        collaborations: collabRes.count
+        collaborations: collabRes.count,
+        papersError: papersRes.error,
+        ideasError: ideasRes.error,
+        collabError: collabRes.error
       })
 
-      setActivity({
-        papersExplored: papersRes.count ?? 0,
-        ideasGenerated: ideasRes.count ?? 0,
-        collaborations: collabRes.count ?? 0,
-      })
+      // Update state with new activity data
+      setActivity(prevActivity => ({
+        papersExplored: papersRes.error ? prevActivity.papersExplored : (papersRes.count ?? 0),
+        ideasGenerated: ideasRes.error ? prevActivity.ideasGenerated : (ideasRes.count ?? 0),
+        collaborations: collabRes.error ? prevActivity.collaborations : (collabRes.count ?? 0),
+      }))
+      
+      // Show success feedback
+      if (!papersRes.error && !ideasRes.error && !collabRes.error) {
+        toast({
+          title: "Activity Updated",
+          description: "Your activity overview has been refreshed.",
+          duration: 2000,
+        })
+      }
     } catch (e) {
       console.error("Error loading activity:", e)
-      setActivity({ papersExplored: 0, ideasGenerated: 0, collaborations: 0 })
+      toast({
+        title: "Error",
+        description: "Failed to load activity data. Please try again.",
+        variant: "destructive",
+      })
+      // Keep previous values on error
+      setActivity(prevActivity => prevActivity)
     } finally {
       setActivityLoading(false)
     }
@@ -427,9 +456,15 @@ export default function ProfilePage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={loadActivity}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    loadActivity()
+                  }}
                   disabled={activityLoading}
                   className="h-6 w-6 p-0"
+                  type="button"
+                  aria-label="Refresh activity"
                 >
                   <RefreshCw className={`h-4 w-4 ${activityLoading ? 'animate-spin' : ''}`} />
                 </Button>

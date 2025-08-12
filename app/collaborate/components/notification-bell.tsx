@@ -148,13 +148,13 @@ export default function NotificationBell() {
     }
   }, [user, session, apiCall])
 
-  // Initial load
+  // Initial load - only when user/session changes, not on every render
   useEffect(() => {
     if (user && session) {
       loadNotifications()
       loadPreferences()
     }
-  }, [user, session, loadNotifications, loadPreferences])
+  }, [user?.id, session?.access_token]) // Only re-run when user ID or session token actually changes
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {

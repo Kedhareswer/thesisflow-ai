@@ -87,7 +87,7 @@ class SocketService {
   }
 
   // Update user status (online, offline, away)
-  updateUserStatus(status: "online" | "offline" | "away"): void {
+  async updateUserStatus(status: "online" | "offline" | "away"): Promise<void> {
     if (!this.socket || !this.userId) return
 
     this.socket.emit(SocketEvent.USER_STATUS_CHANGE, {
@@ -96,15 +96,18 @@ class SocketService {
     })
 
     // Also update in Supabase
-    supabase
-      .from("user_profiles")
-      .update({
-        status,
-        last_active: new Date().toISOString(),
-      })
-      .eq("id", this.userId)
-      .then(() => console.log(`User status updated to ${status}`))
-      .catch((err) => console.error("Error updating user status:", err))
+    try {
+      await supabase
+        .from("user_profiles")
+        .update({
+          status,
+          last_active: new Date().toISOString(),
+        })
+        .eq("id", this.userId)
+      console.log(`User status updated to ${status}`)
+    } catch (err) {
+      console.error("Error updating user status:", err)
+    }
   }
 
   // Notify that user is typing
@@ -167,15 +170,22 @@ export function useSocket(userId: string | null) {
   const [socket, setSocket] = useState<Socket | null>(null)
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId) {
+      // Clean up socket when user logs out
+      socketService.disconnect()
+      setSocket(null)
+      return
+    }
 
+    // Only initialize if not already connected or user changed
     const newSocket = socketService.initialize(userId)
     setSocket(newSocket)
 
     return () => {
-      // No need to disconnect here as we want to maintain the singleton
+      // Only disconnect if user logs out, not on component unmount
+      // This prevents unnecessary disconnections during navigation
     }
-  }, [userId])
+  }, [userId]) // Only re-run when userId actually changes
 
   return socket
 }

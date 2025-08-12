@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -127,21 +127,29 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
   const [localProvider, setLocalProvider] = useState<AIProvider | undefined>(selectedProvider)
   const [localModel, setLocalModel] = useState<string | undefined>(selectedModel)
 
-  // Update topic field when currentTopic changes, but only if different and not currently editing
-  useEffect(() => {
-    if (currentTopic && currentTopic !== topic && !topicExploration.loading) {
-      setTopic(currentTopic)
-    }
-  }, [currentTopic])
-
   const topicExploration = useAsync<{
     content: string
     topic: string
     depth: number
     timestamp: string
   }>(EnhancedResearchService.exploreTopics)
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleTopicExploration = async () => {
+  useEffect(() => {
+    if (currentTopic && currentTopic !== topic && !topicExploration.loading) {
+      setTopic(currentTopic)
+    }
+  }, [currentTopic, topic, topicExploration.loading])
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handleTopicExploration = useCallback(() => {
     if (!topic.trim()) {
       toast({
         title: "Missing Topic",
@@ -151,30 +159,37 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
       return
     }
 
-    try {
-      const depthNumber = parseInt(depth, 10)
-      await topicExploration.execute(topic, depthNumber, additionalContext, localProvider, localModel)
-
-      // Add topic to research session after successful execution
-      // The insights will be added separately when the data is available
-      addTopic({
-        name: topic,
-        description: `Explored at depth ${depthNumber}/5`,
-        confidence: depthNumber / 5, // Convert depth to confidence score
-      })
-
-      toast({
-        title: "Topic Explored",
-        description: "AI-powered research overview generated and saved to your research session.",
-      })
-    } catch (error) {
-      toast({
-        title: "Exploration Failed",
-        description: error instanceof Error ? error.message : "Failed to explore topic. Please try again.",
-        variant: "destructive",
-      })
+    // Clear any existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
     }
-  }
+
+    // Set new debounce timeout
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        const depthNumber = parseInt(depth, 10)
+        await topicExploration.execute(topic, depthNumber, additionalContext, localProvider, localModel)
+
+        // Add topic to research session after successful execution
+        addTopic({
+          name: topic,
+          description: `Explored at depth ${depthNumber}/5`,
+          confidence: depthNumber / 5, // Convert depth to confidence score
+        })
+
+        toast({
+          title: "Topic Explored",
+          description: "AI-powered research overview generated and saved to your research session.",
+        })
+      } catch (error) {
+        toast({
+          title: "Exploration Failed",
+          description: error instanceof Error ? error.message : "Failed to explore topic. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }, 500) // 500ms debounce
+  }, [topic, depth, additionalContext, localProvider, localModel, topicExploration.execute, addTopic, toast])
 
   // Update topic with insights when exploration data is available
   useEffect(() => {
