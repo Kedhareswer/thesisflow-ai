@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,7 +35,7 @@ export default function MinimalAIProviderSelector({
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
-  const loadProviders = async () => {
+  const loadProviders = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -74,7 +74,7 @@ export default function MinimalAIProviderSelector({
     } finally {
       setLoading(false)
     }
-  }
+  }, [onProviderChange, selectedProvider])
 
   useEffect(() => {
     loadProviders()

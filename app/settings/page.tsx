@@ -58,14 +58,24 @@ export default function SettingsPage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase.from("user_settings").select("*").eq("user_id", user.id).single()
+      console.log("Loading settings for user:", user.id)
+      const { data, error } = await supabase
+        .from("user_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle()
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error loading settings:", error)
-        return
+      if (error) {
+        console.log("Settings query result:", { data, error })
+        // PGRST116 is "not found" which is expected for new users
+        if (error.code !== "PGRST116") {
+          console.error("Error loading settings:", error)
+          return
+        }
       }
 
       if (data) {
+        console.log("Found existing settings:", data)
         setSettings({
           email_notifications: data.email_notifications ?? true,
           research_updates: data.research_updates ?? true,
@@ -78,6 +88,8 @@ export default function SettingsPage() {
           auto_save: data.auto_save ?? true,
           data_sharing: data.data_sharing ?? false,
         })
+      } else {
+        console.log("No settings found, using defaults")
       }
     } catch (error) {
       console.error("Error loading settings:", error)
@@ -94,7 +106,7 @@ export default function SettingsPage() {
         .from("user_settings")
         .select("id")
         .eq("user_id", user.id)
-        .single()
+        .maybeSingle()
 
       if (checkError && checkError.code !== "PGRST116") {
         console.error("Error checking existing settings:", checkError)
