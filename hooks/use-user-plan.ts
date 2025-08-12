@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { planCache } from '@/lib/services/cache.service'
 
 interface UserPlan {
-  plan_type: 'free' | 'professional' | 'enterprise'
+  plan_type: 'free' | 'pro' | 'enterprise'
   status: 'active' | 'cancelled' | 'expired' | 'suspended'
   current_period_end: string
 }
@@ -150,10 +150,13 @@ export function useUserPlan() {
     return planData?.plan?.plan_type || 'free'
   }, [planData])
 
-  const isProfessionalOrHigher = useCallback((): boolean => {
+  const isProOrHigher = useCallback((): boolean => {
     const planType = getPlanType()
-    return planType === 'professional' || planType === 'enterprise'
+    return planType === 'pro' || planType === 'professional' || planType === 'enterprise'
   }, [getPlanType])
+
+  // Alias for backward compatibility
+  const isProfessionalOrHigher = isProOrHigher
 
   const isEnterprise = useCallback((): boolean => {
     return getPlanType() === 'enterprise'
@@ -236,7 +239,8 @@ export function useUserPlan() {
     canUseFeature,
     getUsageForFeature,
     getPlanType,
-    isProfessionalOrHigher,
+    isProOrHigher,
+    isProfessionalOrHigher, // Backward compatibility
     isEnterprise,
     isPlanDataReady,
   }

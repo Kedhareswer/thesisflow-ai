@@ -158,42 +158,70 @@ export default function ProfilePage() {
     try {
       console.log("Loading activity data for user:", user.id)
       
-      // Fetch all activity data in parallel
-      const [papersRes, ideasRes, collabRes] = await Promise.all([
-        supabase
-          .from('documents')
-          .select('id', { count: 'exact', head: true })
-          .eq('owner_id', user.id)
-          .eq('document_type', 'paper'),
-        supabase
-          .from('research_ideas')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'active'),
-        supabase
-          .from('team_members')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id),
-      ])
+      // Fetch activity data from the user_activity table
+      const { data: activityData, error } = await supabase
+        .from('user_activity')
+        .select('papers_explored, ideas_generated, collaborations')
+        .eq('user_id', user.id)
+        .maybeSingle()
 
       console.log("Activity data loaded:", {
-        papers: papersRes.count,
-        ideas: ideasRes.count,
-        collaborations: collabRes.count,
-        papersError: papersRes.error,
-        ideasError: ideasRes.error,
-        collabError: collabRes.error
+        data: activityData,
+        error: error
       })
 
-      // Update state with new activity data
-      setActivity(prevActivity => ({
-        papersExplored: papersRes.error ? prevActivity.papersExplored : (papersRes.count ?? 0),
-        ideasGenerated: ideasRes.error ? prevActivity.ideasGenerated : (ideasRes.count ?? 0),
-        collaborations: collabRes.error ? prevActivity.collaborations : (collabRes.count ?? 0),
-      }))
+      if (error) {
+        console.error("Error loading activity:", error)
+        // If error, try to create a new activity record
+        const { data: newActivity, error: insertError } = await supabase
+          .from('user_activity')
+          .insert({
+            user_id: user.id,
+            papers_explored: 0,
+            ideas_generated: 0,
+            collaborations: 0
+          })
+          .select()
+          .single()
+        
+        if (!insertError && newActivity) {
+          setActivity({
+            papersExplored: newActivity.papers_explored ?? 0,
+            ideasGenerated: newActivity.ideas_generated ?? 0,
+            collaborations: newActivity.collaborations ?? 0,
+          })
+        }
+      } else if (activityData) {
+        // Update state with the fetched activity data
+        setActivity({
+          papersExplored: activityData.papers_explored ?? 0,
+          ideasGenerated: activityData.ideas_generated ?? 0,
+          collaborations: activityData.collaborations ?? 0,
+        })
+      } else {
+        // No data found, create a new record
+        const { data: newActivity, error: insertError } = await supabase
+          .from('user_activity')
+          .insert({
+            user_id: user.id,
+            papers_explored: 0,
+            ideas_generated: 0,
+            collaborations: 0
+          })
+          .select()
+          .single()
+        
+        if (!insertError && newActivity) {
+          setActivity({
+            papersExplored: newActivity.papers_explored ?? 0,
+            ideasGenerated: newActivity.ideas_generated ?? 0,
+            collaborations: newActivity.collaborations ?? 0,
+          })
+        }
+      }
       
       // Show success feedback
-      if (!papersRes.error && !ideasRes.error && !collabRes.error) {
+      if (!error || activityData) {
         toast({
           title: "Activity Updated",
           description: "Your activity overview has been refreshed.",
