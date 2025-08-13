@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
-import { headers } from 'next/headers'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia'
+  apiVersion: '2025-07-30.basil'
 })
 
 const supabaseAdmin = createClient(
@@ -25,7 +24,7 @@ function mapSubscriptionStatus(status: string, planType: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
-    const signature = headers().get('stripe-signature')!
+    const signature = request.headers.get('stripe-signature')!
 
     let event: Stripe.Event
 
@@ -99,8 +98,8 @@ export async function POST(request: NextRequest) {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id,
               status: subscription.status,
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              current_period_start: new Date(((subscription as any).current_period_start || 0) * 1000).toISOString(),
+              current_period_end: new Date(((subscription as any).current_period_end || 0) * 1000).toISOString(),
               cancel_at_period_end: subscription.cancel_at_period_end,
               updated_at: new Date().toISOString()
             })
@@ -141,7 +140,7 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription as string
+        const subscriptionId = (invoice as any).subscription as string
         
         if (subscriptionId) {
           // Retrieve subscription to get user ID
@@ -161,7 +160,7 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription as string
+        const subscriptionId = (invoice as any).subscription as string
         
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
