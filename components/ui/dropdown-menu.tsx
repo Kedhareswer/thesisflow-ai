@@ -37,6 +37,30 @@ export function DropdownMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  const handleItemClick = () => {
+    handleOpenChange(false)
+  }
+
+  // Clone children to add onClick handlers that close the menu
+  const childrenWithCloseHandler = React.Children.map(children, (child) => {
+    if (React.isValidElement(child)) {
+      const childElement = child as React.ReactElement<React.HTMLAttributes<HTMLElement>>
+      const originalOnClick = childElement.props?.onClick
+      
+      return React.cloneElement(childElement, {
+        onClick: (e: React.MouseEvent<HTMLElement>) => {
+          // Call original onClick if it exists
+          if (originalOnClick && typeof originalOnClick === 'function') {
+            originalOnClick(e)
+          }
+          // Close the menu
+          handleOpenChange(false)
+        }
+      })
+    }
+    return child
+  })
+
   return (
     <div className="relative" ref={menuRef} {...props}>
       <div onClick={() => handleOpenChange(!isOpen)}>{trigger}</div>
@@ -47,7 +71,7 @@ export function DropdownMenu({
             className
           )}
         >
-          {children}
+          {childrenWithCloseHandler}
         </div>
       )}
     </div>

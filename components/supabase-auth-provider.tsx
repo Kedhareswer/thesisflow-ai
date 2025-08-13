@@ -265,9 +265,20 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       setIsLoading(true)
       const { error } = await supabase.auth.signOut()
       if (error) throw error
+
+      // Clear all caches on logout
+      if (typeof window !== 'undefined') {
+        const { clearAllCaches } = await import('@/lib/services/cache.service')
+        clearAllCaches()
+      }
+
+      toast({
+        title: "Logged out successfully",
+        description: "See you next time!",
+      })
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Sign-Out Failed",
         description: error instanceof Error ? error.message : "Failed to sign out",
         variant: "destructive",
       })

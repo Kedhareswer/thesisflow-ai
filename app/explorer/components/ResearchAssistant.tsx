@@ -1,0 +1,576 @@
+"use client"
+
+import { useState, useRef, useEffect, useCallback } from "react"
+import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import { motion, AnimatePresence } from "framer-motion"
+import { type AIProvider, AI_PROVIDERS, AIProviderService } from "@/lib/ai-providers"
+import { AIProviderDetector } from "@/lib/ai-provider-detector"
+import { useToast } from "@/hooks/use-toast"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useResearchSession } from "@/components/research-session-provider"
+import { Badge } from "@/components/ui/badge"
+
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+  provider?: AIProvider
+  model?: string
+}
+
+interface Personality {
+  key: string
+  name: string
+  description: string
+  systemPrompt: string
+  icon: any
+  color: [number, number, number]
+}
+
+interface ResearchAssistantProps {
+  personalities?: Personality[]
+  selectedPersonality?: Personality
+  onPersonalityChange?: (personality: Personality) => void
+}
+
+export function ResearchAssistant({ 
+  personalities = [],
+  selectedPersonality,
+  onPersonalityChange 
+}: ResearchAssistantProps) {
+  const { toast } = useToast()
+  const { 
+    session, 
+    buildResearchContext, 
+    addChatMessage, 
+    hasContext, 
+    contextSummary 
+  } = useResearchSession()
+  const [value, setValue] = useState("")
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  
+  // Chat state
+  // Initialize messages from session chat history
+  const [messages, setMessages] = useState<Message[]>(() => 
+    session.chatHistory.map((msg, index) => ({
+      id: `session-${index}`,
+      role: msg.role,
+      content: msg.content,
+      timestamp: new Date(msg.timestamp),
+      provider: session.preferences.aiProvider as AIProvider || 'gemini',
+      model: session.preferences.aiModel || 'gemini-pro'
+    }))
+  )
+  const [isTyping, setIsTyping] = useState(false)
+  const [contextCollapsed, setContextCollapsed] = useState(false)
+  
+  // AI Provider state
+  const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
+  const [selectedModel, setSelectedModel] = useState<string>("")
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+
+  // Auto-resize textarea
+  const adjustHeight = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    
+    textarea.style.height = "auto"
+    const newHeight = Math.min(textarea.scrollHeight, 200)
+    textarea.style.height = `${newHeight}px`
+  }, [])
+
+  // Load available providers on mount
+  useEffect(() => {
+    const loadProviders = async () => {
+      setIsLoading(true)
+      try {
+        const providers = await AIProviderDetector.getClientAvailableProviders()
+        setAvailableProviders(providers)
+        
+        if (providers.length > 0 && !selectedProvider) {
+          const defaultProvider = providers[0]
+          setSelectedProvider(defaultProvider)
+          const models = AI_PROVIDERS[defaultProvider].models
+          setAvailableModels(models)
+          setSelectedModel(models[0])
+        }
+      } catch (error) {
+        console.error("Error loading AI providers:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load AI providers",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProviders()
+  }, [])
+
+  // Update models when provider changes
+  useEffect(() => {
+    if (selectedProvider) {
+      const models = AI_PROVIDERS[selectedProvider].models
+      setAvailableModels(models)
+      if (!models.includes(selectedModel)) {
+        setSelectedModel(models[0])
+      }
+    }
+  }, [selectedProvider, selectedModel])
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }, [messages])
+
+  const handleSendMessage = async () => {
+    if (!value.trim() || isSending || !selectedProvider || !selectedModel) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: value.trim(),
+      timestamp: new Date(),
+      provider: selectedProvider,
+      model: selectedModel
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setValue("")
+    adjustHeight()
+    setIsSending(true)
+    setIsTyping(true)
+
+    try {
+      // Build comprehensive system prompt with session context
+      const basePrompt = selectedPersonality?.systemPrompt || 
+        "You are a helpful research assistant. Provide clear, accurate, and detailed responses."
+      
+      // Get current research context from session
+      const researchContext = buildResearchContext()
+      
+      const systemPrompt = researchContext 
+        ? `${basePrompt}
+
+=== CURRENT RESEARCH CONTEXT ===
+${researchContext}
+
+Use this research context to provide more relevant and targeted responses. Reference specific papers, topics, or ideas from the context when relevant.`
+        : basePrompt
+      
+      // Prepare conversation history for context (compact transcript)
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
+      // Compose a single prompt including system context and concise chat history
+      const transcript = conversationHistory
+        .slice(-12) // keep recent turns to control token usage
+        .map(m => `${m.role.toUpperCase()}: ${m.content}`)
+        .join("\n")
+
+      const composedPrompt = `${systemPrompt}
+
+=== CONVERSATION SO FAR ===
+${transcript || "(no prior messages)"}
+
+USER: ${value.trim()}
+ASSISTANT:`
+
+      const apiResponse = await AIProviderService.generateResponse(
+        composedPrompt,
+        selectedProvider,
+        selectedModel
+      )
+
+      // Handle both AIResponse type and API response format
+      const content = typeof apiResponse === 'string' 
+        ? apiResponse 
+        : (apiResponse as any).response || apiResponse.content || 'No response received'
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content,
+        timestamp: new Date(),
+        provider: selectedProvider,
+        model: selectedModel
+      }
+      
+      setMessages(prev => [...prev, assistantMessage])
+      
+      // Save both messages to session
+      addChatMessage('user', value.trim(), researchContext ? ['research_context'] : undefined)
+      addChatMessage('assistant', content, researchContext ? ['research_context'] : undefined)
+    } catch (error) {
+      console.error("Error sending message:", error)
+      toast({
+        title: "Error",
+        description: "Failed to get response from AI provider",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSending(false)
+      setIsTyping(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast({
+      title: "Copied",
+      description: "Message copied to clipboard"
+    })
+  }
+
+  const clearChat = () => {
+    setMessages([])
+    setValue("")
+    // Clear chat from session as well
+    const { clearChatHistory } = useResearchSession()
+    clearChatHistory()
+    toast({
+      title: "Chat Cleared",
+      description: "All messages have been cleared from chat and session."
+    })
+  }
+
+  const getProviderIcon = (provider: AIProvider) => {
+    const config = AI_PROVIDERS[provider]
+    if (config.name === "OpenAI") {
+      return "🤖"
+    } else if (config.name === "Google Gemini") {
+      return "✨"
+    } else if (config.name === "Anthropic") {
+      return "🧠"
+    } else if (config.name === "Mistral AI") {
+      return "🌊"
+    }
+    return <Bot className="w-4 h-4" />
+  }
+
+  return (
+    <div className="flex flex-col h-[75vh] md:h-[80vh] lg:h-[85vh] bg-white rounded-lg border">
+      {/* Header */}
+      <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold">Research Assistant</h3>
+          {selectedPersonality && (
+            <span className="text-sm text-muted-foreground">
+              ({selectedPersonality.name} mode)
+            </span>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearChat}
+          disabled={messages.length === 0}
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Clear
+        </Button>
+      </div>
+
+      {/* Messages */}
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-8">
+        {messages.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            <Bot className="w-14 h-14 mx-auto mb-4 opacity-50" />
+            <p>Start a conversation with your AI research assistant</p>
+            <p className="text-sm mt-2">
+              Select a provider and model, then type your message below
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex gap-3",
+                  message.role === "user" ? "justify-end" : "justify-start"
+                )}
+              >
+                {message.role === "assistant" && (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-primary" />
+                  </div>
+                )}
+                                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-xl px-6 py-4",
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    )}
+                  >
+                    <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs opacity-70">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
+                    {message.role === "assistant" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={() => copyToClipboard(message.content)}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {message.role === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                    <User className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {isTyping && (
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-primary" />
+                </div>
+                <div className="bg-muted rounded-lg px-4 py-2">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </ScrollArea>
+
+      {/* Input Area */}
+      <div className="border-t bg-muted/30 px-6 py-6">
+        {/* Research Context Display */}
+        {hasContext && (
+          contextCollapsed ? (
+            <div className="mb-5 px-4 py-2 w-full bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200/60 flex items-center justify-between">
+              <span className="text-xs text-emerald-700">Session context hidden</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2"
+                onClick={() => setContextCollapsed(false)}
+                aria-label="Expand context"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-5 p-4 md:p-5 min-h-[80px] w-full bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200/60"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                    <Brain className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    Enhanced Context Available
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 border-0">
+                    Session Context
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={() => setContextCollapsed(true)}
+                    aria-label="Collapse context"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-700 mb-1">
+                {contextSummary}
+              </p>
+              <p className="text-xs text-gray-500">
+                🎯 AI responses will be tailored to your research context
+              </p>
+            </motion.div>
+          )
+        )}
+        
+        <div className="flex items-center gap-3 mb-4">
+          {/* Provider Dropdown */}
+          <DropdownMenu
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isLoading || availableProviders.length === 0}
+                className="h-8"
+              >
+                {selectedProvider ? (
+                  <>
+                    {getProviderIcon(selectedProvider)}
+                    <span className="ml-2">{AI_PROVIDERS[selectedProvider].name}</span>
+                  </>
+                ) : (
+                  <>
+                    <Bot className="w-4 h-4" />
+                    <span className="ml-2">Select Provider</span>
+                  </>
+                )}
+                <ChevronDown className="w-3 h-3 ml-2" />
+              </Button>
+            }
+          >
+            {availableProviders.map((provider) => (
+              <DropdownMenuItem
+                key={provider}
+                onClick={() => setSelectedProvider(provider)}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    {getProviderIcon(provider)}
+                    <span>{AI_PROVIDERS[provider].name}</span>
+                  </div>
+                  {selectedProvider === provider && (
+                    <Check className="w-4 h-4 text-primary" />
+                  )}
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenu>
+
+          {/* Model Dropdown */}
+          <DropdownMenu
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selectedProvider || availableModels.length === 0}
+                className="h-8"
+              >
+                <span>{selectedModel || "Select Model"}</span>
+                <ChevronDown className="w-3 h-3 ml-2" />
+              </Button>
+            }
+          >
+            {availableModels.map((model) => (
+              <DropdownMenuItem
+                key={model}
+                onClick={() => setSelectedModel(model)}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span>{model}</span>
+                  {selectedModel === model && (
+                    <Check className="w-4 h-4 text-primary" />
+                  )}
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenu>
+
+          {/* Personality Selector */}
+          {personalities.length > 0 && (
+            <DropdownMenu
+              trigger={
+                <Button variant="outline" size="sm" className="h-8">
+                  {selectedPersonality ? (
+                    <>
+                      <selectedPersonality.icon className="w-4 h-4" />
+                      <span className="ml-2">{selectedPersonality.name}</span>
+                    </>
+                  ) : (
+                    <span>Select Personality</span>
+                  )}
+                  <ChevronDown className="w-3 h-3 ml-2" />
+                </Button>
+              }
+            >
+              {personalities.map((personality) => (
+                <DropdownMenuItem
+                  key={personality.key}
+                  onClick={() => onPersonalityChange?.(personality)}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <personality.icon className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">{personality.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {personality.description}
+                        </div>
+                      </div>
+                    </div>
+                    {selectedPersonality?.key === personality.key && (
+                      <Check className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenu>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <Textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value)
+              adjustHeight()
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask your research question..."
+            className="min-h-[110px] max-h-[320px] resize-none text-sm"
+            disabled={isSending}
+          />
+          <Button
+            onClick={handleSendMessage}
+            disabled={!value.trim() || isSending || !selectedProvider || !selectedModel}
+            className="px-4"
+          >
+            {isSending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ArrowRight className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

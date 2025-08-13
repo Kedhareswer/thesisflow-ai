@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { UpgradeBanner } from "@/components/ui/upgrade-banner";
 import { useSupabaseAuth } from "@/components/supabase-auth-provider";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,14 +36,21 @@ export function SmartUpgradeBanner({
   const [isVisible, setIsVisible] = React.useState(false);
   const [userPlan, setUserPlan] = React.useState<UserPlan | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [mounted, setMounted] = React.useState(false);
   const { user } = useSupabaseAuth();
   const { toast } = useToast();
+
+  // Prevent flash on mount
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check user plan and usage
   React.useEffect(() => {
     const checkUserPlan = async () => {
       if (!user) {
         setLoading(false);
+        setIsVisible(false);
         return;
       }
 
@@ -64,6 +72,7 @@ export function SmartUpgradeBanner({
         setIsVisible(shouldShow);
       } catch (error) {
         console.error('Error checking user plan:', error);
+        setIsVisible(false);
       } finally {
         setLoading(false);
       }
@@ -93,8 +102,12 @@ export function SmartUpgradeBanner({
     }
   };
 
-  // Don't show if loading or not visible
-  if (loading || !isVisible) {
+  // Don't show if loading or not visible - prevent flash
+  if (!mounted || loading) {
+    return null;
+  }
+
+  if (!isVisible) {
     return null;
   }
 
@@ -121,13 +134,24 @@ export function SmartUpgradeBanner({
   };
 
   return (
-    <UpgradeBanner
-      buttonText={getButtonText()}
-      description={getMessage()}
-      onClose={handleClose}
-      onClick={handleUpgradeClick}
-      className={className}
-    />
+    <AnimatePresence mode="wait">
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className={className}
+        >
+          <UpgradeBanner
+            buttonText={getButtonText()}
+            description={getMessage()}
+            onClose={handleClose}
+            onClick={handleUpgradeClick}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

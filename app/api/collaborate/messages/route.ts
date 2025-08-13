@@ -44,25 +44,46 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Use raw SQL query for better reliability
-    const { data: messages, error } = await supabaseAdmin
-      .rpc('get_team_messages', {
-        p_team_id: teamId,
-        p_limit: limit,
-        p_before: before || null,
-        p_after: after || null
-      });
+    // Try RPC first; if not available, fall back to direct query
+    let messages: any[] | null = null
+    let rpcError: any = null
+    try {
+      const rpc = await supabaseAdmin
+        .rpc('get_team_messages', {
+          p_team_id: teamId,
+          p_limit: limit,
+          p_before: before || null,
+          p_after: after || null
+        })
+      messages = rpc.data as any[] | null
+      rpcError = rpc.error
+    } catch (e) {
+      rpcError = e
+    }
 
+    if (!messages || rpcError) {
+      // Fallback: query chat_messages directly
+      let query = supabaseAdmin
+        .from('chat_messages')
+        .select(
+          'id, content, message_type, created_at, team_id, sender_id, mentions, metadata'
+        )
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
 
+      if (before) query = query.lt('created_at', before)
+      if (after) query = query.gt('created_at', after)
 
-
-
-    if (error) {
-      console.error('Error fetching messages:', error);
-      return NextResponse.json(
-        { error: "Failed to fetch messages" },
-        { status: 500 }
-      );
+      const { data: rows, error: fallbackError } = await query
+      if (fallbackError) {
+        console.error('Error fetching messages (fallback):', fallbackError, 'RPC error:', rpcError)
+        return NextResponse.json(
+          { error: 'Failed to fetch messages' },
+          { status: 500 }
+        )
+      }
+      messages = rows || []
     }
 
     // Format messages
@@ -73,12 +94,8 @@ export async function GET(request: NextRequest) {
       timestamp: msg.created_at,
       teamId: msg.team_id,
       senderId: msg.sender_id,
-      senderName: msg.sender_id === 'system' 
-        ? 'System' 
-        : msg.sender_full_name || 'Unknown User',
-      senderAvatar: msg.sender_id === 'system'
-        ? null
-        : msg.sender_avatar_url || null,
+      senderName: msg.sender_id === 'system' ? 'System' : 'Unknown User',
+      senderAvatar: msg.sender_id === 'system' ? null : null,
       mentions: msg.mentions || [],
       metadata: msg.metadata || {}
     }));

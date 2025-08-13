@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Bell, Loader2, Settings, Trash2, X, Check } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { TeamInvitation } from "@/components/ui/team-invitation"
+import { notificationCache } from '@/lib/services/cache.service'
 import {
   DropdownMenu,
   DropdownMenuItem,
@@ -93,11 +94,24 @@ export default function NotificationBell() {
     }
 
     return response.json()
-  }, [session])
+  }, [session?.access_token])
 
-  // Load notifications
-  const loadNotifications = useCallback(async () => {
+  // Load notifications with caching
+  const loadNotifications = useCallback(async (forceRefresh = false) => {
     if (!user || !session) return
+
+    const cacheKey = `notifications_${user.id}`
+    
+    // Check cache first unless force refresh
+    if (!forceRefresh) {
+      const cached = notificationCache.get<{notifications: Notification[], unreadCount: number}>(cacheKey)
+      if (cached) {
+        setNotifications(cached.notifications || [])
+        setUnreadCount(cached.unreadCount || 0)
+        setIsLoading(false)
+        return
+      }
+    }
 
     try {
       setIsLoading(true)
@@ -105,8 +119,15 @@ export default function NotificationBell() {
       const data = await apiCall('/api/collaborate/notifications?limit=20')
       
       if (data.success) {
-        setNotifications(data.notifications || [])
-        setUnreadCount(data.unreadCount || 0)
+        const notificationData = {
+          notifications: data.notifications || [],
+          unreadCount: data.unreadCount || 0
+        }
+        setNotifications(notificationData.notifications)
+        setUnreadCount(notificationData.unreadCount)
+        
+        // Cache for 2 minutes
+        notificationCache.set(cacheKey, notificationData, 2 * 60 * 1000)
       }
     } catch (error) {
       console.error('Error loading notifications:', error)
@@ -118,20 +139,38 @@ export default function NotificationBell() {
           variant: "destructive",
         })
       }
+      
+      // Try stale cache on error
+      const staleCache = notificationCache.get<{notifications: Notification[], unreadCount: number}>(cacheKey)
+      if (staleCache) {
+        setNotifications(staleCache.notifications || [])
+        setUnreadCount(staleCache.unreadCount || 0)
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [user, session, apiCall, toast, notifications.length])
+  }, [user?.id, session?.access_token, apiCall, toast])
 
-  // Load notification preferences
-  const loadPreferences = useCallback(async () => {
+  // Load notification preferences with caching
+  const loadPreferences = useCallback(async (forceRefresh = false) => {
     if (!user || !session) return
+
+    const cacheKey = `notif_prefs_${user.id}`
+    
+    // Check cache first
+    if (!forceRefresh) {
+      const cached = notificationCache.get<NotificationPreferences>(cacheKey)
+      if (cached) {
+        setPreferences(cached)
+        return
+      }
+    }
 
     try {
       const data = await apiCall('/api/collaborate/notification-preferences')
       
       if (data.success && data.preferences) {
-        setPreferences({
+        const prefs = {
           team_invitations: data.preferences.team_invitations,
           member_added: data.preferences.member_added,
           new_messages: data.preferences.new_messages,
@@ -140,21 +179,29 @@ export default function NotificationBell() {
           role_changes: data.preferences.role_changes,
           email_notifications: data.preferences.email_notifications,
           push_notifications: data.preferences.push_notifications,
-        })
+        }
+        setPreferences(prefs)
+        
+        // Cache preferences for 10 minutes
+        notificationCache.set(cacheKey, prefs, 10 * 60 * 1000)
       }
     } catch (error) {
       console.error('Error loading preferences:', error)
-      // Silently fail on preferences load to prevent UI issues
+      // Try stale cache on error
+      const staleCache = notificationCache.get<NotificationPreferences>(cacheKey)
+      if (staleCache) {
+        setPreferences(staleCache)
+      }
     }
-  }, [user, session, apiCall])
+  }, [user?.id, session?.access_token, apiCall])
 
-  // Initial load
+  // Initial load - only when user/session changes, not on every render
   useEffect(() => {
     if (user && session) {
       loadNotifications()
       loadPreferences()
     }
-  }, [user, session, loadNotifications, loadPreferences])
+  }, [user?.id, session?.access_token, loadNotifications, loadPreferences]) // Only re-run when user ID or session token actually changes
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {

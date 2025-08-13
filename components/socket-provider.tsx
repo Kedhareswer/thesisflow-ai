@@ -118,10 +118,11 @@ export function SocketProvider({ children }: SocketProviderProps) {
     setSocket(socketInstance)
 
     return () => {
-      console.log("Cleaning up socket connection")
-      socketInstance.close()
+      if (socketInstance) {
+        socketInstance.disconnect()
+      }
     }
-  }, [])
+  }, []) // Empty dependency array - only run once on mount
 
   return (
     <SocketContext.Provider

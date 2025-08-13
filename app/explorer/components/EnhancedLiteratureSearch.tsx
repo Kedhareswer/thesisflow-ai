@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +46,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
     sort_order: 'desc'
   })
   const [lastSearchQuery, setLastSearchQuery] = useState<string>('')
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Initialize search state manually since we're using API endpoint
   const [paperSearch, setPaperSearch] = useState<{
@@ -59,7 +60,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
   })
   const filterOptions = EnhancedSearchService.getFilterOptions()
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) return
 
     // Check if user can perform literature search
@@ -130,24 +131,24 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       // Update state with search results
       setPaperSearch(prev => ({ ...prev, data: searchResult, loading: false, error: null }))
 
-             // Add papers to research session
-       if (searchResult.papers.length > 0) {
-         addPapers(searchResult.papers, query.trim(), filters)
-         
-         // Increment usage after successful search
-         await incrementUsage('literature_searches')
-         
-         toast({
-           title: "Search Complete",
-           description: `Found ${searchResult.papers.length} papers from ${searchResult.sources.join(', ') || 'academic databases'} (${searchResult.search_time}ms)${data.fallback ? ' - using demo data' : ''}`,
-         })
-       } else {
-         toast({
-           title: "No Results",
-           description: "No papers found for your search. Try different keywords or check your filters.",
-           variant: "destructive",
-         })
-       }
+      // Add papers to research session
+      if (searchResult.papers.length > 0) {
+        addPapers(searchResult.papers, query.trim(), filters)
+        
+        // Increment usage after successful search
+        await incrementUsage('literature_searches')
+        
+        toast({
+          title: "Search Complete",
+          description: `Found ${searchResult.papers.length} papers from ${searchResult.sources.join(', ') || 'academic databases'} (${searchResult.search_time}ms)${data.fallback ? ' - using demo data' : ''}`,
+        })
+      } else {
+        toast({
+          title: "No Results",
+          description: "No papers found for your search. Try different keywords or check your filters.",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to search papers. Please try again."
       setPaperSearch(prev => ({ ...prev, loading: false, error: errorMessage }))
@@ -158,11 +159,30 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
         variant: "destructive",
       })
     }
-  }
+  }, [canUseFeature, filters, toast, addPapers, incrementUsage])
 
-  const handleFilterChange = (key: keyof SearchFilters, value: any) => {
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handleFilterChange = useCallback((key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }))
-  }
+    
+    // Auto-search with debounce when filters change (only if there's a query)
+    if (lastSearchQuery.trim()) {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+      
+      debounceTimeoutRef.current = setTimeout(() => {
+        handleSearch(lastSearchQuery)
+      }, 500) // 500ms debounce
+    }
+  }, [lastSearchQuery, handleSearch])
 
   const handlePaperSelect = (paperId: string, selected: boolean) => {
     const newSelected = new Set(selectedPapers)

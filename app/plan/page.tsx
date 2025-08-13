@@ -1,20 +1,56 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall } from "lucide-react"
+import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall, Loader2, CreditCard, Settings } from "lucide-react"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { useToast } from "@/hooks/use-toast"
 import { RouteGuard } from "@/components/route-guard"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { loadStripe } from "@stripe/stripe-js"
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
 export default function PlanPage() {
-  const { planData, loading, getPlanType, getUsageForFeature, isProfessionalOrHigher, isEnterprise } = useUserPlan()
+  const { planData, loading, getPlanType, getUsageForFeature, isProOrHigher, isEnterprise } = useUserPlan()
   const { toast } = useToast()
+  const { session } = useSupabaseAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [processingCheckout, setProcessingCheckout] = useState(false)
+  const [processingPortal, setProcessingPortal] = useState(false)
+
+  // Handle success/cancel returns from Stripe
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast({
+        title: "Payment Successful!",
+        description: "Your subscription has been activated. Thank you for upgrading!",
+      })
+      // Clear the URL params
+      router.replace('/plan')
+    } else if (searchParams.get('canceled') === 'true') {
+      toast({
+        title: "Payment Canceled",
+        description: "Your upgrade was canceled. You can try again anytime.",
+        variant: "destructive"
+      })
+      router.replace('/plan')
+    } else if (searchParams.get('portal') === 'true') {
+      toast({
+        title: "Subscription Updated",
+        description: "Your subscription changes have been saved.",
+      })
+      router.replace('/plan')
+    }
+  }, [searchParams, toast, router])
 
   const planType = getPlanType()
   const planConfig = {
@@ -26,8 +62,8 @@ export default function PlanPage() {
       price: "$0",
       period: "forever"
     },
-    professional: {
-      name: "Professional",
+    pro: {
+      name: "Pro",
       icon: <Crown className="h-6 w-6" />,
       color: "bg-purple-500",
       description: "Enhanced features with higher limits",
@@ -50,11 +86,11 @@ export default function PlanPage() {
     switch (feature) {
       case 'literature_searches':
         return <Search className="h-4 w-4" />
-      case 'summaries':
+      case 'document_summaries':
         return <FileText className="h-4 w-4" />
       case 'team_members':
         return <Users className="h-4 w-4" />
-      case 'documents':
+      case 'document_uploads':
         return <FileText className="h-4 w-4" />
       case 'ai_generations':
         return <Sparkles className="h-4 w-4" />
@@ -67,11 +103,13 @@ export default function PlanPage() {
     switch (feature) {
       case 'literature_searches':
         return 'Literature Searches'
-      case 'summaries':
+      case 'document_summaries':
         return 'Document Summaries'
       case 'team_members':
         return 'Team Members'
-      case 'documents':
+      case 'team_collaboration':
+        return 'Team Collaboration'
+      case 'document_uploads':
         return 'Document Uploads'
       case 'ai_generations':
         return 'AI Generations'
@@ -88,14 +126,99 @@ export default function PlanPage() {
     })
   }
 
+  const handleCheckout = async (priceId: string, planType: string, billingPeriod: string) => {
+    if (!session?.access_token) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to upgrade your plan.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setProcessingCheckout(true)
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          priceId,
+          planType,
+          billingPeriod
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session')
+      }
+
+      const { url } = await response.json()
+      
+      // Redirect to Stripe Checkout
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Checkout error:', error)
+      toast({
+        title: "Checkout Failed",
+        description: "Unable to start checkout process. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingCheckout(false)
+    }
+  }
+
+  const handleManageSubscription = async () => {
+    if (!session?.access_token) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to manage your subscription.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setProcessingPortal(true)
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create portal session')
+      }
+
+      const { url } = await response.json()
+      
+      // Redirect to Stripe Customer Portal
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Portal error:', error)
+      toast({
+        title: "Portal Access Failed",
+        description: "Unable to access subscription management. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingPortal(false)
+    }
+  }
+
   const handleStartFreeTrial = () => {
-    // This would typically integrate with a payment processor like Stripe
-    toast({
-      title: "Start Free Trial",
-      description: "Redirecting to Professional plan setup... This feature will be available soon!",
-    })
-    // In a real implementation, this would redirect to Stripe or payment setup
-    // window.open('https://stripe.com/connect/oauth/authorize', '_blank')
+    // Pro plan monthly with 7-day trial
+    const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY || 'price_pro_monthly'
+    handleCheckout(priceId, 'pro', 'monthly')
   }
 
   const handleContactSales = () => {
@@ -227,92 +350,139 @@ Thank you!`)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                                 {/* Free Plan */}
-                 <div className={`p-4 rounded-lg border ${planType === 'free' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-                   <div className="flex items-center justify-between mb-2">
-                     <div className="flex items-center gap-2">
-                       <Zap className="h-4 w-4 text-blue-500" />
-                       <span className="font-semibold">Free</span>
-                     </div>
-                     <span className="text-lg font-bold">$0</span>
-                   </div>
-                   <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                     <li>• 50 literature searches/month</li>
-                     <li>• 20 document summaries/month</li>
-                     <li>• 10 document uploads/month</li>
-                     <li>• 30 AI generations/month</li>
-                     <li className="text-red-500">• No team collaboration</li>
-                   </ul>
-                   <Button 
-                     variant="outline" 
-                     className="w-full" 
-                     onClick={handleGetStarted}
-                   >
-                     Get Started
-                     <ArrowRight className="h-4 w-4 ml-2" />
-                   </Button>
-                 </div>
+                {planType === 'free' && (
+                  <div className={`p-4 rounded-lg border ${planType === 'free' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-blue-500" />
+                        <span className="font-semibold">Free</span>
+                      </div>
+                      <span className="text-lg font-bold">$0</span>
+                    </div>
+                    <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                      <li>• 5 literature searches/month</li>
+                      <li>• 3 document summaries/month</li>
+                      <li>• 3 document uploads/month</li>
+                      <li>• 10 AI generations/month</li>
+                      <li className="text-gray-400 line-through">• No team collaboration</li>
+                    </ul>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      disabled
+                    >
+                      Current Plan
+                      <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+                    </Button>
+                  </div>
+                )}
 
-                                 {/* Professional Plan */}
-                 <div className={`p-4 rounded-lg border ${planType === 'professional' ? 'border-purple-500 bg-purple-50' : 'border-gray-200'} relative`}>
-                   <Badge className="absolute -top-2 right-4 bg-gray-600 text-white text-xs">
-                     Most Popular
-                   </Badge>
-                   <div className="flex items-center justify-between mb-2">
-                     <div className="flex items-center gap-2">
-                       <Crown className="h-4 w-4 text-purple-500" />
-                       <span className="font-semibold">Professional</span>
-                     </div>
-                     <span className="text-lg font-bold">$29</span>
-                   </div>
-                   <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                     <li>• 500 literature searches/month</li>
-                     <li>• 200 document summaries/month</li>
-                     <li>• 100 document uploads/month</li>
-                     <li>• 300 AI generations/month</li>
-                     <li>• Team collaboration (up to 10 members)</li>
-                   </ul>
-                   <Button 
-                     className="w-full" 
-                     onClick={handleStartFreeTrial}
-                   >
-                     Start Free Trial
-                     <ArrowRight className="h-4 w-4 ml-2" />
-                   </Button>
-                 </div>
+                {/* Pro Plan */}
+                <div className={`p-4 rounded-lg border ${planType === 'pro' ? 'border-purple-500 bg-purple-50' : 'border-gray-200'} relative`}>
+                  <Badge className="absolute -top-2 right-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
+                    Most Popular
+                  </Badge>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-purple-500" />
+                      <span className="font-semibold">Pro</span>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-bold">$29</span>
+                      <span className="text-sm text-gray-500">/month</span>
+                    </div>
+                  </div>
+                  <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 500 literature searches/month</li>
+                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 200 document summaries/month</li>
+                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 100 document uploads/month</li>
+                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 300 AI generations/month</li>
+                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> Team collaboration (up to 10 members)</li>
+                  </ul>
+                  {planType === 'pro' ? (
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={handleManageSubscription}
+                      disabled={processingPortal}
+                    >
+                      {processingPortal ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          Manage Plan
+                          <Settings className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={handleStartFreeTrial}
+                      disabled={processingCheckout}
+                    >
+                      {processingCheckout ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Start 7-Day Trial
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
 
-                                 {/* Enterprise Plan */}
-                 <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
-                   <div className="flex items-center justify-between mb-2">
-                     <div className="flex items-center gap-2">
-                       <Sparkles className="h-4 w-4 text-pink-500" />
-                       <span className="font-semibold">Enterprise</span>
-                     </div>
-                     <span className="text-lg font-bold">Custom</span>
-                   </div>
-                   <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                     <li>• Unlimited literature searches</li>
-                     <li>• Unlimited document summaries</li>
-                     <li>• Unlimited document uploads</li>
-                     <li>• Unlimited AI generations</li>
-                     <li>• Unlimited team collaboration</li>
-                   </ul>
-                   <Button 
-                     variant="outline" 
-                     className="w-full" 
-                     onClick={handleContactSales}
-                   >
-                     Contact Sales
-                     <PhoneCall className="h-4 w-4 ml-2" />
-                   </Button>
-                 </div>
+                {/* Enterprise Plan */}
+                <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-pink-500" />
+                      <span className="font-semibold">Enterprise</span>
+                    </div>
+                    <span className="text-lg font-bold">Custom</span>
+                  </div>
+                  <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                    <li>• Unlimited literature searches</li>
+                    <li>• Unlimited document summaries</li>
+                    <li>• Unlimited document uploads</li>
+                    <li>• Unlimited AI generations</li>
+                    <li>• Unlimited team collaboration</li>
+                  </ul>
+                  {planType === 'enterprise' ? (
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      disabled
+                    >
+                      Current Plan
+                      <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={handleContactSales}
+                    >
+                      Contact Sales
+                      <PhoneCall className="h-4 w-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
 
-                {!isProfessionalOrHigher() && (
+                {!isProOrHigher() && (
                   <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
                     <DialogTrigger asChild>
                       <Button className="w-full" size="lg">
                         <Crown className="h-4 w-4 mr-2" />
-                        Upgrade to Professional
+                        Upgrade to Pro
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </DialogTrigger>
@@ -320,7 +490,7 @@ Thank you!`)
                       <DialogHeader>
                         <DialogTitle>Upgrade Your Plan</DialogTitle>
                         <DialogDescription>
-                          Get more features and higher limits with our Professional plan.
+                          Get more features and higher limits with our Pro plan.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -344,10 +514,27 @@ Thank you!`)
                           <CheckCircle className="h-4 w-4 text-green-500" />
                           <span>300 AI generations per month</span>
                         </div>
-                        <div className="pt-4">
-                          <Button onClick={handleStartFreeTrial} className="w-full">
-                            Start Free Trial
+                        <div className="pt-4 space-y-2">
+                          <Button 
+                            onClick={handleStartFreeTrial} 
+                            className="w-full"
+                            disabled={processingCheckout}
+                          >
+                            {processingCheckout ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Start 7-Day Free Trial
+                              </>
+                            )}
                           </Button>
+                          <p className="text-xs text-center text-gray-500">
+                            Cancel anytime. No credit card required for trial.
+                          </p>
                         </div>
                       </div>
                     </DialogContent>

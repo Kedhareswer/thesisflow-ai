@@ -1,4 +1,8 @@
 import { fetchOpenAlexWorks } from './openalex'
+// Polyfill DOMParser in Node.js environments (e.g. Next.js API routes)
+// `xmldom` is already included as a dependency in package.json
+// We alias it to `NodeDOMParser` to avoid shadowing the global DOMParser in browsers.
+import { DOMParser as NodeDOMParser } from 'xmldom'
 import { searchSemanticScholar, transformSemanticScholarPaper, getCitationData } from './semantic-scholar'
 import type { ResearchPaper, SearchFilters } from '@/lib/types/common'
 
@@ -91,7 +95,8 @@ async function searchArxiv(query: string, limit = 10): Promise<ResearchPaper[]> 
     const xml = await response.text()
     
     // Parse XML response
-    const parser = new DOMParser()
+    // Use browser DOMParser if available, otherwise fall back to NodeDOMParser
+const parser = typeof window === 'undefined' ? new NodeDOMParser() : new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
   const entries = Array.from(doc.getElementsByTagName('entry'))
     
@@ -156,11 +161,11 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
     console.log('[WhiteRose] Searching for:', query)
     
     // Use OAI-PMH ListRecords with proper filtering
+    // Note: some repositories have varying set names; to maximize compatibility, we omit 'set'
     const baseUrl = 'https://etheses.whiterose.ac.uk/cgi/oai2'
     const params = new URLSearchParams({
       verb: 'ListRecords',
       metadataPrefix: 'oai_dc',
-      set: 'etheses',
       from: '2020-01-01',
       until: new Date().toISOString().split('T')[0] // Today's date
     })
@@ -180,7 +185,8 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
     }
 
     const xml = await response.text()
-    const parser = new DOMParser()
+    // Use browser DOMParser if available, otherwise fall back to NodeDOMParser
+const parser = typeof window === 'undefined' ? new NodeDOMParser() : new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
     
     // Check for OAI errors
@@ -193,22 +199,31 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
     const papers: ResearchPaper[] = []
     const now = new Date()
 
+    // Helper: collect texts by localName (namespace-agnostic)
+    const getTextsByLocal = (parent: Element, local: string) => {
+      const all = Array.from(parent.getElementsByTagName('*')) as Element[]
+      return all
+        .filter(el => (el.localName || el.nodeName) === local)
+        .map(el => el.textContent?.trim() || '')
+        .filter(Boolean)
+    }
+
     for (const record of records.slice(0, limit)) {
-      const metadata = record.getElementsByTagName('oai_dc:dc')[0]
+      // Find metadata element irrespective of prefix (e.g., oai_dc:dc)
+      const mdCandidate = Array.from(record.getElementsByTagName('*'))
+        .find((el: any) => (el.localName || el.nodeName) === 'dc') as Element | undefined
+      const metadata = mdCandidate
       if (!metadata) continue
 
-      const getText = (tag: string) => {
-        const elements = metadata.getElementsByTagName(tag)
-        return Array.from(elements).map(el => el.textContent?.trim() || '').filter(Boolean)
-      }
+      const getText = (localTag: string) => getTextsByLocal(metadata, localTag)
 
-      const titles = getText('dc:title')
-      const creators = getText('dc:creator')
-      const descriptions = getText('dc:description')
-      const dates = getText('dc:date')
-      const subjects = getText('dc:subject')
-      const identifiers = getText('dc:identifier')
-      const types = getText('dc:type')
+      const titles = getText('title')
+      const creators = getText('creator')
+      const descriptions = getText('description')
+      const dates = getText('date')
+      const subjects = getText('subject')
+      const identifiers = getText('identifier')
+      const types = getText('type')
 
       // Filter for thesis/dissertation types and match query
       const isThesis = types.some(type => 
@@ -283,7 +298,8 @@ async function searchManchesterPhrasebank(query: string, limit = 10): Promise<Re
     const response = await fetch(url)
     
     if (!response.ok) {
-      throw new Error(`Google Search API returned ${response.status}`)
+      console.warn(`[Manchester] Google Search API returned ${response.status}. Check GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CSE_ID (cx).`)
+      return []
     }
     
     const data = await response.json()

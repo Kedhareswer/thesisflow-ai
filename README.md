@@ -231,6 +231,31 @@ flowchart TD
    node scripts/run-migration.js
    ```
 
+### Stripe Billing Setup
+
+1. **Create Stripe test data**
+   ```bash
+   node scripts/setup-stripe-prices.js
+   ```
+   The script creates recurring Prices for Pro and Enterprise plans and updates `.env.local` with the new IDs.
+
+2. **Payment links (optional, test mode)**
+
+| Plan | Cycle | Env Var | URL |
+|------|-------|---------|-----|
+| Pro | Monthly | `NEXT_PUBLIC_STRIPE_LINK_PRO_MONTHLY` | <https://buy.stripe.com/test_6oUaEWfQwgm8f0O9fL4gg01> |
+| Pro | Yearly | `NEXT_PUBLIC_STRIPE_LINK_PRO_YEARLY` | <https://buy.stripe.com/test_5kQ4gyfQw5Hu05U63z4gg02> |
+| Enterprise | Monthly | `NEXT_PUBLIC_STRIPE_LINK_ENTERPRISE_MONTHLY` | <https://buy.stripe.com/test_28E6oG33K9XK9Gu8bH4gg03> |
+| Enterprise | Yearly | `NEXT_PUBLIC_STRIPE_LINK_ENTERPRISE_YEARLY` | <https://buy.stripe.com/test_aFa28q47Ob1ObOCfE94gg04> |
+
+3. **Forward webhooks locally**
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+   Ensure the signing secret is set in `.env.local` (`STRIPE_WEBHOOK_SECRET`).
+
+_For detailed instructions see [`STRIPE_SETUP_GUIDE.md`](./STRIPE_SETUP_GUIDE.md)._  
+
 ### Development Server
 
 1. **Start the full development environment**

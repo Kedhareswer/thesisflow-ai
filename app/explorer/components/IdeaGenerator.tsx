@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -101,8 +101,17 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   } | null>(null)
   const [ideaGenerationLoading, setIdeaGenerationLoading] = useState(false)
   const [ideaGenerationError, setIdeaGenerationError] = useState<string | null>(null)
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleIdeaGeneration = async () => {
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handleIdeaGeneration = useCallback(() => {
     if (!ideaTopic.trim()) {
       toast({
         title: "Missing Topic",
@@ -112,38 +121,46 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       return
     }
 
-    setIdeaGenerationLoading(true)
-    setIdeaGenerationError(null)
-    setSelectedGeneratedIdeas(new Set()) // Reset selected ideas
-
-    try {
-      // Build enhanced context if using session context
-      const enhancedContext = useSessionContext ? 
-        `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
-        ideaContext
-
-      const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
-      setIdeaGenerationData(generatedData)
-      
-      // Auto-select all ideas by default
-      const allIndices = new Set(generatedData.ideas.map((_, index) => index))
-      setSelectedGeneratedIdeas(allIndices)
-      
-      toast({
-        title: "Ideas Generated",
-        description: `Generated ${ideaCount} AI-powered research ideas. Select the ones you want to save to your research session.`,
-      })
-    } catch (error) {
-      setIdeaGenerationError(error instanceof Error ? error.message : "Failed to generate ideas. Please try again.")
-      toast({
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate ideas. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIdeaGenerationLoading(false)
+    // Clear any existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
     }
-  }
+
+    // Set new debounce timeout
+    debounceTimeoutRef.current = setTimeout(async () => {
+      setIdeaGenerationLoading(true)
+      setIdeaGenerationError(null)
+      setSelectedGeneratedIdeas(new Set()) // Reset selected ideas
+
+      try {
+        // Build enhanced context if using session context
+        const enhancedContext = useSessionContext ? 
+          `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
+          ideaContext
+
+        const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
+        setIdeaGenerationData(generatedData)
+        
+        // Auto-select all ideas by default
+        const allIndices = new Set(generatedData.ideas.map((_, index) => index))
+        setSelectedGeneratedIdeas(allIndices)
+        
+        toast({
+          title: "Ideas Generated",
+          description: `${ideaCount} research ideas generated successfully.`,
+        })
+      } catch (error) {
+        setIdeaGenerationError(error instanceof Error ? error.message : "Failed to generate ideas. Please try again.")
+        toast({
+          title: "Generation Failed",
+          description: error instanceof Error ? error.message : "Failed to generate ideas. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIdeaGenerationLoading(false)
+      }
+    }, 500) // 500ms debounce
+  }, [ideaTopic, ideaContext, ideaCount, selectedProvider, selectedModel, useSessionContext, buildContext])
 
   // Handle idea selection
   const handleIdeaSelection = (index: number, selected: boolean) => {

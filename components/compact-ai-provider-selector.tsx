@@ -102,15 +102,7 @@ export default function CompactAIProviderSelector({
     loadProviders()
   }, [])
 
-  // Refresh providers when the window gains focus (e.g., after user adds API keys in settings)
-  useEffect(() => {
-    const handleFocus = () => {
-      loadProviders()
-    }
 
-    window.addEventListener("focus", handleFocus)
-    return () => window.removeEventListener("focus", handleFocus)
-  }, [])
 
   const getProviderStatus = (provider: AIProvider) => {
     const isAvailable = availableProviders.includes(provider)

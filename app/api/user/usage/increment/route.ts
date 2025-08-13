@@ -1,0 +1,98 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+/**
+ * SECURE USAGE INCREMENT ENDPOINT
+ * This endpoint safely increments user usage with proper authentication
+ * and limit checking. It NEVER allows usage resets from client-side.
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Authenticate user
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    const { feature, metadata } = await request.json()
+
+    if (!feature) {
+      return NextResponse.json({ error: 'Feature name required' }, { status: 400 })
+    }
+
+
+    // Get current usage and limits
+    const { data: currentUsage, error: usageError } = await supabaseAdmin
+      .rpc('get_user_usage_summary', { p_user_uuid: user.id })
+
+    if (usageError) {
+      console.error('Failed to get usage:', usageError)
+      return NextResponse.json({ error: 'Failed to check usage' }, { status: 500 })
+    }
+
+    // Find the specific feature usage
+    const featureUsage = currentUsage?.find((item: any) => item.feature_name === feature)
+    
+    if (!featureUsage) {
+      return NextResponse.json({ error: 'Invalid feature' }, { status: 400 })
+    }
+
+    // Check if user has reached limit (unless unlimited)
+    if (!featureUsage.is_unlimited && featureUsage.remaining <= 0) {
+      return NextResponse.json({ 
+        error: 'Usage limit exceeded',
+        feature,
+        currentUsage: featureUsage.usage_count,
+        limit: featureUsage.limit_count
+      }, { status: 403 })
+    }
+
+    // Increment usage safely
+    const { data: incrementResult, error: incrementError } = await supabaseAdmin
+      .rpc('increment_user_usage', { 
+        p_user_uuid: user.id, 
+        p_feature_name: feature,
+        p_metadata: metadata || null
+      })
+
+    if (incrementError) {
+      console.error('Failed to increment usage:', incrementError)
+      return NextResponse.json({ error: 'Failed to increment usage' }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      newUsageCount: incrementResult?.new_usage_count || (featureUsage.usage_count + 1),
+      remaining: featureUsage.is_unlimited ? -1 : (featureUsage.remaining - 1),
+      isUnlimited: featureUsage.is_unlimited
+    })
+
+  } catch (error) {
+    console.error('Usage increment error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Disable all other HTTP methods
+export async function GET() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+}
+
+export async function PUT() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+}
+
+export async function DELETE() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+}

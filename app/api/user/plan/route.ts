@@ -20,17 +20,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Get user plan
+    // Get user plan (soft default if not present)
     const { data: plan, error: planError } = await supabaseAdmin
       .from('user_plans')
-      .select('*')
+      .select('plan_type, status, updated_at')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (planError && planError.code !== 'PGRST116') {
       console.error('Plan error:', planError)
       return NextResponse.json({ error: 'Failed to get plan' }, { status: 500 })
     }
+
+    // Validate and normalize plan status
+    const validStatuses = ['active', 'pending', 'canceled', 'expired']
+    const normalizedPlan = plan 
+      ? {
+          plan_type: plan.plan_type || 'free',
+          status: validStatuses.includes(plan.status) ? plan.status : 'active',
+          updated_at: plan.updated_at
+        }
+      : { plan_type: 'free', status: 'active' }
 
     // Get usage summary using the function
     const { data: usage, error: usageError } = await supabaseAdmin
@@ -51,7 +61,7 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({
-      plan: plan || { plan_type: 'free', status: 'active' },
+      plan: normalizedPlan,
       usage: transformedUsage
     })
   } catch (error) {

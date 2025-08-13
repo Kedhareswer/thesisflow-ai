@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'all' // 'sent', 'received', 'all'
     const status = searchParams.get('status') || 'all' // 'pending', 'accepted', 'rejected', 'all'
+    const teamIdFilter = searchParams.get('teamId') || undefined
     
     const supabaseAdmin = createSupabaseAdmin()
     if (!supabaseAdmin) {
@@ -48,6 +49,11 @@ export async function GET(request: NextRequest) {
     // Filter by status
     if (status !== 'all') {
       query = query.eq('status', status)
+    }
+
+    // Optional team filter
+    if (teamIdFilter) {
+      query = query.eq('team_id', teamIdFilter)
     }
 
     const { data: invitations, error } = await query
@@ -96,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan restrictions for team invitations
-    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { user_id: user.id });
+    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { p_user_uuid: user.id });
     
     if (!planData || planData.length === 0) {
       // User doesn't have a plan, assign them to free plan
@@ -112,14 +118,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can use team features
-    const { data: canUseTeams } = await supabaseAdmin.rpc('can_use_feature', { 
-      user_id: user.id, 
-      feature_name: 'team_members' 
-    });
+    const { data: canUseTeams, error: canUseError } = await supabaseAdmin.rpc('can_use_feature', { 
+       p_user_uuid: user.id, 
+       p_feature_name: 'team_members' 
+     });
 
-    if (!canUseTeams || canUseTeams.length === 0 || !canUseTeams[0].can_use) {
+     if (canUseError) {
+       console.error('can_use_feature error:', canUseError);
+       return NextResponse.json(
+         { error: "Internal server error" },
+         { status: 500 }
+       );
+     }
+
+    if (!canUseTeams) {
       return NextResponse.json(
-        { error: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to invite team members." },
+        { error: "Team collaboration is only available for Pro and Enterprise plans. Please upgrade your plan to invite team members." },
         { status: 403 }
       );
     }
@@ -142,12 +156,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can assign this role
-    const { data: canAssign } = await supabaseAdmin
+    const { data: canAssign, error: assignError } = await supabaseAdmin
       .rpc('can_assign_role', {
-        team_uuid: teamId,
-        user_uuid: user.id,
-        target_role: role
-      })
+        p_team_uuid: teamId,
+        p_user_uuid: user.id,
+        p_target_role: role
+      });
+
+    if (assignError) {
+      console.error('can_assign_role error:', assignError);
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
+    }
 
     if (!canAssign) {
       return NextResponse.json(
@@ -158,7 +180,7 @@ export async function POST(request: NextRequest) {
 
     // Find the invitee user by joining with auth.users table
     const { data: inviteeUser, error: userError } = await supabaseAdmin
-      .rpc('find_user_by_email', { user_email: inviteeEmail })
+      .rpc('find_user_by_email', { p_user_email: inviteeEmail })
 
     if (userError) {
       console.error('Error finding user:', userError)
@@ -225,28 +247,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create the invitation
+    // Attempt to create the invitation. If a duplicate exists (unique constraint),
+    // update the existing record instead (acts like resend).
     const { data: invitation, error: inviteError } = await supabaseAdmin
       .from('team_invitations')
-      .insert({
+      .upsert({
         team_id: teamId,
         inviter_id: user.id,
         invitee_id: userData.id,
-        invitee_email: inviteeEmail,
+        invited_email: inviteeEmail, // Use invited_email which is part of unique constraint
+        invitee_email: inviteeEmail, // Keep both for compatibility
         role: role,
-        personal_message: personalMessage,
-        status: 'pending'
-      })
+        personal_message: personalMessage || null,
+        status: 'pending',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'team_id,invited_email' })
       .select(`
         *,
         team:teams!team_invitations_team_id_fkey(id, name, description)
       `)
-      .single()
+      .single();
 
     if (inviteError) {
-      console.error('Error creating invitation:', inviteError)
+      // If duplicate error persists for some other constraint
+      console.error('Error creating/upserting invitation:', inviteError);
       return NextResponse.json(
-        { error: "Failed to create invitation" },
+        { error: "Failed to create invitation", details: inviteError.message },
         { status: 500 }
       )
     }
@@ -255,6 +282,7 @@ export async function POST(request: NextRequest) {
 
     // Create notification for the invitee
     const notificationData = {
+      related_id: invitation.id,
       invitation_id: invitation.id,
       team_id: teamId,
       team_name: team.name,
@@ -274,7 +302,10 @@ export async function POST(request: NextRequest) {
 
     if (notificationError) {
       console.error('Error creating notification:', notificationError)
-      // Don't fail the invitation if notification fails
+      console.error('Notification error details:', notificationError)
+      // Don't fail the invitation if notification fails, but log detailed error
+    } else {
+      console.log('Notification created successfully:', notificationResult)
     }
 
     return NextResponse.json({
