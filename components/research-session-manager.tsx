@@ -135,16 +135,26 @@ export function ResearchSessionManager({ className }: ResearchSessionManagerProp
   }
 
   const handleClearSession = () => {
-    if (confirm('Are you sure you want to clear all session data? This action cannot be undone.')) {
-      clearSession()
-      setSessionName('Research Session')
-      setCurrentTopic('')
-      setCurrentObjective('')
-      
-      toast({
-        title: "Session Cleared",
-        description: "All research session data has been cleared."
-      })
+    if (confirm('Are you sure you want to clear all session data? This action cannot be undone.\n\nNote: This will only clear your research session data (papers, topics, ideas, chat history) and will NOT affect your plan usage or limits.')) {
+      try {
+        // Only clear local session data - NEVER call any APIs that might reset usage
+        clearSession()
+        setSessionName('Research Session')
+        setCurrentTopic('')
+        setCurrentObjective('')
+        
+        toast({
+          title: "Session Cleared",
+          description: "Research session data cleared. Your plan usage remains unchanged.",
+        })
+      } catch (error) {
+        console.error('Error clearing session:', error)
+        toast({
+          title: "Clear Failed",
+          description: "Failed to clear session data. Please try again.",
+          variant: "destructive"
+        })
+      }
     }
   }
 

@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan restrictions for team invitations
-    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { user_id: user.id });
+    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { p_user_uuid: user.id });
     
     if (!planData || planData.length === 0) {
       // User doesn't have a plan, assign them to free plan
@@ -112,14 +112,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can use team features
-    const { data: canUseTeams } = await supabaseAdmin.rpc('can_use_feature', { 
-      user_id: user.id, 
-      feature_name: 'team_members' 
-    });
+    const { data: canUseTeams, error: canUseError } = await supabaseAdmin.rpc('can_use_feature', { 
+       p_user_uuid: user.id, 
+       p_feature_name: 'team_members' 
+     });
 
-    if (!canUseTeams || canUseTeams.length === 0 || !canUseTeams[0].can_use) {
+     if (canUseError) {
+       console.error('can_use_feature error:', canUseError);
+       return NextResponse.json(
+         { error: "Internal server error" },
+         { status: 500 }
+       );
+     }
+
+    if (!canUseTeams) {
       return NextResponse.json(
-        { error: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to invite team members." },
+        { error: "Team collaboration is only available for Pro and Enterprise plans. Please upgrade your plan to invite team members." },
         { status: 403 }
       );
     }
@@ -142,12 +150,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can assign this role
-    const { data: canAssign } = await supabaseAdmin
+    const { data: canAssign, error: assignError } = await supabaseAdmin
       .rpc('can_assign_role', {
-        team_uuid: teamId,
-        user_uuid: user.id,
-        target_role: role
-      })
+        p_team_uuid: teamId,
+        p_user_uuid: user.id,
+        p_target_role: role
+      });
+
+    if (assignError) {
+      console.error('can_assign_role error:', assignError);
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
+    }
 
     if (!canAssign) {
       return NextResponse.json(
@@ -158,7 +174,7 @@ export async function POST(request: NextRequest) {
 
     // Find the invitee user by joining with auth.users table
     const { data: inviteeUser, error: userError } = await supabaseAdmin
-      .rpc('find_user_by_email', { user_email: inviteeEmail })
+      .rpc('find_user_by_email', { p_user_email: inviteeEmail })
 
     if (userError) {
       console.error('Error finding user:', userError)

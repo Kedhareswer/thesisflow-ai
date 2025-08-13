@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan restrictions
-    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { user_id: user.id });
+    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { p_user_uuid: user.id });
     
     if (!planData || planData.length === 0) {
       // User doesn't have a plan, assign them to free plan
@@ -282,14 +282,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user can use team features
-    const { data: canUseTeams } = await supabaseAdmin.rpc('can_use_feature', { 
-      user_id: user.id, 
-      feature_name: 'team_members' 
+    const { data: canUseTeams, error: canUseError } = await supabaseAdmin.rpc('can_use_feature', { 
+      p_user_uuid: user.id, 
+      p_feature_name: 'team_members' 
     });
 
-    if (!canUseTeams || canUseTeams.length === 0 || !canUseTeams[0].can_use) {
+    if (canUseError) {
+      console.error('can_use_feature error:', canUseError);
       return NextResponse.json(
-        { error: "Team collaboration is only available for Professional and Enterprise plans. Please upgrade your plan to create teams." },
+        { error: "Internal server error" },
+        { status: 500 }
+      );
+    }
+
+    if (!canUseTeams) {
+      return NextResponse.json(
+        { error: "Team collaboration is only available for Pro and Enterprise plans. Please upgrade your plan to create teams." },
         { status: 403 }
       );
     }
