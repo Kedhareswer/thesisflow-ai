@@ -7,10 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
-import { AI_Prompt } from "@/components/ui/animated-ai-input"
 import { EnhancedLiteratureSearch } from "./components/EnhancedLiteratureSearch"
 import { TopicExplorer } from "./components/TopicExplorer"
 import { IdeaGenerator } from "./components/IdeaGenerator"
+import { ResearchAssistant } from "./components/ResearchAssistant"
 import { RouteGuard } from "@/components/route-guard"
 import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
 import { ResearchSessionProvider } from "@/components/research-session-provider"
@@ -122,18 +122,18 @@ export default function ResearchExplorer() {
                   <IdeaGenerator />
                 </TabsContent>
                 <TabsContent value="assistant">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        <MessageCircle className="h-5 w-5 mr-2" />
-                        Research Assistant
-                      </CardTitle>
-                      <CardDescription>Get AI-powered assistance for your research questions.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <AI_Prompt /> 
-                    </CardContent>
-                  </Card>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      <h2 className="text-xl font-semibold">Research Assistant</h2>
+                    </div>
+                    <p className="text-sm text-gray-600">Get AI-powered assistance for your research questions.</p>
+                    <ResearchAssistant 
+                      personalities={personalities}
+                      selectedPersonality={selectedPersonality}
+                      onPersonalityChange={setSelectedPersonality}
+                    />
+                  </div>
                 </TabsContent>
                 <TabsContent value="session">
                   <ResearchSessionManager />
