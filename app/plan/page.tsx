@@ -1,20 +1,56 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall } from "lucide-react"
+import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall, Loader2, CreditCard, Settings } from "lucide-react"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { useToast } from "@/hooks/use-toast"
 import { RouteGuard } from "@/components/route-guard"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { loadStripe } from "@stripe/stripe-js"
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
 export default function PlanPage() {
   const { planData, loading, getPlanType, getUsageForFeature, isProOrHigher, isEnterprise } = useUserPlan()
   const { toast } = useToast()
+  const { session } = useSupabaseAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [processingCheckout, setProcessingCheckout] = useState(false)
+  const [processingPortal, setProcessingPortal] = useState(false)
+
+  // Handle success/cancel returns from Stripe
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast({
+        title: "Payment Successful!",
+        description: "Your subscription has been activated. Thank you for upgrading!",
+      })
+      // Clear the URL params
+      router.replace('/plan')
+    } else if (searchParams.get('canceled') === 'true') {
+      toast({
+        title: "Payment Canceled",
+        description: "Your upgrade was canceled. You can try again anytime.",
+        variant: "destructive"
+      })
+      router.replace('/plan')
+    } else if (searchParams.get('portal') === 'true') {
+      toast({
+        title: "Subscription Updated",
+        description: "Your subscription changes have been saved.",
+      })
+      router.replace('/plan')
+    }
+  }, [searchParams, toast, router])
 
   const planType = getPlanType()
   const planConfig = {
@@ -90,14 +126,99 @@ export default function PlanPage() {
     })
   }
 
+  const handleCheckout = async (priceId: string, planType: string, billingPeriod: string) => {
+    if (!session?.access_token) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to upgrade your plan.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setProcessingCheckout(true)
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          priceId,
+          planType,
+          billingPeriod
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session')
+      }
+
+      const { url } = await response.json()
+      
+      // Redirect to Stripe Checkout
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Checkout error:', error)
+      toast({
+        title: "Checkout Failed",
+        description: "Unable to start checkout process. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingCheckout(false)
+    }
+  }
+
+  const handleManageSubscription = async () => {
+    if (!session?.access_token) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to manage your subscription.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setProcessingPortal(true)
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create portal session')
+      }
+
+      const { url } = await response.json()
+      
+      // Redirect to Stripe Customer Portal
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Portal error:', error)
+      toast({
+        title: "Portal Access Failed",
+        description: "Unable to access subscription management. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingPortal(false)
+    }
+  }
+
   const handleStartFreeTrial = () => {
-    // This would typically integrate with a payment processor like Stripe
-    toast({
-      title: "Start Free Trial",
-      description: "Redirecting to Pro plan setup... This feature will be available soon!",
-    })
-    // In a real implementation, this would redirect to Stripe or payment setup
-    // window.open('https://stripe.com/connect/oauth/authorize', '_blank')
+    // Pro plan monthly with 7-day trial
+    const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY || 'price_pro_monthly'
+    handleCheckout(priceId, 'pro', 'monthly')
   }
 
   const handleContactSales = () => {
@@ -282,18 +403,39 @@ Thank you!`)
                     <Button 
                       variant="outline" 
                       className="w-full" 
-                      disabled
+                      onClick={handleManageSubscription}
+                      disabled={processingPortal}
                     >
-                      Current Plan
-                      <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+                      {processingPortal ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          Manage Plan
+                          <Settings className="h-4 w-4 ml-2" />
+                        </>
+                      )}
                     </Button>
                   ) : (
                     <Button 
+                      variant="outline" 
                       className="w-full" 
                       onClick={handleStartFreeTrial}
+                      disabled={processingCheckout}
                     >
-                      Start Free Trial
-                      <ArrowRight className="h-4 w-4 ml-2" />
+                      {processingCheckout ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Start 7-Day Trial
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>
@@ -372,10 +514,27 @@ Thank you!`)
                           <CheckCircle className="h-4 w-4 text-green-500" />
                           <span>300 AI generations per month</span>
                         </div>
-                        <div className="pt-4">
-                          <Button onClick={handleStartFreeTrial} className="w-full">
-                            Start Free Trial
+                        <div className="pt-4 space-y-2">
+                          <Button 
+                            onClick={handleStartFreeTrial} 
+                            className="w-full"
+                            disabled={processingCheckout}
+                          >
+                            {processingCheckout ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Start 7-Day Free Trial
+                              </>
+                            )}
                           </Button>
+                          <p className="text-xs text-center text-gray-500">
+                            Cancel anytime. No credit card required for trial.
+                          </p>
                         </div>
                       </div>
                     </DialogContent>
