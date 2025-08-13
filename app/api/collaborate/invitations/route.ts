@@ -241,28 +241,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create the invitation
+    // Attempt to create the invitation. If a duplicate exists (unique constraint),
+    // update the existing record instead (acts like resend).
     const { data: invitation, error: inviteError } = await supabaseAdmin
       .from('team_invitations')
-      .insert({
+      .upsert({
         team_id: teamId,
         inviter_id: user.id,
         invitee_id: userData.id,
-        invitee_email: inviteeEmail,
+        invited_email: inviteeEmail, // Use invited_email which is part of unique constraint
+        invitee_email: inviteeEmail, // Keep both for compatibility
         role: role,
-        personal_message: personalMessage,
-        status: 'pending'
-      })
+        personal_message: personalMessage || null,
+        status: 'pending',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'team_id,invited_email' })
       .select(`
         *,
         team:teams!team_invitations_team_id_fkey(id, name, description)
       `)
-      .single()
+      .single();
 
     if (inviteError) {
-      console.error('Error creating invitation:', inviteError)
+      // If duplicate error persists for some other constraint
+      console.error('Error creating/upserting invitation:', inviteError);
       return NextResponse.json(
-        { error: "Failed to create invitation" },
+        { error: "Failed to create invitation", details: inviteError.message },
         { status: 500 }
       )
     }
