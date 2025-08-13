@@ -1,4 +1,8 @@
 import { fetchOpenAlexWorks } from './openalex'
+// Polyfill DOMParser in Node.js environments (e.g. Next.js API routes)
+// `xmldom` is already included as a dependency in package.json
+// We alias it to `NodeDOMParser` to avoid shadowing the global DOMParser in browsers.
+import { DOMParser as NodeDOMParser } from 'xmldom'
 import { searchSemanticScholar, transformSemanticScholarPaper, getCitationData } from './semantic-scholar'
 import type { ResearchPaper, SearchFilters } from '@/lib/types/common'
 
@@ -91,7 +95,8 @@ async function searchArxiv(query: string, limit = 10): Promise<ResearchPaper[]> 
     const xml = await response.text()
     
     // Parse XML response
-    const parser = new DOMParser()
+    // Use browser DOMParser if available, otherwise fall back to NodeDOMParser
+const parser = typeof window === 'undefined' ? new NodeDOMParser() : new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
   const entries = Array.from(doc.getElementsByTagName('entry'))
     
@@ -180,7 +185,8 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
     }
 
     const xml = await response.text()
-    const parser = new DOMParser()
+    // Use browser DOMParser if available, otherwise fall back to NodeDOMParser
+const parser = typeof window === 'undefined' ? new NodeDOMParser() : new DOMParser()
     const doc = parser.parseFromString(xml, 'text/xml')
     
     // Check for OAI errors

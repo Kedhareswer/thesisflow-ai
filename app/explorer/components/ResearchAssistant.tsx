@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowRight, Bot, ChevronDown, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2 } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -71,6 +71,7 @@ export function ResearchAssistant({
     }))
   )
   const [isTyping, setIsTyping] = useState(false)
+  const [contextCollapsed, setContextCollapsed] = useState(false)
   
   // AI Provider state
   const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
@@ -331,7 +332,7 @@ ASSISTANT:`
                         : "bg-muted"
                     )}
                   >
-                    <div className="text-[1rem] whitespace-pre-wrap leading-7">{message.content}</div>
+                    <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-xs opacity-70">
                       {message.timestamp.toLocaleTimeString()}
@@ -377,31 +378,57 @@ ASSISTANT:`
       <div className="border-t bg-muted/30 px-6 py-6">
         {/* Research Context Display */}
         {hasContext && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-5 p-4 md:p-5 min-h-[80px] w-full bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200/60"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                  <Brain className="w-3 h-3 text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-700">
-                  Enhanced Context Available
-                </span>
-              </div>
-              <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 border-0">
-                Session Context
-              </Badge>
+          contextCollapsed ? (
+            <div className="mb-5 px-4 py-2 w-full bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200/60 flex items-center justify-between">
+              <span className="text-xs text-emerald-700">Session context hidden</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2"
+                onClick={() => setContextCollapsed(false)}
+                aria-label="Expand context"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </Button>
             </div>
-            <p className="text-sm text-gray-700 mb-1">
-              {contextSummary}
-            </p>
-            <p className="text-xs text-gray-500">
-              🎯 AI responses will be tailored to your research context
-            </p>
-          </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-5 p-4 md:p-5 min-h-[80px] w-full bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200/60"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                    <Brain className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    Enhanced Context Available
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 border-0">
+                    Session Context
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={() => setContextCollapsed(true)}
+                    aria-label="Collapse context"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-700 mb-1">
+                {contextSummary}
+              </p>
+              <p className="text-xs text-gray-500">
+                🎯 AI responses will be tailored to your research context
+              </p>
+            </motion.div>
+          )
         )}
         
         <div className="flex items-center gap-3 mb-4">
@@ -528,7 +555,7 @@ ASSISTANT:`
             }}
             onKeyDown={handleKeyDown}
             placeholder="Ask your research question..."
-            className="min-h-[110px] max-h-[320px] resize-none text-[0.95rem]"
+            className="min-h-[110px] max-h-[320px] resize-none text-sm"
             disabled={isSending}
           />
           <Button

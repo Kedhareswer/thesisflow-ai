@@ -107,6 +107,8 @@ export function AI_Prompt() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // Maximum characters allowed in the input – keep UX predictable
+  const MAX_LENGTH = 4000;
 
   // Load available providers on component mount
   useEffect(() => {
@@ -297,7 +299,7 @@ export function AI_Prompt() {
               <Textarea
                 id="ai-input"
                 value={value}
-                placeholder={"What can I do for you?"}
+                placeholder={"Ask me anything… (Shift+Enter for newline)"} maxLength={MAX_LENGTH}
                 className={cn(
                   "w-full rounded-xl rounded-b-none px-6 py-4 bg-black/5 dark:bg-white/5 border-none dark:text-white placeholder:text-black/70 dark:placeholder:text-white/70 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base",
                   "min-h-[96px]"
@@ -425,6 +427,13 @@ export function AI_Prompt() {
                     <Paperclip className="w-4 h-4 transition-colors" />
                   </label>
                 </div>
+                {/* Live character counter */}
+                <span
+                  className="text-xs text-black/50 dark:text-white/50 mr-2 select-none"
+                  aria-live="polite"
+                >
+                  {value.length}/{MAX_LENGTH}
+                </span>
                 <button
                   type="button"
                   className={cn(
