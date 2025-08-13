@@ -276,6 +276,7 @@ export async function POST(request: NextRequest) {
 
     // Create notification for the invitee
     const notificationData = {
+      related_id: invitation.id,
       invitation_id: invitation.id,
       team_id: teamId,
       team_name: team.name,
@@ -295,7 +296,10 @@ export async function POST(request: NextRequest) {
 
     if (notificationError) {
       console.error('Error creating notification:', notificationError)
-      // Don't fail the invitation if notification fails
+      console.error('Notification error details:', notificationError)
+      // Don't fail the invitation if notification fails, but log detailed error
+    } else {
+      console.log('Notification created successfully:', notificationResult)
     }
 
     return NextResponse.json({
