@@ -195,7 +195,7 @@ export default function CollaboratePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, session, selectedTeamId, apiCall])
+  }, [user, apiCall])
 
   // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
@@ -225,16 +225,17 @@ export default function CollaboratePage() {
 
   // Effects
   useEffect(() => {
-    if (!authLoading && session) {
+    if (!authLoading && session && user) {
       loadTeams()
     }
-  }, [authLoading, session, loadTeams])
+  }, [authLoading, session, user, loadTeams])
 
   useEffect(() => {
     if (selectedTeamId) {
       loadMessages(selectedTeamId)
     }
-  }, [selectedTeamId, loadMessages])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeamId])
 
   // Handle invitation URL parameter
   useEffect(() => {
@@ -502,7 +503,7 @@ export default function CollaboratePage() {
   }
 
   // Loading and error states
-  if (isLoading) {
+  if (isLoading && teams.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-fade-in">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import InvitationManager from "./invitation-manager"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -514,9 +515,10 @@ export function TeamSettings({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="danger">Danger Zone</TabsTrigger>
           </TabsList>
@@ -602,6 +604,27 @@ export function TeamSettings({
                     Save Changes
                   </Button>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Invitations Management */}
+          <TabsContent value="invitations" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Invitations
+                </CardTitle>
+                <CardDescription>Send, view, and manage team invitations.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InvitationManager
+                  teamId={team.id}
+                  teamName={team.name}
+                  userRole={currentUserRole}
+                  userId={(team as any).currentUserId || ""}
+                />
               </CardContent>
             </Card>
           </TabsContent>

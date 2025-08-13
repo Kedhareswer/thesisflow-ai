@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'all' // 'sent', 'received', 'all'
     const status = searchParams.get('status') || 'all' // 'pending', 'accepted', 'rejected', 'all'
+    const teamIdFilter = searchParams.get('teamId') || undefined
     
     const supabaseAdmin = createSupabaseAdmin()
     if (!supabaseAdmin) {
@@ -48,6 +49,11 @@ export async function GET(request: NextRequest) {
     // Filter by status
     if (status !== 'all') {
       query = query.eq('status', status)
+    }
+
+    // Optional team filter
+    if (teamIdFilter) {
+      query = query.eq('team_id', teamIdFilter)
     }
 
     const { data: invitations, error } = await query

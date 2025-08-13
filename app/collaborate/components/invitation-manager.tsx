@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,6 +26,7 @@ import {
   Eye,
   Edit3
 } from 'lucide-react'
+import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 
 interface Invitation {
   id: string
@@ -36,6 +37,8 @@ interface Invitation {
     is_public: boolean
     category: string
   }
+  inviter_id?: string
+  invitee_id?: string
   inviter?: {
     id: string
     full_name: string
@@ -68,6 +71,8 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
   const [showInviteDialog, setShowInviteDialog] = useState(false)
   const [responseDialog, setResponseDialog] = useState<{ open: boolean; invitation?: Invitation; action?: 'accept' | 'reject' }>({ open: false })
   const { toast } = useToast()
+  const { session, user } = useSupabaseAuth()
+  const effectiveUserId = user?.id || userId
 
   // Form state
   const [inviteForm, setInviteForm] = useState({
@@ -80,17 +85,35 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
   const canInvite = userRole === 'owner' || userRole === 'admin'
   const canAssignAdmin = userRole === 'owner'
 
+  // Authenticated API helper
+  const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
+    if (!session?.access_token) {
+      throw new Error('Authentication required')
+    }
+
+    const res = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        ...options.headers,
+      },
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Network error' }))
+      throw new Error(err.error || `HTTP ${res.status}`)
+    }
+
+    return res.json()
+  }, [session?.access_token])
+
   // Fetch invitations
   const fetchInvitations = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/collaborate/invitations?type=all&status=all`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch invitations')
-      }
-
-      const data = await response.json()
+      const data = await apiCall(`/api/collaborate/invitations?type=all&status=all`)
       setInvitations(data.invitations || [])
     } catch (error) {
       console.error('Error fetching invitations:', error)
@@ -124,9 +147,8 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
 
     try {
       setSendingInvite(true)
-      const response = await fetch('/api/collaborate/invitations', {
+      const data = await apiCall('/api/collaborate/invitations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamId,
           inviteeEmail: inviteForm.email.trim(),
@@ -134,12 +156,6 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
           personalMessage: inviteForm.message.trim()
         })
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send invitation')
-      }
 
       toast({
         title: 'Success',
@@ -166,21 +182,14 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
   // Handle invitation response
   const handleInvitationResponse = async (invitationId: string, action: 'accept' | 'reject' | 'cancel', response?: string) => {
     try {
-      const res = await fetch('/api/collaborate/invitations', {
+      const data = await apiCall('/api/collaborate/invitations', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invitationId,
           action,
           response
         })
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || `Failed to ${action} invitation`)
-      }
 
       toast({
         title: 'Success',
@@ -205,9 +214,9 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
   }
 
   // Filter invitations
-  const sentInvitations = invitations.filter(inv => inv.inviter?.id === userId && inv.team.id === teamId)
-  const receivedInvitations = invitations.filter(inv => inv.invitee?.id === userId)
-  const teamInvitations = invitations.filter(inv => inv.team.id === teamId && inv.inviter?.id !== userId)
+  const sentInvitations = invitations.filter(inv => (inv.inviter?.id === effectiveUserId || inv.inviter_id === effectiveUserId) && inv.team.id === teamId)
+  const receivedInvitations = invitations.filter(inv => (inv.invitee?.id === effectiveUserId || inv.invitee_id === effectiveUserId))
+  const teamInvitations = invitations.filter(inv => inv.team.id === teamId)
 
   // Render role icon
   const RoleIcon = ({ role }: { role: string }) => {
@@ -342,7 +351,7 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
 
       {/* Invitations tabs */}
       <Tabs defaultValue="received" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="received" className="relative">
             Received
             {receivedInvitations.filter(i => i.status === 'pending').length > 0 && (
@@ -353,6 +362,7 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
           </TabsTrigger>
           <TabsTrigger value="sent">Sent</TabsTrigger>
           {canInvite && <TabsTrigger value="team">Team</TabsTrigger>}
+          <TabsTrigger value="all">All</TabsTrigger>
         </TabsList>
 
         {/* Received Invitations */}
@@ -518,6 +528,48 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
             )}
           </TabsContent>
         )}
+
+        {/* All Invitations (account-wide) */}
+        <TabsContent value="all" className="space-y-4">
+          {invitations.filter(inv => (
+            inv.invitee_id === effectiveUserId || inv.inviter_id === effectiveUserId ||
+            inv.invitee?.id === effectiveUserId || inv.inviter?.id === effectiveUserId
+          )).length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Mail className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No invitations</p>
+              </CardContent>
+            </Card>
+          ) : (
+            invitations
+              .filter(inv => (
+                inv.invitee_id === effectiveUserId || inv.inviter_id === effectiveUserId ||
+                inv.invitee?.id === effectiveUserId || inv.inviter?.id === effectiveUserId
+              ))
+              .map((invitation) => (
+                <Card key={invitation.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="font-medium">
+                          {(invitation.inviter_id === effectiveUserId || invitation.inviter?.id === effectiveUserId)
+                            ? 'You invited'
+                            : 'Invited you'} {invitation.invitee_email}
+                        </p>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>{invitation.team?.name || 'Team'}</span>
+                          <span>•</span>
+                          <span>{new Date(invitation.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={invitation.status} />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* Response Dialog */}
