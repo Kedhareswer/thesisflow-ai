@@ -56,6 +56,7 @@ interface Team {
   isPublic: boolean
   category: string
   owner: string
+  currentUserId?: string
 }
 
 interface TeamSettingsProps {
@@ -623,7 +624,7 @@ export function TeamSettings({
                   teamId={team.id}
                   teamName={team.name}
                   userRole={currentUserRole}
-                  userId={(team as any).currentUserId || ""}
+                  userId={team.currentUserId || user?.id || ""}
                 />
               </CardContent>
             </Card>

@@ -66,7 +66,8 @@ export async function GET(request: NextRequest) {
       let query = supabaseAdmin
         .from('chat_messages')
         .select(
-          'id, content, message_type, created_at, team_id, sender_id, mentions, metadata'
+          `id, content, message_type, created_at, team_id, sender_id, mentions, metadata,
+           sender:user_profiles!chat_messages_sender_id_fkey(full_name, avatar_url)`
         )
         .eq('team_id', teamId)
         .order('created_at', { ascending: false })
@@ -94,8 +95,8 @@ export async function GET(request: NextRequest) {
       timestamp: msg.created_at,
       teamId: msg.team_id,
       senderId: msg.sender_id,
-      senderName: msg.sender_id === 'system' ? 'System' : 'Unknown User',
-      senderAvatar: msg.sender_id === 'system' ? null : null,
+      senderName: msg.sender_id === 'system' ? 'System' : (msg.sender?.full_name || 'Unknown User'),
+      senderAvatar: msg.sender_id === 'system' ? null : (msg.sender?.avatar_url || null),
       mentions: msg.mentions || [],
       metadata: msg.metadata || {}
     }));

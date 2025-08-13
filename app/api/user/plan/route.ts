@@ -32,11 +32,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to get plan' }, { status: 500 })
     }
 
-    // Validate and normalize plan status
+    // Validate and normalize plan data
     const validStatuses = ['active', 'pending', 'canceled', 'expired']
+    const validPlanTypes = ['free', 'pro', 'enterprise']
     const normalizedPlan = plan 
       ? {
-          plan_type: plan.plan_type || 'free',
+          plan_type: validPlanTypes.includes(plan.plan_type) ? plan.plan_type : 'free',
           status: validStatuses.includes(plan.status) ? plan.status : 'active',
           updated_at: plan.updated_at
         }

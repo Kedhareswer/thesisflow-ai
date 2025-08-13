@@ -51,6 +51,7 @@ export function ResearchAssistant({
     session, 
     buildResearchContext, 
     addChatMessage, 
+    clearChatHistory,
     hasContext, 
     contextSummary 
   } = useResearchSession()
@@ -80,6 +81,9 @@ export function ResearchAssistant({
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
+
+  // Memoized icon component for the currently selected personality
+  const SelectedPersonalityIcon = selectedPersonality?.icon
 
   // Auto-resize textarea
   const adjustHeight = useCallback(() => {
@@ -254,7 +258,6 @@ ASSISTANT:`
     setMessages([])
     setValue("")
     // Clear chat from session as well
-    const { clearChatHistory } = useResearchSession()
     clearChatHistory()
     toast({
       title: "Chat Cleared",
@@ -510,7 +513,9 @@ ASSISTANT:`
                 <Button variant="outline" size="sm" className="h-8">
                   {selectedPersonality ? (
                     <>
-                      <selectedPersonality.icon className="w-4 h-4" />
+                      {SelectedPersonalityIcon && (
+                         <SelectedPersonalityIcon className="w-4 h-4" />
+                       )}
                       <span className="ml-2">{selectedPersonality.name}</span>
                     </>
                   ) : (
@@ -527,7 +532,7 @@ ASSISTANT:`
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
-                      <personality.icon className="w-4 h-4" />
+                      {(() => { const Icon = personality.icon; return <Icon className="w-4 h-4" /> })()}
                       <div>
                         <div className="font-medium">{personality.name}</div>
                         <div className="text-xs text-muted-foreground">

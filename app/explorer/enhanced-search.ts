@@ -3,6 +3,17 @@ import { fetchOpenAlexWorks } from './openalex'
 // `xmldom` is already included as a dependency in package.json
 // We alias it to `NodeDOMParser` to avoid shadowing the global DOMParser in browsers.
 import { DOMParser as NodeDOMParser } from 'xmldom'
+
+// Helper to obtain a DOMParser instance that works in both browser and Node.js
+function getParser(): DOMParser {
+  if (typeof window === 'undefined') {
+    if (!NodeDOMParser) {
+      throw new Error('XML parsing not available in Node.js environment. Ensure "xmldom" is installed.')
+    }
+    return new NodeDOMParser() as unknown as DOMParser
+  }
+  return new DOMParser()
+}
 import { searchSemanticScholar, transformSemanticScholarPaper, getCitationData } from './semantic-scholar'
 import type { ResearchPaper, SearchFilters } from '@/lib/types/common'
 
@@ -96,7 +107,7 @@ async function searchArxiv(query: string, limit = 10): Promise<ResearchPaper[]> 
     
     // Parse XML response
     // Use browser DOMParser if available, otherwise fall back to NodeDOMParser
-const parser = typeof window === 'undefined' ? new NodeDOMParser() : new DOMParser()
+const parser = getParser()
     const doc = parser.parseFromString(xml, 'text/xml')
   const entries = Array.from(doc.getElementsByTagName('entry'))
     
@@ -186,7 +197,7 @@ async function searchWhiteRose(query: string, limit = 10): Promise<ResearchPaper
 
     const xml = await response.text()
     // Use browser DOMParser if available, otherwise fall back to NodeDOMParser
-const parser = typeof window === 'undefined' ? new NodeDOMParser() : new DOMParser()
+const parser = getParser()
     const doc = parser.parseFromString(xml, 'text/xml')
     
     // Check for OAI errors
