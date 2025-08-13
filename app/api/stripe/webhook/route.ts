@@ -98,9 +98,9 @@ export async function POST(request: NextRequest) {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id,
               status: subscription.status,
-              current_period_start: new Date((subscription.current_period_start || 0) * 1000).toISOString(),
-              current_period_end: new Date((subscription.current_period_end || 0) * 1000).toISOString(),
-              cancel_at_period_end: subscription.cancel_at_period_end,
+              current_period_start: new Date(((subscription as any).current_period_start ?? 0) * 1000).toISOString(),
+              current_period_end: new Date(((subscription as any).current_period_end ?? 0) * 1000).toISOString(),
+              cancel_at_period_end: (subscription as any).cancel_at_period_end,
               updated_at: new Date().toISOString()
             })
 
@@ -139,7 +139,9 @@ export async function POST(request: NextRequest) {
       }
 
       case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice
+        const invoice = event.data.object as Stripe.Invoice & {
+          subscription?: string | Stripe.Subscription
+        }
         let subscriptionId: string | undefined;
         if (typeof invoice.subscription === 'string') {
           subscriptionId = invoice.subscription;
@@ -164,7 +166,9 @@ export async function POST(request: NextRequest) {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice
+        const invoice = event.data.object as Stripe.Invoice & {
+          subscription?: string | Stripe.Subscription
+        }
         let subscriptionId: string | undefined;
         if (typeof invoice.subscription === 'string') {
           subscriptionId = invoice.subscription;

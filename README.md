@@ -520,6 +520,63 @@ ai-project-planner/
 
 ---
 
+## Billing & Database Reference
+
+### Stripe Billing Plans
+
+| Plan | Interval | Price ID | Nickname | Amount (USD) |
+|------|----------|----------|----------|--------------|
+| Pro  | Monthly  | `price_1RvWEoCsh1PH67WU5EvJARv8` | Pro Monthly | $29.00 |
+| Pro  | Yearly   | `price_1RvWEpCsh1PH67WUZX4cQG0E` | Pro Yearly  | $290.00 |
+| Enterprise | Monthly | `price_1RvWEVCsh1PH67WUUwtNRHA8` | Enterprise Monthly | $99.00 |
+| Enterprise | Yearly  | `price_1RvWEWCsh1PH67WUKViSHbx2` | Enterprise Yearly  | $990.00 |
+
+> **Tip**  Use the Stripe CLI to forward webhooks locally:
+> ```bash
+> stripe listen --forward-to localhost:3000/api/stripe/webhook
+> ```
+> Set `STRIPE_WEBHOOK_SECRET` from the CLI output in your `.env.local`.
+
+### Environment Variables Matrix
+
+| Variable | Scope | Required | Description |
+|----------|-------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Client | ✅ | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client | ✅ | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server | ✅ | Service role for webhook security |
+| `STRIPE_SECRET_KEY` | Server | ✅ | Secret API key |
+| `STRIPE_WEBHOOK_SECRET` | Server | ✅ | Used to verify incoming webhooks |
+| `NEXT_PUBLIC_STRIPE_LINK_PRO_MONTHLY` | Client | ➖ | Hosted payment link (optional) |
+| `OPENAI_API_KEY`, `GEMINI_API_KEY`, ... | Server | ➖ | AI provider keys |
+
+### Supabase Schema (excerpt)
+
+```mermaid
+erDiagram
+  auth.users ||--o{ user_profiles : has
+  auth.users ||--o{ user_plans : subscribes
+  auth.users ||--o{ user_usage : tracks
+  auth.users ||--o{ user_activity : logs
+  user_plans ||--|{ stripe_subscriptions : links
+  teams ||--o{ team_files : stores
+```
+
+| Table | RLS | Key Columns | Purpose |
+|-------|-----|-------------|---------|
+| `user_profiles` | ✅ | `id (PK)` | Public user profile info |
+| `user_plans`    | ❌ | `user_id (FK)` | Stripe plan & status |
+| `user_usage`    | ✅ | `user_id (FK)` | Feature usage counters |
+| `usage_audit_log` | ✅ | `user_id (FK)` | Usage change history |
+| `teams` | ✅ | `owner_id (FK)` | Collaboration groups |
+| `team_files` | ✅ | `team_id (FK)` | Shared project files |
+
+_To inspect the full schema, run:_
+```bash
+supabase db diff --project-ref wvlxgbqjwgleizbpdulo
+```
+
+---
+
 ## Contributing
 
 We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for details.
