@@ -129,9 +129,23 @@ export class AIProviderService {
       // Use our secure API route instead of direct API calls
       const response = await fetch("/api/ai/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        // Build headers with optional Supabase auth token if available
+        headers: await (async () => {
+          const base: Record<string, string> = {
+            "Content-Type": "application/json",
+          }
+          try {
+            const { supabase } = await import("./supabase")
+            const { data } = await supabase.auth.getSession()
+            const token = data.session?.access_token
+            if (token) {
+              base["Authorization"] = `Bearer ${token}`
+            }
+          } catch {
+            // Supabase not available (e.g., during SSR), ignore
+          }
+          return base as HeadersInit
+        })(),
         body: JSON.stringify({
           prompt,
           provider,

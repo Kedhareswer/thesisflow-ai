@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import { ErrorBoundary } from "@/components/common/ErrorBoundary"
-import { ResearchChatbot } from "@/components/research-chatbot"
+import { AI_Prompt } from "@/components/ui/animated-ai-input"
 import { EnhancedLiteratureSearch } from "./components/EnhancedLiteratureSearch"
 import { TopicExplorer } from "./components/TopicExplorer"
 import { IdeaGenerator } from "./components/IdeaGenerator"
@@ -131,13 +131,7 @@ export default function ResearchExplorer() {
                       <CardDescription>Get AI-powered assistance for your research questions.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ResearchChatbot
-                        topic={chatTopic}
-                        papers={chatPapers}
-                        ideas={chatIdeas}
-                        context="Research exploration session"
-                        personality={selectedPersonality}
-                      />
+                      <AI_Prompt /> 
                     </CardContent>
                   </Card>
                 </TabsContent>
