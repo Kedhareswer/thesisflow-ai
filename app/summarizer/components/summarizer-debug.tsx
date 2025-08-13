@@ -239,7 +239,9 @@ export function SummarizerDebug() {
       
       const data = await response.json()
       
-      if (data.success && data.content) {
+      // Handle both 'response' and 'content' fields for backward compatibility
+      const responseContent = data.response || data.content || ""
+      if (data.success && responseContent) {
         return {
           component: 'AI Service',
           status: 'success',
@@ -303,10 +305,12 @@ SENTIMENT: [positive/neutral/negative]`,
       
       const data = await response.json()
       
-      if (data.success && data.content) {
-        const hasExpectedFormat = data.content.includes('SUMMARY:') || 
-                                  data.content.includes('KEY_POINTS:') ||
-                                  data.content.toLowerCase().includes('summary')
+      // Handle both 'response' and 'content' fields for backward compatibility
+      const responseContent = data.response || data.content || ""
+      if (data.success && responseContent) {
+        const hasExpectedFormat = responseContent.includes('SUMMARY:') || 
+                                  responseContent.includes('KEY_POINTS:') ||
+                                  responseContent.toLowerCase().includes('summary')
         
         if (hasExpectedFormat) {
           return {

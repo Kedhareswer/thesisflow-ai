@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ErrorHandler } from '@/lib/utils/error-handler';
 
 // Define a basic API for web search
 // In a production environment, you would integrate with a real search API like Google, Bing, or DuckDuckGo
@@ -7,9 +8,30 @@ export async function POST(request: Request) {
     const { query } = await request.json();
 
     if (!query || typeof query !== 'string') {
-      return NextResponse.json({ 
-        error: "Search query is required",
-      }, { status: 400 });
+      const validationError = ErrorHandler.processError(
+        "Search query is required and cannot be empty",
+        {
+          operation: 'web-search-validation'
+        }
+      )
+      return NextResponse.json(
+        ErrorHandler.formatErrorResponse(validationError),
+        { status: 400 }
+      );
+    }
+
+    // Validate query length
+    if (query.trim().length < 2) {
+      const validationError = ErrorHandler.processError(
+        "Search query must be at least 2 characters long",
+        {
+          operation: 'web-search-validation'
+        }
+      )
+      return NextResponse.json(
+        ErrorHandler.formatErrorResponse(validationError),
+        { status: 400 }
+      );
     }
 
     // Use Google Custom Search API or fallback to a custom implementation
@@ -21,10 +43,15 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Error performing web search:", error);
-    return NextResponse.json({
-      error: "Failed to perform web search",
-      details: error instanceof Error ? error.message : String(error),
-    }, { status: 500 });
+
+    const searchError = ErrorHandler.processError(error, {
+      operation: 'web-search'
+    });
+
+    return NextResponse.json(
+      ErrorHandler.formatErrorResponse(searchError),
+      { status: 500 }
+    );
   }
 }
 
@@ -41,7 +68,7 @@ async function searchWeb(query: string): Promise<SearchResult[]> {
     // You can replace this with any search API of your choice
     const googleApiKey = process.env.GOOGLE_SEARCH_API_KEY;
     const googleCseId = process.env.GOOGLE_SEARCH_CSE_ID;
-    
+
     if (googleApiKey && googleCseId) {
       // Try using the Google Custom Search API
       try {
@@ -64,43 +91,73 @@ async function searchWeb(query: string): Promise<SearchResult[]> {
 
 // Function to search using the Google Custom Search API
 async function searchWithGoogleApi(
-  query: string, 
-  apiKey: string, 
+  query: string,
+  apiKey: string,
   cseId: string
 ): Promise<SearchResult[]> {
   const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}`;
-  
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Accept": "application/json",
-    },
-    cache: "no-store",
-    next: { revalidate: 0 },
-  });
 
-  if (!response.ok) {
-    throw new Error(`Google Search API returned ${response.status}: ${await response.text()}`);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+      next: { revalidate: 0 },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+
+      if (response.status === 403) {
+        throw new Error(`Google Search API quota exceeded or invalid API key. Please check your API configuration.`);
+      } else if (response.status === 400) {
+        throw new Error(`Invalid search query or API parameters.`);
+      } else {
+        throw new Error(`Google Search API returned ${response.status}: ${errorText}`);
+      }
+    }
+
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      return []; // Return empty array for no results
+    }
+
+    // Map Google Search API response to our standard format
+    return data.items.map((item: any) => {
+      try {
+        const hostname = new URL(item.link).hostname.replace("www.", "");
+        return {
+          title: item.title || 'Untitled',
+          url: item.link,
+          description: item.snippet || 'No description available',
+          source: hostname,
+        };
+      } catch (urlError) {
+        // Handle invalid URLs gracefully
+        return {
+          title: item.title || 'Untitled',
+          url: item.link,
+          description: item.snippet || 'No description available',
+          source: 'Unknown',
+        };
+      }
+    });
+  } catch (error) {
+    console.error('Google Search API error:', error);
+    throw error; // Re-throw to be handled by the calling function
   }
-
-  const data = await response.json();
-  
-  // Map Google Search API response to our standard format
-  return (data.items || []).map((item: any) => ({
-    title: item.title,
-    url: item.link,
-    description: item.snippet,
-    source: new URL(item.link).hostname.replace("www.", ""),
-  }));
 }
 
 // Fallback search function that simulates search results for demo purposes
 function fallbackSearch(query: string): SearchResult[] {
   const normalizedQuery = query.toLowerCase();
-  
+
   // Mock search results based on the query
   const results: SearchResult[] = [];
-  
+
   // Technology and programming results
   if (normalizedQuery.includes('javascript') || normalizedQuery.includes('js')) {
     results.push(
@@ -124,7 +181,7 @@ function fallbackSearch(query: string): SearchResult[] {
       }
     );
   }
-  
+
   if (normalizedQuery.includes('react')) {
     results.push(
       {
@@ -200,7 +257,7 @@ function fallbackSearch(query: string): SearchResult[] {
       }
     );
   }
-  
+
   // News and current events
   if (normalizedQuery.includes('news') || normalizedQuery.includes('current events')) {
     results.push(
@@ -224,7 +281,7 @@ function fallbackSearch(query: string): SearchResult[] {
       }
     );
   }
-  
+
   // Research papers and academic content
   if (normalizedQuery.includes('research') || normalizedQuery.includes('paper') || normalizedQuery.includes('academic')) {
     results.push(
@@ -278,7 +335,7 @@ function fallbackSearch(query: string): SearchResult[] {
       }
     );
   }
-  
+
   // Return up to 10 results
   return results.slice(0, 10);
 

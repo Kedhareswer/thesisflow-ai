@@ -77,13 +77,24 @@ export class FileProcessor {
         })
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          
+          // Handle structured error responses from the updated extract-file endpoint
+          if (errorData.userMessage) {
+            let errorMessage = errorData.userMessage
+            if (errorData.actions && errorData.actions.length > 0) {
+              errorMessage += " Suggested actions: " + errorData.actions.join(", ")
+            }
+            throw new Error(errorMessage)
+          }
+          
           throw new Error(`Server extraction failed (${response.status})`)
         }
 
         const data = await response.json()
         return {
           content: data.text as string,
-          pages: undefined
+          pages: data.metadata?.pages || undefined
         }
       } catch (error) {
         throw new Error(`Failed to extract PDF in browser: ${error instanceof Error ? error.message : 'Unknown error'}`)

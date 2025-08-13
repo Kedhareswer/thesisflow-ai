@@ -8,6 +8,7 @@ import { Upload, FileText, X } from "lucide-react"
 import { FileProcessor, type FileProcessingResult } from "@/lib/file-processors"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
+import { ErrorHandler } from "@/lib/utils/error-handler"
 
 interface FileUploaderProps {
   onFileProcessed: (content: string, metadata: FileProcessingResult["metadata"]) => void
@@ -26,11 +27,18 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
 
     // File size validation (10MB limit)
     if (file.size > 10 * 1024 * 1024) {
-      const error = "File size must be less than 10MB"
-      onError(error)
+      const sizeError = ErrorHandler.processError(
+        "File size exceeds 10MB limit",
+        {
+          operation: 'file-upload-validation',
+          fileType: file.type,
+          contentLength: file.size
+        }
+      )
+      onError(sizeError.message)
       toast({
-        title: "File too large",
-        description: error,
+        title: sizeError.title,
+        description: sizeError.message,
         variant: "destructive",
       })
       return
@@ -39,11 +47,17 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
     // File type validation
     const supportedTypes = FileProcessor.getSupportedTypes()
     if (!supportedTypes.includes(file.type)) {
-      const error = `Unsupported file type: ${file.type}. Supported types: ${supportedTypes.map((type) => FileProcessor.getTypeDescription(type)).join(", ")}`
-      onError(error)
+      const typeError = ErrorHandler.processError(
+        `Unsupported file type: ${file.type}`,
+        {
+          operation: 'file-upload-validation',
+          fileType: file.type
+        }
+      )
+      onError(typeError.message)
       toast({
-        title: "Unsupported file type",
-        description: error,
+        title: typeError.title,
+        description: typeError.message,
         variant: "destructive",
       })
       return
@@ -57,7 +71,15 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
       const result = await FileProcessor.processFile(file)
 
       if (!result.content.trim()) {
-        throw new Error("No content could be extracted from the file")
+        const emptyContentError = ErrorHandler.processError(
+          "No readable content found in file",
+          {
+            operation: 'file-processing-content',
+            fileType: file.type,
+            contentLength: result.content?.length || 0
+          }
+        )
+        throw new Error(emptyContentError.message)
       }
 
       onFileProcessed(result.content, result.metadata)
@@ -67,12 +89,16 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
         description: `${file.name} (${result.metadata.wordCount} words)`,
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to process file"
-      onError(errorMessage)
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'file-processing',
+        fileType: file.type
+      })
+      
+      onError(processedError.message)
 
       toast({
-        title: "File processing failed",
-        description: errorMessage,
+        title: processedError.title,
+        description: processedError.message,
         variant: "destructive",
       })
 

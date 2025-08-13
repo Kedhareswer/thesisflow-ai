@@ -12,12 +12,13 @@ import { useToast } from "@/hooks/use-toast"
 
 interface MinimalAIProviderSelectorProps {
   selectedProvider: AIProvider | undefined
-  onProviderChange: (provider: AIProvider) => void
+  onProviderChange: (provider: AIProvider | undefined) => void
   selectedModel?: string
-  onModelChange?: (model: string) => void
+  onModelChange?: (model: string | undefined) => void
   variant?: "inline" | "compact" | "full"
   showModelSelector?: boolean
   showConfigLink?: boolean
+  showFallbackOption?: boolean
   className?: string
 }
 
@@ -29,6 +30,7 @@ export default function MinimalAIProviderSelector({
   variant = "compact",
   showModelSelector = true,
   showConfigLink = true,
+  showFallbackOption = true,
   className = "",
 }: MinimalAIProviderSelectorProps) {
   const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
@@ -108,11 +110,25 @@ export default function MinimalAIProviderSelector({
           <span className="text-sm font-medium text-gray-700">AI:</span>
         </div>
 
-        <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+        <Select 
+          value={selectedProvider || "auto"} 
+          onValueChange={(value) => onProviderChange(value === "auto" ? undefined : value as AIProvider)}
+        >
           <SelectTrigger className="w-32 h-8 text-xs border-gray-200">
             <SelectValue placeholder="Select" />
           </SelectTrigger>
           <SelectContent>
+            {showFallbackOption && (
+              <SelectItem value="auto">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-3 w-3" />
+                  <span>Auto</span>
+                  <Badge variant="secondary" className="text-xs">
+                    Fallback
+                  </Badge>
+                </div>
+              </SelectItem>
+            )}
             {Object.entries(AI_PROVIDERS).map(([key, config]) => (
               <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
                 <div className="flex items-center gap-2">
@@ -177,11 +193,27 @@ export default function MinimalAIProviderSelector({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label className="text-xs text-gray-600 mb-1 block">Provider</Label>
-            <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+            <Select 
+              value={selectedProvider || "auto"} 
+              onValueChange={(value) => onProviderChange(value === "auto" ? undefined : value as AIProvider)}
+            >
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent>
+                {showFallbackOption && (
+                  <SelectItem value="auto">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        <span>Auto Fallback</span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Recommended
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                )}
                 {Object.entries(AI_PROVIDERS).map(([key, config]) => (
                   <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
                     <div className="flex items-center justify-between w-full">
@@ -250,11 +282,27 @@ export default function MinimalAIProviderSelector({
       <div className="space-y-4">
         <div>
           <Label className="text-sm text-gray-700 mb-2 block">Provider</Label>
-          <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+          <Select 
+            value={selectedProvider || "auto"} 
+            onValueChange={(value) => onProviderChange(value === "auto" ? undefined : value as AIProvider)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select AI provider" />
             </SelectTrigger>
             <SelectContent>
+              {showFallbackOption && (
+                <SelectItem value="auto">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      <span className="font-medium">Auto Fallback</span>
+                    </div>
+                    <Badge variant="secondary">
+                      Recommended
+                    </Badge>
+                  </div>
+                </SelectItem>
+              )}
               {Object.entries(AI_PROVIDERS).map(([key, config]) => (
                 <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
                   <div className="flex items-center justify-between w-full">

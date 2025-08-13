@@ -21,6 +21,12 @@ export interface GenerateTextResult {
     completionTokens?: number
     totalTokens?: number
   }
+  fallbackInfo?: {
+    providersAttempted: number
+    totalRetries: number
+    finalProvider?: AIProvider
+    errors?: string
+  }
 }
 
 export interface UserApiKey {
@@ -143,6 +149,12 @@ class EnhancedAIService {
         userId: options.userId,
       })
 
+      // If no specific provider is requested, use fallback mechanism
+      if (!options.provider) {
+        console.log("Enhanced AI Service: No specific provider requested, using fallback mechanism")
+        return await this.generateTextWithFallback(options)
+      }
+
       // Load user API keys (pass userId for server-side)
       const userApiKeys = await this.loadUserApiKeys(options.userId)
       console.log(
@@ -164,33 +176,30 @@ class EnhancedAIService {
         }
       }
 
-      // Determine which provider to use
-      let selectedProvider = options.provider
-      if (!selectedProvider || !availableProviders.includes(selectedProvider)) {
-        selectedProvider = availableProviders[0]
-        console.log("Enhanced AI Service: Auto-selected provider:", selectedProvider)
+      // Check if requested provider is available
+      if (!availableProviders.includes(options.provider)) {
+        console.log(`Enhanced AI Service: Requested provider ${options.provider} not available, using fallback`)
+        return await this.generateTextWithFallback(options)
       }
 
       // Get the API key for the selected provider
       const userApiKey = userApiKeys.find(
-        (key) => key.provider === selectedProvider && key.is_active && key.test_status === "valid" && key.decrypted_key,
+        (key) => key.provider === options.provider && key.is_active && key.test_status === "valid" && key.decrypted_key,
       )
 
       if (!userApiKey || !userApiKey.decrypted_key) {
-        return {
-          success: false,
-          error: `No valid API key found for provider: ${selectedProvider}`,
-        }
+        console.log(`Enhanced AI Service: No valid API key for ${options.provider}, using fallback`)
+        return await this.generateTextWithFallback(options)
       }
 
-      console.log("Enhanced AI Service: Using provider:", selectedProvider)
+      console.log("Enhanced AI Service: Using requested provider:", options.provider)
 
       // Get provider configuration
-      const providerConfig = AI_PROVIDERS[selectedProvider]
+      const providerConfig = AI_PROVIDERS[options.provider]
       if (!providerConfig) {
         return {
           success: false,
-          error: `Unknown provider: ${selectedProvider}`,
+          error: `Unknown provider: ${options.provider}`,
         }
       }
 
@@ -202,7 +211,7 @@ class EnhancedAIService {
       // Validate model exists for provider
       if (options.model && !providerConfig.models.includes(options.model)) {
         console.warn(
-          `Enhanced AI Service: Model ${options.model} not in available models for ${selectedProvider}, using default`,
+          `Enhanced AI Service: Model ${options.model} not in available models for ${options.provider}, using default`,
         )
         selectedModel = providerConfig.models[0]
         console.log("Enhanced AI Service: Using default model instead:", selectedModel)
@@ -210,20 +219,74 @@ class EnhancedAIService {
 
       console.log("Enhanced AI Service: Final selected model:", selectedModel)
 
-      // Generate the response using the provider's API
-      const result = await this.callProviderAPI(selectedProvider, userApiKey.decrypted_key, {
-        ...options,
-        model: selectedModel,
-        provider: selectedProvider,
-      })
+      // Try the specific provider with retry logic for transient errors
+      const maxRetries = 2
+      const baseDelay = 1000
 
-      console.log("Enhanced AI Service: Generation result:", {
-        success: result.success,
-        contentLength: result.content?.length,
-        error: result.error,
-      })
+      for (let retry = 0; retry <= maxRetries; retry++) {
+        try {
+          // Generate the response using the provider's API
+          const result = await this.callProviderAPI(options.provider, userApiKey.decrypted_key, {
+            ...options,
+            model: selectedModel,
+            provider: options.provider,
+          })
 
-      return result
+          console.log("Enhanced AI Service: Generation result:", {
+            success: result.success,
+            contentLength: result.content?.length,
+            error: result.error,
+          })
+
+          if (result.success) {
+            return result
+          }
+
+          // If the specific provider failed and it's not a transient error, try fallback
+          if (!this.isTransientError(result.error || "")) {
+            console.log("Enhanced AI Service: Non-transient error, trying fallback")
+            return await this.generateTextWithFallback(options)
+          }
+
+          // For transient errors, retry if we have attempts left
+          if (retry < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retry)
+            console.log(`Enhanced AI Service: Retrying ${options.provider} in ${delay}ms...`)
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            continue
+          }
+
+          // Max retries reached, try fallback
+          console.log("Enhanced AI Service: Max retries reached, trying fallback")
+          return await this.generateTextWithFallback(options)
+
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          console.log(`Enhanced AI Service: Exception with ${options.provider} (attempt ${retry + 1}): ${errorMessage}`)
+
+          // For permanent errors, immediately try fallback
+          if (this.isPermanentError(errorMessage)) {
+            console.log("Enhanced AI Service: Permanent error, trying fallback")
+            return await this.generateTextWithFallback(options)
+          }
+
+          // For transient errors, retry if we have attempts left
+          if (this.isTransientError(errorMessage) && retry < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retry)
+            console.log(`Enhanced AI Service: Retrying ${options.provider} in ${delay}ms...`)
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            continue
+          }
+
+          // Max retries reached or non-transient error, try fallback
+          console.log("Enhanced AI Service: Trying fallback after error")
+          return await this.generateTextWithFallback(options)
+        }
+      }
+
+      // This should never be reached, but just in case
+      return await this.generateTextWithFallback(options)
+
     } catch (error) {
       console.error("Enhanced AI Service: Error in generateText:", error)
       return {
@@ -735,7 +798,7 @@ Requirements: Novel, feasible, practical research directions.`
     console.log(`Enhanced AI Service: Generating chunk ${chunkNumber} with ${count} ideas`)
     console.log(`Enhanced AI Service: Prompt length: ${prompt.length} characters`)
 
-    const result = await this.generateTextWithFallback({
+    const result = await this.generateText({
       prompt,
       maxTokens: count * 200, // More conservative token limit
       temperature: 0.8, // Slightly lower for more focused ideas
@@ -793,13 +856,14 @@ Requirements: Novel, feasible, practical research directions.`
     return ideas.slice(0, 10)
   }
 
-  // Enhanced generateText with provider fallback and retry logic
-  private async generateTextWithFallback(options: GenerateTextOptions): Promise<GenerateTextResult> {
-    const maxRetries = 2
+  // Enhanced generateText with comprehensive provider fallback and retry logic
+  async generateTextWithFallback(options: GenerateTextOptions): Promise<GenerateTextResult> {
+    const maxRetries = 3
     const baseDelay = 1000 // 1 second
+    const maxDelay = 30000 // 30 seconds max delay
 
     // Get available providers in order of preference
-    const userApiKeys = await this.loadUserApiKeys()
+    const userApiKeys = await this.loadUserApiKeys(options.userId)
     const availableProviders = userApiKeys
       .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
       .map((key) => key.provider as AIProvider)
@@ -811,7 +875,9 @@ Requirements: Novel, feasible, practical research directions.`
       }
     }
 
-    console.log(`Enhanced AI Service: Available providers: ${availableProviders.join(", ")}`)
+    console.log(`Enhanced AI Service: Available providers for fallback: ${availableProviders.join(", ")}`)
+
+    const errors: Array<{ provider: AIProvider; error: string; attempts: number }> = []
 
     // Try each provider in order
     for (let providerIndex = 0; providerIndex < availableProviders.length; providerIndex++) {
@@ -830,39 +896,131 @@ Requirements: Novel, feasible, practical research directions.`
 
           if (result.success) {
             console.log(`Enhanced AI Service: Success with ${provider} on attempt ${retry + 1}`)
-            return result
+            return {
+              ...result,
+              fallbackInfo: {
+                providersAttempted: providerIndex + 1,
+                totalRetries: errors.reduce((sum, e) => sum + e.attempts, 0) + retry,
+                finalProvider: provider
+              }
+            }
           } else {
             console.log(`Enhanced AI Service: Failed with ${provider}: ${result.error}`)
-            break // Don't retry on non-transient errors
+            
+            // Check if this is a permanent error that shouldn't be retried
+            const isPermanentError = this.isPermanentError(result.error || "")
+            if (isPermanentError) {
+              errors.push({ provider, error: result.error || "Unknown error", attempts: retry + 1 })
+              break // Move to next provider immediately
+            }
+            
+            // For non-permanent errors, continue to retry logic below
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
-          console.log(`Enhanced AI Service: Error with ${provider} (attempt ${retry + 1}): ${errorMessage}`)
+          console.log(`Enhanced AI Service: Exception with ${provider} (attempt ${retry + 1}): ${errorMessage}`)
 
           // Check if it's a transient error worth retrying
-          const isTransientError =
-            errorMessage.includes("503") ||
-            errorMessage.includes("overloaded") ||
-            errorMessage.includes("rate limit") ||
-            errorMessage.includes("timeout")
+          const isTransientError = this.isTransientError(errorMessage)
+          const isPermanentError = this.isPermanentError(errorMessage)
+
+          if (isPermanentError) {
+            console.log(`Enhanced AI Service: Permanent error with ${provider}, moving to next provider`)
+            errors.push({ provider, error: errorMessage, attempts: retry + 1 })
+            break // Move to next provider
+          }
 
           if (isTransientError && retry < maxRetries) {
-            const delay = baseDelay * Math.pow(2, retry) // Exponential backoff
-            console.log(`Enhanced AI Service: Retrying ${provider} in ${delay}ms...`)
+            const delay = Math.min(baseDelay * Math.pow(2, retry), maxDelay) // Exponential backoff with cap
+            console.log(`Enhanced AI Service: Retrying ${provider} in ${delay}ms... (attempt ${retry + 2}/${maxRetries + 1})`)
             await new Promise((resolve) => setTimeout(resolve, delay))
             continue
           } else {
             console.log(`Enhanced AI Service: Giving up on ${provider} after ${retry + 1} attempts`)
+            errors.push({ provider, error: errorMessage, attempts: retry + 1 })
             break // Move to next provider
           }
         }
       }
     }
 
+    // All providers failed, return comprehensive error information
+    const totalAttempts = errors.reduce((sum, e) => sum + e.attempts, 0)
+    const errorSummary = errors.map(e => `${e.provider}: ${e.error} (${e.attempts} attempts)`).join("; ")
+    
+    console.error(`Enhanced AI Service: All ${availableProviders.length} providers failed after ${totalAttempts} total attempts`)
+    
     return {
       success: false,
-      error: `All AI providers failed. Please try again later or check your API keys.`,
+      error: `All AI providers failed after ${totalAttempts} attempts. ${this.generateFallbackGuidance(errors)}`,
+      fallbackInfo: {
+        providersAttempted: availableProviders.length,
+        totalRetries: totalAttempts,
+        errors: errorSummary
+      }
     }
+  }
+
+  /**
+   * Determine if an error is transient and worth retrying
+   */
+  private isTransientError(errorMessage: string): boolean {
+    const transientPatterns = [
+      "503", "502", "500", // Server errors
+      "overloaded", "busy", "temporarily unavailable",
+      "rate limit", "too many requests", "429",
+      "timeout", "connection", "network",
+      "internal error", "service unavailable",
+      "try again", "temporary"
+    ]
+    
+    const errorLower = errorMessage.toLowerCase()
+    return transientPatterns.some(pattern => errorLower.includes(pattern))
+  }
+
+  /**
+   * Determine if an error is permanent and shouldn't be retried
+   */
+  private isPermanentError(errorMessage: string): boolean {
+    const permanentPatterns = [
+      "api key", "unauthorized", "401", "403", "invalid key",
+      "quota exceeded", "billing", "payment",
+      "model not found", "invalid model", "404",
+      "content policy", "safety", "blocked",
+      "invalid request", "bad request", "400"
+    ]
+    
+    const errorLower = errorMessage.toLowerCase()
+    return permanentPatterns.some(pattern => errorLower.includes(pattern))
+  }
+
+  /**
+   * Generate helpful guidance based on the types of errors encountered
+   */
+  private generateFallbackGuidance(errors: Array<{ provider: AIProvider; error: string; attempts: number }>): string {
+    const hasAuthErrors = errors.some(e => this.isPermanentError(e.error) && e.error.toLowerCase().includes("api key"))
+    const hasQuotaErrors = errors.some(e => e.error.toLowerCase().includes("quota") || e.error.toLowerCase().includes("limit"))
+    const hasTransientErrors = errors.some(e => this.isTransientError(e.error))
+    
+    const guidance = []
+    
+    if (hasAuthErrors) {
+      guidance.push("Check your API keys in Settings")
+    }
+    
+    if (hasQuotaErrors) {
+      guidance.push("Some providers have reached their usage limits")
+    }
+    
+    if (hasTransientErrors) {
+      guidance.push("Try again in a few minutes")
+    }
+    
+    if (guidance.length === 0) {
+      guidance.push("Please check your API keys and try again")
+    }
+    
+    return guidance.join(". ")
   }
 
   // Simplified content summarization with chunking for large content

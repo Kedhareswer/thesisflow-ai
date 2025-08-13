@@ -11,9 +11,9 @@ import { useState } from "react"
 
 interface ConfigurationPanelProps {
   selectedProvider: AIProvider | undefined
-  onProviderChange: (provider: AIProvider) => void
+  onProviderChange: (provider: AIProvider | undefined) => void
   selectedModel?: string
-  onModelChange?: (model: string) => void
+  onModelChange?: (model: string | undefined) => void
   summaryStyle: "academic" | "executive" | "bullet-points" | "detailed"
   onSummaryStyleChange: (style: "academic" | "executive" | "bullet-points" | "detailed") => void
   summaryLength: "brief" | "medium" | "comprehensive"

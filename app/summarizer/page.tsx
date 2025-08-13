@@ -2,20 +2,25 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
 import type { AIProvider } from "@/lib/ai-providers"
+import { ErrorHandler, type UserFriendlyError } from "@/lib/utils/error-handler"
+import { SummarizerService, type SummaryResult } from "@/lib/services/summarizer.service"
+import type { ProcessingProgress } from "@/lib/utils/chunked-processor"
 import { ContextInputPanel } from "./components/context-input-panel"
 import { ConfigurationPanel } from "./components/configuration-panel"
 import { SummaryOutputPanel } from "./components/summary-output-panel"
 import { WebSearchPanel } from "./components/web-search-panel"
+import { ErrorDisplay } from "./components/error-display"
+import { ProcessingProgressIndicator, ChunkingStats } from "./components/processing-progress"
+import { EnhancedLoading, SummaryLoadingSkeleton } from "./components/enhanced-loading"
+import { SummaryStatistics } from "./components/summary-statistics"
+import { QualityAssessment } from "./components/quality-assessment"
 
-interface SummaryResult {
-  summary: string
-  keyPoints: string[]
-  readingTime: number
+// Enhanced SummaryResult interface to match the new service
+interface EnhancedSummaryResult extends Omit<SummaryResult, 'readingTime'> {
+  readingTime: number // Override to make it required
   sentiment?: "positive" | "neutral" | "negative"
   originalLength: number
   summaryLength: number
@@ -32,16 +37,17 @@ export default function SummarizerPage() {
   // State management
   const [content, setContent] = useState("")
   const [url, setUrl] = useState("")
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>()
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string>()
   const [summaryStyle, setSummaryStyle] = useState<"academic" | "executive" | "bullet-points" | "detailed">("academic")
   const [summaryLength, setSummaryLength] = useState<"brief" | "medium" | "comprehensive">("medium")
-  const [result, setResult] = useState<SummaryResult | null>(null)
+  const [result, setResult] = useState<EnhancedSummaryResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [urlFetching, setUrlFetching] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<UserFriendlyError | null>(null)
   const [currentTab, setCurrentTab] = useState<"file" | "url">("file")
+  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null)
 
   // Utility functions
   const getWordCount = useCallback((text: string) => {
@@ -60,208 +66,35 @@ export default function SummarizerPage() {
     [getWordCount],
   )
 
-  // Helper to estimate tokens (rough approximation)
-  const estimateTokens = (text: string) => Math.ceil(text.length / 4)
 
-  // Helper to clean up JSON artifacts from summary text
-  const cleanSummaryText = (text: string): string => {
-    if (!text) return ""
-    
-    return text
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/\\n/g, '\n') // Convert escaped newlines
-      .replace(/\\"/g, '"') // Convert escaped quotes
-      .replace(/\\t/g, '\t') // Convert escaped tabs
-      .replace(/\\r/g, '\r') // Convert escaped carriage returns
-      .replace(/\\\\/g, '\\') // Convert double backslashes
-      .trim()
-  }
 
-  // Style and length instructions for dynamic prompts
-  const styleInstructions = {
-    academic: "Write in an academic, scholarly tone with formal language, citations where appropriate, and analytical depth. Focus on methodology, findings, and implications.",
-    executive: "Write in a business executive style - concise, action-oriented, with clear recommendations and strategic insights. Use bullet points for key takeaways.",
-    "bullet-points": "Present the information in a structured bullet-point format. Each point should be clear, concise, and actionable. Use sub-bullets for details.",
-    detailed: "Provide a comprehensive, detailed analysis with thorough explanations, context, and nuanced understanding. Include multiple perspectives and deep insights."
-  }
-
-  const lengthInstructions = {
-    brief: "Keep the summary very concise (150-200 words). Focus only on the most essential points and key insights.",
-    medium: "Provide a balanced summary (300-400 words) with main points and supporting details.",
-    comprehensive: "Create a thorough summary (500-700 words) with comprehensive coverage, detailed analysis, and extensive insights."
-  }
-
-  // Helper to generate dynamic prompts based on style and length
-  const generateSummaryPrompt = (content: string, style: string, length: string): string => {
-    return `Please provide a ${length} ${style} summary of the following content.
-
-${lengthInstructions[length as keyof typeof lengthInstructions]}
-
-Style Instructions: ${styleInstructions[style as keyof typeof styleInstructions]}
-
-Content to summarize:
-${content}
-
-Please format your response as JSON with the following structure. IMPORTANT: The "summary" field should contain clean, readable text (not JSON format). If relevant, include tables (with title, headers, rows) and graphs (with title, type, data):
-{
-  "summary": "The main summary text in clean, readable format with proper paragraphs and formatting",
-  "keyPoints": ["point 1", "point 2", "point 3"],
-  "sentiment": "positive|neutral|negative",
-  "topics": ["topic 1", "topic 2"],
-  "difficulty": "beginner|intermediate|advanced",
-  "tables": [
-    {
-      "title": "Table Title",
-      "headers": ["Column 1", "Column 2"],
-      "rows": [["Row1Col1", "Row1Col2"], ["Row2Col1", "Row2Col2"]]
-    }
-  ],
-  "graphs": [
-    {
-      "title": "Graph Title",
-      "type": "bar|line|pie|scatter",
-      "data": { "labels": ["A", "B"], "values": [10, 20] }
-    }
-  ]
-}`
-  }
-
-  // Helper to get max tokens based on summary length
-  const getMaxTokens = (length: string): number => {
-    switch (length) {
-      case "brief": return 800
-      case "medium": return 1200
-      case "comprehensive": return 1800
-      default: return 1000
-    }
-  }
-
-  // Chunked summarization when content too large
-  const summarizeInChunks = async (): Promise<SummaryResult | null> => {
-    const maxTokensPerChunk = 8000 // safe margin (≈32k chars)
-    const maxCharsPerChunk = maxTokensPerChunk * 4
-
-    // Split content into manageable chunks
-    const chunks: string[] = []
-    for (let i = 0; i < content.length; i += maxCharsPerChunk) {
-      chunks.push(content.substring(i, i + maxCharsPerChunk))
-    }
-
-    // Summarize each chunk briefly to keep token usage low
-    const chunkSummaries: string[] = []
-    for (let idx = 0; idx < chunks.length; idx++) {
-      const chunk = chunks[idx]
-      const chunkPrompt = `Provide a concise summary (executive, bullet points) of the following content (part ${idx + 1} of ${chunks.length}). Limit to 150 words.\n\n${chunk}`
-
-      const response = await fetch("/api/ai/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: chunkPrompt,
-          provider: selectedProvider,
-          model: selectedModel,
-          temperature: 0.3,
-          maxTokens: 512,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Chunk ${idx + 1} summarization failed (${response.status})`)
-      }
-      const data = await response.json()
-      if (data.error) throw new Error(data.error)
-      chunkSummaries.push(data.content)
-    }
-
-    // Aggregate summaries
-    const aggregatePrompt = `Combine the following chunk summaries into a single ${summaryLength} ${summaryStyle} summary.
-
-${lengthInstructions[summaryLength as keyof typeof lengthInstructions]}
-
-Style Instructions: ${styleInstructions[summaryStyle as keyof typeof styleInstructions]}
-
-Chunk Summaries:
-${chunkSummaries
-      .map((s, i) => `Part ${i + 1}: ${s}`)
-  .join("\n\n")}
-
-Return JSON with the following structure. IMPORTANT: The "summary" field should contain clean, readable text (not JSON format):
-{
-  "summary": "The combined summary text in clean, readable format with proper paragraphs",
-  "keyPoints": ["key point 1", "key point 2", "key point 3"],
-  "sentiment": "positive|neutral|negative",
-  "topics": ["topic 1", "topic 2"],
-  "difficulty": "beginner|intermediate|advanced"
-}`
-
-    const aggregateResponse = await fetch("/api/ai/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: aggregatePrompt,
-        provider: selectedProvider,
-        model: selectedModel,
-        temperature: 0.3,
-        maxTokens: getMaxTokens(summaryLength),
-      }),
-    })
-
-    if (!aggregateResponse.ok) {
-      throw new Error(`Aggregation failed (${aggregateResponse.status})`)
-    }
-    const aggregateData = await aggregateResponse.json()
-    if (aggregateData.error) throw new Error(aggregateData.error)
-
-    let parsed
-    try {
-      // Clean the response content to extract JSON
-      let contentToParse = aggregateData.content.trim()
-      
-      // Try to find JSON object in the response
-      const jsonMatch = contentToParse.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        contentToParse = jsonMatch[0]
-      }
-      
-      parsed = JSON.parse(contentToParse)
-      
-      // Ensure summary is a string, not JSON
-      if (typeof parsed.summary === 'string') {
-        // Clean up any remaining JSON artifacts
-        parsed.summary = cleanSummaryText(parsed.summary)
-      }
-    } catch (parseError) {
-      console.warn('Failed to parse JSON response in chunked summarization:', parseError)
-      parsed = { 
-        summary: cleanSummaryText(aggregateData.content), 
-        keyPoints: [] 
-      }
-    }
-
+  // Convert SummaryResult to EnhancedSummaryResult
+  const enhanceResult = (result: SummaryResult): EnhancedSummaryResult => {
     const originalLength = getWordCount(content)
-    const summaryWordCount = getWordCount(parsed.summary || aggregateData.content)
+    const summaryWordCount = getWordCount(result.summary)
     const compressionRatio = `${Math.round((1 - summaryWordCount / originalLength) * 100)}%`
 
-    const finalResult: SummaryResult = {
-      summary: parsed.summary || aggregateData.content,
-      keyPoints: parsed.keyPoints || [],
-      readingTime: getReadingTime(parsed.summary || aggregateData.content),
-      sentiment: parsed.sentiment,
+    return {
+      ...result,
+      readingTime: result.readingTime || getReadingTime(result.summary), // Ensure readingTime is always a number
       originalLength,
       summaryLength: summaryWordCount,
       compressionRatio,
-      topics: parsed.topics,
-      difficulty: parsed.difficulty,
+      sentiment: "neutral", // Default values for backward compatibility
+      topics: [],
+      difficulty: "intermediate",
+      tables: [],
+      graphs: []
     }
-    return finalResult
   }
 
-  // Handle URL fetching
+  // Handle URL fetching and summarization
   const handleUrlFetch = async () => {
     if (!url.trim()) return
 
     setUrlFetching(true)
     setError(null)
+    setProcessingProgress(null)
 
     try {
       const response = await fetch("/api/fetch-url", {
@@ -270,14 +103,31 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
         body: JSON.stringify({ url }),
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.statusText}`)
-      }
-
       const data = await response.json()
 
-      if (data.error) {
-        throw new Error(data.error)
+      if (!response.ok || data.error) {
+        // Handle structured error responses from the new error handling system
+        if (data.userMessage) {
+          const structuredError: UserFriendlyError = {
+            title: data.error || "URL Fetch Failed",
+            message: data.userMessage,
+            actions: data.actions || [],
+            fallbackOptions: data.fallbackOptions,
+            helpLinks: data.helpLinks,
+            errorType: data.errorType || 'url_extraction',
+            technicalDetails: data.technicalDetails
+          }
+          setError(structuredError)
+          toast({
+            title: "URL Fetch Failed",
+            description: data.userMessage,
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Fallback for legacy error responses
+        throw new Error(data.error || `Failed to fetch URL: ${response.statusText}`)
       }
 
       setContent(data.content || "")
@@ -286,15 +136,63 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
         description: `Successfully extracted ${getWordCount(data.content || "")} words from the URL.`,
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch URL content"
-      setError(errorMessage)
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'url-fetch',
+        url
+      })
+      setError(processedError)
       toast({
         title: "URL Fetch Failed",
-        description: errorMessage,
+        description: processedError.message,
         variant: "destructive",
       })
     } finally {
       setUrlFetching(false)
+    }
+  }
+
+  // Handle URL summarization with progress
+  const handleUrlSummarize = async () => {
+    if (!url.trim()) return
+
+    setLoading(true)
+    setError(null)
+    setProcessingProgress(null)
+
+    try {
+      const result = await SummarizerService.summarizeUrl(
+        url,
+        true,
+        (progress) => setProcessingProgress(progress),
+        {
+          provider: selectedProvider,
+          model: selectedModel,
+          style: summaryStyle,
+          length: summaryLength
+        }
+      )
+
+      const enhancedResult = enhanceResult(result)
+      setResult(enhancedResult)
+
+      toast({
+        title: "URL Summarized",
+        description: `Successfully summarized content from URL using ${result.processingMethod} processing.`,
+      })
+    } catch (error) {
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'summarize-url',
+        url
+      })
+      setError(processedError)
+      toast({
+        title: "URL Summarization Failed",
+        description: processedError.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+      setProcessingProgress(null)
     }
   }
 
@@ -312,19 +210,70 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
 
   const handleFileError = useCallback(
     (error: string) => {
-      setError(error)
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'file-processing'
+      })
+      setError(processedError)
       toast({
         title: "File Processing Failed",
-        description: error,
+        description: processedError.message,
         variant: "destructive",
       })
     },
     [toast],
   )
 
-  // Handle summarization
-  const handleSummarize = async () => {
+  // Handle file summarization with progress
+  const handleFileSummarize = async (file: File) => {
+    setLoading(true)
+    setError(null)
+    setProcessingProgress(null)
+
+    try {
+      const result = await SummarizerService.summarizeFile(
+        file,
+        true,
+        (progress) => setProcessingProgress(progress),
+        {
+          provider: selectedProvider,
+          model: selectedModel,
+          style: summaryStyle,
+          length: summaryLength
+        }
+      )
+
+      const enhancedResult = enhanceResult(result)
+      setResult(enhancedResult)
+
+      toast({
+        title: "File Summarized",
+        description: `Successfully summarized ${file.name} using ${result.processingMethod} processing.`,
+      })
+    } catch (error) {
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'summarize-file',
+        fileType: file.type
+      })
+      setError(processedError)
+      toast({
+        title: "File Summarization Failed",
+        description: processedError.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+      setProcessingProgress(null)
+    }
+  }
+
+  // Handle text summarization with progress
+  const handleSummarize = async (retryOptions?: any) => {
     if (!content.trim()) {
+      const validationError = ErrorHandler.processError(
+        "No content provided for summarization",
+        { operation: 'summarize-validation' }
+      )
+      setError(validationError)
       toast({
         title: "No Content",
         description: "Please provide content to summarize.",
@@ -333,131 +282,52 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
       return
     }
 
-    if (!selectedProvider) {
-      toast({
-        title: "No AI Provider",
-        description: "Please select an AI provider to generate summaries.",
-        variant: "destructive",
-      })
-      return
+    // Apply retry options if provided
+    if (retryOptions) {
+      if (retryOptions.style) setSummaryStyle(retryOptions.style)
+      if (retryOptions.length) setSummaryLength(retryOptions.length)
+      if (retryOptions.provider) setSelectedProvider(retryOptions.provider)
+      if (retryOptions.model) setSelectedModel(retryOptions.model)
     }
 
     setLoading(true)
     setError(null)
+    setProcessingProgress(null)
 
     try {
-      const totalTokens = estimateTokens(content)
-      const tokenThreshold = 11000 // Groq safe limit
-      if (totalTokens > tokenThreshold) {
-        console.log("Using chunked summarization due to large content")
-        const chunkedResult = await summarizeInChunks()
-        if (chunkedResult) {
-          setResult(chunkedResult)
-          toast({ title: "Summary Generated", description: `Successfully summarized large document in chunks.` })
-          return
-        }
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`
-      }
-
-      const response = await fetch("/api/ai/generate", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          prompt: generateSummaryPrompt(content, summaryStyle, summaryLength),
+      const result = await SummarizerService.summarizeText(
+        content,
+        true,
+        (progress) => setProcessingProgress(progress),
+        {
           provider: selectedProvider,
           model: selectedModel,
-          temperature: 0.3,
-          maxTokens: getMaxTokens(summaryLength),
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      if (data.error) {
-        throw new Error(data.error)
-      }
-
-      // Try to parse JSON response, fallback to plain text
-      let parsedResult
-      try {
-        // Clean the response content to extract JSON
-        let contentToParse = data.content.trim()
-        
-        // Try to find JSON object in the response
-        const jsonMatch = contentToParse.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          contentToParse = jsonMatch[0]
+          style: summaryStyle,
+          length: summaryLength
         }
-        
-        parsedResult = JSON.parse(contentToParse)
-        
-        // Ensure summary is a string, not JSON
-        if (typeof parsedResult.summary === 'string') {
-          // Clean up any remaining JSON artifacts
-          parsedResult.summary = cleanSummaryText(parsedResult.summary)
-        }
-      } catch (parseError) {
-        console.warn('Failed to parse JSON response:', parseError)
-        // Fallback for non-JSON responses
-        parsedResult = {
-          summary: cleanSummaryText(data.content),
-          keyPoints: [],
-          sentiment: "neutral",
-          topics: [],
-          difficulty: "intermediate",
-          tables: [],
-          graphs: [],
-        }
-      }
+      )
 
-      const originalLength = getWordCount(content)
-      const summaryWordCount = getWordCount(parsedResult.summary)
-      const compressionRatio = `${Math.round((1 - summaryWordCount / originalLength) * 100)}%`
+      const enhancedResult = enhanceResult(result)
+      setResult(enhancedResult)
 
-      const summaryResult: SummaryResult = {
-        summary: parsedResult.summary || data.content,
-        keyPoints: parsedResult.keyPoints || [],
-        readingTime: getReadingTime(parsedResult.summary || data.content),
-        sentiment: parsedResult.sentiment,
-        originalLength,
-        summaryLength: summaryWordCount,
-        compressionRatio,
-        topics: parsedResult.topics,
-        difficulty: parsedResult.difficulty,
-        tables: parsedResult.tables || [],
-        graphs: parsedResult.graphs || [],
-      }
-
-      setResult(summaryResult)
       toast({
         title: "Summary Generated",
-        description: `Successfully created a ${summaryLength} ${summaryStyle} summary.`,
+        description: `Successfully created summary using ${result.processingMethod} processing.`,
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to generate summary"
-      setError(errorMessage)
-        toast({
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'summarize-text',
+        contentLength: content.length
+      })
+      setError(processedError)
+      toast({
         title: "Summarization Failed",
-        description: errorMessage,
-          variant: "destructive",
-        })
+        description: processedError.message,
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
+      setProcessingProgress(null)
     }
   }
 
@@ -509,8 +379,8 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
     if (navigator.share) {
       try {
         await navigator.share({
-      title: "AI Generated Summary",
-      text: result.summary,
+          title: "AI Generated Summary",
+          text: result.summary,
         })
       } catch (error) {
         // User cancelled sharing
@@ -519,6 +389,17 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
       // Fallback to copying to clipboard
       handleCopyToClipboard(result.summary)
     }
+  }
+
+  // Handle quality feedback
+  const handleQualityFeedback = (rating: "good" | "poor", feedback?: string) => {
+    // Log feedback for analytics (could be sent to backend)
+    console.log('Quality feedback:', { rating, feedback, resultId: result?.summary.slice(0, 50) })
+
+    toast({
+      title: "Feedback Received",
+      description: `Thank you for rating this summary as ${rating}.`,
+    })
   }
 
   return (
@@ -537,28 +418,21 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
         </div>
       </div>
 
-      {/* Error Alert */}
+      {/* Enhanced Error Display */}
       {error && (
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <Alert className="border-gray-300 bg-gray-50">
-            <AlertCircle className="h-4 w-4 text-gray-700" />
-            <AlertDescription className="text-gray-800">
-              {error}
-              {error.toLowerCase().includes('token') || error.toLowerCase().includes('limit') || error.toLowerCase().includes('failed') ? (
-                <span className="block mt-2 text-sm">
-                  <strong>Note:</strong> For enhanced PDF processing, try{' '}
-                  <a 
-                    href="https://quantumn-pdf-chatapp.netlify.app/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="underline hover:text-black"
-                  >
-                    QuantumPDF
-                  </a>
-                </span>
-              ) : null}
-            </AlertDescription>
-          </Alert>
+          <ErrorDisplay
+            error={error}
+            onRetry={() => {
+              setError(null)
+              if (currentTab === "url" && url) {
+                handleUrlFetch()
+              } else if (content) {
+                handleSummarize()
+              }
+            }}
+            onDismiss={() => setError(null)}
+          />
         </div>
       )}
 
@@ -568,19 +442,46 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
           // Summary View - Full width when summary exists
           <div className="space-y-8">
             {/* Summary Output - Primary Focus */}
-            <SummaryOutputPanel
-              result={result}
-              loading={loading}
-              copied={copied}
-              onCopyToClipboard={handleCopyToClipboard}
-              onDownloadSummary={handleDownloadSummary}
-              onShareSummary={handleShareSummary}
-              getWordCount={getWordCount}
-              showAdvancedStats={false}
-              summaryStyle={summaryStyle}
-              summaryLength={summaryLength}
-            />
-            
+            <div className="space-y-6">
+              <SummaryOutputPanel
+                result={result}
+                loading={loading}
+                copied={copied}
+                onCopyToClipboard={handleCopyToClipboard}
+                onDownloadSummary={handleDownloadSummary}
+                onShareSummary={handleShareSummary}
+                getWordCount={getWordCount}
+                showAdvancedStats={false}
+                summaryStyle={summaryStyle}
+                summaryLength={summaryLength}
+              />
+
+              {/* Enhanced Statistics and Quality Assessment */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <SummaryStatistics
+                  result={result}
+                  getWordCount={getWordCount}
+                />
+
+                <QualityAssessment
+                  result={result}
+                  onRetry={handleSummarize}
+                  onFeedback={handleQualityFeedback}
+                />
+              </div>
+
+              {/* Chunking Statistics */}
+              {result?.metadata && (result.metadata.totalChunks || 0) > 1 && (
+                <ChunkingStats
+                  metadata={result.metadata}
+                  confidence={result.confidence}
+                  warnings={result.warnings}
+                  suggestions={result.suggestions}
+                  className="max-w-4xl mx-auto"
+                />
+              )}
+            </div>
+
             {/* Input Controls - Minimized when summary exists */}
             <div className="border-t border-gray-200 pt-8">
               <div className="grid gap-6 lg:grid-cols-3">
@@ -599,7 +500,7 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
                     onTabChange={setCurrentTab}
                   />
                 </div>
-                
+
                 <div className="space-y-6">
                   <ConfigurationPanel
                     selectedProvider={selectedProvider}
@@ -611,16 +512,19 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
                     summaryLength={summaryLength}
                     onSummaryLengthChange={setSummaryLength}
                   />
-                  
+
                   <Button
                     onClick={handleSummarize}
-                    disabled={loading || !content.trim() || !selectedProvider}
+                    disabled={loading || !content.trim()}
                     className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
                   >
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
+                        {processingProgress?.stage === 'chunking' && 'Analyzing Structure...'}
+                        {processingProgress?.stage === 'processing' && `Processing (${processingProgress.currentChunk || 1}/${processingProgress.totalChunks || 1})...`}
+                        {processingProgress?.stage === 'synthesizing' && 'Creating Summary...'}
+                        {!processingProgress && 'Initializing...'}
                       </>
                     ) : (
                       "Generate New Summary"
@@ -642,7 +546,7 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
                     handleUrlFetch();
                   }} />
                 )}
-                
+
                 <ContextInputPanel
                   content={content}
                   url={url}
@@ -671,14 +575,17 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
                 />
 
                 <Button
-                  onClick={handleSummarize}
-                  disabled={loading || !content.trim() || !selectedProvider}
+                  onClick={() => handleSummarize()}
+                  disabled={loading || !content.trim()}
                   className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating Summary...
+                      {processingProgress?.stage === 'chunking' && 'Analyzing Structure...'}
+                      {processingProgress?.stage === 'processing' && `Processing (${processingProgress.currentChunk || 1}/${processingProgress.totalChunks || 1})...`}
+                      {processingProgress?.stage === 'synthesizing' && 'Creating Summary...'}
+                      {!processingProgress && 'Initializing...'}
                     </>
                   ) : (
                     "Generate Summary"
@@ -688,9 +595,9 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
                 {/* Subtle QuantumPDF Note */}
                 <p className="text-xs text-gray-500 text-center font-light">
                   For advanced PDF analysis, visit{' '}
-                  <a 
-                    href="https://quantumn-pdf-chatapp.netlify.app/" 
-                    target="_blank" 
+                  <a
+                    href="https://quantumn-pdf-chatapp.netlify.app/"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-gray-700"
                   >
@@ -700,13 +607,19 @@ Return JSON with the following structure. IMPORTANT: The "summary" field should 
               </div>
             </div>
 
-            {/* Loading State */}
+            {/* Enhanced Loading State with Progress */}
             {loading && (
-              <div className="mt-12 text-center">
-                <div className="inline-flex items-center gap-3 text-gray-600">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span className="font-light">Analyzing content and generating summary...</span>
-                </div>
+              <div className="mt-12 space-y-6">
+                <EnhancedLoading
+                  progress={processingProgress}
+                  operation="summarize"
+                  className="max-w-2xl mx-auto"
+                />
+
+                {/* Show skeleton while processing */}
+                {processingProgress?.stage === 'processing' && (
+                  <SummaryLoadingSkeleton className="max-w-4xl mx-auto" />
+                )}
               </div>
             )}
           </div>

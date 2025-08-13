@@ -11,6 +11,8 @@ import {
   CardTitle 
 } from "@/components/ui/card"
 import { Loader2, Search, Globe, ExternalLink } from "lucide-react"
+import { ErrorHandler, type UserFriendlyError } from "@/lib/utils/error-handler"
+import { InlineError } from "./error-display"
 
 interface SearchResult {
   title: string;
@@ -27,7 +29,7 @@ export function WebSearchPanel({ onSelectUrl }: WebSearchPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UserFriendlyError | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const handleSearch = async () => {
@@ -44,7 +46,24 @@ export function WebSearchPanel({ onSelectUrl }: WebSearchPanelProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Handle structured error responses from the error handling system
+        if (errorData.userMessage) {
+          const structuredError: UserFriendlyError = {
+            title: errorData.error || "Search Failed",
+            message: errorData.userMessage,
+            actions: errorData.actions || [],
+            fallbackOptions: errorData.fallbackOptions,
+            helpLinks: errorData.helpLinks,
+            errorType: errorData.errorType || 'network',
+            technicalDetails: errorData.technicalDetails
+          }
+          setError(structuredError);
+          return;
+        }
+        
+        // Fallback for legacy error responses
         throw new Error(errorData.error || `Failed to search: ${response.status}`);
       }
 
@@ -52,11 +71,20 @@ export function WebSearchPanel({ onSelectUrl }: WebSearchPanelProps) {
       setResults(data.results || []);
       
       if (data.results?.length === 0) {
-        setError("No results found for your search query. Try different keywords.");
+        const noResultsError = ErrorHandler.processError(
+          "No results found for your search query",
+          {
+            operation: 'web-search-no-results'
+          }
+        );
+        setError(noResultsError);
       }
     } catch (error) {
       console.error("Search error:", error);
-      setError(error instanceof Error ? error.message : "Failed to search. Please try again.");
+      const processedError = ErrorHandler.processError(error, {
+        operation: 'web-search'
+      });
+      setError(processedError);
     } finally {
       setLoading(false);
     }
@@ -125,9 +153,7 @@ export function WebSearchPanel({ onSelectUrl }: WebSearchPanelProps) {
 
           {/* Error Message */}
           {error && (
-            <div className="text-sm text-red-500 p-2 bg-red-50 rounded-md">
-              {error}
-            </div>
+            <InlineError error={error} className="mt-2" />
           )}
 
           {/* Loading State */}
