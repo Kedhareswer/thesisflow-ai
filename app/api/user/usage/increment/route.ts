@@ -71,10 +71,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to increment usage' }, { status: 500 })
     }
 
+    const actualNewCount = incrementResult?.new_usage_count ?? (featureUsage.usage_count + 1)
+    const actualRemaining = featureUsage.is_unlimited
+      ? -1
+      : (featureUsage.limit_count - actualNewCount)
+
     return NextResponse.json({
       success: true,
-      newUsageCount: incrementResult?.new_usage_count || (featureUsage.usage_count + 1),
-      remaining: featureUsage.is_unlimited ? -1 : (featureUsage.remaining - 1),
+      newUsageCount: actualNewCount,
+      remaining: actualRemaining,
       isUnlimited: featureUsage.is_unlimited
     })
 

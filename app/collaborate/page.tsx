@@ -294,36 +294,39 @@ export default function CollaboratePage() {
     console.log('Creating team - Plan loading:', planLoading)
     console.log('Creating team - Can use team_members before refresh:', canUseFeature('team_members'))
 
-    // Wait for plan data to be ready with extended timeout
+    // Ensure plan data is available before proceeding
     if (!isPlanDataReady()) {
-      console.log('Creating team - Waiting for plan data to be ready...')
-      let attempts = 0
-      while (!isPlanDataReady() && attempts < 20) { // Increased timeout
-        await new Promise(resolve => setTimeout(resolve, 500))
-        attempts++
-        console.log(`Creating team - Plan data ready attempt ${attempts}:`, isPlanDataReady())
-        
-        // Try to refresh plan data every few attempts
-        if (attempts % 5 === 0) {
-          console.log('Creating team - Forcing plan data refresh...')
-          await refreshPlanData()
-        }
+      console.log('Creating team - Refreshing plan data...')
+      await refreshPlanData()
+
+      const maxWaitMs = 3000 // 3 s timeout
+      const start = Date.now()
+      while (!isPlanDataReady() && Date.now() - start < maxWaitMs) {
+        await new Promise((res) => setTimeout(res, 100))
       }
-      
-      // If still not ready after extended wait, try one more refresh
+
       if (!isPlanDataReady()) {
-        console.log('Creating team - Final plan data refresh attempt...')
-        await refreshPlanData()
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Give it time to load
+        toast({
+          title: 'Unable to verify plan',
+          description: 'Please try again in a moment',
+          variant: 'destructive',
+        })
+        return
       }
     }
 
     console.log('Creating team - Plan data after all attempts:', planData)
     console.log('Creating team - Can use team_members after all attempts:', canUseFeature('team_members'))
 
-    // Skip plan restriction check for now to test team creation directly
-    // The backend will still enforce the restriction
-    console.log('Creating team - Bypassing frontend plan check, backend will enforce restrictions')
+    // Check plan restrictions before creating a team
+    if (!canUseFeature('team_members')) {
+      toast({
+        title: "Plan upgrade required",
+        description: "Team collaboration is only available for Pro and Enterprise plans.",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       setIsCreatingTeam(true)

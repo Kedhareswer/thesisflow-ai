@@ -4,12 +4,41 @@
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_your_stripe_secret_key');
 
+// --- Helper functions to make script idempotent ---
+/**
+ * Returns an existing active price for given product & interval settings, or null if none found.
+ */
+async function checkExistingPrice(productId, interval, intervalCount) {
+  try {
+    const prices = await stripe.prices.list({ product: productId, active: true, limit: 100 });
+    return prices.data.find((p) => p.recurring && p.recurring.interval === interval && p.recurring.interval_count === intervalCount) || null;
+  } catch (err) {
+    console.warn('Failed to list prices', err);
+    return null;
+  }
+}
+
+/**
+ * Fetches an existing price matching the config or creates a new one.
+ */
+async function createOrGetPrice(config) {
+  const { product, recurring } = config;
+  const existing = await checkExistingPrice(product, recurring.interval, recurring.interval_count);
+  if (existing) {
+    console.log(`Using existing price ${existing.id} for ${config.nickname}`);
+    return existing;
+  }
+  const created = await stripe.prices.create(config);
+  console.log(`Created new price ${created.id} for ${config.nickname}`);
+  return created;
+}
+
 async function setupStripePrices() {
   try {
     console.log('Creating Stripe recurring prices...');
 
     // Create Pro Monthly Price ($29/month)
-    const proMonthlyPrice = await stripe.prices.create({
+    const proMonthlyPrice = await createOrGetPrice({
       product: 'prod_SrE9EJdym66Hdr', // Pro product ID
       unit_amount: 2900, // $29.00 in cents
       currency: 'usd',
@@ -26,7 +55,7 @@ async function setupStripePrices() {
     console.log('Created Pro Monthly price:', proMonthlyPrice.id);
 
     // Create Enterprise Monthly Price ($99/month)
-    const enterpriseMonthlyPrice = await stripe.prices.create({
+    const enterpriseMonthlyPrice = await createOrGetPrice({
       product: 'prod_SrE9hKEszkVJly', // Enterprise product ID
       unit_amount: 9900, // $99.00 in cents
       currency: 'usd',
@@ -43,7 +72,7 @@ async function setupStripePrices() {
     console.log('Created Enterprise Monthly price:', enterpriseMonthlyPrice.id);
 
     // Create Pro Yearly Price ($290/year - ~17% discount)
-    const proYearlyPrice = await stripe.prices.create({
+    const proYearlyPrice = await createOrGetPrice({
       product: 'prod_SrE9EJdym66Hdr', // Pro product ID
       unit_amount: 29000, // $290.00 in cents
       currency: 'usd',
@@ -60,7 +89,7 @@ async function setupStripePrices() {
     console.log('Created Pro Yearly price:', proYearlyPrice.id);
 
     // Create Enterprise Yearly Price ($990/year - ~17% discount)
-    const enterpriseYearlyPrice = await stripe.prices.create({
+    const enterpriseYearlyPrice = await createOrGetPrice({
       product: 'prod_SrE9hKEszkVJly', // Enterprise product ID
       unit_amount: 99000, // $990.00 in cents
       currency: 'usd',

@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan restrictions
-    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { p_user_uuid: user.id });
+    const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { user_id: user.id });
     
     if (!planData || planData.length === 0) {
       // User doesn't have a plan, assign them to free plan
@@ -283,8 +283,8 @@ export async function POST(request: NextRequest) {
 
     // Check if user can use team features
     const { data: canUseTeams, error: canUseError } = await supabaseAdmin.rpc('can_use_feature', { 
-      p_user_uuid: user.id, 
-      p_feature_name: 'team_members' 
+      user_id: user.id, 
+      feature_name: 'team_members' 
     });
 
     if (canUseError) {

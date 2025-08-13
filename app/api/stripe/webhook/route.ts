@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-07-30.basil'
+  apiVersion: '2025-04-30.basil' as any
 })
 
 const supabaseAdmin = createClient(
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id,
               status: subscription.status,
-              current_period_start: new Date(((subscription as any).current_period_start || 0) * 1000).toISOString(),
-              current_period_end: new Date(((subscription as any).current_period_end || 0) * 1000).toISOString(),
+              current_period_start: new Date((subscription.current_period_start || 0) * 1000).toISOString(),
+              current_period_end: new Date((subscription.current_period_end || 0) * 1000).toISOString(),
               cancel_at_period_end: subscription.cancel_at_period_end,
               updated_at: new Date().toISOString()
             })
@@ -140,7 +140,12 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = (invoice as any).subscription as string
+        let subscriptionId: string | undefined;
+        if (typeof invoice.subscription === 'string') {
+          subscriptionId = invoice.subscription;
+        } else if (invoice.subscription && (invoice.subscription as Stripe.Subscription).id) {
+          subscriptionId = (invoice.subscription as Stripe.Subscription).id;
+        }
         
         if (subscriptionId) {
           // Retrieve subscription to get user ID
@@ -160,7 +165,12 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = (invoice as any).subscription as string
+        let subscriptionId: string | undefined;
+        if (typeof invoice.subscription === 'string') {
+          subscriptionId = invoice.subscription;
+        } else if (invoice.subscription && (invoice.subscription as Stripe.Subscription).id) {
+          subscriptionId = (invoice.subscription as Stripe.Subscription).id;
+        }
         
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
@@ -211,9 +221,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Stripe requires raw body for webhook signature verification
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+// Export runtime for App Router (ensures Node.js environment)
+export const runtime = 'nodejs'

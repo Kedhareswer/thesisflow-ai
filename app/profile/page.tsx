@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,6 +53,8 @@ export default function ProfilePage() {
     collaborations: null,
   })
   const [activityLoading, setActivityLoading] = useState(false)
+  // Ref to debounce activity reloads triggered by realtime updates
+  const activityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -60,7 +62,7 @@ export default function ProfilePage() {
       // Initial load of activity
       loadActivity()
     }
-  }, [user?.id]) // Use user.id as dependency to avoid re-renders
+  }, [user]) // Use user object as dependency to avoid missed updates
 
   // Real-time subscriptions for activity updates
   useEffect(() => {
@@ -79,7 +81,12 @@ export default function ProfilePage() {
         (payload) => {
           console.log('Documents updated:', payload)
           // Debounce the refresh to avoid too many updates
-          setTimeout(() => loadActivity(), 500)
+          {
+            if (activityDebounceRef.current) {
+              clearTimeout(activityDebounceRef.current)
+            }
+            activityDebounceRef.current = setTimeout(() => loadActivity(), 500)
+          }
         }
       )
       .on(
@@ -92,7 +99,12 @@ export default function ProfilePage() {
         },
         (payload) => {
           console.log('Research ideas updated:', payload)
-          setTimeout(() => loadActivity(), 500)
+          {
+            if (activityDebounceRef.current) {
+              clearTimeout(activityDebounceRef.current)
+            }
+            activityDebounceRef.current = setTimeout(() => loadActivity(), 500)
+          }
         }
       )
       .on(
@@ -105,7 +117,12 @@ export default function ProfilePage() {
         },
         (payload) => {
           console.log('Team members updated:', payload)
-          setTimeout(() => loadActivity(), 500)
+          {
+            if (activityDebounceRef.current) {
+              clearTimeout(activityDebounceRef.current)
+            }
+            activityDebounceRef.current = setTimeout(() => loadActivity(), 500)
+          }
         }
       )
       .subscribe()

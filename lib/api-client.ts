@@ -110,7 +110,7 @@ class APIClient {
         
         const response = await fetch(url, {
           ...options,
-          credentials: 'include',
+          
         })
 
         if (!response.ok) {

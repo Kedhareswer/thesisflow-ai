@@ -80,7 +80,7 @@ export function LiteratureSearch({ className }: LiteratureSearchProps) {
         })
       }
     }, 500) // 500ms debounce
-  }, [searchType, paperSearch.execute])
+  }, [searchType, paperSearch.execute, toast])
 
   const searchData = paperSearch.data as any
   const papers = searchData?.data?.data || searchData?.papers || []

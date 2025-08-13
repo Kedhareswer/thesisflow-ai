@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-07-30.basil'
+  apiVersion: '2025-04-30.basil' as any // Use the latest GA release and cast to any to bypass type mismatch
 })
 
 const supabaseAdmin = createClient(
@@ -52,26 +52,48 @@ export async function POST(request: NextRequest) {
 
     let customerId = userPlan?.stripe_customer_id
 
-    // Create or retrieve Stripe customer
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email!,
-        metadata: {
-          supabase_user_id: user.id,
-          supabase_email: user.email!
-        }
-      })
-      customerId = customer.id
+    // Validate that planType matches the priceId
+    const isPro = priceId === PRICE_IDS.pro_monthly || priceId === PRICE_IDS.pro_yearly
+    if (isPro && planType !== 'pro') {
+      return NextResponse.json({ error: 'Plan type mismatch' }, { status: 400 })
+    }
+    
 
-      // Update user_plans with customer ID
-      await supabaseAdmin
-        .from('user_plans')
-        .upsert({
-          user_id: user.id,
-          stripe_customer_id: customerId,
-          plan_type: 'free',
-          updated_at: new Date().toISOString()
+    // Create or retrieve Stripe customer with transactional safety
+    if (!customerId) {
+      let customer: Stripe.Customer | null = null
+      try {
+        customer = await stripe.customers.create({
+          email: user.email!,
+          metadata: {
+            supabase_user_id: user.id,
+            supabase_email: user.email!
+          }
         })
+        customerId = customer.id
+
+        // Update user_plans with customer ID
+        await supabaseAdmin
+          .from('user_plans')
+          .upsert({
+            user_id: user.id,
+            stripe_customer_id: customerId,
+            plan_type: 'free',
+            updated_at: new Date().toISOString()
+          })
+      } catch (error) {
+        // If database update fails, delete the Stripe customer to maintain consistency
+        if (customer) {
+          await stripe.customers.del(customer.id).catch(console.error)
+        }
+        throw error
+      }
+    }
+
+    // Validate NEXT_PUBLIC_APP_URL and create checkout session
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!appUrl) {
+      throw new Error('NEXT_PUBLIC_APP_URL environment variable is required')
     }
 
     // Create checkout session
@@ -85,15 +107,15 @@ export async function POST(request: NextRequest) {
         }
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/plan?canceled=true`,
+      success_url: `${appUrl}/plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/plan?canceled=true`,
       subscription_data: {
         metadata: {
           supabase_user_id: user.id,
           plan_type: planType,
           billing_period: billingPeriod
         },
-        trial_period_days: planType === 'pro' ? 7 : undefined // 7-day trial for Pro plan
+        trial_period_days: isPro ? 7 : undefined // 7-day trial for Pro plan
       },
       metadata: {
         supabase_user_id: user.id,
