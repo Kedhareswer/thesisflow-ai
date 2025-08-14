@@ -39,6 +39,7 @@ import {
   Zap,
   Lock,
   ChevronRight,
+  ChevronDown
 } from "lucide-react"
 
 import { useSocket } from "@/components/socket-provider"
@@ -394,11 +395,26 @@ export default function CollaboratePage() {
 
   // Real-time message subscription
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
+  
+  // Check if scrolled to bottom
+  const checkScrollPosition = useCallback(() => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
+      const isBottom = scrollTop + clientHeight >= scrollHeight - 10
+      setIsScrolledToBottom(isBottom)
+      setShowScrollButton(!isBottom)
+    }
+  }, [])
   
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+      setShowScrollButton(false)
+      setUnreadCount(0)
     }
   }, [])
 
@@ -415,21 +431,37 @@ export default function CollaboratePage() {
             const exists = prev.some(msg => msg.id === newMessage.id)
             if (exists) return prev
             
-            // Add new message to the end (bottom of chat)
             const updated = [...prev, newMessage]
             
-            // Auto-scroll to bottom after state update
-            setTimeout(scrollToBottom, 10)
+            // Auto-scroll only if already at bottom
+            setTimeout(() => {
+              if (isScrolledToBottom) {
+                scrollToBottom()
+              } else {
+                // Increment unread count if not at bottom
+                setUnreadCount(prev => prev + 1)
+              }
+            }, 10)
             
             return updated
           })
         }
       )
       
-      // Cleanup subscription when team changes or component unmounts
-      return unsubscribe
+      // Setup scroll listener
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.addEventListener('scroll', checkScrollPosition)
+      }
+      
+      // Cleanup
+      return () => {
+        unsubscribe()
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.removeEventListener('scroll', checkScrollPosition)
+        }
+      }
     }
-  }, [selectedTeamId, loadMessages, scrollToBottom])
+  }, [selectedTeamId, loadMessages, scrollToBottom, checkScrollPosition, isScrolledToBottom])
   
   // Auto-scroll to bottom when messages first load
   useEffect(() => {
@@ -951,36 +983,6 @@ export default function CollaboratePage() {
               
               {selectedTeam ? (
                 <Card className="border-none shadow-sm h-full">
-                  <CardHeader className="border-b bg-muted/30">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl">
-                          <Users className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="flex items-center gap-3 text-xl">
-                            {selectedTeam.name}
-                            {selectedTeam.isPublic && <Globe className="h-4 w-4 text-muted-foreground" />}
-                            <Badge variant="outline" className="font-normal">{selectedTeam.category}</Badge>
-                          </CardTitle>
-                          <p className="text-sm text-muted-foreground mt-1">{selectedTeam.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Video className="h-4 w-4" />
-                          <span className="hidden sm:inline">Video Call</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsSettingsOpen(true)}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
                   <CardContent className="p-0">
                     <Tabs defaultValue="chat" className="h-full">
                       <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-12">
@@ -1014,13 +1016,23 @@ export default function CollaboratePage() {
                                 <p className="text-xs text-muted-foreground">{selectedTeam.members.length} members</p>
                               </div>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {teamMessages.length} messages
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Video className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => setIsSettingsOpen(true)}
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
 
                           {/* Messages Area */}
-                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-muted/5">
+                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-muted/5 relative">
                             {teamMessages.length === 0 ? (
                               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                                 <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
@@ -1102,6 +1114,24 @@ export default function CollaboratePage() {
                             )}
                           </div>
 
+                          {/* Scroll to Bottom Button */}
+                          {showScrollButton && (
+                            <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
+                              <Button
+                                onClick={scrollToBottom}
+                                size="sm"
+                                className="rounded-full px-3 py-2 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all animate-bounce"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs">
+                                    {unreadCount > 0 ? `${unreadCount} new` : '↓'}
+                                  </span>
+                                  <ChevronDown className="w-3 h-3" />
+                                </div>
+                              </Button>
+                            </div>
+                          )}
+
                           {/* Message Input */}
                           <div className="px-4 py-3 border-t bg-background">
                             <div className="flex items-center gap-3">
@@ -1116,6 +1146,7 @@ export default function CollaboratePage() {
                                       handleSendMessage()
                                     }
                                   }}
+                                  onFocus={scrollToBottom}
                                   className="pr-12 rounded-full border-muted-foreground/20 focus:border-primary/50 transition-colors"
                                   disabled={isSendingMessage}
                                 />
