@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine, Crown } from "lucide-react"
+import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine, Crown, Menu } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useEffect, useState, lazy, Suspense } from "react"
 
@@ -139,6 +140,46 @@ export function MainNav() {
               </div>
             )}
           </nav>
+
+          {/* Mobile Navigation */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Open navigation</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="pr-0">
+                <nav className="flex flex-col gap-2 p-4">
+                  {user && !isLoading ? (
+                    navigation.map((item) => {
+                      const Icon = item.icon
+                      const isActive = pathname === item.href
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center rounded-md px-3 py-2 text-sm font-medium",
+                            isActive ? "bg-gray-100 text-black" : "text-gray-700 hover:bg-gray-100"
+                          )}
+                        >
+                          <Icon className="mr-2 h-4 w-4" />
+                          {item.name}
+                        </Link>
+                      )
+                    })
+                  ) : (
+                    <>
+                      <Link href="/login" className="px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100">Sign In</Link>
+                      <Link href="/signup" className="px-3 py-2 text-sm font-medium text-white bg-black rounded-md">Sign Up</Link>
+                    </>
+                  )}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
