@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Check } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -36,6 +38,7 @@ import {
   FileText,
   Zap,
   Lock,
+  ChevronRight,
 } from "lucide-react"
 
 import { useSocket } from "@/components/socket-provider"
@@ -45,6 +48,7 @@ import { RouteGuard } from "@/components/route-guard"
 import { TeamSettings } from "./components/team-settings"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
+import { InvitationsDialog } from "./components/invitations-dialog"
 import { DevelopmentNotice } from "@/components/ui/development-notice"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { PlanStatus } from "@/components/ui/plan-status"
@@ -123,6 +127,7 @@ export default function CollaboratePage() {
     category: "Research",
     isPublic: false,
   })
+  const [isInvitationsDialogOpen, setIsInvitationsDialogOpen] = useState(false)
 
   const { toast } = useToast()
   const { socket } = useSocket()
@@ -197,6 +202,38 @@ export default function CollaboratePage() {
     }
   }, [user, apiCall])
 
+  // Handle invitation responses
+  const handleInvitationResponse = useCallback(async (invitationId: string, action: 'accept' | 'reject') => {
+    try {
+      const data = await apiCall('/api/collaborate/invitations', {
+        method: 'PUT',
+        body: JSON.stringify({
+          invitationId,
+          action,
+        }),
+      })
+
+      if (data.success) {
+        toast({
+          title: action === 'accept' ? "Invitation accepted" : "Invitation rejected",
+          description: action === 'accept' ? "You've joined the team!" : "You've declined the invitation",
+        })
+        
+        // Reload teams if accepted
+        if (action === 'accept') {
+          loadTeams()
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to ${action} invitation`,
+        variant: "destructive",
+      })
+      throw error
+    }
+  }, [apiCall, toast, loadTeams])
+
   // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
     if (!teamId) return
@@ -222,6 +259,119 @@ export default function CollaboratePage() {
       console.error('Error loading messages:', error)
     }
   }, [apiCall])
+
+  // Member management handlers
+  const changeMemberRole = useCallback(async (teamId: string, memberId: string, newRole: 'viewer' | 'editor' | 'admin') => {
+    // Optimistic update first
+    let previousRole: 'viewer' | 'editor' | 'admin' | 'owner' | undefined
+    setTeams(prev => prev.map(t => {
+      if (t.id !== teamId) return t
+      return {
+        ...t,
+        members: t.members.map(m => {
+          if (m.id !== memberId) return m
+          previousRole = m.role
+          return { ...m, role: newRole }
+        })
+      }
+    }))
+    try {
+      const res = await apiCall('/api/collaborate/team-members', {
+        method: 'PUT',
+        body: JSON.stringify({ teamId, memberId, newRole })
+      })
+      if (res?.success) {
+        toast({ title: 'Role updated', description: `Member role changed to ${newRole}` })
+      } else {
+        throw new Error(res?.error || 'Role update failed')
+      }
+    } catch (e) {
+      // Rollback
+      if (previousRole) {
+        setTeams(prev => prev.map(t => t.id === teamId ? {
+          ...t,
+          members: t.members.map(m => m.id === memberId ? { ...m, role: previousRole! } : m)
+        } : t))
+      }
+      toast({ title: 'Error', description: 'Failed to update role', variant: 'destructive' })
+    }
+  }, [apiCall, toast, setTeams])
+  // Confirm remove dialog state
+  const [removeConfirm, setRemoveConfirm] = useState<{ open: boolean, teamId?: string, member?: { id: string, name?: string } }>({ open: false })
+
+  const promptRemoveMember = useCallback((teamId: string, memberId: string, name?: string) => {
+    setRemoveConfirm({ open: true, teamId, member: { id: memberId, name } })
+  }, [])
+
+  const removeMemberConfirmed = useCallback(async () => {
+    if (!removeConfirm.open || !removeConfirm.teamId || !removeConfirm.member) return
+    const { teamId, member } = removeConfirm
+    // Optimistic remove
+    let removedMember: any
+    setTeams(prev => prev.map(t => {
+      if (t.id !== teamId) return t
+      const remaining = t.members.filter(m => {
+        if (m.id === member.id) { removedMember = m; return false }
+        return true
+      })
+      return { ...t, members: remaining }
+    }))
+    setRemoveConfirm({ open: false })
+    try {
+      const res = await apiCall(`/api/collaborate/team-members?teamId=${teamId}&memberId=${member.id}`, { method: 'DELETE' })
+      if (res?.success) {
+        toast({ title: 'Member removed', description: 'The user has been removed from the team.' })
+      } else {
+        throw new Error(res?.error || 'Remove failed')
+      }
+    } catch (e) {
+      // Rollback
+      if (removedMember) {
+        setTeams(prev => prev.map(t => t.id === teamId ? {
+          ...t,
+          members: [...t.members, removedMember]
+        } : t))
+      }
+      toast({ title: 'Error', description: 'Failed to remove member', variant: 'destructive' })
+    }
+  }, [apiCall, removeConfirm, setTeams, toast])
+
+  // Optimistic team add after accepting an invitation (no extra API calls)
+  const handleJoinedTeam = useCallback((args: { team: { id: string; name: string; description?: string; category?: string; isPublic?: boolean; createdAt?: string; owner?: string }, role: 'viewer' | 'editor' | 'admin' }) => {
+    const { team, role } = args
+    if (!team?.id || !user) return
+
+    setTeams((prev) => {
+      if (prev.some(t => t.id === team.id)) return prev
+
+      const now = new Date().toISOString()
+      const optimisticTeam: Team = {
+        id: team.id,
+        name: team.name,
+        description: team.description || '',
+        category: team.category || 'Research',
+        isPublic: !!team.isPublic,
+        createdAt: team.createdAt || now,
+        owner: team.owner || '',
+        members: [
+          {
+            id: user.id,
+            name: (user as any)?.user_metadata?.full_name || user.email || 'You',
+            email: user.email || '',
+            avatar: undefined,
+            status: 'online',
+            role,
+            joinedAt: now,
+            lastActive: now,
+          },
+        ],
+      }
+      return [optimisticTeam, ...prev]
+    })
+
+    // Optionally select the new team if none selected
+    setSelectedTeamId((prev) => prev || team.id)
+  }, [user])
 
   // Effects
   useEffect(() => {
@@ -443,8 +593,8 @@ export default function CollaboratePage() {
     }
   }
 
-  const handleInvitationResponse = async (action: 'accept' | 'reject') => {
-    if (!invitationDialog.invitation) return
+  const handleRespondToInvitation = async () => {
+    if (!invitationDialog.invitation || !invitationDialog.action) return
 
     try {
       setIsRespondingToInvitation(true)
@@ -453,13 +603,13 @@ export default function CollaboratePage() {
         method: 'PUT',
         body: JSON.stringify({
           invitationId: invitationDialog.invitation.id,
-          action: action,
+          action: invitationDialog.action,
         }),
       })
 
       if (data.success) {
         toast({
-          title: `Invitation ${action}ed`,
+          title: `Invitation ${invitationDialog.action}ed`,
           description: data.message,
         })
         
@@ -637,6 +787,23 @@ export default function CollaboratePage() {
                   </CardContent>
                 </Card>
 
+                {/* Invitations */}
+                <Card className="border-none shadow-sm">
+                  <CardContent className="pt-6">
+                    <Button
+                      onClick={() => setIsInvitationsDialogOpen(true)}
+                      className="w-full justify-between gap-3 h-12"
+                      variant="outline"
+                    >
+                      <div className="flex items-center gap-3">
+                        <UserPlus className="h-4 w-4" />
+                        Invitations
+                      </div>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+
                 {/* Teams List */}
                 <Card className="border-none shadow-sm">
                   <CardHeader className="pb-4">
@@ -752,6 +919,11 @@ export default function CollaboratePage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        {/* Inline notifications access for collaboration */}
+                        <div className="hidden sm:block">
+                          {/* Small bell with dropdown */}
+                          <NotificationBell />
+                        </div>
                         <Button variant="outline" size="sm" className="gap-2">
                           <Video className="h-4 w-4" />
                           <span className="hidden sm:inline">Video Call</span>
@@ -860,16 +1032,6 @@ export default function CollaboratePage() {
                                 Manage your team collaboration
                               </p>
                             </div>
-                            {['owner', 'admin'].includes(currentUserRole) && (
-                              <Button
-                                variant="outline"
-                                onClick={() => setIsInviteDialogOpen(true)}
-                                className="gap-2"
-                              >
-                                <UserPlus className="h-4 w-4" />
-                                Invite Member
-                              </Button>
-                            )}
                           </div>
 
                           <div className="grid gap-3">
@@ -908,19 +1070,78 @@ export default function CollaboratePage() {
                                   >
                                     {member.role}
                                   </Badge>
-                                  {currentUserRole === 'owner' && member.role !== 'owner' && member.id !== user?.id && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        toast({
-                                          title: "Coming Soon",
-                                          description: "Role management will be available soon!",
-                                        })
-                                      }}
+                                  {['owner', 'admin'].includes(currentUserRole) && member.id !== user?.id && (
+                                    <DropdownMenu
+                                      trigger={
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent/50">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      }
+                                      className="w-48"
                                     >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
+                                      <DropdownMenuLabel>Edit Member</DropdownMenuLabel>
+                                      <DropdownMenuSeparator />
+                                      {(() => {
+                                        const disableVE = (currentUserRole === 'admin' && member.role !== 'viewer' && member.role !== 'editor') || member.role === 'owner'
+                                        const disableAdmin = currentUserRole !== 'owner' || member.role === 'owner'
+                                        const disableRemove = (currentUserRole === 'admin' && !(member.role === 'viewer' || member.role === 'editor')) || member.role === 'owner'
+                                        const items: React.ReactNode[] = []
+                                        if (disableVE) {
+                                          items.push(
+                                            <div key="view-disabled" className="relative flex select-none items-center rounded-sm px-2 py-1.5 text-sm text-muted-foreground opacity-60 cursor-not-allowed" aria-disabled>
+                                              Set as Viewer
+                                            </div>
+                                          )
+                                        } else {
+                                          items.push(
+                                            <DropdownMenuItem key="view" onClick={() => changeMemberRole(selectedTeam.id, member.id, 'viewer')}>
+                                              Set as Viewer
+                                            </DropdownMenuItem>
+                                          )
+                                        }
+                                        if (disableVE) {
+                                          items.push(
+                                            <div key="edit-disabled" className="relative flex select-none items-center rounded-sm px-2 py-1.5 text-sm text-muted-foreground opacity-60 cursor-not-allowed" aria-disabled>
+                                              Set as Editor
+                                            </div>
+                                          )
+                                        } else {
+                                          items.push(
+                                            <DropdownMenuItem key="edit" onClick={() => changeMemberRole(selectedTeam.id, member.id, 'editor')}>
+                                              Set as Editor
+                                            </DropdownMenuItem>
+                                          )
+                                        }
+                                        if (disableAdmin) {
+                                          items.push(
+                                            <div key="admin-disabled" className="relative flex select-none items-center rounded-sm px-2 py-1.5 text-sm text-muted-foreground opacity-60 cursor-not-allowed" aria-disabled>
+                                              Set as Admin
+                                            </div>
+                                          )
+                                        } else {
+                                          items.push(
+                                            <DropdownMenuItem key="admin" onClick={() => changeMemberRole(selectedTeam.id, member.id, 'admin')}>
+                                              Set as Admin
+                                            </DropdownMenuItem>
+                                          )
+                                        }
+                                        items.push(<DropdownMenuSeparator key="sep" />)
+                                        if (disableRemove) {
+                                          items.push(
+                                            <div key="remove-disabled" className="relative flex select-none items-center rounded-sm px-2 py-1.5 text-sm text-muted-foreground opacity-60 cursor-not-allowed" aria-disabled>
+                                              Remove Member
+                                            </div>
+                                          )
+                                        } else {
+                                          items.push(
+                                            <DropdownMenuItem key="remove" className="text-destructive" onClick={() => promptRemoveMember(selectedTeam.id, member.id)}>
+                                              Remove Member
+                                            </DropdownMenuItem>
+                                          )
+                                        }
+                                        return items
+                                      })()}
+                                    </DropdownMenu>
                                   )}
                                 </div>
                               </div>
@@ -993,8 +1214,44 @@ export default function CollaboratePage() {
               )}
             </div>
           </div>
+
+          {/* Remove Member Confirm Dialog */}
+          <Dialog open={removeConfirm.open} onOpenChange={(o) => setRemoveConfirm(prev => ({ ...prev, open: o }))}>
+            <DialogContent className="sm:max-w-[380px]">
+              <DialogHeader>
+                <DialogTitle>Remove member?</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-muted-foreground">
+                  {(() => {
+                    const mem = selectedTeam?.members?.find(m => m.id === removeConfirm.member?.id)
+                    const name = removeConfirm.member?.name || (mem as any)?.full_name || (mem as any)?.name || (mem as any)?.email || 'this member'
+                    return <>This will remove <span className="font-medium text-foreground">{name}</span> from the team.</>
+                  })()}
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRemoveConfirm({ open: false })}
+                    className="rounded-md flex items-center justify-center h-8 w-8 p-0 hover:bg-red-50 text-zinc-500 hover:text-red-600 transition-colors"
+                    aria-label="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeMemberConfirmed}
+                    className="rounded-md flex items-center justify-center h-8 w-8 p-0 hover:bg-emerald-50 text-zinc-500 hover:text-emerald-600 transition-colors"
+                    aria-label="Confirm"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-        
+
         {/* Team Settings Modal */}
         {selectedTeam && (
           <TeamSettings
@@ -1229,48 +1486,37 @@ export default function CollaboratePage() {
             </DialogHeader>
             {invitationDialog.invitation && (
               <div className="space-y-6 mt-6">
-                <div className="text-center">
-                  <div className="text-lg font-semibold mb-2">
-                    {invitationDialog.invitation.inviter?.full_name || 'Someone'} invited you to join
-                  </div>
-                  <div className="text-xl font-bold text-primary mb-2">
-                    {invitationDialog.invitation.team?.name}
-                  </div>
-                  <div className="text-sm text-muted-foreground mb-4">
-                    as <span className="font-medium">{invitationDialog.invitation.role}</span>
-                  </div>
-                  {invitationDialog.invitation.personal_message && (
-                    <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                      "{invitationDialog.invitation.personal_message}"
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
+                <p className="text-sm text-muted-foreground">
+                  You have been invited to join the team "{invitationDialog.invitation.team_name}".
+                </p>
+                <div className="flex gap-2 justify-end">
                   <Button 
                     variant="outline" 
-                    onClick={() => handleInvitationResponse('reject')}
+                    onClick={() => setInvitationDialog({ ...invitationDialog, action: 'reject' })}
                     disabled={isRespondingToInvitation}
                   >
                     Decline
                   </Button>
                   <Button 
-                    onClick={() => handleInvitationResponse('accept')}
+                    onClick={() => setInvitationDialog({ ...invitationDialog, action: 'accept' })}
                     disabled={isRespondingToInvitation}
                   >
-                    {isRespondingToInvitation ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Accepting...
-                      </>
-                    ) : (
-                      'Accept Invitation'
-                    )}
+                    {isRespondingToInvitation ? "Processing..." : "Accept"}
                   </Button>
                 </div>
               </div>
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Invitations Dialog */}
+        <InvitationsDialog 
+          open={isInvitationsDialogOpen}
+          onOpenChange={setIsInvitationsDialogOpen}
+          apiCall={apiCall}
+          user={user || undefined}
+          onJoinedTeam={handleJoinedTeam}
+        />
 
         {/* Development Notice Popup */}
         <DevelopmentNotice />

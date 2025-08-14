@@ -351,7 +351,7 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
 
       {/* Invitations tabs */}
       <Tabs defaultValue="received" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={`grid w-full ${canInvite ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="received" className="relative">
             Received
             {receivedInvitations.filter(i => i.status === 'pending').length > 0 && (
@@ -362,7 +362,6 @@ export default function InvitationManager({ teamId, teamName, userRole, userId }
           </TabsTrigger>
           <TabsTrigger value="sent">Sent</TabsTrigger>
           {canInvite && <TabsTrigger value="team">Team</TabsTrigger>}
-          <TabsTrigger value="all">All</TabsTrigger>
         </TabsList>
 
         {/* Received Invitations */}

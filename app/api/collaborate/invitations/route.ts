@@ -41,9 +41,16 @@ export async function GET(request: NextRequest) {
     if (type === 'sent') {
       query = query.eq('inviter_id', user.id)
     } else if (type === 'received') {
-      query = query.eq('invitee_id', user.id)
+      // Include fallback by email in case invitee_id wasn't populated
+      // Some historical records may only have invitee_email/invited_email
+      query = query.or(
+        `invitee_id.eq.${user.id},invitee_email.eq.${user.email},invited_email.eq.${user.email}`
+      )
     } else {
-      query = query.or(`inviter_id.eq.${user.id},invitee_id.eq.${user.id}`)
+      // All: both directions + email-based fallbacks
+      query = query.or(
+        `inviter_id.eq.${user.id},invitee_id.eq.${user.id},invitee_email.eq.${user.email},invited_email.eq.${user.email}`
+      )
     }
 
     // Filter by status
@@ -66,9 +73,35 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Enrich inviter/invitee profiles without relying on PostgREST FK hints
+    const enriched = invitations || []
+    if (enriched.length > 0) {
+      const inviterIds = enriched.map((i: any) => i.inviter_id).filter(Boolean)
+      const inviteeIds = enriched.map((i: any) => i.invitee_id).filter(Boolean)
+      const ids = Array.from(new Set([...
+        inviterIds,
+        inviteeIds
+      ])) as string[]
+
+      if (ids.length > 0) {
+        const { data: profiles, error: profilesError } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id, full_name, avatar_url, email')
+          .in('id', ids)
+
+        if (!profilesError && profiles) {
+          const byId = new Map(profiles.map(p => [p.id, p]))
+          for (const inv of enriched) {
+            if (inv.inviter_id) inv.inviter = byId.get(inv.inviter_id) || null
+            if (inv.invitee_id) inv.invitee = byId.get(inv.invitee_id) || null
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      invitations: invitations || []
+      invitations: enriched
     })
 
   } catch (error) {
@@ -376,7 +409,37 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    if ((action === 'accept' || action === 'reject') && invitation.invitee_id !== user.id) {
+    // Resolve current user's email (server JWT may omit .email)
+    let currentEmail = (user.email || user.user_metadata?.email || '').toLowerCase()
+    if (!currentEmail) {
+      const { data: meProfile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('email')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (meProfile?.email) currentEmail = String(meProfile.email).toLowerCase()
+    }
+
+    // Determine if current user is the invitee (support legacy email-only invites)
+    const isInvitee = (
+      invitation.invitee_id === user.id ||
+      (invitation.invitee_email && String(invitation.invitee_email).toLowerCase() === currentEmail) ||
+      (invitation.invited_email && String(invitation.invited_email).toLowerCase() === currentEmail)
+    )
+
+    // Debug: trace invitee check
+    console.log('PUT invitations: invitee check', {
+      invitationId,
+      action,
+      userId: user.id,
+      currentEmail,
+      invitee_id: invitation.invitee_id,
+      invitee_email: invitation.invitee_email,
+      invited_email: invitation.invited_email,
+      isInvitee
+    })
+
+    if ((action === 'accept' || action === 'reject') && !isInvitee) {
       return NextResponse.json(
         { error: "Only the invitee can accept or reject an invitation" },
         { status: 403 }
@@ -410,13 +473,16 @@ export async function PUT(request: NextRequest) {
 
     if (action === 'accept') {
       updateData.status = 'accepted'
+      // Ensure invitee_id populated for legacy invites
+      const inviteeId: string = invitation.invitee_id || user.id
+      if (!invitation.invitee_id) updateData.invitee_id = inviteeId
       
       // Add user to team members
       const { error: memberError } = await supabaseAdmin
         .from('team_members')
         .insert({
           team_id: invitation.team_id,
-          user_id: invitation.invitee_id,
+          user_id: inviteeId,
           role: invitation.role,
           joined_at: new Date().toISOString()
         })
@@ -446,6 +512,8 @@ export async function PUT(request: NextRequest) {
 
     } else if (action === 'reject') {
       updateData.status = 'rejected'
+      // Ensure invitee_id populated for legacy invites
+      if (!invitation.invitee_id) updateData.invitee_id = user.id
       
       // Create notification for the inviter
       await supabaseAdmin.rpc('create_notification', {
