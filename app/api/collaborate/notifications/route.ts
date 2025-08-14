@@ -185,7 +185,7 @@ export async function DELETE(request: NextRequest) {
         .from('notifications')
         .delete()
         .eq('user_id', user.id)
-        .eq('is_read', true)
+        .eq('read', true)
 
       if (deleteError) {
         console.error('Error deleting all notifications:', deleteError)

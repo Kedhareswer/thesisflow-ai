@@ -1,83 +1,40 @@
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+
+interface BaseInvitation {
+  id: string;
+  team_name: string;
+  role: string;
+  status: string;
+  created_at: string;
+  inviter_name?: string;
+  inviter_email?: string;
+  inviter_avatar?: string;
+  invitee_name?: string;
+  invitee_email?: string;
+  invitee_avatar?: string;
+}
 
 interface TeamInvitationProps {
-  invitation: {
-    id: string;
-    team: {
-      id: string;
-      name: string;
-      description?: string;
-    };
-    inviter: {
-      id: string;
-      full_name: string;
-      avatar_url?: string;
-    };
-    role: 'viewer' | 'editor' | 'admin';
-    personal_message?: string;
-    created_at: string;
-  };
-  onAccept?: (invitationId: string) => Promise<void>;
-  onDecline?: (invitationId: string) => Promise<void>;
+  invitation: BaseInvitation;
+  context?: "received" | "sent"; // determines copy and which avatar/name to show
+  onAccept?: (invitationId: string) => void;
+  onReject?: (invitationId: string) => void;
+  onCancel?: (invitationId: string) => void;
+  onClick?: () => void;
   className?: string;
 }
 
 export function TeamInvitation({ 
   invitation, 
+  context = "received",
   onAccept, 
-  onDecline, 
+  onReject, 
+  onCancel,
+  onClick,
   className 
 }: TeamInvitationProps) {
-  const [isResponding, setIsResponding] = useState(false);
-  const { toast } = useToast();
-
-  const handleAccept = async () => {
-    if (!onAccept) return;
-    
-    try {
-      setIsResponding(true);
-      await onAccept(invitation.id);
-      toast({
-        title: "Invitation accepted",
-        description: `You've joined ${invitation.team.name}`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to accept invitation",
-        variant: "destructive",
-      });
-    } finally {
-      setIsResponding(false);
-    }
-  };
-
-  const handleDecline = async () => {
-    if (!onDecline) return;
-    
-    try {
-      setIsResponding(true);
-      await onDecline(invitation.id);
-      toast({
-        title: "Invitation declined",
-        description: "You've declined the invitation",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to decline invitation",
-        variant: "destructive",
-      });
-    } finally {
-      setIsResponding(false);
-    }
-  };
-
   const formatTime = (timestamp: string) => {
     const now = new Date();
     const inviteTime = new Date(timestamp);
@@ -93,27 +50,25 @@ export function TeamInvitation({
     return inviteTime.toLocaleDateString();
   };
 
-  const getRoleDisplay = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'Admin';
-      case 'editor':
-        return 'Editor';
-      case 'viewer':
-        return 'Viewer';
-      default:
-        return role;
-    }
-  };
+  const isSent = context === 'sent';
+  const displayName = isSent
+    ? (invitation.invitee_name || invitation.invitee_email || "User")
+    : (invitation.inviter_name || invitation.inviter_email || "User");
+  const avatarSrc = isSent
+    ? (invitation.invitee_avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face")
+    : (invitation.inviter_avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face");
 
   return (
     <div className={cn("w-full max-w-xl mx-auto", className)}>
-      <div className="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-[0_1px_6px_0_rgba(0,0,0,0.02)] rounded-xl p-4">
+      <div
+        className="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-[0_1px_6px_0_rgba(0,0,0,0.02)] rounded-xl p-4 cursor-pointer hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"
+        onClick={onClick}
+      >
         <div className="flex items-center gap-4">
           <div className="relative h-10 w-10 flex-shrink-0">
             <Image
-              src={invitation.inviter.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face"}
-              alt={invitation.inviter.full_name}
+              src={avatarSrc}
+              alt={displayName}
               sizes="40px"
               fill
               className="rounded-full object-cover"
@@ -128,52 +83,63 @@ export function TeamInvitation({
                   Team Invitation
                 </p>
                 <p className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  {invitation.inviter.full_name} invited you to join{" "}
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                    {invitation.team.name}
-                  </span>
-                  {" "}as {getRoleDisplay(invitation.role)}
+                  {isSent ? (
+                    <>
+                      You invited {displayName} to join{" "}
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                        {invitation.team_name}
+                      </span>
+                      {" "}as {invitation.role}
+                    </>
+                  ) : (
+                    <>
+                      {displayName} invited you to join{" "}
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                        {invitation.team_name}
+                      </span>
+                      {" "}as {invitation.role}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleDecline}
-              disabled={isResponding}
-              className="rounded-lg flex items-center justify-center h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-950/50 text-zinc-400 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleAccept}
-              disabled={isResponding}
-              className={cn(
-                "rounded-lg flex items-center justify-center h-8 w-8 p-0",
-                "hover:bg-emerald-50 dark:hover:bg-emerald-950/50",
-                "text-zinc-400 hover:text-emerald-600",
-                "dark:text-zinc-500 dark:hover:text-emerald-400",
-                "transition-colors"
-              )}
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-          </div>
+          {invitation.status === 'pending' && !isSent && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onReject?.(invitation.id) }}
+                className="rounded-lg flex items-center justify-center h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-950/50 text-zinc-400 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onAccept?.(invitation.id) }}
+                className={cn(
+                  "rounded-lg flex items-center justify-center h-8 w-8 p-0",
+                  "hover:bg-emerald-50 dark:hover:bg-emerald-950/50",
+                  "text-zinc-400 hover:text-emerald-600",
+                  "dark:text-zinc-500 dark:hover:text-emerald-400",
+                  "transition-colors"
+                )}
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {invitation.status === 'pending' && isSent && onCancel && (
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCancel?.(invitation.id) }}
+                className="text-xs px-2 py-1 rounded-md text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-950/40 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
-
-        {invitation.personal_message && (
-          <div className="mt-3 ml-14">
-            <p className="text-[12px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-md p-2">
-              "{invitation.personal_message}"
-            </p>
-          </div>
-        )}
 
         <div className="mt-2 ml-14">
           <p className="text-[12px] text-zinc-400 dark:text-zinc-500">

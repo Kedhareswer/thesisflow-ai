@@ -45,7 +45,24 @@ export function SmartUpgradeBanner({
     setMounted(true);
   }, []);
 
-  // Check user plan and usage
+  // Helper: localStorage dismissal key (per user + feature)
+  const getDismissKey = React.useCallback(() => {
+    const uid = user?.id || 'anon';
+    return `upgrade_banner_dismissed:${uid}:${feature}`;
+  }, [user?.id, feature]);
+
+  const isDismissed = React.useCallback(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(getDismissKey()) : null;
+      if (!raw) return false;
+      const ts = Number(raw);
+      return Number.isFinite(ts) && Date.now() < ts;
+    } catch {
+      return false;
+    }
+  }, [getDismissKey]);
+
+  // Check user plan and usage (and respect persisted dismissal)
   React.useEffect(() => {
     const checkUserPlan = async () => {
       if (!user) {
@@ -65,9 +82,11 @@ export function SmartUpgradeBanner({
         setUserPlan(planData);
 
         // Check if we should show the banner
-        const shouldShow = 
+        const eligible =
           (planData?.plan_type === 'free' && showForFreeUsers) ||
           (currentUsage >= limit * 0.8); // Show when 80% of limit is reached
+
+        const shouldShow = eligible && !isDismissed();
 
         setIsVisible(shouldShow);
       } catch (error) {
@@ -79,7 +98,7 @@ export function SmartUpgradeBanner({
     };
 
     checkUserPlan();
-  }, [user, currentUsage, limit, showForFreeUsers]);
+  }, [user, currentUsage, limit, showForFreeUsers, isDismissed]);
 
   const handleUpgradeClick = () => {
     if (onUpgradeClick) {
@@ -96,6 +115,14 @@ export function SmartUpgradeBanner({
   };
 
   const handleClose = () => {
+    // Persist dismissal for 24 hours to avoid blocking UI repeatedly
+    try {
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      const until = Date.now() + oneDayMs;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(getDismissKey(), String(until));
+      }
+    } catch {}
     setIsVisible(false);
     if (onClose) {
       onClose();
