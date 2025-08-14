@@ -140,7 +140,7 @@ export function SummarizerTabbedLayout({
                 {/* Tab Navigation */}
                 <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
                     <div className="max-w-7xl mx-auto px-6">
-                        <TabsList className="grid w-full max-w-md grid-cols-3 bg-transparent p-0 h-auto border-0">
+                        <TabsList className="grid w-full max-w-md grid-cols-3 bg-transparent p-0 h-auto border-0 mx-auto">
                             {(['input', 'summary', 'analytics'] as const).map((tab) => {
                                 const Icon = getTabIcon(tab)
                                 const isDisabled = getTabState(tab) === 'disabled'
