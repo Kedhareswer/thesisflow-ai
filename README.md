@@ -1,6 +1,5 @@
 <div align="center">
 
-# 🧠 AI Research Hub
 *Transform your research workflow with intelligent AI-powered tools*
 
 ![Bolt Research Hub](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
