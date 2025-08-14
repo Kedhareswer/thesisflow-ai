@@ -17,11 +17,11 @@ import { Label } from "@/components/ui/label"
 import { FileProcessor, type FileProcessingResult } from "@/lib/file-processors"
 import { supabase } from "@/lib/supabase"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
-import { 
-  Sparkles, 
-  ChevronUp, 
-  ChevronDown, 
-  Settings, 
+import {
+  Sparkles,
+  ChevronUp,
+  ChevronDown,
+  Settings,
   AlertTriangle,
   Loader2,
   CheckCircle,
@@ -40,13 +40,13 @@ interface AIWritingAssistantProps {
   documentTemplate: string
   currentDocumentContent?: string // Add current document content for better context
   isAuthenticated?: boolean // Add authentication state
-  onProviderChange?: (provider: AIProvider) => void
-  onModelChange?: (model: string) => void
+  onProviderChange?: (provider: AIProvider | undefined) => void
+  onModelChange?: (model: string | undefined) => void
 }
 
-export function AIWritingAssistant({ 
-  selectedProvider, 
-  selectedModel, 
+export function AIWritingAssistant({
+  selectedProvider,
+  selectedModel,
   onInsertText,
   documentTemplate,
   currentDocumentContent = "",
@@ -68,10 +68,10 @@ export function AIWritingAssistant({
     idf: Map<string, number>
     totalDocs: number
   } | null>(null)
-  
+
   const { toast } = useToast()
   const { session } = useResearchSession()
-  
+
   // Writing task options
   const writingTasks = [
     { id: 'continue', name: 'Continue Writing', description: 'Continue from where you left off' },
@@ -103,7 +103,7 @@ export function AIWritingAssistant({
         return 'standard academic style';
     }
   }
-  
+
   // -------- RAG utilities (lightweight, client-side) --------
   const normalizeText = (text: string) =>
     text
@@ -114,7 +114,7 @@ export function AIWritingAssistant({
 
   const tokenize = (text: string): string[] => {
     const stopwords = new Set([
-      'the','is','a','an','and','or','of','to','in','for','on','with','as','by','at','from','that','this','it','be','are','was','were','has','have','had','but','not','if','than','then','into','we','our','their','its'
+      'the', 'is', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'on', 'with', 'as', 'by', 'at', 'from', 'that', 'this', 'it', 'be', 'are', 'was', 'were', 'has', 'have', 'had', 'but', 'not', 'if', 'than', 'then', 'into', 'we', 'our', 'their', 'its'
     ])
     return normalizeText(text)
       .split(' ')
@@ -247,26 +247,26 @@ export function AIWritingAssistant({
   // Get research context for AI prompt
   const getResearchContext = () => {
     let context = 'Research Context:\n'
-    
+
     // Add session data if available
     if (session?.currentTopic) {
       context += `Current Topic: ${session.currentTopic}\n`
     }
-    
+
     if (session?.selectedPapers?.length > 0) {
       context += `Selected Papers: ${session.selectedPapers.length} papers\n`
       session.selectedPapers.slice(0, 3).forEach((paper: any, index: number) => {
         context += `  ${index + 1}. ${paper.title || 'Untitled'}\n`
       })
     }
-    
+
     if (session?.selectedIdeas?.length > 0) {
       context += `Selected Ideas: ${session.selectedIdeas.length} ideas\n`
       session.selectedIdeas.slice(0, 3).forEach((idea: any, index: number) => {
         context += `  ${index + 1}. ${idea.title || 'Untitled'}\n`
       })
     }
-    
+
     // Add current document content for context
     if (currentDocumentContent && currentDocumentContent.trim()) {
       const contentPreview = currentDocumentContent.slice(0, 500) // First 500 characters
@@ -286,17 +286,17 @@ export function AIWritingAssistant({
         context += `\nRetrieved Context (from uploaded sources):\n${joined}\n`
       }
     }
-    
+
     context += `Using: ${selectedProvider} with ${selectedModel}\n`
     context += `Template: ${documentTemplate || 'Standard Academic'}\n`
-    
+
     return context
   }
-  
+
   // Generate AI writing based on task and context
   const generateText = async () => {
     if (isGenerating) return
-    
+
     // Check if user is authenticated
     if (!isAuthenticated) {
       toast({
@@ -306,29 +306,29 @@ export function AIWritingAssistant({
       })
       return
     }
-    
+
     try {
       setIsGenerating(true)
-      
+
       // Get current Supabase session
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) {
         throw new Error("No valid session found")
       }
-      
+
       const templateStyle = getTemplateStyle()
       const researchContext = getResearchContext()
-      
-    let systemPrompt = `You are a professional academic writer assisting with a research document in ${templateStyle}. `
+
+      let systemPrompt = `You are a professional academic writer assisting with a research document in ${templateStyle}. `
       systemPrompt += `Write in a clear, academic style appropriate for publication. `
       systemPrompt += `Focus on producing coherent, well-structured text that would be suitable for a scholarly publication. `
-    systemPrompt += `Always maintain academic integrity and provide well-reasoned arguments.`
-    if (ragEnabled && uploadedSources.length > 0) {
-      systemPrompt += ` Use ONLY the provided Retrieved Context and Session Context for factual statements. If the context is insufficient, explicitly state "insufficient context" rather than inventing facts. Quote or paraphrase faithfully and avoid hallucinations.`
-    }
-      
+      systemPrompt += `Always maintain academic integrity and provide well-reasoned arguments.`
+      if (ragEnabled && uploadedSources.length > 0) {
+        systemPrompt += ` Use ONLY the provided Retrieved Context and Session Context for factual statements. If the context is insufficient, explicitly state "insufficient context" rather than inventing facts. Quote or paraphrase faithfully and avoid hallucinations.`
+      }
+
       let taskPrompt = ''
-      
+
       switch (writingTask) {
         case 'continue':
           taskPrompt = `Continue writing the document from where it left off. Maintain the same style, tone, and academic rigor.`
@@ -358,9 +358,9 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
         default:
           taskPrompt = `Continue writing the document in a professional academic style.`
       }
-      
+
       const fullPrompt = `${systemPrompt}\n\n${researchContext}\n\nTask: ${taskPrompt}`
-      
+
       // Call the AI generation API with authentication
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
@@ -381,20 +381,20 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
           }
         })
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to generate content')
       }
-      
+
       const data = await response.json()
-      
+
       if (!data.success || !data.response) {
         throw new Error(data.error || 'No content generated')
       }
-      
+
       setGeneratedText(data.response)
-      
+
       toast({
         title: "Content generated",
         description: `AI writing assistant has generated ${writingTask} content using ${data.provider || selectedProvider}.`,
@@ -410,16 +410,16 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
       setIsGenerating(false)
     }
   }
-  
+
   // Insert the generated text into the editor
   const handleInsert = () => {
     if (!generatedText) return
-    
+
     // Add a newline before insertion if the document already has content
-    const insertText = currentDocumentContent && currentDocumentContent.trim() 
-      ? `\n\n${generatedText}` 
+    const insertText = currentDocumentContent && currentDocumentContent.trim()
+      ? `\n\n${generatedText}`
       : generatedText
-    
+
     onInsertText(insertText)
     setGeneratedText('') // Clear the generated text after insertion
     toast({
@@ -427,7 +427,7 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
       description: "Generated text has been inserted into your document.",
     })
   }
-  
+
   return (
     <div className="space-y-4">
       {/* Show EmptyState when no content and not authenticated */}
@@ -442,7 +442,7 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
           }}
         />
       )}
-      
+
       {/* Show EmptyState when authenticated but no content */}
       {isAuthenticated && !currentDocumentContent.trim() && (
         <EmptyState
@@ -459,31 +459,31 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
           }}
         />
       )}
-      
+
       {/* Settings Toggle */}
       <div className="flex justify-between items-center">
-      <div className="flex flex-wrap gap-2 items-center">
-        {writingTasks.map(task => (
-          <Badge 
-            key={task.id}
-            variant={writingTask === task.id ? "default" : "outline"}
+        <div className="flex flex-wrap gap-2 items-center">
+          {writingTasks.map(task => (
+            <Badge
+              key={task.id}
+              variant={writingTask === task.id ? "default" : "outline"}
               className="cursor-pointer hover:bg-primary/10"
-            onClick={() => setWritingTask(task.id)}
-          >
-            {task.name}
-          </Badge>
-        ))}
-        <div className="flex items-center gap-2 ml-2">
-          <Label className="text-xs">RAG</Label>
-          <input
-            type="checkbox"
-            checked={ragEnabled}
-            onChange={(e) => setRagEnabled(e.target.checked)}
-            className="h-4 w-4"
-            aria-label="Toggle retrieval augmented generation"
-          />
+              onClick={() => setWritingTask(task.id)}
+            >
+              {task.name}
+            </Badge>
+          ))}
+          <div className="flex items-center gap-2 ml-2">
+            <Label className="text-xs">RAG</Label>
+            <input
+              type="checkbox"
+              checked={ragEnabled}
+              onChange={(e) => setRagEnabled(e.target.checked)}
+              className="h-4 w-4"
+              aria-label="Toggle retrieval augmented generation"
+            />
+          </div>
         </div>
-      </div>
         <Button
           variant="ghost"
           size="sm"
@@ -492,7 +492,7 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
           <Settings className="h-4 w-4" />
         </Button>
       </div>
-      
+
       {/* AI Provider Settings */}
       {showSettings && (
         <Card>
@@ -500,8 +500,8 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
             <MinimalAIProviderSelector
               selectedProvider={selectedProvider as AIProvider}
               selectedModel={selectedModel}
-              onProviderChange={onProviderChange || (() => {})}
-              onModelChange={onModelChange || (() => {})}
+              onProviderChange={onProviderChange || (() => { })}
+              onModelChange={onModelChange || (() => { })}
               variant="compact"
               showModelSelector={true}
               showConfigLink={false}
@@ -509,10 +509,10 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
           </CardContent>
         </Card>
       )}
-      
+
       {writingTask === 'custom' && (
         <div className="space-y-2">
-          <Textarea 
+          <Textarea
             placeholder="Describe what you want the AI to write about..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -529,10 +529,10 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
           )}
         </div>
       )}
-      
+
       <div className="flex gap-2">
-        <Button 
-          onClick={generateText} 
+        <Button
+          onClick={generateText}
           disabled={isGenerating || !isAuthenticated}
           className="w-full bg-black hover:bg-gray-800 text-white"
         >
@@ -553,14 +553,14 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
             </>
           )}
         </Button>
-        
+
         {generatedText && writingTask !== 'analyze' && (
           <Button variant="outline" onClick={handleInsert}>
             <ArrowRight className="h-4 w-4" />
           </Button>
         )}
       </div>
-      
+
       {generatedText && (
         <Card>
           <CardContent className="pt-4">
@@ -572,17 +572,17 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
               {generatedText}
             </div>
             {writingTask !== 'analyze' && (
-            <div className="mt-3 flex justify-end">
-              <Button size="sm" variant="ghost" onClick={handleInsert}>
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" variant="ghost" onClick={handleInsert}>
                   <CheckCircle className="h-3 w-3 mr-1" />
-                Insert
-              </Button>
-            </div>
+                  Insert
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
       )}
-      
+
       <div className="text-xs text-muted-foreground mt-2">
         {isAuthenticated ? (
           <>

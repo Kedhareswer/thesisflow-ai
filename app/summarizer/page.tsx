@@ -8,35 +8,35 @@ import { SummarizerService, type SummaryResult } from "@/lib/services/summarizer
 import type { ProcessingProgress } from "@/lib/utils/chunked-processor"
 
 // Import the new tabbed layout and tab components
-import { 
-  SummarizerTabbedLayout, 
+import {
+  SummarizerTabbedLayout,
   useSummarizerTabs,
-  type SummarizerTab 
+  type SummarizerTab
 } from "./components/summarizer-tabbed-layout"
 import { InputTab } from "./components/input-tab"
 import { SummaryTab, type EnhancedSummaryResult } from "./components/summary-tab"
-import { 
-  AnalyticsTab, 
-  type SummaryHistoryItem, 
-  type UsageStatistics 
+import {
+  AnalyticsTab,
+  type SummaryHistoryItem,
+  type UsageStatistics
 } from "./components/analytics-tab"
 import { ErrorDisplay } from "./components/error-display"
 
-// Enhanced SummaryResult interface to match the new service
-interface EnhancedSummaryResult extends Omit<SummaryResult, 'readingTime'> {
-  readingTime: number // Override to make it required
-  sentiment?: "positive" | "neutral" | "negative"
-  originalLength: number
-  summaryLength: number
-  compressionRatio: string
-  topics?: string[]
-  difficulty?: "beginner" | "intermediate" | "advanced"
-  tables?: any[]
-  graphs?: any[]
-}
-
 export default function SummarizerPage() {
   const { toast } = useToast()
+
+  // Tab management
+  const {
+    activeTab,
+    hasActiveSummary,
+    isProcessing,
+    handleTabChange,
+    resetTabs,
+    startProcessing,
+    completeProcessing,
+    setHasActiveSummary,
+    setIsProcessing
+  } = useSummarizerTabs('input')
 
   // State management
   const [content, setContent] = useState("")
@@ -52,6 +52,41 @@ export default function SummarizerPage() {
   const [error, setError] = useState<UserFriendlyError | null>(null)
   const [currentTab, setCurrentTab] = useState<"file" | "url" | "text">("file")
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null)
+
+  // Mock data for analytics (in real implementation, this would come from localStorage or backend)
+  const [summaryHistory] = useState<SummaryHistoryItem[]>([])
+  const [usageStatistics] = useState<UsageStatistics>({
+    totalSummaries: summaryHistory.length,
+    averageCompressionRatio: 75,
+    mostUsedInputMethod: 'text',
+    mostUsedProvider: 'openai',
+    totalWordsProcessed: summaryHistory.reduce((acc, item) => acc + item.statistics.originalLength, 0),
+    totalTimeSaved: summaryHistory.reduce((acc, item) => acc + item.statistics.readingTime, 0),
+    summariesByMonth: [],
+    topTopics: [],
+    // Enhanced statistics
+    averageConfidence: 0.85,
+    successRate: 95,
+    mostUsedDifficulty: 'intermediate',
+    averageProcessingTime: 2.5,
+    inputMethodBreakdown: [
+      { method: 'text', count: 0, percentage: 0 },
+      { method: 'file', count: 0, percentage: 0 },
+      { method: 'url', count: 0, percentage: 0 },
+      { method: 'search', count: 0, percentage: 0 }
+    ],
+    providerBreakdown: [
+      { provider: 'openai', count: 0, percentage: 0 },
+      { provider: 'gemini', count: 0, percentage: 0 },
+      { provider: 'groq', count: 0, percentage: 0 },
+      { provider: 'anthropic', count: 0, percentage: 0 }
+    ],
+    sentimentBreakdown: [
+      { sentiment: 'positive', count: 0, percentage: 0 },
+      { sentiment: 'neutral', count: 0, percentage: 0 },
+      { sentiment: 'negative', count: 0, percentage: 0 }
+    ]
+  })
 
   // Utility functions
   const getWordCount = useCallback((text: string) => {
@@ -70,8 +105,6 @@ export default function SummarizerPage() {
     [getWordCount],
   )
 
-
-
   // Convert SummaryResult to EnhancedSummaryResult
   const enhanceResult = (result: SummaryResult): EnhancedSummaryResult => {
     const originalLength = getWordCount(content)
@@ -80,11 +113,11 @@ export default function SummarizerPage() {
 
     return {
       ...result,
-      readingTime: result.readingTime || getReadingTime(result.summary), // Ensure readingTime is always a number
+      readingTime: result.readingTime || getReadingTime(result.summary),
       originalLength,
       summaryLength: summaryWordCount,
       compressionRatio,
-      sentiment: "neutral", // Default values for backward compatibility
+      sentiment: "neutral",
       topics: [],
       difficulty: "intermediate",
       tables: [],
@@ -92,7 +125,7 @@ export default function SummarizerPage() {
     }
   }
 
-  // Handle URL fetching and summarization
+  // Handle URL fetching
   const handleUrlFetch = async () => {
     if (!url.trim()) return
 
@@ -110,7 +143,6 @@ export default function SummarizerPage() {
       const data = await response.json()
 
       if (!response.ok || data.error) {
-        // Handle structured error responses from the new error handling system
         if (data.userMessage) {
           const structuredError: UserFriendlyError = {
             title: data.error || "URL Fetch Failed",
@@ -130,7 +162,6 @@ export default function SummarizerPage() {
           return
         }
 
-        // Fallback for legacy error responses
         throw new Error(data.error || `Failed to fetch URL: ${response.statusText}`)
       }
 
@@ -152,51 +183,6 @@ export default function SummarizerPage() {
       })
     } finally {
       setUrlFetching(false)
-    }
-  }
-
-  // Handle URL summarization with progress
-  const handleUrlSummarize = async () => {
-    if (!url.trim()) return
-
-    setLoading(true)
-    setError(null)
-    setProcessingProgress(null)
-
-    try {
-      const result = await SummarizerService.summarizeUrl(
-        url,
-        true,
-        (progress) => setProcessingProgress(progress),
-        {
-          provider: selectedProvider,
-          model: selectedModel,
-          style: summaryStyle,
-          length: summaryLength
-        }
-      )
-
-      const enhancedResult = enhanceResult(result)
-      setResult(enhancedResult)
-
-      toast({
-        title: "URL Summarized",
-        description: `Successfully summarized content from URL using ${result.processingMethod} processing.`,
-      })
-    } catch (error) {
-      const processedError = ErrorHandler.processError(error, {
-        operation: 'summarize-url',
-        url
-      })
-      setError(processedError)
-      toast({
-        title: "URL Summarization Failed",
-        description: processedError.message,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-      setProcessingProgress(null)
     }
   }
 
@@ -227,49 +213,6 @@ export default function SummarizerPage() {
     [toast],
   )
 
-  // Handle file summarization with progress
-  const handleFileSummarize = async (file: File) => {
-    setLoading(true)
-    setError(null)
-    setProcessingProgress(null)
-
-    try {
-      const result = await SummarizerService.summarizeFile(
-        file,
-        true,
-        (progress) => setProcessingProgress(progress),
-        {
-          provider: selectedProvider,
-          model: selectedModel,
-          style: summaryStyle,
-          length: summaryLength
-        }
-      )
-
-      const enhancedResult = enhanceResult(result)
-      setResult(enhancedResult)
-
-      toast({
-        title: "File Summarized",
-        description: `Successfully summarized ${file.name} using ${result.processingMethod} processing.`,
-      })
-    } catch (error) {
-      const processedError = ErrorHandler.processError(error, {
-        operation: 'summarize-file',
-        fileType: file.type
-      })
-      setError(processedError)
-      toast({
-        title: "File Summarization Failed",
-        description: processedError.message,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-      setProcessingProgress(null)
-    }
-  }
-
   // Handle text summarization with progress
   const handleSummarize = async (retryOptions?: any) => {
     if (!content.trim()) {
@@ -295,6 +238,8 @@ export default function SummarizerPage() {
     }
 
     setLoading(true)
+    setIsProcessing(true)
+    startProcessing()
     setError(null)
     setProcessingProgress(null)
 
@@ -321,6 +266,8 @@ export default function SummarizerPage() {
 
       const enhancedResult = enhanceResult(result)
       setResult(enhancedResult)
+      setHasActiveSummary(true)
+      completeProcessing(true)
 
       toast({
         title: "Summary Generated",
@@ -332,6 +279,7 @@ export default function SummarizerPage() {
         contentLength: content.length
       })
       setError(processedError)
+      completeProcessing(false)
       toast({
         title: "Summarization Failed",
         description: processedError.message,
@@ -339,6 +287,7 @@ export default function SummarizerPage() {
       })
     } finally {
       setLoading(false)
+      setIsProcessing(false)
       setProcessingProgress(null)
     }
   }
@@ -403,14 +352,31 @@ export default function SummarizerPage() {
     }
   }
 
-  // Handle quality feedback
-  const handleQualityFeedback = (rating: "good" | "poor", feedback?: string) => {
-    // Log feedback for analytics (could be sent to backend)
-    console.log('Quality feedback:', { rating, feedback, resultId: result?.summary.slice(0, 50) })
-
+  // Analytics handlers
+  const handleViewHistoryItem = (item: SummaryHistoryItem) => {
+    // In a real implementation, this would load the historical summary
+    console.log('Viewing history item:', item)
     toast({
-      title: "Feedback Received",
-      description: `Thank you for rating this summary as ${rating}.`,
+      title: "History Item",
+      description: `Viewing summary: ${item.title}`,
+    })
+  }
+
+  const handleDeleteHistoryItem = (id: string) => {
+    // In a real implementation, this would delete from localStorage/backend
+    console.log('Deleting history item:', id)
+    toast({
+      title: "Item Deleted",
+      description: "Summary has been removed from history.",
+    })
+  }
+
+  const handleExportHistory = () => {
+    // In a real implementation, this would export all history data
+    console.log('Exporting history')
+    toast({
+      title: "Export Started",
+      description: "History data is being prepared for download.",
     })
   }
 
@@ -448,195 +414,67 @@ export default function SummarizerPage() {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {result ? (
-          // Summary View - Full width when summary exists
-          <div className="space-y-8">
-            {/* Summary Output - Primary Focus */}
-            <div className="space-y-6">
-              <SummaryOutputPanel
-                result={result}
-                loading={loading}
-                copied={copied}
-                onCopyToClipboard={handleCopyToClipboard}
-                onDownloadSummary={handleDownloadSummary}
-                onShareSummary={handleShareSummary}
-                getWordCount={getWordCount}
-                showAdvancedStats={false}
-                summaryStyle={summaryStyle}
-                summaryLength={summaryLength}
-              />
-
-              {/* Enhanced Statistics and Quality Assessment */}
-              <div className="grid gap-6 lg:grid-cols-2">
-                <SummaryStatistics
-                  result={result}
-                  getWordCount={getWordCount}
-                />
-
-                <QualityAssessment
-                  result={result}
-                  onRetry={handleSummarize}
-                  onFeedback={handleQualityFeedback}
-                />
-              </div>
-
-              {/* Chunking Statistics */}
-              {result?.metadata && (result.metadata.totalChunks || 0) > 1 && (
-                <ChunkingStats
-                  metadata={result.metadata}
-                  confidence={result.confidence}
-                  warnings={result.warnings}
-                  suggestions={result.suggestions}
-                  className="max-w-4xl mx-auto"
-                />
-              )}
-            </div>
-
-            {/* Input Controls - Minimized when summary exists */}
-            <div className="border-t border-gray-200 pt-8">
-              <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                  <ContextInputPanel
-                    content={content}
-                    url={url}
-                    onContentChange={setContent}
-                    onUrlChange={setUrl}
-                    onUrlFetch={handleUrlFetch}
-                    onFileProcessed={handleFileProcessed}
-                    onFileError={handleFileError}
-                    urlFetching={urlFetching}
-                    getWordCount={getWordCount}
-                    currentTab={currentTab}
-                    onTabChange={setCurrentTab}
-                  />
-                </div>
-
-                <div className="space-y-6">
-                  <ConfigurationPanel
-                    selectedProvider={selectedProvider}
-                    onProviderChange={setSelectedProvider}
-                    selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
-                    summaryStyle={summaryStyle}
-                    onSummaryStyleChange={setSummaryStyle}
-                    summaryLength={summaryLength}
-                    onSummaryLengthChange={setSummaryLength}
-                  />
-
-                  <Button
-                    onClick={handleSummarize}
-                    disabled={loading || !content.trim()}
-                    className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {processingProgress?.stage === 'chunking' && 'Analyzing Structure...'}
-                        {processingProgress?.stage === 'processing' && `Processing (${processingProgress.currentChunk || 1}/${processingProgress.totalChunks || 1})...`}
-                        {processingProgress?.stage === 'synthesizing' && 'Creating Summary...'}
-                        {!processingProgress && 'Initializing...'}
-                      </>
-                    ) : (
-                      "Generate New Summary"
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Input View - Centered when no summary
-          <div className="max-w-4xl mx-auto">
-            <div className="grid gap-8 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
-                {/* Web Search Panel - Only show when URL tab is active */}
-                {currentTab === "url" && (
-                  <WebSearchPanel onSelectUrl={(selectedUrl) => {
-                    setUrl(selectedUrl);
-                    handleUrlFetch();
-                  }} />
-                )}
-
-                <ContextInputPanel
-                  content={content}
-                  url={url}
-                  onContentChange={setContent}
-                  onUrlChange={setUrl}
-                  onUrlFetch={handleUrlFetch}
-                  onFileProcessed={handleFileProcessed}
-                  onFileError={handleFileError}
-                  urlFetching={urlFetching}
-                  getWordCount={getWordCount}
-                  currentTab={currentTab}
-                  onTabChange={setCurrentTab}
-                />
-              </div>
-
-              <div className="space-y-6">
-                <ConfigurationPanel
-                  selectedProvider={selectedProvider}
-                  onProviderChange={setSelectedProvider}
-                  selectedModel={selectedModel}
-                  onModelChange={setSelectedModel}
-                  summaryStyle={summaryStyle}
-                  onSummaryStyleChange={setSummaryStyle}
-                  summaryLength={summaryLength}
-                  onSummaryLengthChange={setSummaryLength}
-                />
-
-                <Button
-                  onClick={() => handleSummarize()}
-                  disabled={loading || !content.trim()}
-                  className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {processingProgress?.stage === 'chunking' && 'Analyzing Structure...'}
-                      {processingProgress?.stage === 'processing' && `Processing (${processingProgress.currentChunk || 1}/${processingProgress.totalChunks || 1})...`}
-                      {processingProgress?.stage === 'synthesizing' && 'Creating Summary...'}
-                      {!processingProgress && 'Initializing...'}
-                    </>
-                  ) : (
-                    "Generate Summary"
-                  )}
-                </Button>
-
-                {/* Subtle QuantumPDF Note */}
-                <p className="text-xs text-gray-500 text-center font-light">
-                  For advanced PDF analysis, visit{' '}
-                  <a
-                    href="https://quantumn-pdf-chatapp.netlify.app/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-gray-700"
-                  >
-                    QuantumPDF
-                  </a>
-                </p>
-              </div>
-            </div>
-
-            {/* Enhanced Loading State with Progress */}
-            {loading && (
-              <div className="mt-12 space-y-6">
-                <EnhancedLoading
-                  progress={processingProgress}
-                  operation="summarize"
-                  className="max-w-2xl mx-auto"
-                />
-
-                {/* Show skeleton while processing */}
-                {processingProgress?.stage === 'processing' && (
-                  <SummaryLoadingSkeleton className="max-w-4xl mx-auto" />
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Tabbed Layout */}
+      <SummarizerTabbedLayout
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        hasActiveSummary={hasActiveSummary}
+        isProcessing={isProcessing}
+      >
+        {{
+          inputTab: (
+            <InputTab
+              content={content}
+              url={url}
+              onContentChange={setContent}
+              onUrlChange={setUrl}
+              onFileProcessed={handleFileProcessed}
+              onFileError={handleFileError}
+              onUrlFetch={handleUrlFetch}
+              urlFetching={urlFetching}
+              selectedProvider={selectedProvider}
+              onProviderChange={setSelectedProvider}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              summaryStyle={summaryStyle}
+              onSummaryStyleChange={setSummaryStyle}
+              summaryLength={summaryLength}
+              onSummaryLengthChange={setSummaryLength}
+              isProcessing={isProcessing}
+              processingProgress={processingProgress}
+              onStartProcessing={handleSummarize}
+              getWordCount={getWordCount}
+              currentTab={currentTab}
+              onTabChange={setCurrentTab}
+            />
+          ),
+          summaryTab: (
+            <SummaryTab
+              result={result}
+              isProcessing={isProcessing}
+              processingProgress={processingProgress}
+              onRetry={handleSummarize}
+              onCopyToClipboard={handleCopyToClipboard}
+              onDownloadSummary={handleDownloadSummary}
+              onShareSummary={handleShareSummary}
+              copied={copied}
+              getWordCount={getWordCount}
+              summaryStyle={summaryStyle}
+              summaryLength={summaryLength}
+            />
+          ),
+          analyticsTab: (
+            <AnalyticsTab
+              currentSummary={result}
+              summaryHistory={summaryHistory}
+              usageStatistics={usageStatistics}
+              onViewHistoryItem={handleViewHistoryItem}
+              onDeleteHistoryItem={handleDeleteHistoryItem}
+              onExportHistory={handleExportHistory}
+            />
+          )
+        }}
+      </SummarizerTabbedLayout>
     </div>
   )
 }

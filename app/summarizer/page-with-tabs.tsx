@@ -62,7 +62,29 @@ export default function SummarizerPage() {
     totalWordsProcessed: summaryHistory.reduce((acc, item) => acc + item.statistics.originalLength, 0),
     totalTimeSaved: summaryHistory.reduce((acc, item) => acc + item.statistics.readingTime, 0),
     summariesByMonth: [],
-    topTopics: []
+    topTopics: [],
+    // Enhanced statistics
+    averageConfidence: 0.85,
+    successRate: 95,
+    mostUsedDifficulty: 'intermediate',
+    averageProcessingTime: 2.5,
+    inputMethodBreakdown: [
+      { method: 'text', count: 0, percentage: 0 },
+      { method: 'file', count: 0, percentage: 0 },
+      { method: 'url', count: 0, percentage: 0 },
+      { method: 'search', count: 0, percentage: 0 }
+    ],
+    providerBreakdown: [
+      { provider: 'openai', count: 0, percentage: 0 },
+      { provider: 'gemini', count: 0, percentage: 0 },
+      { provider: 'groq', count: 0, percentage: 0 },
+      { provider: 'anthropic', count: 0, percentage: 0 }
+    ],
+    sentimentBreakdown: [
+      { sentiment: 'positive', count: 0, percentage: 0 },
+      { sentiment: 'neutral', count: 0, percentage: 0 },
+      { sentiment: 'negative', count: 0, percentage: 0 }
+    ]
   })
 
   // Utility functions

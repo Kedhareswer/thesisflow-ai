@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Lightbulb, BookOpen, AlertCircle, Loader2, Plus, Save, Trash2 } from "lucide-react"
-import { enhancedAIService, type ResearchResult } from "@/lib/enhanced-ai-service"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { projectService, type ResearchIdea } from "@/lib/services/project.service"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
@@ -28,6 +28,14 @@ interface GeneratedIdea {
   impact?: string
   challenges?: string
   saved?: boolean
+}
+
+interface ResearchResult {
+  ideas: Array<{ title: string; description: string }>
+  topic: string
+  context: string
+  count: number
+  timestamp: string
 }
 
 export default function ResearchAssistant() {
@@ -76,11 +84,12 @@ export default function ResearchAssistant() {
     setIdeas([])
 
     try {
-      const result: ResearchResult = await enhancedAIService.generateResearchIdeas(
+      const result = await enhancedAIService.generateResearchIdeas(
         topic,
-        context || undefined,
+        context || "",
+        5,
         selectedProvider,
-        selectedModel,
+        selectedModel
       )
 
       setIdeas(

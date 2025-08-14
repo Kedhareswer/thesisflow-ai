@@ -70,24 +70,18 @@ import {
   CheckSquare,
   Square,
   Minus,
-  Plus as PlusIcon,
   X,
   ArrowRight,
   ArrowLeft,
   ArrowUp,
   ArrowDown,
   Home,
-  End,
-  PageUp,
-  PageDown,
   RotateCcw,
   RotateCw,
   ZoomIn,
   ZoomOut,
   Maximize,
   Minimize,
-  Fullscreen,
-  FullscreenExit,
   Volume2,
   VolumeX,
   Mic,
@@ -108,19 +102,7 @@ import {
   Hash,
   AtSign,
   DollarSign,
-  Percent,
-  Hash as HashIcon,
-  Number,
-  Hash as NumberIcon,
-  Hash as HashIcon2,
-  Hash as HashIcon3,
-  Hash as HashIcon4,
-  Hash as HashIcon5,
-  Hash as HashIcon6,
-  Hash as HashIcon7,
-  Hash as HashIcon8,
-  Hash as HashIcon9,
-  Hash as HashIcon10,
+  Percent
 } from "lucide-react";
 
 // Utility function to detect OS and return appropriate modifier key
@@ -206,26 +188,7 @@ interface WriterCommandMenuProps {
   onMerge?: () => void;
   onBranch?: () => void;
   onVersionControl?: () => void;
-  onGit?: () => void;
-  onGitHub?: () => void;
-  onGitLab?: () => void;
-  onBitbucket?: () => void;
-  onSVN?: () => void;
-  onMercurial?: () => void;
-  onFossil?: () => void;
-  onBazaar?: () => void;
-  onMonotone?: () => void;
-  onDarcs?: () => void;
-  onPijul?: () => void;
-  onPijul2?: () => void;
-  onPijul3?: () => void;
-  onPijul4?: () => void;
-  onPijul5?: () => void;
-  onPijul6?: () => void;
-  onPijul7?: () => void;
-  onPijul8?: () => void;
-  onPijul9?: () => void;
-  onPijul10?: () => void;
+
 }
 
 export function WriterCommandMenu({
@@ -301,26 +264,7 @@ export function WriterCommandMenu({
   onMerge,
   onBranch,
   onVersionControl,
-  onGit,
-  onGitHub,
-  onGitLab,
-  onBitbucket,
-  onSVN,
-  onMercurial,
-  onFossil,
-  onBazaar,
-  onMonotone,
-  onDarcs,
-  onPijul,
-  onPijul2,
-  onPijul3,
-  onPijul4,
-  onPijul5,
-  onPijul6,
-  onPijul7,
-  onPijul8,
-  onPijul9,
-  onPijul10,
+
 }: WriterCommandMenuProps) {
   const [open, setOpen] = React.useState(false);
   useCommandMenuShortcut(() => setOpen(true));

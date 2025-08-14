@@ -10,18 +10,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 })
     }
 
-    // Simple comparison implementation using chatCompletion
+    // Simple comparison implementation using generateText
     const results: Record<string, any> = {}
     for (const provider of providers) {
       try {
-        const response = await enhancedAIService.chatCompletion([
-          { role: 'user', content: prompt }
-        ], { preferredProvider: provider })
-        results[provider] = {
-          content: response.content,
-          provider: response.provider,
-          model: response.model,
-          usage: response.usage
+        const response = await enhancedAIService.generateText({
+          prompt,
+          provider: provider as AIProvider
+        })
+        
+        if (response.success) {
+          results[provider] = {
+            content: response.content,
+            provider: response.provider,
+            model: response.model,
+            usage: response.usage
+          }
+        } else {
+          results[provider] = {
+            error: response.error || 'Failed to get response'
+          }
         }
       } catch (error) {
         results[provider] = {

@@ -1,9 +1,27 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Download, Share2, RefreshCw, Clock, Zap, Target, Loader2 } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { 
+  Copy, 
+  Download, 
+  Share2, 
+  RefreshCw, 
+  Clock, 
+  Zap, 
+  Target, 
+  Loader2,
+  FileText,
+  TrendingUp,
+  Brain,
+  CheckCircle,
+  AlertTriangle,
+  ThumbsUp,
+  ThumbsDown,
+  Star
+} from "lucide-react"
 import { SummaryOutputPanel } from "./summary-output-panel"
 import { SummaryStatistics } from "./summary-statistics"
 import { QualityAssessment } from "./quality-assessment"
@@ -27,7 +45,7 @@ export interface EnhancedSummaryResult {
   confidence?: number
   warnings?: string[]
   suggestions?: string[]
-  processingMethod?: string
+  processingMethod?: "direct" | "chunked" | "fallback"
   metadata?: any
 }
 
@@ -173,83 +191,266 @@ export function SummaryTab({
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-8">
-          {/* Quick Stats Bar */}
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Badge variant="secondary" className="px-3 py-1 bg-gray-100 text-gray-700 font-light">
-              <Clock className="h-3 w-3 mr-1" />
-              {result.readingTime} min read
-            </Badge>
-            <Badge variant="secondary" className="px-3 py-1 bg-gray-100 text-gray-700 font-light">
-              <Zap className="h-3 w-3 mr-1" />
-              {result.compressionRatio} compression
-            </Badge>
-            <Badge variant="secondary" className="px-3 py-1 bg-gray-100 text-gray-700 font-light">
-              <Target className="h-3 w-3 mr-1" />
-              {result.summaryLength} words
-            </Badge>
-            {result.confidence && (
-              <Badge variant="secondary" className="px-3 py-1 bg-gray-100 text-gray-700 font-light">
-                {Math.round(result.confidence * 100)}% confidence
-              </Badge>
-            )}
-          </div>
+          {/* Enhanced Key Statistics Display */}
+          <Card className="border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-semibold text-blue-900">{result.readingTime}</div>
+                  <div className="text-sm text-blue-700 font-light">Minutes to read</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Zap className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-semibold text-green-900">{result.compressionRatio}</div>
+                  <div className="text-sm text-green-700 font-light">Compression ratio</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <FileText className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-semibold text-purple-900">{result.summaryLength}</div>
+                  <div className="text-sm text-purple-700 font-light">Summary words</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <Star className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div className="text-2xl font-semibold text-orange-900">
+                    {result.confidence ? `${Math.round(result.confidence * 100)}%` : 'N/A'}
+                  </div>
+                  <div className="text-sm text-orange-700 font-light">Confidence score</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Summary Output - Primary Focus */}
-          <div className="space-y-6">
-            <SummaryOutputPanel
-              result={result}
-              loading={false}
-              copied={copied}
-              onCopyToClipboard={onCopyToClipboard}
-              onDownloadSummary={onDownloadSummary}
-              onShareSummary={onShareSummary}
-              getWordCount={getWordCount}
-              showAdvancedStats={false}
-              summaryStyle={summaryStyle}
-              summaryLength={summaryLength}
-            />
+          {/* Enhanced Summary Content Display */}
+          <Card className="border-gray-200">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl font-light text-black tracking-tight">
+                  Generated Summary
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-light">
+                    {summaryStyle} • {summaryLength}
+                  </Badge>
+                  {result.processingMethod && (
+                    <Badge variant="secondary" className="text-xs font-light">
+                      {result.processingMethod}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="prose prose-lg max-w-none">
+                <div className="text-gray-900 leading-relaxed font-light text-lg space-y-4">
+                  {result.summary.split('\n').map((paragraph, index) => (
+                    paragraph.trim() && (
+                      <p key={index} className="mb-4 last:mb-0">
+                        {paragraph}
+                      </p>
+                    )
+                  ))}
+                </div>
+              </div>
+              
+              <Separator className="my-6" />
+              
+              {/* Enhanced Action Buttons */}
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Button
+                  onClick={() => onCopyToClipboard(result.summary)}
+                  variant="outline"
+                  className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  {copied ? "Copied!" : "Copy Summary"}
+                </Button>
+                
+                <Button
+                  onClick={onDownloadSummary}
+                  variant="outline"
+                  className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+                
+                <Button
+                  onClick={onShareSummary}
+                  variant="outline"
+                  className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
+                >
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </Button>
+                
+                <Button
+                  onClick={() => onRetry()}
+                  variant="outline"
+                  className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button
-                onClick={() => onCopyToClipboard(result.summary)}
-                variant="outline"
-                className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                {copied ? "Copied!" : "Copy"}
-              </Button>
-              
-              <Button
-                onClick={onDownloadSummary}
-                variant="outline"
-                className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-              
-              <Button
-                onClick={onShareSummary}
-                variant="outline"
-                className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-              
-              <Button
-                onClick={() => onRetry()}
-                variant="outline"
-                className="border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-light"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Regenerate
-              </Button>
-            </div>
-          </div>
+          {/* Key Points Section */}
+          {result.keyPoints && result.keyPoints.length > 0 && (
+            <Card className="border-gray-200">
+              <CardHeader>
+                <CardTitle className="text-xl font-light text-black tracking-tight flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Key Points
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {result.keyPoints.map((point, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2.5 flex-shrink-0" />
+                      <span className="text-gray-900 leading-relaxed font-light">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Enhanced Statistics and Quality Assessment */}
+          {/* Enhanced Quality Assessment Section */}
+          <Card className="border-gray-200">
+            <CardHeader>
+              <CardTitle className="text-xl font-light text-black tracking-tight flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                Quality Assessment & Feedback
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Quality Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {result.sentiment && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-1">Sentiment</div>
+                    <Badge 
+                      className={
+                        result.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
+                        result.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }
+                    >
+                      {result.sentiment}
+                    </Badge>
+                  </div>
+                )}
+                
+                {result.difficulty && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-1">Difficulty</div>
+                    <Badge 
+                      className={
+                        result.difficulty === 'beginner' ? 'bg-green-100 text-green-800' :
+                        result.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }
+                    >
+                      {result.difficulty}
+                    </Badge>
+                  </div>
+                )}
+                
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600 mb-1">Processing</div>
+                  <Badge variant="outline">
+                    {result.processingMethod || 'direct'}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Feedback Options */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-900">How is this summary?</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQualityFeedback("good")}
+                      className="flex items-center gap-1 text-green-700 border-green-200 hover:bg-green-50"
+                    >
+                      <ThumbsUp className="h-3 w-3" />
+                      Good
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQualityFeedback("poor")}
+                      className="flex items-center gap-1 text-red-700 border-red-200 hover:bg-red-50"
+                    >
+                      <ThumbsDown className="h-3 w-3" />
+                      Needs Improvement
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Retry Suggestions */}
+              {result.confidence && result.confidence < 0.7 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-yellow-800 mb-2">Suggestions for Better Results</h4>
+                      <div className="space-y-2">
+                        <p className="text-sm text-yellow-700">
+                          The confidence score is below optimal. Try these options:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onRetry({ style: "academic" })}
+                            className="text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+                          >
+                            Academic Style
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onRetry({ length: "comprehensive" })}
+                            className="text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+                          >
+                            More Detailed
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onRetry({ length: "brief" })}
+                            className="text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+                          >
+                            More Concise
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Enhanced Statistics */}
           <div className="grid gap-6 lg:grid-cols-2">
             <SummaryStatistics
               result={result}
@@ -263,7 +464,7 @@ export function SummaryTab({
             />
           </div>
 
-          {/* Chunking Statistics */}
+          {/* Processing Details */}
           {result?.metadata && (result.metadata.totalChunks || 0) > 1 && (
             <ChunkingStats
               metadata={result.metadata}
@@ -274,16 +475,19 @@ export function SummaryTab({
             />
           )}
 
-          {/* Processing Method Info */}
-          {result.processingMethod && (
-            <Card className="max-w-2xl mx-auto border-gray-200 bg-gray-50">
-              <CardContent className="p-4 text-center">
-                <p className="text-sm text-gray-600 font-light">
-                  Processed using <span className="font-medium">{result.processingMethod}</span> method
-                  {result.metadata?.totalChunks && result.metadata.totalChunks > 1 && 
-                    ` with ${result.metadata.totalChunks} content chunks`
-                  }
-                </p>
+          {/* Success Indicator for High Quality */}
+          {result.confidence && result.confidence >= 0.8 && (
+            <Card className="border-green-200 bg-green-50 max-w-2xl mx-auto">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 text-center">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <h4 className="font-medium text-green-800">Excellent Summary Generated!</h4>
+                    <p className="text-sm text-green-700">
+                      High-quality summary with {Math.round(result.confidence * 100)}% confidence score.
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}

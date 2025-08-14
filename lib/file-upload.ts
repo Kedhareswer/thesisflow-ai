@@ -1,4 +1,3 @@
-import { saveAs } from 'file-saver';
 import mammoth from 'mammoth';
 
 interface FileProcessingResult {
