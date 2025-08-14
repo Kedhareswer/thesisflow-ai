@@ -21,6 +21,7 @@ class SocketService {
   private socket: Socket | null = null
   private userId: string | null = null
   private initialized = false
+  private readonly isDev = process.env.NODE_ENV === 'development'
 
   // Initialize socket connection
   initialize(userId: string): Socket {
@@ -38,6 +39,7 @@ class SocketService {
     this.userId = userId
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+    const path = process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io"
 
     // Create socket instance but don't auto-connect until we attach auth token
     this.socket = io(url, {
@@ -45,6 +47,10 @@ class SocketService {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      // Use same path as server and prefer websockets to avoid polling 400s/CORS issues
+      path,
+      transports: ["websocket", "polling"],
+      withCredentials: true,
     })
 
     // Wire up base events once
@@ -52,12 +58,23 @@ class SocketService {
       this.initialized = true
 
       this.socket.on(SocketEvent.CONNECT, () => {
-        console.log("Socket connected")
+        if (this.isDev) console.debug("socket: connected")
         this.updateUserStatus("online")
       })
 
       this.socket.on(SocketEvent.DISCONNECT, () => {
-        console.log("Socket disconnected")
+        if (this.isDev) console.debug("socket: disconnected")
+      })
+
+      // Provide detailed diagnostics for connection errors
+      this.socket.on("connect_error", (err: any) => {
+        if (this.isDev) console.warn("socket: connect_error -", err?.message)
+      })
+      this.socket.on("error", (err: any) => {
+        if (this.isDev) console.warn("socket: error -", err?.message || err)
+      })
+      this.socket.io.on("reconnect_error", (err: any) => {
+        if (this.isDev) console.warn("socket: reconnect_error -", err?.message)
       })
 
       // Cleanly mark offline on page unload
@@ -73,7 +90,7 @@ class SocketService {
     supabase.auth.getSession().then(({ data }) => {
       const token = data.session?.access_token
       if (!token) {
-        console.warn("No Supabase access token; delaying socket connect")
+        if (this.isDev) console.debug("socket: no Supabase token; delaying connect")
         return
       }
       // Prefer server-trusted user id from session
@@ -87,7 +104,7 @@ class SocketService {
       try {
         this.socket.connect()
       } catch (e) {
-        console.error("Socket connect failed:", e)
+        if (this.isDev) console.warn("socket: connect failed")
       }
     })
 
@@ -152,7 +169,7 @@ class SocketService {
           last_active: new Date().toISOString(),
         })
         .eq("id", this.userId)
-      console.log(`User status updated to ${status}`)
+      if (this.isDev) console.debug(`socket: status -> ${status}`)
     } catch (err) {
       console.error("Error updating user status:", err)
     }
