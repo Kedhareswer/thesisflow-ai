@@ -49,8 +49,6 @@ async function generateWithProvider(prompt: string, provider: AIProvider, model?
       return await generateWithGroq(prompt, model)
     case "aiml":
       return await generateWithAIML(prompt, model)
-    case "deepinfra":
-      return await generateWithDeepInfra(prompt, model)
     default:
       throw new Error(`Unsupported provider: ${provider}`)
   }

@@ -66,8 +66,6 @@ export default function AIProviderSelector({
         return <Zap className="h-4 w-4" />
       case "aiml":
         return <Brain className="h-4 w-4" />
-      case "deepinfra":
-        return <DollarSign className="h-4 w-4" />
       case "openai":
         return <Brain className="h-4 w-4" />
       default:
