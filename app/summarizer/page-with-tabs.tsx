@@ -8,17 +8,17 @@ import { SummarizerService, type SummaryResult } from "@/lib/services/summarizer
 import type { ProcessingProgress } from "@/lib/utils/chunked-processor"
 
 // Import the new tabbed layout and tab components
-import {
-  SummarizerTabbedLayout,
+import { 
+  SummarizerTabbedLayout, 
   useSummarizerTabs,
-  type SummarizerTab
+  type SummarizerTab 
 } from "./components/summarizer-tabbed-layout"
 import { InputTab } from "./components/input-tab"
 import { SummaryTab, type EnhancedSummaryResult } from "./components/summary-tab"
-import {
-  AnalyticsTab,
-  type SummaryHistoryItem,
-  type UsageStatistics
+import { 
+  AnalyticsTab, 
+  type SummaryHistoryItem, 
+  type UsageStatistics 
 } from "./components/analytics-tab"
 import { ErrorDisplay } from "./components/error-display"
 
@@ -46,7 +46,6 @@ export default function SummarizerPage() {
   const [summaryStyle, setSummaryStyle] = useState<"academic" | "executive" | "bullet-points" | "detailed">("academic")
   const [summaryLength, setSummaryLength] = useState<"brief" | "medium" | "comprehensive">("medium")
   const [result, setResult] = useState<EnhancedSummaryResult | null>(null)
-  const [loading, setLoading] = useState(false)
   const [urlFetching, setUrlFetching] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<UserFriendlyError | null>(null)
@@ -213,7 +212,7 @@ export default function SummarizerPage() {
     [toast],
   )
 
-  // Handle text summarization with progress
+  // Handle summarization
   const handleSummarize = async (retryOptions?: any) => {
     if (!content.trim()) {
       const validationError = ErrorHandler.processError(
@@ -237,8 +236,6 @@ export default function SummarizerPage() {
       if (retryOptions.model) setSelectedModel(retryOptions.model)
     }
 
-    setLoading(true)
-    setIsProcessing(true)
     startProcessing()
     setError(null)
     setProcessingProgress(null)
@@ -266,7 +263,6 @@ export default function SummarizerPage() {
 
       const enhancedResult = enhanceResult(result)
       setResult(enhancedResult)
-      setHasActiveSummary(true)
       completeProcessing(true)
 
       toast({
@@ -286,8 +282,6 @@ export default function SummarizerPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
-      setIsProcessing(false)
       setProcessingProgress(null)
     }
   }
@@ -355,28 +349,20 @@ export default function SummarizerPage() {
   // Analytics handlers
   const handleViewHistoryItem = (item: SummaryHistoryItem) => {
     // In a real implementation, this would load the historical summary
-    console.log('Viewing history item:', item)
-    toast({
-      title: "History Item",
-      description: `Viewing summary: ${item.title}`,
-    })
+    console.log('View history item:', item)
   }
 
   const handleDeleteHistoryItem = (id: string) => {
     // In a real implementation, this would delete from localStorage/backend
-    console.log('Deleting history item:', id)
-    toast({
-      title: "Item Deleted",
-      description: "Summary has been removed from history.",
-    })
+    console.log('Delete history item:', id)
   }
 
   const handleExportHistory = () => {
-    // In a real implementation, this would export all history data
-    console.log('Exporting history')
+    // In a real implementation, this would export history data
+    console.log('Export history')
     toast({
       title: "Export Started",
-      description: "History data is being prepared for download.",
+      description: "History data has been exported.",
     })
   }
 
@@ -386,12 +372,12 @@ export default function SummarizerPage() {
       <div className="border-b border-gray-200 bg-white hidden">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="text-center">
-            
+            <h1 className="text-4xl font-light tracking-tight text-black mb-3">
               Summarizer
-            
-            
-              
-            
+            </h1>
+            <p className="text-gray-600 text-lg font-light max-w-2xl mx-auto">
+              Transform lengthy content into concise, intelligent summaries
+            </p>
           </div>
         </div>
       </div>

@@ -29,6 +29,21 @@ export interface GenerateTextResult {
   }
 }
 
+export interface ResearchResult {
+  ideas: Array<{ 
+    title: string
+    description: string
+    research_question?: string
+    methodology?: string
+    impact?: string
+    challenges?: string
+  }>
+  topic: string
+  context: string
+  count: number
+  timestamp: string
+}
+
 export interface UserApiKey {
   provider: string
   decrypted_key?: string
@@ -746,13 +761,9 @@ class EnhancedAIService {
     topic: string,
     context = "",
     count = 5,
-  ): Promise<{
-    ideas: Array<{ title: string; description: string }>
-    topic: string
-    context: string
-    count: number
-    timestamp: string
-  }> {
+    provider?: AIProvider,
+    model?: string,
+  ): Promise<ResearchResult> {
     // Implement chunked generation for better reliability
     const chunkSize = Math.min(count, 3) // Generate max 3 ideas at a time
     const chunks = Math.ceil(count / chunkSize)
@@ -762,7 +773,7 @@ class EnhancedAIService {
 
     for (let i = 0; i < chunks; i++) {
       const currentChunkSize = Math.min(chunkSize, count - allIdeas.length)
-      const chunkIdeas = await this.generateResearchIdeasChunk(topic, context, currentChunkSize, i + 1)
+      const chunkIdeas = await this.generateResearchIdeasChunk(topic, context, currentChunkSize, i + 1, provider, model)
       allIdeas.push(...chunkIdeas)
 
       // Add small delay between chunks to avoid overwhelming the API
@@ -785,6 +796,8 @@ class EnhancedAIService {
     context: string,
     count: number,
     chunkNumber: number,
+    provider?: AIProvider,
+    model?: string,
   ): Promise<Array<{ title: string; description: string }>> {
     // Optimized, concise prompt to reduce token usage
     const prompt = `Generate ${count} research ideas for "${topic}"${context ? `\nContext: ${context.substring(0, 200)}` : ""}
@@ -800,6 +813,8 @@ Requirements: Novel, feasible, practical research directions.`
 
     const result = await this.generateText({
       prompt,
+      provider,
+      model,
       maxTokens: count * 200, // More conservative token limit
       temperature: 0.8, // Slightly lower for more focused ideas
     })

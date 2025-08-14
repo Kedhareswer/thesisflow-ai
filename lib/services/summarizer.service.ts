@@ -49,7 +49,7 @@ export interface SummaryResult {
   keyPoints: string[]
   readingTime?: number
   id?: string // Add ID for database reference
-  processingMethod?: 'direct' | 'chunked'
+  processingMethod?: 'direct' | 'chunked' | 'fallback'
   confidence?: number
   warnings?: string[]
   suggestions?: string[]
@@ -80,7 +80,7 @@ export class SummarizerService {
    * Summarize text content using AI with intelligent chunking for large documents
    */
   static async summarizeText(
-    text: string, 
+    text: string,
     saveToDatabase = true,
     onProgress?: (progress: ProcessingProgress) => void,
     options?: SummaryOptions
@@ -96,7 +96,7 @@ export class SummarizerService {
 
       if (needsChunking) {
         console.log("SummarizerService: Using chunked processing for large content")
-        
+
         const synthesizedResult = await ChunkedProcessor.processLargeContent(
           text,
           'summarize',
@@ -121,7 +121,7 @@ export class SummarizerService {
         }
       } else {
         console.log("SummarizerService: Using direct processing for small content")
-        
+
         onProgress?.({
           stage: 'processing',
           progress: 50,
@@ -154,7 +154,7 @@ export class SummarizerService {
         })
 
         const parsedResult = this.parseSummaryResponse(response, text.length)
-        
+
         result = {
           ...parsedResult,
           processingMethod: 'direct',
@@ -179,10 +179,10 @@ export class SummarizerService {
       // Save to database if user is authenticated and saveToDatabase is true
       if (saveToDatabase) {
         try {
-          const title = text.length > 50 
-            ? text.substring(0, 50) + "..." 
+          const title = text.length > 50
+            ? text.substring(0, 50) + "..."
             : text
-          
+
           const savedSummary = await this.saveSummary(
             title,
             text,
@@ -192,7 +192,7 @@ export class SummarizerService {
             undefined,
             result.readingTime
           )
-          
+
           result.id = savedSummary.id
         } catch (dbError) {
           console.warn("Failed to save summary to database:", dbError)
@@ -215,7 +215,7 @@ export class SummarizerService {
    * Summarize content from a URL using AI with intelligent chunking
    */
   static async summarizeUrl(
-    url: string, 
+    url: string,
     saveToDatabase = true,
     onProgress?: (progress: ProcessingProgress) => void,
     options?: SummaryOptions
@@ -256,7 +256,7 @@ export class SummarizerService {
             url,
             result.readingTime
           )
-          
+
           result.id = savedSummary.id
         } catch (dbError) {
           console.warn("Failed to save URL summary to database:", dbError)
@@ -279,7 +279,7 @@ export class SummarizerService {
    * Summarize content from an uploaded file using AI with intelligent chunking
    */
   static async summarizeFile(
-    file: File, 
+    file: File,
     saveToDatabase = true,
     onProgress?: (progress: ProcessingProgress) => void,
     options?: SummaryOptions
@@ -336,7 +336,7 @@ export class SummarizerService {
             undefined,
             result.readingTime
           )
-          
+
           result.id = savedSummary.id
         } catch (dbError) {
           console.warn("Failed to save file summary to database:", dbError)
@@ -347,7 +347,7 @@ export class SummarizerService {
       return result
     } catch (error) {
       console.error("Error summarizing file:", error)
-      
+
       const processedError = ErrorHandler.processError(error, {
         operation: 'summarize-file',
         fileType: file.type
@@ -504,13 +504,13 @@ export class SummarizerService {
       const match = content.match(pattern);
       if (match && match[1]) {
         const keyPointsText = match[1].trim();
-        
+
         // Try to extract numbered or bulleted points
         const pointsArray = keyPointsText
           .split(/\n+|\d+\.\s+|•\s+|\*\s+|\-\s+/)
           .map(point => point.trim())
           .filter(point => point.length > 10);
-        
+
         if (pointsArray.length > 0) {
           keyPointsArray = pointsArray.slice(0, 5);
           break;
@@ -525,7 +525,7 @@ export class SummarizerService {
         .split(/\.\s+|\n+/)
         .map(s => s.trim())
         .filter(s => s.length > 20 && s.length < 200);
-      
+
       if (sentences.length >= 3) {
         keyPointsArray = sentences.slice(0, 5);
       } else {
