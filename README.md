@@ -1,8 +1,9 @@
+<div align="center">
+
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
 [![GitHub Forks](https://img.shields.io/github/forks/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
 
-<div align="center">
 
 *Transform your research workflow with intelligent AI-powered tools*
 
