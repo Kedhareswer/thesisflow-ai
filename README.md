@@ -1,8 +1,9 @@
+
+<div align="center">
+
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
 [![GitHub Forks](https://img.shields.io/github/forks/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
-
-<div align="center">
 
 *Transform your research workflow with intelligent AI-powered tools*
 
@@ -50,35 +51,6 @@ mindmap
 ```
 
 </div>
-
-### 🧭 Key Feature Flow: Real-time Chat
-
-```mermaid
-sequenceDiagram
-  participant User
-  participant ChatUI
-  participant MessagesContainer as Messages
-  participant Socket
-
-  User->>ChatUI: Open team chat
-  ChatUI->>Messages: Attach scroll listener
-  Socket-->>Messages: New message
-  Messages->>ChatUI: Check isScrolledToBottom
-
-  alt At bottom
-    Messages->>ChatUI: Append + scrollToBottom()
-    ChatUI->>ChatUI: Reset unreadCount / hide button
-  else Not at bottom
-    Messages->>ChatUI: Append (no scroll)
-    ChatUI->>ChatUI: Increment unreadCount / show button
-  end
-
-  User->>ChatUI: Tap scroll-to-bottom or focus input
-  ChatUI->>Messages: scrollToBottom()
-  ChatUI->>ChatUI: Reset unreadCount / hide button
-```
-
----
 
 ---
 
