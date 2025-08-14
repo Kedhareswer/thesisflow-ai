@@ -49,27 +49,36 @@ mindmap
       Deadline Management
 ```
 
-#### 🧭 End-to-End User Flow
+</div>
+
+### 🧭 Key Feature Flow: Real-time Chat
 
 ```mermaid
-flowchart LR
-    A[🏠 Landing / Home] --> B[🔐 Sign Up / Sign In]
-    B --> C[📊 Dashboard]
-    C --> D[🔍 Literature Search]
-    D --> E[📑 Select Papers]
-    E --> F[📝 Summarize & Analyze]
-    F --> G[✍️ Write Manuscript]
-    G --> H[👥 Collaborate]
-    H --> I[📋 Manage Tasks]
-    I --> J[📤 Export / Publish]
-    J --> K[📈 Analytics & Insights]
+sequenceDiagram
+  participant User
+  participant ChatUI
+  participant MessagesContainer as Messages
+  participant Socket
 
-    style D fill:#e3f2fd
-    style F fill:#fff3e0
-    style H fill:#f3e5f5
+  User->>ChatUI: Open team chat
+  ChatUI->>Messages: Attach scroll listener
+  Socket-->>Messages: New message
+  Messages->>ChatUI: Check isScrolledToBottom
+
+  alt At bottom
+    Messages->>ChatUI: Append + scrollToBottom()
+    ChatUI->>ChatUI: Reset unreadCount / hide button
+  else Not at bottom
+    Messages->>ChatUI: Append (no scroll)
+    ChatUI->>ChatUI: Increment unreadCount / show button
+  end
+
+  User->>ChatUI: Tap scroll-to-bottom or focus input
+  ChatUI->>Messages: scrollToBottom()
+  ChatUI->>ChatUI: Reset unreadCount / hide button
 ```
 
-</div>
+---
 
 ---
 
