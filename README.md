@@ -850,26 +850,26 @@ python/
 
 ```mermaid
 graph TD
-    A[🌐 Client] --> B[🔐 Auth Middleware]
-    B --> C[📍 API Routes]
+    A[🌐 Client] --> B[🔐 Auth Middleware];
+    B --> C[📍 API Routes];
     
-    C --> D[🤖 AI Services]
-    C --> E[🔍 Search APIs]
-    C --> F[👥 Collaboration]
-    C --> G[📄 Documents]
-    C --> H[📊 Analytics]
+    C --> D[🤖 AI Services];
+    C --> E[🔍 Search APIs];
+    C --> F[👥 Collaboration];
+    C --> G[📄 Documents];
+    C --> H[📊 Analytics];
     
-    D --> D1[/api/ai/generate]
-    D --> D2[/api/ai/summarize]
-    D --> D3[/api/ai/chat]
+    D --> D1[/api/ai/generate];
+    D --> D2[/api/ai/summarize];
+    D --> D3[/api/ai/chat];
     
-    E --> E1[/api/search/literature]
-    E --> E2[/api/search/papers]
-    E --> E3[/api/search/citations]
+    E --> E1[/api/search/literature];
+    E --> E2[/api/search/papers];
+    E --> E3[/api/search/citations];
     
-    F --> F1[/api/collaborate/teams]
-    F --> F2[/api/collaborate/chat]
-    F --> F3[/api/collaborate/files]
+    F --> F1[/api/collaborate/teams];
+    F --> F2[/api/collaborate/chat];
+    F --> F3[/api/collaborate/files];
     
     style D fill:#e8f5e8
     style E fill:#e3f2fd
@@ -1292,12 +1292,12 @@ graph LR
 
 ```mermaid
 erDiagram
-  auth.users ||--o{ user_profiles : has
-  auth.users ||--o{ user_plans : subscribes
-  auth.users ||--o{ user_usage : tracks
-  auth.users ||--o{ user_activity : logs
-  user_plans ||--|{ stripe_subscriptions : links
-  teams ||--o{ team_files : stores
+  auth_users ||--o{ user_profiles : has;
+  auth_users ||--o{ user_plans : subscribes;
+  auth_users ||--o{ user_usage : tracks;
+  auth_users ||--o{ user_activity : logs;
+  user_plans ||--|{ stripe_subscriptions : links;
+  teams ||--o{ team_files : stores;
 ```
 
 | Table | RLS | Key Columns | Purpose |
