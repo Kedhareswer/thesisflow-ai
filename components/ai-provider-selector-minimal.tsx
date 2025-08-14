@@ -66,10 +66,9 @@ export default function MinimalAIProviderSelector({
       const data = await response.json()
       setAvailableProviders(data.availableProviders || [])
 
-      // Auto-select first available provider if none selected
-      if (!selectedProvider && data.availableProviders?.length > 0) {
-        onProviderChange(data.availableProviders[0])
-      }
+      // Don't auto-select provider - let user choose or use auto fallback
+      // This allows the system to use the enhanced fallback mechanism
+      console.log("MinimalAIProviderSelector: Available providers loaded:", data.availableProviders)
     } catch (error) {
       console.error("Error loading providers:", error)
       setAvailableProviders([])
@@ -124,7 +123,7 @@ export default function MinimalAIProviderSelector({
                   <Zap className="h-3 w-3" />
                   <span>Auto</span>
                   <Badge variant="secondary" className="text-xs">
-                    Fallback
+                    {availableProviders.length > 0 ? `${availableProviders.length} Available` : 'Fallback'}
                   </Badge>
                 </div>
               </SelectItem>
@@ -206,10 +205,10 @@ export default function MinimalAIProviderSelector({
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
                         <Zap className="h-4 w-4" />
-                        <span>Auto Fallback</span>
+                        <span>Auto Select</span>
                       </div>
                       <Badge variant="secondary" className="text-xs">
-                        Recommended
+                        {availableProviders.length > 0 ? `${availableProviders.length} Available` : 'Setup Required'}
                       </Badge>
                     </div>
                   </SelectItem>
@@ -295,10 +294,10 @@ export default function MinimalAIProviderSelector({
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4" />
-                      <span className="font-medium">Auto Fallback</span>
+                      <span className="font-medium">Auto Select</span>
                     </div>
                     <Badge variant="secondary">
-                      Recommended
+                      {availableProviders.length > 0 ? `${availableProviders.length} Available` : 'Setup Required'}
                     </Badge>
                   </div>
                 </SelectItem>

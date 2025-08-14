@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      providers: availableProviders,
+      availableProviders: availableProviders.map(p => p.provider), // Return just the provider names for compatibility
+      providers: availableProviders, // Keep full provider info for other uses
       totalProviders: availableProviders.length
     })
 

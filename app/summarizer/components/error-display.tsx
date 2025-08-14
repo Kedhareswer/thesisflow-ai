@@ -94,6 +94,18 @@ export function ErrorDisplay({ error, onRetry, onDismiss, className }: ErrorDisp
                 </Button>
               )}
               
+              {processedError.errorType === 'url_extraction' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open('https://archive.org/', '_blank')}
+                  className="text-red-700 border-red-300 hover:bg-red-100"
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Try Archive.org
+                </Button>
+              )}
+              
               {onDismiss && (
                 <Button
                   variant="ghost"

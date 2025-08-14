@@ -47,7 +47,7 @@ export function ConfigurationPanel({
       />
 
       {/* Provider Impact Indicator */}
-      {selectedProvider && (
+      {selectedProvider ? (
         <div className="mb-4 p-3 bg-blue-50 rounded-sm border border-blue-200">
           <p className="text-sm text-blue-800 font-light">
             <span className="font-medium">Using {selectedProvider}:</span>
@@ -57,7 +57,12 @@ export function ConfigurationPanel({
             {selectedProvider === "anthropic" && " High-quality reasoning and detailed insights"}
             {selectedProvider === "mistral" && " Fast and efficient AI processing"}
             {selectedProvider === "aiml" && " Specialized AI analysis and insights"}
-
+          </p>
+        </div>
+      ) : (
+        <div className="mb-4 p-3 bg-green-50 rounded-sm border border-green-200">
+          <p className="text-sm text-green-800 font-light">
+            <span className="font-medium">Auto Mode:</span> Intelligently selects the best available AI provider with automatic fallback for optimal reliability
           </p>
         </div>
       )}

@@ -167,7 +167,8 @@ export class ChunkedProcessor {
         const synthesizedResult = await this.synthesizeChunkResults(
             chunkResults,
             content,
-            chunkingResult
+            chunkingResult,
+            options
         )
 
         onProgress?.({
@@ -410,7 +411,11 @@ IMPORTANT_DETAILS:
     private static async synthesizeChunkResults(
         chunkResults: ChunkProcessingResult[],
         originalContent: string,
-        chunkingResult: any
+        chunkingResult: any,
+        options: {
+            provider?: string
+            model?: string
+        } = {}
     ): Promise<SynthesizedResult> {
         // Combine all summaries and key points
         const allSummaries = chunkResults.map(r => r.summary).filter(s => s && !s.includes('processing failed'))
@@ -442,7 +447,9 @@ TOP_KEY_POINTS:
             const synthesisResult = await enhancedAIService.generateText({
                 prompt: synthesisPrompt,
                 maxTokens: 1000,
-                temperature: 0.5 // Lower temperature for more consistent synthesis
+                temperature: 0.5, // Lower temperature for more consistent synthesis
+                provider: options.provider,
+                model: options.model
             })
 
             if (synthesisResult.success && synthesisResult.content) {

@@ -864,7 +864,7 @@ Requirements: Novel, feasible, practical research directions.`
 
     // Get available providers in order of preference
     const userApiKeys = await this.loadUserApiKeys(options.userId)
-    const availableProviders = userApiKeys
+    let availableProviders = userApiKeys
       .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
       .map((key) => key.provider as AIProvider)
 
@@ -875,7 +875,17 @@ Requirements: Novel, feasible, practical research directions.`
       }
     }
 
-    console.log(`Enhanced AI Service: Available providers for fallback: ${availableProviders.join(", ")}`)
+    // If user has a preferred provider, try it first
+    if (options.provider && availableProviders.includes(options.provider)) {
+      // Move the preferred provider to the front of the list
+      availableProviders = [
+        options.provider,
+        ...availableProviders.filter(p => p !== options.provider)
+      ]
+      console.log(`Enhanced AI Service: Prioritizing user's preferred provider: ${options.provider}`)
+    }
+
+    console.log(`Enhanced AI Service: Provider order for fallback: ${availableProviders.join(", ")}`)
 
     const errors: Array<{ provider: AIProvider; error: string; attempts: number }> = []
 
@@ -889,8 +899,36 @@ Requirements: Novel, feasible, practical research directions.`
       // Try each provider with retries for transient errors
       for (let retry = 0; retry <= maxRetries; retry++) {
         try {
-          const result = await this.generateText({
+          // Get the API key for this provider
+          const userApiKey = userApiKeys.find(
+            (key) => key.provider === provider && key.is_active && key.test_status === "valid" && key.decrypted_key,
+          )
+
+          if (!userApiKey || !userApiKey.decrypted_key) {
+            console.log(`Enhanced AI Service: No valid API key for ${provider}, skipping`)
+            errors.push({ provider, error: "No valid API key", attempts: retry + 1 })
+            break // Move to next provider
+          }
+
+          // Get provider configuration
+          const providerConfig = AI_PROVIDERS[provider]
+          if (!providerConfig) {
+            console.log(`Enhanced AI Service: Unknown provider ${provider}, skipping`)
+            errors.push({ provider, error: "Unknown provider", attempts: retry + 1 })
+            break // Move to next provider
+          }
+
+          // Determine model to use
+          const selectedModel = options.model && providerConfig.models.includes(options.model) 
+            ? options.model 
+            : providerConfig.models[0]
+
+          console.log(`Enhanced AI Service: Using ${provider} with model ${selectedModel}`)
+
+          // Call the provider API directly
+          const result = await this.callProviderAPI(provider, userApiKey.decrypted_key, {
             ...options,
+            model: selectedModel,
             provider,
           })
 

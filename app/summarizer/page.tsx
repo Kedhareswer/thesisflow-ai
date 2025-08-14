@@ -46,7 +46,7 @@ export default function SummarizerPage() {
   const [urlFetching, setUrlFetching] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<UserFriendlyError | null>(null)
-  const [currentTab, setCurrentTab] = useState<"file" | "url">("file")
+  const [currentTab, setCurrentTab] = useState<"file" | "url" | "text">("file")
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null)
 
   // Utility functions
@@ -111,7 +111,7 @@ export default function SummarizerPage() {
           const structuredError: UserFriendlyError = {
             title: data.error || "URL Fetch Failed",
             message: data.userMessage,
-            actions: data.actions || [],
+            actions: [...(data.actions || []), "Switch to Text tab to paste content manually"],
             fallbackOptions: data.fallbackOptions,
             helpLinks: data.helpLinks,
             errorType: data.errorType || 'url_extraction',
@@ -120,7 +120,7 @@ export default function SummarizerPage() {
           setError(structuredError)
           toast({
             title: "URL Fetch Failed",
-            description: data.userMessage,
+            description: data.userMessage + " Try switching to the Text tab to paste content manually.",
             variant: "destructive",
           })
           return
@@ -295,6 +295,14 @@ export default function SummarizerPage() {
     setProcessingProgress(null)
 
     try {
+      console.log('Summarizer: Starting summarization with options:', {
+        provider: selectedProvider,
+        model: selectedModel,
+        style: summaryStyle,
+        length: summaryLength,
+        contentLength: content.length
+      })
+
       const result = await SummarizerService.summarizeText(
         content,
         true,

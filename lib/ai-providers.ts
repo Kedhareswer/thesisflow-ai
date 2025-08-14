@@ -26,13 +26,13 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   gemini: {
     name: "Google Gemini",
     models: [
-      "gemini-2.5-pro",
-      "gemini-2.5-flash", 
-      "gemini-2.5-flash-lite-preview",
-      "gemini-2.0-flash",
-      "gemini-1.5-pro",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-8b"
+      "gemini-1.5-flash", // Free model - default
+      "gemini-1.5-flash-8b", // Free model
+      "gemini-2.0-flash", // Free model
+      "gemini-2.5-flash", // Free model
+      "gemini-2.5-flash-lite-preview", // Free model
+      "gemini-1.5-pro", // Paid model
+      "gemini-2.5-pro" // Paid model
     ],
     maxTokens: 1048576, // 1M tokens for Gemini 2.5
     supportedFeatures: ["text", "chat", "summarization", "analysis", "multimodal", "vision", "long-context"],
@@ -40,16 +40,16 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   aiml: {
     name: "AIML API",
     models: [
-      "gpt-4.1",
-      "gpt-4.1-mini", 
-      "gpt-4o",
-      "gpt-4o-mini",
-      "claude-3.7-sonnet",
-      "claude-3.5-sonnet",
-      "gemini-2.5-pro-preview",
-      "gemini-2.5-flash-preview",
-      "deepseek-r1",
-      "deepseek-v3"
+      "gpt-4o-mini", // Free/cheaper model - default
+      "gpt-4.1-mini", // Free/cheaper model
+      "gemini-2.5-flash-preview", // Free model
+      "deepseek-r1", // Free model
+      "deepseek-v3", // Free model
+      "gpt-4o", // Paid model
+      "gpt-4.1", // Paid model
+      "claude-3.5-sonnet", // Paid model
+      "claude-3.7-sonnet", // Paid model
+      "gemini-2.5-pro-preview" // Paid model
     ],
     maxTokens: 200000, // GPT-4.1 supports up to 1M tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "code", "reasoning", "multimodal"],
@@ -57,14 +57,14 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   groq: {
     name: "Groq",
     models: [
-      "llama-3.3-70b-versatile",
-      "llama-3.1-8b-instant",
-      "llama-4-scout-17b-16e-instruct",
-      "llama-4-maverick-17b-128e-instruct", 
-      "deepseek-r1-distill-qwen-32b",
-      "qwen-qwq-32b",
-      "gemma2-9b-it",
-      "mistral-saba-24b"
+      "llama-3.1-8b-instant", // Free model - default
+      "gemma2-9b-it", // Free model
+      "deepseek-r1-distill-qwen-32b", // Free model
+      "qwen-qwq-32b", // Free model
+      "llama-3.3-70b-versatile", // Free model
+      "mistral-saba-24b", // Free model
+      "llama-4-scout-17b-16e-instruct", // Potentially paid
+      "llama-4-maverick-17b-128e-instruct" // Potentially paid
     ],
     maxTokens: 128000, // Llama 3.3 supports 128k tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference", "reasoning"],
@@ -72,16 +72,16 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   openai: {
     name: "OpenAI",
     models: [
-      "gpt-4.1",
-      "gpt-4.1-mini",
-      "gpt-4.1-nano",
-      "o4-mini",
-      "o3",
-      "o3-mini", 
-      "gpt-4o",
-      "gpt-4o-mini",
-      "gpt-4-turbo",
-      "gpt-3.5-turbo"
+      "gpt-4o-mini", // Cheaper model - default
+      "gpt-3.5-turbo", // Cheaper model
+      "gpt-4.1-mini", // Cheaper model
+      "gpt-4.1-nano", // Cheaper model
+      "o3-mini", // Cheaper reasoning model
+      "o4-mini", // Cheaper model
+      "gpt-4o", // Paid model
+      "gpt-4-turbo", // Paid model
+      "gpt-4.1", // Paid model
+      "o3" // Expensive reasoning model
     ],
     maxTokens: 1000000, // GPT-4.1 supports up to 1M tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "function-calling", "reasoning", "multimodal"],
@@ -89,13 +89,13 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   anthropic: {
     name: "Anthropic",
     models: [
-      "claude-3.5-sonnet",
-      "claude-3.5-haiku",
-      "claude-3-opus",
-      "claude-3-sonnet",
-      "claude-3-haiku",
-      "claude-2.1",
-      "claude-2.0"
+      "claude-3.5-haiku", // Cheaper model - default
+      "claude-3-haiku", // Cheaper model
+      "claude-2.0", // Cheaper model
+      "claude-2.1", // Cheaper model
+      "claude-3-sonnet", // Mid-tier model
+      "claude-3.5-sonnet", // Expensive model
+      "claude-3-opus" // Most expensive model
     ],
     maxTokens: 200000, // Claude 3.5 supports up to 200k tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "reasoning", "long-context"],
@@ -103,12 +103,12 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   mistral: {
     name: "Mistral AI",
     models: [
-      "mistral-large-latest",
-      "mistral-medium-latest",
-      "mistral-small-latest",
-      "mistral-large",
-      "mistral-medium",
-      "mistral-small"
+      "mistral-small-latest", // Cheaper model - default
+      "mistral-small", // Cheaper model
+      "mistral-medium-latest", // Mid-tier model
+      "mistral-medium", // Mid-tier model
+      "mistral-large-latest", // Expensive model
+      "mistral-large" // Expensive model
     ],
     maxTokens: 32768, // Mistral supports up to 32k tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference"],

@@ -87,6 +87,7 @@ export class SummarizerService {
   ): Promise<SummaryResult> {
     try {
       console.log("SummarizerService: Starting text summarization, length:", text.length)
+      console.log("SummarizerService: Options received:", options)
 
       // Determine if chunking is needed
       const needsChunking = text.length > 8000 // Conservative threshold

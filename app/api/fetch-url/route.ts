@@ -27,6 +27,24 @@ const PAYWALL_INDICATORS = [
   'register', 'sign-up', 'member-only', 'access-denied'
 ]
 
+// News sites that often block automated access
+const NEWS_SITES_WITH_RESTRICTIONS = [
+  'bbc.com', 'bbc.co.uk', 'cnn.com', 'nytimes.com', 'wsj.com', 
+  'ft.com', 'economist.com', 'reuters.com', 'bloomberg.com',
+  'guardian.co.uk', 'theguardian.com', 'washingtonpost.com'
+]
+
+// Alternative content sources for news articles
+const NEWS_ALTERNATIVE_SOURCES = {
+  'bbc.com': 'Try using the BBC RSS feeds or search for the article on archive.org',
+  'bbc.co.uk': 'Try using the BBC RSS feeds or search for the article on archive.org',
+  'cnn.com': 'Try using CNN RSS feeds or look for the article on Google News',
+  'nytimes.com': 'Try searching for the article title on archive.org or Google News',
+  'wsj.com': 'Try searching for the article title on archive.org or alternative news sources',
+  'guardian.co.uk': 'Try using The Guardian\'s RSS feeds or archive.org',
+  'theguardian.com': 'Try using The Guardian\'s RSS feeds or archive.org'
+}
+
 interface ContentExtractionResult {
   content: string
   title?: string
@@ -108,6 +126,18 @@ export async function POST(request: Request) {
       )
     }
 
+    // Check if this is a news site that might have restrictions
+    const isRestrictedNewsSite = NEWS_SITES_WITH_RESTRICTIONS.some(domain =>
+      hostname.includes(domain) || hostname.endsWith(domain)
+    )
+
+    // Add special handling for news sites
+    let isNewsSiteAttempt = false
+    if (isRestrictedNewsSite) {
+      isNewsSiteAttempt = true
+      console.log(`Attempting to extract from restricted news site: ${hostname}`)
+    }
+
     // Check for dynamic content indicators
     const hasDynamicContent = DYNAMIC_CONTENT_INDICATORS.some(indicator =>
       parsedUrl.href.toLowerCase().includes(indicator)
@@ -135,11 +165,22 @@ export async function POST(request: Request) {
     let lastError: unknown
 
     // Try multiple user agents for better compatibility
-    const userAgents = [
-      "Mozilla/5.0 (compatible; ResearchHub/1.0; Content Extractor)",
+    let userAgents = [
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     ]
+
+    // Use more diverse user agents for news sites
+    if (isNewsSiteAttempt) {
+      userAgents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+      ]
+    }
 
     for (let attempt = 0; attempt < userAgents.length; attempt++) {
       try {
@@ -216,27 +257,60 @@ export async function POST(request: Request) {
       // Enhanced error handling for specific HTTP status codes
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`
       let specificGuidance = false
+      let actions: string[] = []
+      let fallbackOptions: string[] = []
 
       switch (response.status) {
         case 403:
           errorMessage = "Access forbidden - the website blocks automated content extraction"
           specificGuidance = true
+          actions = [
+            "Try visiting the URL directly and copying the content",
+            "Check if the URL is accessible in your browser",
+            "Try a different page from the same website"
+          ]
+          if (isNewsSiteAttempt) {
+            const hostname = new URL(url).hostname.toLowerCase()
+            const alternativeSource = NEWS_ALTERNATIVE_SOURCES[hostname as keyof typeof NEWS_ALTERNATIVE_SOURCES]
+            if (alternativeSource) {
+              fallbackOptions = [alternativeSource]
+            }
+            fallbackOptions.push("Search for the article title on Google News or archive.org")
+          }
           break
         case 404:
           errorMessage = "Page not found - the URL may be incorrect or the content has been moved"
           specificGuidance = true
+          actions = [
+            "Check the URL for typos",
+            "Try searching for the article title on the website",
+            "Look for the content on archive.org"
+          ]
           break
         case 429:
           errorMessage = "Too many requests - the website is rate limiting our access"
           specificGuidance = true
+          actions = [
+            "Wait a few minutes and try again",
+            "Try accessing the content manually"
+          ]
           break
         case 503:
           errorMessage = "Service unavailable - the website is temporarily down"
           specificGuidance = true
+          actions = [
+            "Try again in a few minutes",
+            "Check if the website is accessible in your browser"
+          ]
           break
         case 401:
           errorMessage = "Authentication required - the content may be behind a login"
           specificGuidance = true
+          actions = [
+            "Try logging into the website first",
+            "Look for a free version of the article",
+            "Search for the content on other sources"
+          ]
           break
       }
 
@@ -245,10 +319,15 @@ export async function POST(request: Request) {
         url
       })
 
-      return NextResponse.json(
-        ErrorHandler.formatErrorResponse(httpError),
-        { status: response.status }
-      )
+      const errorResponse = ErrorHandler.formatErrorResponse(httpError)
+      if (actions.length > 0) {
+        errorResponse.actions = actions
+      }
+      if (fallbackOptions.length > 0) {
+        errorResponse.fallbackOptions = fallbackOptions
+      }
+
+      return NextResponse.json(errorResponse, { status: response.status })
     }
 
     // Enhanced content type checking
@@ -338,19 +417,46 @@ export async function POST(request: Request) {
     const extractionResult = await extractContentWithCheerio(html, url)
 
     if (!extractionResult.content || extractionResult.content.length < 50) {
-      const extractionError = ErrorHandler.processError(
-        "Could not extract meaningful content from URL. The page may contain mostly dynamic content or be empty.",
-        {
-          operation: 'url-extraction-content',
-          url,
-          contentLength: extractionResult.content?.length || 0
-        }
-      )
+      let errorMessage = "Could not extract meaningful content from URL. The page may contain mostly dynamic content or be empty."
+      let actions = [
+        "Try visiting the URL directly and copying the content",
+        "Check if the page loads properly in your browser",
+        "Try a different page from the same website"
+      ]
+      let fallbackOptions: string[] = []
 
-      return NextResponse.json(
-        ErrorHandler.formatErrorResponse(extractionError),
-        { status: 400 }
-      )
+      if (isNewsSiteAttempt) {
+        errorMessage = "Could not extract content from this news website. Many news sites block automated access or require JavaScript to load content."
+        const hostname = new URL(url).hostname.toLowerCase()
+        const alternativeSource = NEWS_ALTERNATIVE_SOURCES[hostname as keyof typeof NEWS_ALTERNATIVE_SOURCES]
+        if (alternativeSource) {
+          fallbackOptions = [alternativeSource]
+        }
+        fallbackOptions.push(
+          "Try copying the article text directly from your browser",
+          "Search for the article on archive.org or Google News",
+          "Look for RSS feeds from this news source"
+        )
+        actions = [
+          "Visit the URL directly in your browser and copy the text",
+          "Try using the website's RSS feed if available",
+          "Search for the article title on other news aggregators"
+        ]
+      }
+
+      const extractionError = ErrorHandler.processError(errorMessage, {
+        operation: 'url-extraction-content',
+        url,
+        contentLength: extractionResult.content?.length || 0
+      })
+
+      const errorResponse = ErrorHandler.formatErrorResponse(extractionError)
+      errorResponse.actions = actions
+      if (fallbackOptions.length > 0) {
+        errorResponse.fallbackOptions = fallbackOptions
+      }
+
+      return NextResponse.json(errorResponse, { status: 400 })
     }
 
     // Check content quality
@@ -456,7 +562,7 @@ async function extractContentWithCheerio(html: string, url: string): Promise<Con
 
     // Strategy 3: Common article containers (enhanced)
     if (!content || content.length < 200) {
-      const articleSelectors = [
+      let articleSelectors = [
         'article[role="main"]',
         'main article',
         '[role="main"] article',
@@ -476,6 +582,34 @@ async function extractContentWithCheerio(html: string, url: string): Promise<Con
         '#main-content',
         '.page-content'
       ]
+
+      // Add site-specific selectors for better extraction
+      const hostname = new URL(url).hostname.toLowerCase()
+      if (hostname.includes('bbc.')) {
+        articleSelectors = [
+          '[data-component="text-block"]',
+          '.story-body__inner',
+          '.story-body',
+          '[data-component="story-body"]',
+          '.gel-body-copy',
+          '.ssrcss-1q0x1qg-Paragraph',
+          ...articleSelectors
+        ]
+      } else if (hostname.includes('cnn.')) {
+        articleSelectors = [
+          '.zn-body__paragraph',
+          '.l-container',
+          '.pg-rail-tall__body',
+          ...articleSelectors
+        ]
+      } else if (hostname.includes('guardian.')) {
+        articleSelectors = [
+          '.content__article-body',
+          '.article-body-commercial-selector',
+          '.content__main-column',
+          ...articleSelectors
+        ]
+      }
 
       for (const selector of articleSelectors) {
         const element = $(selector).first()
