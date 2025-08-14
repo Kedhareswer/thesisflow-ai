@@ -1,3 +1,7 @@
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
+[![GitHub Forks](https://img.shields.io/github/forks/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
+
 <div align="center">
 
 *Transform your research workflow with intelligent AI-powered tools*
@@ -17,7 +21,7 @@
 
 ```mermaid
 mindmap
-  root((AI Research Hub))
+  root((Bolt Research Hub))
     Literature Discovery
       Multi-source Search
       Citation Enhancement
@@ -45,9 +49,25 @@ mindmap
       Deadline Management
 ```
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner/blob/master/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
-[![GitHub Forks](https://img.shields.io/github/forks/Kedhareswer/ai-project-planner?style=for-the-badge)](https://github.com/Kedhareswer/ai-project-planner)
+#### 🧭 End-to-End User Flow
+
+```mermaid
+flowchart LR
+    A[🏠 Landing / Home] --> B[🔐 Sign Up / Sign In]
+    B --> C[📊 Dashboard]
+    C --> D[🔍 Literature Search]
+    D --> E[📑 Select Papers]
+    E --> F[📝 Summarize & Analyze]
+    F --> G[✍️ Write Manuscript]
+    G --> H[👥 Collaborate]
+    H --> I[📋 Manage Tasks]
+    I --> J[📤 Export / Publish]
+    J --> K[📈 Analytics & Insights]
+
+    style D fill:#e3f2fd
+    style F fill:#fff3e0
+    style H fill:#f3e5f5
+```
 
 </div>
 
