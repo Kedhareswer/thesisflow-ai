@@ -179,10 +179,13 @@ class CollaborateService {
     type: 'text' | 'system' = 'text'
   ): Promise<{ success: boolean; message?: ChatMessage; error?: string }> {
     try {
-      // Send via Socket.io for real-time delivery
-      socketService.sendMessage(teamId, content, type);
-      
-      // Also send via API for persistence
+      // If socket connected, send via websocket only (server persists and broadcasts)
+      if (socketService.isConnected()) {
+        socketService.sendMessage(teamId, content, type);
+        return { success: true };
+      }
+
+      // Fallback: send via API when offline
       const response = await fetch('/api/collaborate/messages', {
         method: 'POST',
         headers: {
@@ -232,7 +235,7 @@ class CollaborateService {
   }
 
   // Subscribe to new messages for a team
-  subscribeToMessages(teamId: string, callback: (message: ChatMessage) => void): () => void {
+  subscribeToMessages(teamId: string, callback: (message: any) => void): () => void {
     const socket = socketService.initialize('current-user');
     
     // Join the team room
@@ -243,7 +246,7 @@ class CollaborateService {
       if (data.teamId === teamId) {
         callback({
           id: data.id,
-          senderId: data.userId,
+          senderId: data.senderId,
           senderName: data.senderName,
           senderAvatar: data.senderAvatar,
           content: data.content,
@@ -272,11 +275,12 @@ class CollaborateService {
       callback(data.userId, data.status);
     };
     
-    socket.on(SocketEvent.USER_STATUS_CHANGE, handleStatusChange);
+    // Server emits 'user-status-changed'
+    socket.on('user-status-changed', handleStatusChange);
     
     // Return unsubscribe function
     return () => {
-      socket.off(SocketEvent.USER_STATUS_CHANGE, handleStatusChange);
+      socket.off('user-status-changed', handleStatusChange);
     };
   }
 }

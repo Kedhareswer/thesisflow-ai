@@ -50,10 +50,7 @@ export async function GET(request: NextRequest) {
     try {
       const rpc = await supabaseAdmin
         .rpc('get_team_messages', {
-          p_team_id: teamId,
-          p_limit: limit,
-          p_before: before || null,
-          p_after: after || null
+          p_team_id: teamId
         })
       messages = rpc.data as any[] | null
       rpcError = rpc.error
@@ -62,13 +59,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (!messages || rpcError) {
-      // Fallback: query chat_messages directly
+      // Fallback: query chat_messages directly (no FK-based embed)
       let query = supabaseAdmin
         .from('chat_messages')
-        .select(
-          `id, content, message_type, created_at, team_id, sender_id, mentions, metadata,
-           sender:user_profiles!chat_messages_sender_id_fkey(full_name, avatar_url)`
-        )
+        .select('id, content, message_type, created_at, team_id, sender_id, mentions, metadata')
         .eq('team_id', teamId)
         .order('created_at', { ascending: false })
         .limit(limit)
@@ -83,6 +77,25 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, messages: [], hasMore: false })
       }
       messages = rows || []
+
+      // Fetch sender profiles in batch to enrich messages
+      const senderIds = Array.from(new Set((messages as any[]).map(m => m.sender_id).filter(Boolean)))
+      let profilesById: Record<string, { full_name: string | null, avatar_url: string | null }> = {}
+      if (senderIds.length) {
+        const { data: profiles } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', senderIds)
+        for (const p of profiles || []) {
+          profilesById[p.id as string] = { full_name: p.full_name || null, avatar_url: p.avatar_url || null }
+        }
+      }
+
+      // Attach sender profile info to each message for consistent downstream formatting
+      messages = (messages as any[]).map(m => ({
+        ...m,
+        sender: profilesById[m.sender_id] || null
+      }))
     }
 
     // Format messages
@@ -93,8 +106,12 @@ export async function GET(request: NextRequest) {
       timestamp: msg.created_at,
       teamId: msg.team_id,
       senderId: msg.sender_id,
-      senderName: msg.sender_id === 'system' ? 'System' : (msg.sender?.full_name || 'Unknown User'),
-      senderAvatar: msg.sender_id === 'system' ? null : (msg.sender?.avatar_url || null),
+      senderName: msg.sender_id === 'system'
+        ? 'System'
+        : (msg.sender?.full_name || msg.sender_full_name || 'Unknown User'),
+      senderAvatar: msg.sender_id === 'system'
+        ? null
+        : (msg.sender?.avatar_url || msg.sender_avatar_url || null),
       mentions: msg.mentions || [],
       metadata: msg.metadata || {}
     }));
@@ -212,10 +229,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user profile for notification
+    // Get user profile for notification and response enrichment
     const { data: userProfile } = await supabaseAdmin
       .from('user_profiles')
-      .select('full_name')
+      .select('full_name, avatar_url')
       .eq('id', user.id)
       .single();
 
@@ -288,8 +305,8 @@ export async function POST(request: NextRequest) {
       timestamp: message.created_at,
       teamId: message.team_id,
       senderId: message.sender_id,
-      senderName: message.sender?.full_name || 'Unknown User',
-      senderAvatar: message.sender?.avatar_url || null,
+      senderName: senderName,
+      senderAvatar: userProfile?.avatar_url || null,
       mentions: message.mentions || [],
       metadata: message.metadata || {}
     };

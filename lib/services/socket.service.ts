@@ -20,43 +20,93 @@ export enum SocketEvent {
 class SocketService {
   private socket: Socket | null = null
   private userId: string | null = null
+  private initialized = false
 
   // Initialize socket connection
   initialize(userId: string): Socket {
+    // If already initialized for this user, return existing socket
     if (this.socket && this.userId === userId) {
       return this.socket
     }
 
-    // Close existing connection if user changed
+    // Clean up previous connection on user switch
     if (this.socket) {
       this.socket.disconnect()
+      this.socket = null
     }
 
     this.userId = userId
 
-    // Connect to WebSocket server
-    this.socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", {
-      auth: {
-        userId,
-      },
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+
+    // Create socket instance but don't auto-connect until we attach auth token
+    this.socket = io(url, {
+      autoConnect: false,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     })
 
-    this.socket.on(SocketEvent.CONNECT, () => {
-      console.log("Socket connected")
-      this.updateUserStatus("online")
+    // Wire up base events once
+    if (!this.initialized) {
+      this.initialized = true
+
+      this.socket.on(SocketEvent.CONNECT, () => {
+        console.log("Socket connected")
+        this.updateUserStatus("online")
+      })
+
+      this.socket.on(SocketEvent.DISCONNECT, () => {
+        console.log("Socket disconnected")
+      })
+
+      // Cleanly mark offline on page unload
+      if (typeof window !== 'undefined') {
+        window.addEventListener("beforeunload", () => {
+          this.updateUserStatus("offline")
+          this.socket?.disconnect()
+        })
+      }
+    }
+
+    // Fetch Supabase session token and connect
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token
+      if (!token) {
+        console.warn("No Supabase access token; delaying socket connect")
+        return
+      }
+      // Prefer server-trusted user id from session
+      const sessionUserId = data.session?.user?.id
+      if (sessionUserId) {
+        this.userId = sessionUserId
+      }
+      if (!this.socket) return
+      // Attach token for server auth middleware
+      ;(this.socket as any).auth = { token }
+      try {
+        this.socket.connect()
+      } catch (e) {
+        console.error("Socket connect failed:", e)
+      }
     })
 
-    this.socket.on(SocketEvent.DISCONNECT, () => {
-      console.log("Socket disconnected")
-    })
-
-    // Set up disconnect handler for when user leaves the page
-    window.addEventListener("beforeunload", () => {
-      this.updateUserStatus("offline")
-      this.socket?.disconnect()
+    // Also react to auth state changes (refresh tokens, login/logout)
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      const token = session?.access_token
+      if (!this.socket) return
+      if (!token) {
+        // Logout: disconnect socket
+        this.disconnect()
+        return
+      }
+      if (session?.user?.id) {
+        this.userId = session.user.id
+      }
+      ;(this.socket as any).auth = { token }
+      if (this.socket.disconnected) {
+        this.socket.connect()
+      }
     })
 
     return this.socket
@@ -90,10 +140,8 @@ class SocketService {
   async updateUserStatus(status: "online" | "offline" | "away"): Promise<void> {
     if (!this.socket || !this.userId) return
 
-    this.socket.emit(SocketEvent.USER_STATUS_CHANGE, {
-      userId: this.userId,
-      status,
-    })
+    // Server expects 'update-status' from client; it will broadcast 'user-status-changed'
+    this.socket.emit('update-status', status)
 
     // Also update in Supabase
     try {
@@ -140,6 +188,11 @@ class SocketService {
   off(event: SocketEvent | string, callback: (...args: any[]) => void): void {
     if (!this.socket) return
     this.socket.off(event, callback)
+  }
+
+  // Connection state helper
+  isConnected(): boolean {
+    return !!this.socket?.connected
   }
 
   // Send typing status (alias for startTyping/stopTyping)
