@@ -2,149 +2,160 @@
 inclusion: always
 ---
 
+---
+inclusion: always
+---
+
 # Security Guidelines & Best Practices
 
-## Authentication & Authorization
+## Authentication Patterns
 
-### Supabase Auth Implementation
-
-- Always use `requireAuth` utility for protected API routes
-- Implement proper Row Level Security (RLS) policies for all database tables
-- Validate user sessions on both client and server sides
-- Use `supabase.auth.getUser()` for server-side auth checks
-- Never expose service role keys in client-side code
-
-### API Route Security
-
+### Required API Route Pattern
 ```typescript
-// Required pattern for protected routes
+// MANDATORY: All protected API routes must use this pattern
 export async function POST(request: Request) {
-  const user = await requireAuth(request);
-  // Route logic here
+  const user = await requireAuth(request); // Always first line
+  const body = await request.json();
+  // Validate with Zod schema before processing
+  return NextResponse.json(result);
 }
 ```
 
-### JWT Token Handling
+### Supabase Auth Rules
+- Use `requireAuth` from `@/lib/auth-utils` for all protected routes
+- Server-side: `supabase.auth.getUser()` for user validation
+- Client-side: Check auth state before rendering protected content
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code
+- All database tables MUST have RLS policies enabled
 
-- Store tokens securely using Supabase client
-- Implement proper token refresh mechanisms
-- Never store sensitive tokens in localStorage
-- Use httpOnly cookies for sensitive session data
-
-## Input Validation & Sanitization
+## Input Validation Requirements
 
 ### Zod Schema Validation
-
-- Validate all user inputs using Zod schemas
-- Sanitize file uploads and content processing
-- Implement proper type checking for API parameters
-- Validate environment variables on startup
+```typescript
+// REQUIRED: Validate all API inputs
+const schema = z.object({
+  title: z.string().min(1).max(255),
+  content: z.string().optional(),
+});
+const validatedData = schema.parse(body);
+```
 
 ### File Upload Security
+- Allowed formats: PDF, DOCX, TXT only
+- Max size: 10MB per file
+- Use Supabase Storage with secure bucket policies
+- Generate UUIDs for file names, never use user-provided names
+- Validate file headers, not just extensions
 
-- Restrict file types to allowed formats (PDF, DOCX, TXT)
-- Implement file size limits (max 10MB)
-- Scan uploaded files for malicious content
-- Use Supabase Storage with proper bucket policies
-- Generate secure, non-predictable file names
+### URL Validation
+```typescript
+// REQUIRED: Validate URLs before fetching
+const urlSchema = z.string().url().refine(url => {
+  const parsed = new URL(url);
+  return ['http:', 'https:'].includes(parsed.protocol);
+});
+```
 
-### Content Processing
+## API Security Patterns
 
-- Sanitize HTML content from rich text editors
-- Validate URLs before fetching external content
-- Implement rate limiting for AI API calls
-- Escape user-generated content in database queries
-
-## API Security
-
-### Rate Limiting
-
-- Implement rate limiting for AI generation endpoints
-- Protect literature search APIs from abuse
+### Rate Limiting Implementation
+- AI endpoints: 10 requests/minute per user
+- Literature search: 30 requests/minute per user
+- File upload: 5 files/minute per user
 - Use exponential backoff for external API calls
-- Monitor and log suspicious activity patterns
 
-### CORS Configuration
-
-- Configure strict CORS policies for production
-- Whitelist only necessary origins
-- Implement proper preflight request handling
-- Secure WebSocket connections with origin validation
+### Error Response Format
+```typescript
+// STANDARD: Never expose internal details
+return NextResponse.json(
+  { error: "Invalid request", code: "VALIDATION_ERROR" },
+  { status: 400 }
+);
+```
 
 ### External API Integration
+- Store all API keys in `.env.local`
+- Implement timeout configurations (30s max)
+- Validate all external API responses with Zod
+- Log API failures without exposing keys
 
-- Store all API keys in environment variables
-- Implement proper error handling for API failures
-- Use secure HTTP clients with timeout configurations
-- Validate responses from external services
-
-## Data Protection
+## Data Protection Rules
 
 ### Sensitive Data Handling
+- Never log: API keys, user passwords, session tokens, file contents
+- Sanitize error messages before sending to client
+- Use parameterized queries for all database operations
+- Encrypt file contents in Supabase Storage
 
-- Never log sensitive user data or API keys
-- Implement proper data encryption for stored files
-- Use secure methods for password reset flows
-- Sanitize error messages to prevent information leakage
+### Database Security Patterns
+```sql
+-- REQUIRED: RLS policy example
+CREATE POLICY "Users can only access their own data" ON user_documents
+  FOR ALL USING (auth.uid() = user_id);
+```
 
-### Database Security
+## Environment Security
 
-- Use parameterized queries to prevent SQL injection
-- Implement proper foreign key constraints
-- Enable audit logging for sensitive operations
-- Regular backup and recovery procedures
+### Required Environment Variables
+```bash
+# MANDATORY: These must be set and validated on startup
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+```
 
-### Privacy Compliance
+### Environment Validation
+```typescript
+// REQUIRED: Validate env vars on startup
+const envSchema = z.object({
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  OPENAI_API_KEY: z.string().min(1),
+});
+```
 
-- Implement proper data retention policies
-- Provide user data export/deletion capabilities
-- Secure handling of research documents and citations
-- Comply with academic data sharing requirements
+## Component Security
 
-## Environment & Deployment Security
+### Client Component Security
+- Validate user permissions before rendering sensitive UI
+- Sanitize all user-generated content with DOMPurify
+- Use error boundaries for all feature components
+- Never store sensitive data in component state
 
-### Environment Variables
+### Form Security
+```typescript
+// REQUIRED: Form validation pattern
+const formSchema = z.object({
+  // Define strict validation rules
+});
 
-- Never commit `.env` files to version control
-- Use different keys for development/production
-- Implement proper secret rotation procedures
-- Validate required environment variables on startup
+const form = useForm<z.infer<typeof formSchema>>({
+  resolver: zodResolver(formSchema),
+});
+```
 
-### Production Deployment
+## WebSocket Security
 
-- Enable HTTPS for all production traffic
-- Implement proper CSP headers
-- Use secure session configurations
-- Regular security updates and dependency audits
+### Socket.io Configuration
+- Validate origin for all WebSocket connections
+- Authenticate users before allowing socket connections
+- Implement rate limiting for socket events
+- Sanitize all real-time message content
 
-## Error Handling & Logging
+## Critical Security Checks
 
-### Secure Error Responses
+### Before Deployment
+- [ ] All API routes use `requireAuth`
+- [ ] All user inputs validated with Zod
+- [ ] No API keys in client-side code
+- [ ] RLS policies enabled on all tables
+- [ ] File upload restrictions implemented
+- [ ] Error messages sanitized
+- [ ] Environment variables validated
 
-- Never expose internal system details in error messages
-- Implement consistent error response formats
-- Log security events for monitoring
-- Use proper HTTP status codes
-
-### Monitoring & Alerting
-
-- Monitor for unusual API usage patterns
-- Alert on authentication failures
-- Track file upload and processing activities
-- Implement proper audit trails for team collaboration
-
-## Code Security Patterns
-
-### TypeScript Security
-
-- Use strict TypeScript configuration
-- Implement proper type guards for user inputs
-- Avoid `any` types in security-critical code
-- Use readonly types for immutable data
-
-### Component Security
-
-- Sanitize props passed to components
-- Implement proper error boundaries
-- Validate user permissions in UI components
-- Secure handling of collaborative editing features
+### Code Review Checklist
+- [ ] No `console.log` with sensitive data
+- [ ] No hardcoded secrets or URLs
+- [ ] Proper TypeScript types (no `any`)
+- [ ] Input validation on all endpoints
+- [ ] Proper error handling implemented
