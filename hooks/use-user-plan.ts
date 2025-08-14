@@ -127,24 +127,35 @@ export function useUserPlan() {
     }
   }, [user?.id, session?.access_token, fetchPlanData, toast])
 
+  const normalizeFeatureKey = useCallback((f: string) => f.replace(/\s+/g, '_').toLowerCase(), [])
+
   const canUseFeature = useCallback((feature: string): boolean => {
     // If plan data is still loading, we can't make a determination yet
     if (loading) return false
     
     // If no plan data and not loading, assume free plan restrictions
     if (!planData) return false
-    
-    const usageItem = planData.usage.find(item => item.feature === feature)
-    if (!usageItem) return false
+
+    const key = normalizeFeatureKey(feature)
+    const usageItem = planData.usage.find(item => item.feature === key)
+
+    if (!usageItem) {
+      // If usage record is missing but user is Pro/Enterprise, default-allow
+      const planType = planData.plan?.plan_type
+      if (planType === 'pro' || planType === 'enterprise') {
+        return true
+      }
+      return false
+    }
     
     return usageItem.is_unlimited || usageItem.remaining > 0
-  }, [planData, loading])
+  }, [planData, loading, normalizeFeatureKey])
 
   const getUsageForFeature = useCallback((feature: string): UsageItem | null => {
     if (!planData) return null
-    
-    return planData.usage.find(item => item.feature === feature) || null
-  }, [planData])
+    const key = normalizeFeatureKey(feature)
+    return planData.usage.find(item => item.feature === key) || null
+  }, [planData, normalizeFeatureKey])
 
   const getPlanType = useCallback((): string => {
     return planData?.plan?.plan_type || 'free'
@@ -152,7 +163,7 @@ export function useUserPlan() {
 
   const isProOrHigher = useCallback((): boolean => {
     const planType = getPlanType()
-    return planType === 'pro' || planType === 'professional' || planType === 'enterprise'
+    return planType === 'pro' || planType === 'enterprise'
   }, [getPlanType])
 
   // Alias for backward compatibility
@@ -201,7 +212,10 @@ export function useUserPlan() {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Usage updated:', payload)
+          if (process.env.NODE_ENV === 'development') {
+            // eslint-disable-next-line no-console
+            console.log('Usage updated:', payload)
+          }
           // Refresh plan data when usage changes (force refresh)
           fetchPlanData(true)
         }

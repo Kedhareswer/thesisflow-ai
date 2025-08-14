@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "ws": "node server/websocket-server.js"
   },
   "dependencies": {
     "@base-ui-components/react": "latest",
