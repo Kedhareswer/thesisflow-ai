@@ -1,22 +1,26 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import { ErrorHandler, type UserFriendlyError } from "@/lib/utils/error-handler"
 import { SummarizerService, type SummaryResult } from "@/lib/services/summarizer.service"
 import type { ProcessingProgress } from "@/lib/utils/chunked-processor"
-import { ContextInputPanel } from "./components/context-input-panel"
-import { ConfigurationPanel } from "./components/configuration-panel"
-import { SummaryOutputPanel } from "./components/summary-output-panel"
-import { WebSearchPanel } from "./components/web-search-panel"
+
+// Import the new tabbed layout and tab components
+import { 
+  SummarizerTabbedLayout, 
+  useSummarizerTabs,
+  type SummarizerTab 
+} from "./components/summarizer-tabbed-layout"
+import { InputTab } from "./components/input-tab"
+import { SummaryTab, type EnhancedSummaryResult } from "./components/summary-tab"
+import { 
+  AnalyticsTab, 
+  type SummaryHistoryItem, 
+  type UsageStatistics 
+} from "./components/analytics-tab"
 import { ErrorDisplay } from "./components/error-display"
-import { ProcessingProgressIndicator, ChunkingStats } from "./components/processing-progress"
-import { EnhancedLoading, SummaryLoadingSkeleton } from "./components/enhanced-loading"
-import { SummaryStatistics } from "./components/summary-statistics"
-import { QualityAssessment } from "./components/quality-assessment"
 
 // Enhanced SummaryResult interface to match the new service
 interface EnhancedSummaryResult extends Omit<SummaryResult, 'readingTime'> {
