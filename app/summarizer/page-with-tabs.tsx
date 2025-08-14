@@ -369,7 +369,7 @@ export default function SummarizerPage() {
   return (
     <div className="min-h-screen bg-white text-black">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-white">
+      <div className="border-b border-gray-200 bg-white hidden">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="text-center">
             <h1 className="text-4xl font-light tracking-tight text-black mb-3">
