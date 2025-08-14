@@ -6,7 +6,15 @@
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+// Load environment variables, prioritizing .env.local for development.
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+const envLocal = path.resolve(__dirname, '../.env.local');
+const envDefault = path.resolve(__dirname, '../.env');
+
+dotenv.config({ path: fs.existsSync(envLocal) ? envLocal : envDefault });
 
 const PORT = process.env.WS_PORT || 3001;
 const CORS_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
