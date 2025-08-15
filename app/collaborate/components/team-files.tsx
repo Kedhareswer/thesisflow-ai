@@ -179,17 +179,17 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
         setIsLoading(true)
       }
       
-      console.log(`[FRONTEND] Loading files for team: ${teamId}`)
+      // console.log(`[FRONTEND] Loading files for team: ${teamId}`)
       const data = await apiCall(`/api/collaborate/files?teamId=${teamId}`)
-      console.log(`[FRONTEND] API response:`, data)
+      // console.log(`[FRONTEND] API response:`, data)
       
       if (data.success) {
         const freshFiles = data.files || []
-        console.log(`[FRONTEND] Processing ${freshFiles.length} files:`, freshFiles)
+        // console.log(`[FRONTEND] Processing ${freshFiles.length} files:`, freshFiles)
         setFiles(freshFiles)
         // Cache the fresh data
         saveCachedFiles(teamId, freshFiles)
-        console.log(`[FRONTEND] Files state updated and cached`)
+        // console.log(`[FRONTEND] Files state updated and cached`)
       } else {
         console.error(`[FRONTEND] API returned success=false:`, data)
       }

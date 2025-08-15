@@ -85,6 +85,7 @@
     "react-beautiful-dnd": "latest",
     "react-day-picker": "latest",
     "react-dom": "^19.1.1",
+    "react-dropzone": "^14.3.8",
     "react-hook-form": "latest",
     "react-markdown": "latest",
     "react-resizable-panels": "latest",
