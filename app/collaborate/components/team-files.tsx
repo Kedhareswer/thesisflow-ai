@@ -44,7 +44,8 @@ import {
   Cloud,
   HardDrive,
   Github,
-  FolderOpen
+  FolderOpen,
+  RefreshCw
 } from 'lucide-react'
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { formatDistanceToNow } from 'date-fns'
@@ -76,13 +77,44 @@ interface TeamFilesProps {
   apiCall?: (url: string, options?: RequestInit) => Promise<any>
 }
 
+// Local storage utilities for caching team files
+const getStorageKey = (teamId: string) => `team-files-${teamId}`
+
+const loadCachedFiles = (teamId: string): TeamFile[] => {
+  try {
+    const cached = localStorage.getItem(getStorageKey(teamId))
+    return cached ? JSON.parse(cached) : []
+  } catch (error) {
+    console.warn('Failed to load cached files:', error)
+    return []
+  }
+}
+
+const saveCachedFiles = (teamId: string, files: TeamFile[]) => {
+  try {
+    localStorage.setItem(getStorageKey(teamId), JSON.stringify(files))
+  } catch (error) {
+    console.warn('Failed to cache files:', error)
+  }
+}
+
+const clearCachedFiles = (teamId: string) => {
+  try {
+    localStorage.removeItem(getStorageKey(teamId))
+  } catch (error) {
+    console.warn('Failed to clear cached files:', error)
+  }
+}
+
 export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }: TeamFilesProps) {
   const { user } = useSupabaseAuth()
   const { toast } = useToast()
   
   const [files, setFiles] = useState<TeamFile[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoadedFromCache, setHasLoadedFromCache] = useState(false)
   const [uploadLoading, setUploadLoading] = useState(false)
+  const [reloadLoading, setReloadLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('files')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('all')
@@ -129,33 +161,91 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
     return response.json()
   }, [providedApiCall])
 
-  // Load files and links
-  const loadData = useCallback(async () => {
+  // Load cached files immediately
+  const loadCachedData = useCallback(() => {
+    if (teamId && !hasLoadedFromCache) {
+      const cachedFiles = loadCachedFiles(teamId)
+      if (cachedFiles.length > 0) {
+        setFiles(cachedFiles)
+        setHasLoadedFromCache(true)
+      }
+    }
+  }, [teamId, hasLoadedFromCache])
+
+  // Load files and links from API
+  const loadData = useCallback(async (showLoading = true) => {
     try {
-      setIsLoading(true)
+      if (showLoading) {
+        setIsLoading(true)
+      }
       
+      console.log(`[FRONTEND] Loading files for team: ${teamId}`)
       const data = await apiCall(`/api/collaborate/files?teamId=${teamId}`)
+      console.log(`[FRONTEND] API response:`, data)
       
       if (data.success) {
-        setFiles(data.files || [])
+        const freshFiles = data.files || []
+        console.log(`[FRONTEND] Processing ${freshFiles.length} files:`, freshFiles)
+        setFiles(freshFiles)
+        // Cache the fresh data
+        saveCachedFiles(teamId, freshFiles)
+        console.log(`[FRONTEND] Files state updated and cached`)
+      } else {
+        console.error(`[FRONTEND] API returned success=false:`, data)
       }
     } catch (error) {
-      console.error('Error loading files:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load team files",
-        variant: "destructive"
-      })
+      console.error('[FRONTEND] Error loading files:', error)
+      // Only show error if we don't have cached data
+      if (!hasLoadedFromCache || files.length === 0) {
+        toast({
+          title: "Error",
+          description: "Failed to load team files",
+          variant: "destructive"
+        })
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [teamId, apiCall, toast])
+  }, [teamId, apiCall, toast, hasLoadedFromCache, files.length])
 
+  // Manual reload function
+  const handleReload = useCallback(async () => {
+    try {
+      setReloadLoading(true)
+      console.log(`[FRONTEND] Manual reload triggered for team: ${teamId}`)
+      await loadData(false) // Don't show main loading spinner
+      toast({
+        title: "Files refreshed",
+        description: "Team files have been updated",
+      })
+    } catch (error) {
+      console.error('[FRONTEND] Error reloading files:', error)
+    } finally {
+      setReloadLoading(false)
+    }
+  }, [loadData, toast, teamId])
+
+  // Load cached data immediately on mount
   useEffect(() => {
     if (teamId) {
-      loadData()
+      loadCachedData()
     }
-  }, [teamId, loadData])
+  }, [teamId, loadCachedData])
+
+  // Load fresh data from API
+  useEffect(() => {
+    if (teamId) {
+      // If we have cached data, load API data in background without showing loading
+      const hasCache = hasLoadedFromCache && files.length > 0
+      loadData(!hasCache)
+    }
+  }, [teamId, loadData, hasLoadedFromCache, files.length])
+
+  // Clear cache when teamId changes
+  useEffect(() => {
+    setHasLoadedFromCache(false)
+    setFiles([])
+  }, [teamId])
 
   // Get file icon based on MIME type
   const getFileIcon = (mimeType?: string) => {
@@ -223,7 +313,10 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
       })
 
       if (data.success) {
-        setFiles(prev => [data.file, ...prev])
+        const updatedFiles = [data.file, ...files]
+        setFiles(updatedFiles)
+        // Update cache with new file
+        saveCachedFiles(teamId, updatedFiles)
 
         // Reset form
         setSelectedFile(null)
@@ -270,7 +363,10 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
       })
 
       if (data.success) {
-        setFiles(prev => [data.file, ...prev])
+        const updatedFiles = [data.file, ...files]
+        setFiles(updatedFiles)
+        // Update cache with new link
+        saveCachedFiles(teamId, updatedFiles)
 
         // Reset form
         setLinkTitle('')
@@ -322,7 +418,10 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
       })
 
       if (data.success) {
-        setFiles(prev => prev.filter(file => file.id !== fileId))
+        const updatedFiles = files.filter(file => file.id !== fileId)
+        setFiles(updatedFiles)
+        // Update cache after deletion
+        saveCachedFiles(teamId, updatedFiles)
         toast({
           title: fileType === 'file' ? "File deleted" : "Link deleted",
           description: `${fileName} has been deleted`,
@@ -352,6 +451,8 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
   // Separate files and links
   const fileItems = filteredFiles.filter(file => file.type === 'file')
   const linkItems = filteredFiles.filter(file => file.type === 'link')
+  
+  console.log(`[FRONTEND] Rendering - Total files: ${files.length}, Filtered: ${filteredFiles.length}, File items: ${fileItems.length}, Link items: ${linkItems.length}`)
 
   return (
     <div className="space-y-6">
@@ -497,10 +598,24 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
           {/* Files List */}
           <Card>
             <CardHeader>
-              <CardTitle>Team Files</CardTitle>
-              <CardDescription>
-                Files shared by your team members
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Team Files</CardTitle>
+                  <CardDescription>
+                    Files shared by your team members
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReload}
+                  disabled={reloadLoading}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${reloadLoading ? 'animate-spin' : ''}`} />
+                  {reloadLoading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -710,10 +825,24 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
           {/* Links List */}
           <Card>
             <CardHeader>
-              <CardTitle>Shared Links</CardTitle>
-              <CardDescription>
-                External links and cloud storage shared by your team
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Shared Links</CardTitle>
+                  <CardDescription>
+                    External links and cloud storage shared by your team
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReload}
+                  disabled={reloadLoading}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${reloadLoading ? 'animate-spin' : ''}`} />
+                  {reloadLoading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {linkItems.length === 0 ? (
