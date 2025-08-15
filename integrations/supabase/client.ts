@@ -42,48 +42,32 @@ let supabaseClient: SupabaseClient<Database>;
 
 try {
   const isValid = validateSupabaseConfig();
-  
-  if (isValid) {
-    // Log success for debugging (hide sensitive data)
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-      console.log('✅ Supabase client initialized with URL:', SUPABASE_URL.split('.')[0] + '.supabase.co');
-    }
-    
-    supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storageKey: 'ai-research-platform-auth',
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-      },
-      global: {
-        headers: {
-          'X-Client-Info': 'ai-research-platform@1.0.0',
-        },
-      },
-    });
-  } else {
-    // Create fallback client for development/demo mode
-    supabaseClient = createClient<Database>(
-      'https://placeholder.supabase.co', 
-      'placeholder-key',
-      {
-        auth: { persistSession: false }
-      }
-    );
+  if (!isValid) {
+    throw new Error('Supabase environment variables missing or invalid');
   }
-} catch (error) {
-  console.error('Failed to initialize Supabase client:', error instanceof Error ? error.message : String(error));
+
+  // Log success for debugging (hide sensitive data)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('✅ Supabase client initialized with URL:', SUPABASE_URL.split('.')[0] + '.supabase.co');
+  }
   
-  // Fallback client
-  supabaseClient = createClient<Database>(
-    'https://placeholder.supabase.co', 
-    'placeholder-key',
-    {
-      auth: { persistSession: false }
-    }
-  );
+  supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      storageKey: 'ai-research-platform-auth',
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'ai-research-platform@1.0.0',
+      },
+    },
+  });
+} catch (error) {
+  const msg = error instanceof Error ? error.message : String(error);
+  throw new Error(`Failed to initialize Supabase client: ${msg}`);
 }
 
 // Import the supabase client like this:

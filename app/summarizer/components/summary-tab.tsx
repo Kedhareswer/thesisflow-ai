@@ -10,17 +10,13 @@ import {
   Share2, 
   RefreshCw, 
   Clock, 
-  Zap, 
-  Target, 
-  Loader2,
-  FileText,
-  TrendingUp,
   Brain,
-  CheckCircle,
-  AlertTriangle,
   ThumbsUp,
   ThumbsDown,
-  Star
+  FileText,
+  Star,
+  Target,
+  CheckCircle,
 } from "lucide-react"
 import { SummaryOutputPanel } from "./summary-output-panel"
 import { SummaryStatistics } from "./summary-statistics"
@@ -205,7 +201,7 @@ export function SummaryTab({
                 
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <Zap className="h-5 w-5 text-green-600" />
+                    <Brain className="h-5 w-5 text-green-600" />
                   </div>
                   <div className="text-2xl font-semibold text-green-900">{result.compressionRatio}</div>
                   <div className="text-sm text-green-700 font-light">Compression ratio</div>
@@ -328,127 +324,6 @@ export function SummaryTab({
               </CardContent>
             </Card>
           )}
-
-          {/* Enhanced Quality Assessment Section */}
-          <Card className="border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-xl font-light text-black tracking-tight flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Quality Assessment & Feedback
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Quality Indicators */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {result.sentiment && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-1">Sentiment</div>
-                    <Badge 
-                      className={
-                        result.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
-                        result.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }
-                    >
-                      {result.sentiment}
-                    </Badge>
-                  </div>
-                )}
-                
-                {result.difficulty && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-1">Difficulty</div>
-                    <Badge 
-                      className={
-                        result.difficulty === 'beginner' ? 'bg-green-100 text-green-800' :
-                        result.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }
-                    >
-                      {result.difficulty}
-                    </Badge>
-                  </div>
-                )}
-                
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-sm text-gray-600 mb-1">Processing</div>
-                  <Badge variant="outline">
-                    {result.processingMethod || 'direct'}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Feedback Options */}
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900">How is this summary?</span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQualityFeedback("good")}
-                      className="flex items-center gap-1 text-green-700 border-green-200 hover:bg-green-50"
-                    >
-                      <ThumbsUp className="h-3 w-3" />
-                      Good
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQualityFeedback("poor")}
-                      className="flex items-center gap-1 text-red-700 border-red-200 hover:bg-red-50"
-                    >
-                      <ThumbsDown className="h-3 w-3" />
-                      Needs Improvement
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Retry Suggestions */}
-              {result.confidence && result.confidence < 0.7 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-yellow-800 mb-2">Suggestions for Better Results</h4>
-                      <div className="space-y-2">
-                        <p className="text-sm text-yellow-700">
-                          The confidence score is below optimal. Try these options:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onRetry({ style: "academic" })}
-                            className="text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                          >
-                            Academic Style
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onRetry({ length: "comprehensive" })}
-                            className="text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                          >
-                            More Detailed
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onRetry({ length: "brief" })}
-                            className="text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                          >
-                            More Concise
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Enhanced Statistics */}
           <div className="grid gap-6 lg:grid-cols-2">

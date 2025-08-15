@@ -8,9 +8,10 @@ import type { User, SupabaseClient, Session, AuthChangeEvent } from "@supabase/s
 import { useToast } from "@/hooks/use-toast"
 
 // Securely access environment variables
+const sanitize = (val?: string) => val?.replace(/^"|"$/g, '').trim() ?? '';
 const getSupabaseConfig = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = sanitize(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const supabaseAnonKey = sanitize(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   
   // Validate environment variables are set
   if (!supabaseUrl || supabaseUrl.trim() === '') {
@@ -42,14 +43,7 @@ try {
     }
   });
 } catch (error) {
-  console.error('Failed to initialize Supabase client:', error);
-  // In a real app, you might want to show a more user-friendly error or fallback UI
-  // For development, we'll create a minimal mock client that won't break the app
-  if (typeof window !== 'undefined') {
-    console.warn('Supabase environment variables are missing. Authentication features will not work.');
-  }
-  // Create a minimal mock client to prevent TypeScript errors
-  supabase = createClient('https://placeholder.supabase.co', 'placeholder-key');
+  throw error;
 }
 
 type SupabaseAuthContextType = {
