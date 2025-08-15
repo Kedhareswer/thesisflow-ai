@@ -2,138 +2,217 @@
 inclusion: always
 ---
 
+---
+
+## inclusion: always
+
 # Technology Stack & Development Guidelines
 
-## Required Tech Stack
+## Core Stack
 
 ### Frontend (Next.js 15.2.4 + React 19)
 
 - **Framework**: Next.js App Router with TypeScript 5.9.2
-- **UI**: Radix UI primitives + shadcn/ui components
-- **Styling**: TailwindCSS 3.4 with CSS variables (`cn()` utility for conditional classes)
-- **State**: Zustand (global), React Context (auth/providers), React Hook Form + Zod (forms)
-- **Rich Text**: TipTap for collaborative editing
-- **Icons**: Lucide React only
+- **UI**: shadcn/ui components (Radix UI primitives)
+- **Styling**: TailwindCSS 3.4 with CSS variables, `cn()` utility
+- **State**: Zustand (global), React Context (auth/providers)
+- **Forms**: React Hook Form + Zod validation (MANDATORY)
+- **Icons**: Lucide React ONLY
 
 ### Backend & Services
 
-- **API**: Next.js API routes (`app/api/*/route.ts` pattern)
-- **Database**: Supabase PostgreSQL with Row Level Security (RLS)
+- **API**: Next.js API routes (`app/api/[feature]/route.ts`)
+- **Database**: Supabase PostgreSQL with RLS
 - **Auth**: Supabase Auth with JWT tokens
-- **Real-time**: Socket.io WebSocket server (port 3001)
-- **File Storage**: Supabase Storage (10MB limit, PDF/DOCX/TXT only)
-- **Python Service**: Flask literature search service (port 5000)
+- **Real-time**: Socket.io WebSocket (port 3001)
+- **File Storage**: Supabase Storage (10MB, PDF/DOCX/TXT only)
+- **Literature Search**: Python Flask service (port 5000)
 
-### AI & External APIs
+### AI Integration
 
-- **AI Providers**: OpenAI, Google Gemini, Groq, Anthropic, Mistral, AIML API
-- **AI Service**: Use `enhanced-ai-service.ts` with automatic fallback/retry
-- **Literature APIs**: OpenAlex, Semantic Scholar, arXiv, White Rose eTheses
-- **Payments**: Stripe with webhook handling
+- **Service**: Use `lib/enhanced-ai-service.ts` for ALL AI calls
+- **Providers**: OpenAI, Gemini, Groq, Anthropic, Mistral, AIML
+- **Features**: Auto-fallback, streaming, rate limiting
 
-## Critical Code Patterns
+## Mandatory Code Patterns
 
-### API Route Template
+### API Route Structure (STRICT)
 
 ```typescript
 export async function POST(request: Request) {
-  const user = await requireAuth(request); // Always authenticate first
+  const user = await requireAuth(request); // ALWAYS first line
   const body = await request.json();
-  // Validate with Zod schema
-  // Business logic
+  const validatedData = schema.parse(body); // Zod validation required
+
+  // Business logic here
+
   return NextResponse.json(result);
 }
 ```
 
-### Component Structure
+### Component Pattern (REQUIRED)
 
-- Use `"use client"` directive for client components
-- Function components with TypeScript interfaces
-- Props interfaces named `[ComponentName]Props`
-- Always implement error boundaries and loading states
+```typescript
+"use client"; // For client components
 
-### Database Access
+interface ComponentNameProps {
+  // Props must match component name
+}
 
-- Use Supabase client with proper RLS policies
-- Always handle authentication state in queries
-- Use TypeScript types for database schemas
-- Implement proper foreign key relationships
+export function ComponentName({ prop }: ComponentNameProps) {
+  // Implementation with error boundaries and loading states
+}
+```
 
-### File Organization
+### Import Order (ENFORCED)
 
-- API routes: `app/api/[feature]/route.ts`
-- Components: Feature-based in `components/[feature]/`
-- Services: Business logic in `lib/services/`
-- Types: Centralized in `lib/types/`
-- Path alias: `@/` maps to project root
+```typescript
+// 1. React/Next.js
+import React from "react";
+import { NextResponse } from "next/server";
+
+// 2. Third-party libraries
+import { z } from "zod";
+
+// 3. Internal (@/ alias ONLY)
+import { Button } from "@/components/ui/button";
+import { requireAuth } from "@/lib/auth-utils";
+
+// 4. Types (separate section)
+import type { User } from "@/lib/types";
+```
+
+## File Organization Rules
+
+### Directory Structure
+
+- `app/[feature]/page.tsx` - Feature pages
+- `app/api/[feature]/route.ts` - API endpoints
+- `components/[feature]/` - Feature components
+- `lib/services/` - Business logic
+- `lib/types/` - TypeScript definitions
+
+### Naming Conventions
+
+- **Components**: PascalCase (`UserProfile.tsx`)
+- **UI Components**: kebab-case (`button.tsx`)
+- **Services**: kebab-case (`enhanced-ai-service.ts`)
+- **API Routes**: Always `route.ts`
+
+### Path Aliases
+
+- Use `@/` for ALL internal imports
+- Never use relative imports across directories
 
 ## Development Commands
 
-### Essential Commands
-
 ```bash
-# Full development environment
+# Full environment
 node start-dev.js
 
 # Individual services
-pnpm dev          # Next.js (port 3000)
-pnpm dev:ws       # WebSocket (port 3001)
-cd python && python app.py  # Literature search (port 5000)
+pnpm dev                    # Next.js (3000)
+pnpm dev:ws                # WebSocket (3001)
+cd python && python app.py # Literature (5000)
 
-# Database operations
+# Database
 node scripts/run-migration.js
 node scripts/test-database.js
 ```
 
-## Security Requirements
+## Security Requirements (CRITICAL)
 
-### Authentication
+### Authentication Pattern
 
-- Always use `requireAuth` utility for protected routes
-- Implement proper RLS policies for all database tables
-- Never expose service role keys in client code
+```typescript
+// MANDATORY for protected routes
+const user = await requireAuth(request);
+```
 
 ### Input Validation
 
-- Validate all inputs with Zod schemas
-- Sanitize file uploads (PDF, DOCX, TXT only, 10MB max)
-- Escape user-generated content
-- Implement rate limiting for AI endpoints
+- ALL inputs MUST use Zod schemas
+- File uploads: PDF/DOCX/TXT only, 10MB max
+- Rate limiting on AI endpoints
 
 ### Environment Variables
 
-- Store all secrets in `.env.local`
-- Never commit environment files
-- Required vars: Supabase keys, AI provider keys, Stripe keys
+```bash
+# Required in .env.local
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+```
 
-## AI Integration Rules
+## AI Service Usage (MANDATORY)
 
-### Enhanced AI Service
+### Enhanced AI Service Pattern
 
-- Use `lib/enhanced-ai-service.ts` for all AI calls
-- Implement automatic provider fallback
-- Handle streaming responses where possible
-- Include proper error handling and retry logic
+```typescript
+import { generateResponse } from "@/lib/enhanced-ai-service";
 
-### Multi-Provider Support
+const response = await generateResponse({
+  provider: "openai", // or auto-detect
+  messages: [...],
+  stream: true, // when possible
+  maxRetries: 3
+});
+```
 
-- Support OpenAI, Gemini, Groq, Anthropic, Mistral, AIML
-- Use provider detection and automatic switching
-- Implement rate limiting per provider
-- Store provider preferences per user
+### Provider Support
 
-## File Processing Standards
+- Auto-fallback between providers
+- User preference storage
+- Rate limiting per provider
+- Error handling with retries
 
-### Supported Formats
+## File Processing Rules
 
-- PDF, DOCX, TXT files only
-- Maximum 10MB file size
-- Secure upload to Supabase Storage
-- Progress indicators for uploads
+### Upload Restrictions
 
-### Document Processing
+- Formats: PDF, DOCX, TXT only (validate MIME types)
+- Size: 10MB maximum
+- Storage: Supabase with secure policies
+- Naming: UUID-based, never user input
 
-- Use appropriate processors in `lib/file-processors.ts`
-- Implement proper error handling for corrupted files
-- Generate secure, non-predictable file names
-- Clean up temporary files after processing
+### Processing Pattern
+
+```typescript
+// Use lib/file-processors.ts
+const processor = getFileProcessor(file.type);
+const content = await processor.process(file);
+```
+
+## Error Handling Standards
+
+### API Responses
+
+```typescript
+// Consistent error format
+return NextResponse.json(
+  { error: "Validation failed", code: "INVALID_INPUT" },
+  { status: 400 }
+);
+```
+
+### Component Error Boundaries
+
+- Wrap all feature components
+- Graceful degradation
+- User-friendly error messages
+
+## Performance Guidelines
+
+### Optimization Rules
+
+- Lazy load non-critical components
+- Use React.memo for expensive renders
+- Implement proper loading states
+- Cache API responses where appropriate
+
+### Real-time Features
+
+- WebSocket for chat/collaboration
+- Supabase realtime for database changes
+- Optimistic updates for better UX

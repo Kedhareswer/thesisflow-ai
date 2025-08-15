@@ -8,125 +8,140 @@ inclusion: always
 
 # Security Guidelines & Best Practices
 
-## Authentication Patterns
+## Authentication Requirements
 
-### Required API Route Pattern
+### API Route Authentication Pattern
 ```typescript
-// MANDATORY: All protected API routes must use this pattern
+// MANDATORY: All protected API routes must start with this
 export async function POST(request: Request) {
   const user = await requireAuth(request); // Always first line
   const body = await request.json();
-  // Validate with Zod schema before processing
+  const validatedData = schema.parse(body); // Validate before processing
   return NextResponse.json(result);
 }
 ```
 
-### Supabase Auth Rules
-- Use `requireAuth` from `@/lib/auth-utils` for all protected routes
-- Server-side: `supabase.auth.getUser()` for user validation
-- Client-side: Check auth state before rendering protected content
-- Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code
-- All database tables MUST have RLS policies enabled
+### Supabase Authentication Rules
+- **Protected Routes**: Always use `requireAuth` from `@/lib/auth-utils`
+- **Server Auth**: Use `supabase.auth.getUser()` for user validation
+- **Client Auth**: Check auth state before rendering protected content
+- **Service Key**: Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code
+- **RLS Policies**: All database tables MUST have Row Level Security enabled
 
-## Input Validation Requirements
+## Input Validation Standards
 
-### Zod Schema Validation
+### Zod Schema Requirements
 ```typescript
-// REQUIRED: Validate all API inputs
+// REQUIRED: All API inputs must be validated
 const schema = z.object({
   title: z.string().min(1).max(255),
   content: z.string().optional(),
+  url: z.string().url().optional(),
 });
 const validatedData = schema.parse(body);
 ```
 
-### File Upload Security
-- Allowed formats: PDF, DOCX, TXT only
-- Max size: 10MB per file
-- Use Supabase Storage with secure bucket policies
-- Generate UUIDs for file names, never use user-provided names
-- Validate file headers, not just extensions
+### File Upload Restrictions
+- **Formats**: PDF, DOCX, TXT only (validate MIME types and headers)
+- **Size Limit**: 10MB maximum per file
+- **Storage**: Use Supabase Storage with secure bucket policies
+- **Naming**: Generate UUIDs for file names, never use user input
+- **Processing**: Validate file integrity before processing
 
-### URL Validation
+### URL Validation Pattern
 ```typescript
-// REQUIRED: Validate URLs before fetching
+// REQUIRED: Validate external URLs
 const urlSchema = z.string().url().refine(url => {
   const parsed = new URL(url);
-  return ['http:', 'https:'].includes(parsed.protocol);
+  return ['http:', 'https:'].includes(parsed.protocol) && 
+         !parsed.hostname.includes('localhost');
 });
 ```
 
-## API Security Patterns
+## API Security Implementation
 
-### Rate Limiting Implementation
-- AI endpoints: 10 requests/minute per user
-- Literature search: 30 requests/minute per user
-- File upload: 5 files/minute per user
-- Use exponential backoff for external API calls
+### Rate Limiting Rules
+- **AI Endpoints**: 10 requests/minute per user
+- **Literature Search**: 30 requests/minute per user  
+- **File Upload**: 5 files/minute per user
+- **External APIs**: Implement exponential backoff (1s, 2s, 4s, 8s)
 
-### Error Response Format
+### Error Response Standards
 ```typescript
-// STANDARD: Never expose internal details
+// STANDARD: Sanitized error responses
 return NextResponse.json(
   { error: "Invalid request", code: "VALIDATION_ERROR" },
   { status: 400 }
 );
+// Never expose: stack traces, internal paths, API keys
 ```
 
-### External API Integration
-- Store all API keys in `.env.local`
-- Implement timeout configurations (30s max)
-- Validate all external API responses with Zod
-- Log API failures without exposing keys
+### External API Security
+- **API Keys**: Store in `.env.local`, never in client code
+- **Timeouts**: 30 second maximum for all external calls
+- **Validation**: Use Zod schemas for all external API responses
+- **Logging**: Log failures without exposing sensitive data
 
-## Data Protection Rules
+## Data Protection Standards
 
-### Sensitive Data Handling
-- Never log: API keys, user passwords, session tokens, file contents
-- Sanitize error messages before sending to client
-- Use parameterized queries for all database operations
-- Encrypt file contents in Supabase Storage
+### Sensitive Data Rules
+- **Never Log**: API keys, passwords, session tokens, file contents, user PII
+- **Error Sanitization**: Remove internal details before client responses
+- **Database Queries**: Use parameterized queries only
+- **File Storage**: Encrypt sensitive files in Supabase Storage
 
-### Database Security Patterns
+### Database Security Pattern
 ```sql
--- REQUIRED: RLS policy example
-CREATE POLICY "Users can only access their own data" ON user_documents
+-- REQUIRED: RLS policy template
+CREATE POLICY "user_access_policy" ON table_name
   FOR ALL USING (auth.uid() = user_id);
+
+-- Enable RLS
+ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
 ```
 
-## Environment Security
+## Environment & Configuration Security
 
 ### Required Environment Variables
 ```bash
-# MANDATORY: These must be set and validated on startup
+# Core Services
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+
+# AI Providers
 OPENAI_API_KEY=
+GEMINI_API_KEY=
+GROQ_API_KEY=
+
+# External Services
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
 ```
 
 ### Environment Validation
 ```typescript
-// REQUIRED: Validate env vars on startup
+// REQUIRED: Validate critical env vars on startup
 const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
 });
+envSchema.parse(process.env);
 ```
 
-## Component Security
+## Component Security Patterns
 
 ### Client Component Security
-- Validate user permissions before rendering sensitive UI
-- Sanitize all user-generated content with DOMPurify
-- Use error boundaries for all feature components
-- Never store sensitive data in component state
+- **Permission Checks**: Validate user access before rendering sensitive UI
+- **Content Sanitization**: Use DOMPurify for user-generated content
+- **Error Boundaries**: Wrap all feature components
+- **State Management**: Never store sensitive data in component state
 
-### Form Security
+### Form Security Implementation
 ```typescript
-// REQUIRED: Form validation pattern
+// REQUIRED: Secure form pattern
 const formSchema = z.object({
-  // Define strict validation rules
+  field: z.string().min(1).max(500),
 });
 
 const form = useForm<z.infer<typeof formSchema>>({
@@ -134,28 +149,31 @@ const form = useForm<z.infer<typeof formSchema>>({
 });
 ```
 
-## WebSocket Security
+## Real-time Security (WebSocket)
 
-### Socket.io Configuration
-- Validate origin for all WebSocket connections
-- Authenticate users before allowing socket connections
-- Implement rate limiting for socket events
-- Sanitize all real-time message content
+### Socket.io Security Configuration
+- **Origin Validation**: Verify request origin for all connections
+- **Authentication**: Authenticate users before socket connection
+- **Rate Limiting**: Limit socket events per user (100/minute)
+- **Message Sanitization**: Validate and sanitize all real-time messages
 
-## Critical Security Checks
+## Security Validation Checklist
 
-### Before Deployment
-- [ ] All API routes use `requireAuth`
-- [ ] All user inputs validated with Zod
-- [ ] No API keys in client-side code
-- [ ] RLS policies enabled on all tables
-- [ ] File upload restrictions implemented
-- [ ] Error messages sanitized
-- [ ] Environment variables validated
+### Pre-Deployment Requirements
+- [ ] All API routes implement `requireAuth` authentication
+- [ ] All user inputs validated with Zod schemas
+- [ ] No API keys or secrets in client-side code
+- [ ] RLS policies enabled and tested on all database tables
+- [ ] File upload restrictions properly implemented
+- [ ] Error messages sanitized and non-revealing
+- [ ] Environment variables validated on startup
+- [ ] Rate limiting implemented on all endpoints
 
-### Code Review Checklist
-- [ ] No `console.log` with sensitive data
-- [ ] No hardcoded secrets or URLs
-- [ ] Proper TypeScript types (no `any`)
-- [ ] Input validation on all endpoints
-- [ ] Proper error handling implemented
+### Code Review Security Checks
+- [ ] No `console.log` statements with sensitive data
+- [ ] No hardcoded secrets, API keys, or URLs
+- [ ] Proper TypeScript types (avoid `any` type)
+- [ ] Input validation on all API endpoints
+- [ ] Comprehensive error handling with proper status codes
+- [ ] Proper CORS configuration for production
+- [ ] SQL injection prevention (parameterized queries only)

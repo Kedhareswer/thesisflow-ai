@@ -4,208 +4,165 @@ inclusion: always
 
 # Project Structure & Code Organization
 
-## Directory Structure & Patterns
+## Directory Structure Rules
 
-### Core Application Structure
+### Feature-Based Organization
 
-```
-app/                    # Next.js App Router - feature-based organization
-├── api/               # API routes with consistent patterns
-│   ├── ai/            # AI generation endpoints
-│   ├── search/        # Literature search APIs
-│   ├── collaborate/   # Team collaboration APIs
-│   └── */route.ts     # Each endpoint as route.ts file
-├── (auth)/            # Route groups for auth pages
-├── [feature]/         # Feature directories (explorer, summarizer, writer, etc.)
-│   ├── page.tsx       # Main feature page
-│   ├── components/    # Feature-specific components
-│   └── lib/          # Feature-specific utilities
-├── layout.tsx         # Root layout with providers
-└── globals.css        # Global styles with CSS variables
-```
+- `app/[feature]/` - Each feature gets its own directory with `page.tsx`
+- `app/api/[feature]/route.ts` - API endpoints follow feature structure
+- `components/[feature]/` - Feature-specific components
+- `lib/services/` - Business logic services
 
-### Component Organization
+### Critical File Locations
 
-```
-components/
-├── ui/               # shadcn/ui base components (button, dialog, etc.)
-├── [feature]/        # Feature-specific components
-├── common/           # Shared components across features
-├── providers/        # React Context providers
-└── *.tsx            # Top-level shared components
-```
+- `lib/enhanced-ai-service.ts` - Multi-provider AI service (USE THIS for all AI calls)
+- `lib/supabase.ts` - Database client
+- `lib/auth-utils.ts` - Authentication utilities (`requireAuth` function)
+- `components/ui/` - shadcn/ui base components
+- `middleware.ts` - Authentication middleware
 
-### Service Layer Structure
+## Mandatory Code Patterns
 
-```
-lib/
-├── services/         # Business logic services
-├── types/           # TypeScript definitions
-├── utils/           # Utility functions
-├── ai-providers.ts  # AI provider configurations
-├── enhanced-ai-service.ts # Multi-provider AI service
-├── supabase.ts      # Database client
-└── utils.ts         # Common utilities (cn, etc.)
-```
-
-## Code Patterns & Conventions
-
-### Component Patterns
-
-- Use `"use client"` directive for client components
-- Function components with TypeScript interfaces
-- Props interfaces named `[ComponentName]Props`
-- Error boundaries for robust UX
-- Consistent loading and error states
-
-### API Route Patterns
+### API Route Structure
 
 ```typescript
-// Standard API route structure
 export async function POST(request: Request) {
-  const user = await requireAuth(request); // Always authenticate first
+  const user = await requireAuth(request); // ALWAYS first line
   const body = await request.json();
-  // Validate with Zod schema
-  // Business logic
+  const validatedData = schema.parse(body); // Zod validation required
   return NextResponse.json(result);
 }
 ```
 
-### Service Layer Patterns
-
-- Centralize business logic in `lib/services/`
-- Use dependency injection for testability
-- Consistent error handling with typed errors
-- Async/await for all async operations
-
-### State Management Strategy
-
-1. **Server State**: Supabase queries with real-time subscriptions
-2. **Global State**: Zustand stores for app-wide state
-3. **Context State**: React Context for auth and providers
-4. **Local State**: useState/useReducer for component state
-
-## File Naming & Import Conventions
-
-### Naming Rules
-
-- **Components**: PascalCase (`UserProfile.tsx`)
-- **UI Components**: kebab-case (`button.tsx`, `dialog.tsx`)
-- **API Routes**: Always `route.ts` in feature directories
-- **Services**: kebab-case (`enhanced-ai-service.ts`)
-- **Types**: kebab-case (`user-types.ts`)
-- **Utilities**: camelCase (`authUtils.ts`)
-
-### Import Order & Aliases
+### Component Structure
 
 ```typescript
-// 1. React and Next.js
+"use client"; // Required for client components
+
+interface ComponentNameProps {
+  // Props interface must match component name
+}
+
+export function ComponentName({ prop }: ComponentNameProps) {
+  // Implementation
+}
+```
+
+### Import Order (Strict)
+
+```typescript
+// 1. React/Next.js
 import React from "react";
 import { NextResponse } from "next/server";
 
-// 2. Third-party libraries
+// 2. Third-party
 import { z } from "zod";
 
-// 3. Internal imports with @/ alias
+// 3. Internal (@/ alias)
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth-utils";
 
-// 4. Relative imports
-import "./styles.css";
-
-// 5. Type-only imports
+// 4. Types (separate)
 import type { User } from "@/lib/types";
 ```
 
+## File Naming Conventions
+
+### Strict Rules
+
+- **Components**: PascalCase (`UserProfile.tsx`)
+- **UI Components**: kebab-case (`button.tsx`, `input.tsx`)
+- **API Routes**: Always `route.ts` in feature directories
+- **Services**: kebab-case (`enhanced-ai-service.ts`)
+- **Utilities**: camelCase (`authUtils.ts`)
+- **Types**: kebab-case (`user-types.ts`)
+
 ### Path Aliases
 
-- `@/` → project root
-- `@/components/ui` → base UI components
-- `@/lib` → utilities and services
-- `@/hooks` → custom hooks
+- `@/` → project root (ALWAYS use this for internal imports)
+- Never use relative imports for cross-directory references
+
+## State Management Rules
+
+### By Scope
+
+1. **Server State**: Supabase queries with real-time subscriptions
+2. **Global State**: Zustand stores (auth, user preferences)
+3. **Context State**: React Context for providers only
+4. **Local State**: useState/useReducer for component-specific data
+
+### Forms
+
+- React Hook Form + Zod validation (MANDATORY)
+- Error boundaries on all form components
+- Loading states during submission
 
 ## Architecture Patterns
 
-### Component Hierarchy
+### Data Flow (Enforced)
 
 ```
-RootLayout
-├── Providers (Theme, Auth, Research Session)
-├── MainNav
-└── Page Content
-    ├── Feature Components
-    ├── UI Components
-    └── Form Components
+Component → API Route → Service → Database/External API
+         ↓
+    Zod Validation → requireAuth → Business Logic
 ```
 
-### Data Flow Patterns
+### AI Integration Pattern
 
-- **Authentication**: Middleware → Provider → Protected Routes
-- **API Requests**: Component → API Route → Service → Database/External API
-- **Real-time**: Database Change → Supabase Realtime → Component
-- **AI Generation**: Input → API Route → Enhanced AI Service → Provider → Response
+```typescript
+// ALWAYS use enhanced-ai-service.ts
+import { generateResponse } from "@/lib/enhanced-ai-service";
 
-### Error Handling Strategy
+const response = await generateResponse({
+  provider: "openai", // or auto-detect
+  messages: [...],
+  stream: true // when possible
+});
+```
 
-- API routes return consistent error formats
-- Components use error boundaries
-- Loading states for async operations
-- Graceful degradation for failed services
+### Error Handling (Required)
 
-## Development Patterns
+- API routes: Consistent error format with status codes
+- Components: Error boundaries for all features
+- Services: Typed errors with proper logging
+- UI: Loading states and graceful degradation
 
-### Form Handling
+## Component Organization Rules
 
-- React Hook Form with Zod validation
-- Consistent error display patterns
-- Loading states during submission
-- Success/error feedback to users
+### Feature Components
 
-### File Processing
+- Place in `components/[feature]/` directory
+- Export from index file for clean imports
+- Include loading and error states
+- Use TypeScript interfaces for all props
 
-- Support PDF, DOCX, TXT formats
-- 10MB file size limit
-- Secure file upload to Supabase Storage
-- Progress indicators for uploads
+### Shared Components
 
-### AI Integration
-
-- Multi-provider support with fallback
-- Streaming responses where possible
-- Rate limiting and error handling
-- Context-aware prompt engineering
+- `components/ui/` - Base shadcn/ui components (DO NOT modify)
+- `components/common/` - Shared business components
+- `components/providers/` - React Context providers only
 
 ### Real-time Features
 
-- WebSocket server on port 3001
-- Socket.io for real-time collaboration
+- WebSocket server on port 3001 (Socket.io)
 - Supabase realtime for database changes
 - Optimistic updates for better UX
+- Rate limiting on all real-time endpoints
 
-## Configuration & Environment
+## Development Commands
 
-### Required Environment Variables
+### Essential Services
 
 ```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-# AI Providers
-OPENAI_API_KEY=
-GEMINI_API_KEY=
-GROQ_API_KEY=
-
-# Payments
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+node start-dev.js     # Full development environment
+pnpm dev             # Next.js only (port 3000)
+pnpm dev:ws          # WebSocket server (port 3001)
+cd python && python app.py  # Literature search (port 5000)
 ```
 
-### Key Configuration Files
+### File Processing Rules
 
-- `.env.local` - Local development environment
-- `next.config.js` - Next.js configuration
-- `tailwind.config.ts` - TailwindCSS with CSS variables
-- `components.json` - shadcn/ui configuration
-- `middleware.ts` - Authentication middleware
+- PDF, DOCX, TXT only (validate MIME types)
+- 10MB maximum file size
+- Supabase Storage with secure bucket policies
+- Generate UUIDs for file names (never use user input)
