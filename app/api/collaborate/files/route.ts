@@ -252,6 +252,8 @@ export async function GET(request: NextRequest) {
     // Sort all files by creation date
     allFiles.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
+    console.log(`[FILES API] Returning ${allFiles.length} files for team ${teamId}:`, allFiles.map(f => ({ id: f.id, name: f.name, type: f.type })))
+
     return NextResponse.json({
       success: true,
       files: allFiles,

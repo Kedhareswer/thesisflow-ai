@@ -959,7 +959,7 @@ export default function CollaboratePage() {
             {/* Main Content */}
             <div className="lg:col-span-8 xl:col-span-9 animate-fade-in">
               {/* Debug Section - Only show in development */}
-              {process.env.NODE_ENV === 'development' && planData && (
+              {/* {process.env.NODE_ENV === 'development' && planData && (
                 <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <h3 className="font-semibold text-yellow-800 mb-2">Debug Info (Development Only)</h3>
                   <div className="text-sm text-yellow-700">
@@ -979,7 +979,7 @@ export default function CollaboratePage() {
                     </Button>
                   </div>
                 </div>
-              )}
+              )} */}
               
               {selectedTeam ? (
                 <Card className="border-none shadow-sm h-full">
