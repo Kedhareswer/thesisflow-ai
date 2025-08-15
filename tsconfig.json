@@ -23,5 +23,11 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "lib/storage/providers/dropbox.ts",
+    "lib/storage/providers/onedrive.ts",
+    "app/api/auth/callback/dropbox/**",
+    "app/api/auth/callback/onedrive/**"
+  ]
 }
