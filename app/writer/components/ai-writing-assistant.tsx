@@ -257,22 +257,30 @@ export function AIWritingAssistant({
     }
 
     if (session?.selectedPapers?.length > 0) {
-      context += `Selected Papers: ${session.selectedPapers.length} papers\n`
-      session.selectedPapers.slice(0, 5).forEach((paper: any, index: number) => {
-        const authors = paper.authors?.slice(0, 3).join(', ') || 'Unknown authors'
-        const year = paper.year || paper.publication_year || 'Unknown year'
-        const journal = paper.journal || paper.venue || ''
+      context += `\n=== SELECTED PAPERS FOR LITERATURE REVIEW ===\n`
+      context += `Total Papers: ${session.selectedPapers.length}\n\n`
+      
+      session.selectedPapers.slice(0, 8).forEach((paper: any, index: number) => {
+        const authors = paper.authors?.slice(0, 3).join(', ') || 'Authors not specified'
+        const year = paper.year || paper.publication_year || paper.date?.slice(0, 4) || 'Year not specified'
+        const journal = paper.journal || paper.venue || paper.source || ''
         const doi = paper.doi || ''
+        const methodology = paper.methodology || ''
         
-        context += `  ${index + 1}. ${paper.title || 'Untitled'}\n`
-        context += `     Authors: ${authors}\n`
-        context += `     Year: ${year}\n`
-        if (journal) context += `     Journal: ${journal}\n`
-        if (doi) context += `     DOI: ${doi}\n`
+        context += `PAPER ${index + 1}:\n`
+        context += `Title: ${paper.title || 'Title not specified'}\n`
+        context += `Authors: ${authors}\n`
+        context += `Year: ${year}\n`
+        if (journal) context += `Journal/Venue: ${journal}\n`
+        if (doi) context += `DOI: ${doi}\n`
+        if (methodology) context += `Methodology: ${methodology}\n`
         if (paper.abstract) {
-          context += `     Abstract: ${paper.abstract.slice(0, 200)}${paper.abstract.length > 200 ? '...' : ''}\n`
+          context += `Abstract: ${paper.abstract}\n`
         }
-        context += `\n`
+        if (paper.keywords) {
+          context += `Keywords: ${Array.isArray(paper.keywords) ? paper.keywords.join(', ') : paper.keywords}\n`
+        }
+        context += `\n---\n\n`
       })
     }
 
@@ -296,10 +304,10 @@ export function AIWritingAssistant({
         .join(' | ')
       const top = retrieveTopK(queryHints, 8)
       const joined = top
-        .map((t, i) => `(${i + 1}) ${t.substring(0, 800)}`)
-        .join("\n\n")
+        .map((t, i) => `RETRIEVED SOURCE ${i + 1}:\n${t.substring(0, 800)}`)
+        .join("\n\n---\n\n")
       if (joined) {
-        context += `\nRetrieved Context (from uploaded sources):\n${joined}\n`
+        context += `\n=== RETRIEVED CONTEXT FROM UPLOADED SOURCES ===\n${joined}\n\n`
       }
     }
 
