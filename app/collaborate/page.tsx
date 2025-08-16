@@ -1000,8 +1000,8 @@ export default function CollaboratePage() {
                         </TabsTrigger>
                       </TabsList>
 
-                      <TabsContent value="chat" className="mt-0 p-0">
-                        <div className="h-[600px] flex flex-col bg-background">
+                      <TabsContent value="chat" className="mt-0 p-0 flex flex-col h-full">
+                        <div className="flex flex-col flex-1 bg-background">
                           {/* Chat Header */}
                           <div className="px-6 py-4 border-b bg-muted/30 flex items-center justify-between">
                             <div className="flex items-center gap-3">

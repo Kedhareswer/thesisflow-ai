@@ -245,7 +245,7 @@ const templates = {
     {
       id: "keywords",
       title: "Keywords",
-      prompt: "List 3-6 relevant keywords. Do not include the 'Keywords' heading.",
+      prompt: "List 6-8 relevant keywords. Do not include the 'Keywords' heading.",
       required: true,
       editable: true,
     },
