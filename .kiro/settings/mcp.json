@@ -1,17 +1,4 @@
 {
   "mcpServers": {
-    "AI_Research_supabase": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--access-token",
-        "sbp_e446aabf37f53635f4367da103368a0e33f0a167"
-      ],
-      "disabled": false,
-      "autoApprove": [
-        "get_project"
-      ]
-    }
   }
 }
