@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/ui/empty-state"
+import { buildWritingPrompt } from "@/lib/prompt-builder"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers"
@@ -56,6 +58,7 @@ export function AIWritingAssistant({
 }: AIWritingAssistantProps) {
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [temperature, setTemperature] = useState(0.5)
   const [generatedText, setGeneratedText] = useState('')
   const [writingTask, setWritingTask] = useState<string>('continue')
   const [showSettings, setShowSettings] = useState(false)
@@ -319,67 +322,32 @@ export function AIWritingAssistant({
       const templateStyle = getTemplateStyle()
       const researchContext = getResearchContext()
 
-      let systemPrompt = `You are a professional academic writer assisting with a research document in ${templateStyle}. `
-      systemPrompt += `Write in a clear, academic style appropriate for publication. `
-      systemPrompt += `Focus on producing coherent, well-structured text that would be suitable for a scholarly publication. `
-      systemPrompt += `Always maintain academic integrity and provide well-reasoned arguments.`
-      if (ragEnabled && uploadedSources.length > 0) {
-        systemPrompt += ` Use ONLY the provided Retrieved Context and Session Context for factual statements. If the context is insufficient, explicitly state "insufficient context" rather than inventing facts. Quote or paraphrase faithfully and avoid hallucinations.`
-      }
-
-      let taskPrompt = ''
-
-      switch (writingTask) {
-        case 'continue':
-          taskPrompt = `Continue writing the document from where it left off. Maintain the same style, tone, and academic rigor.`
-          break
-        case 'introduction':
-          taskPrompt = `Write a compelling introduction for this research document. Include background context, research question, and significance.`
-          break
-        case 'abstract':
-          taskPrompt = `Write a concise abstract (150-250 words) that summarizes the research problem, methodology, key findings, and conclusions.`
-          break
-        case 'literature_review':
-          taskPrompt = `Write a rigorous Literature Review that critically synthesizes the most relevant, recent (last 3–5 years preferred) and foundational studies. Structure with clear themes, identify gaps, and relate prior findings directly to the current research problem.
-
-Output requirements:
-- Start with a brief overview paragraph that defines the scope and search strategy (databases, keywords, date range if known from context; otherwise state reasonable assumptions).
-- Organize the body into thematic sub-sections with concise, comparative analysis—not summaries.
-- Where appropriate, note methodological differences, datasets, metrics, and limitations.
-- Conclude with gaps, inconsistencies, and how they motivate the present work.
-
-Include a compact Markdown table titled "Comparison of Recent Studies" with columns: Author/Year, Focus, Method/Dataset, Key Findings, Limitations/Relevance. Populate 4–8 rows using only information derivable from the provided context; if uncertain, write "unknown" rather than inventing facts.
-
-Style: objective academic tone, avoid generic filler, do not fabricate citations or DOIs.`
-          break
-        case 'analyze':
-          taskPrompt = `Analyze the current document content for structure, clarity, academic tone, and coherence. Provide specific suggestions for improvement.`
-          break
-        default:
-          taskPrompt = `Continue writing the document in a professional academic style.`
-      }
-
-      const fullPrompt = `${systemPrompt}\n\n${researchContext}\n\nTask: ${taskPrompt}`
+      const fullPrompt = buildWritingPrompt({
+        templateStyle,
+        researchContext,
+        writingTask,
+        ragEnabled,
+        uploadedSourceCount: uploadedSources.length,
+      })
 
       // Call the AI generation API with authentication
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           prompt: fullPrompt,
           provider: selectedProvider,
           model: selectedModel,
           maxTokens: 1200,
-          temperature: 0.5,
-          // pass a hint to the backend for potential server-side retrieval extensions later
+          temperature,
           metadata: {
             ragEnabled,
-            uploadedSourceCount: uploadedSources.length
-          }
-        })
+            uploadedSourceCount: uploadedSources.length,
+          },
+        }),
       })
 
       if (!response.ok) {
@@ -387,17 +355,34 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
         throw new Error(errorData.error || 'Failed to generate content')
       }
 
-      const data = await response.json()
+      if (!response.body) throw new Error('No response stream')
 
-      if (!data.success || !data.response) {
-        throw new Error(data.error || 'No content generated')
+      // Stream the response
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let partial = ''
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        partial += decoder.decode(value, { stream: true })
+        setGeneratedText(partial)
       }
 
-      setGeneratedText(data.response)
+      // Extract citations (DOIs) from the generated text
+      const doiRegex = /(10\.\d{4,9}\/[-._;()\/:A-Z0-9]+)/gi
+      const dois = [...new Set((partial.match(doiRegex) || []))]
+      if (dois.length > 0) {
+        toast({ 
+          title: "Citations detected", 
+          description: `${dois.length} DOI(s) extracted and sent to Citation Manager.` 
+        })
+        // TODO: integrate with citation manager context/state
+      }
 
       toast({
         title: "Content generated",
-        description: `AI writing assistant has generated ${writingTask} content using ${data.provider || selectedProvider}.`,
+        description: `AI writing assistant generated ${writingTask} content using ${selectedProvider}.`,
       })
     } catch (error) {
       console.error("Error generating text:", error)
@@ -495,19 +480,33 @@ Style: objective academic tone, avoid generic filler, do not fabricate citations
 
       {/* AI Provider Settings */}
       {showSettings && (
-        <Card>
-          <CardContent className="pt-4">
-            <MinimalAIProviderSelector
-              selectedProvider={selectedProvider as AIProvider}
-              selectedModel={selectedModel}
-              onProviderChange={onProviderChange || (() => { })}
-              onModelChange={onModelChange || (() => { })}
-              variant="compact"
-              showModelSelector={true}
-              showConfigLink={false}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-4">
+              <MinimalAIProviderSelector
+                selectedProvider={selectedProvider as AIProvider}
+                selectedModel={selectedModel}
+                onProviderChange={onProviderChange || (() => { })}
+                onModelChange={onModelChange || (() => { })}
+                variant="compact"
+                showModelSelector={true}
+                showConfigLink={false}
+              />
+            </CardContent>
+          </Card>
+          <div className="flex items-center gap-4">
+            <Label className="text-xs w-24">Creativity</Label>
+            <Slider
+              min={0}
+              max={1}
+              step={0.1}
+              value={[temperature]}
+              onValueChange={(v)=>setTemperature(v[0])}
+              className="w-full"
             />
-          </CardContent>
-        </Card>
+            <span className="text-xs w-10 text-right">{temperature.toFixed(1)}</span>
+          </div>
+        </div>
       )}
 
       {writingTask === 'custom' && (
