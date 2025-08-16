@@ -17,6 +17,9 @@ import { useResearchSession } from "@/components/research-session-provider"
 import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers"
 import { Label } from "@/components/ui/label"
 import { FileProcessor, type FileProcessingResult } from "@/lib/file-processors"
+import { transformInlineCitations, extractCitationNumbers, buildReferenceBlock } from "@/lib/utils/inline-citation"
+import { getPreset } from "@/lib/config/model-presets"
+import { runGuardrails } from "@/lib/services/guardrails.service"
 import { supabase } from "@/lib/supabase"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { searchSemanticScholar, getCitationData, transformSemanticScholarPaper } from "@/app/explorer/semantic-scholar"
@@ -59,7 +62,8 @@ export function AIWritingAssistant({
 }: AIWritingAssistantProps) {
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [temperature, setTemperature] = useState(0.5)
+  const preset = getPreset(selectedProvider, selectedModel)
+  const [temperature, setTemperature] = useState(preset?.defaultTemperature ?? 0.5)
   const [generatedText, setGeneratedText] = useState('')
   const [writingTask, setWritingTask] = useState<string>('continue')
   const [showSettings, setShowSettings] = useState(false)
@@ -74,7 +78,7 @@ export function AIWritingAssistant({
   } | null>(null)
 
   const { toast } = useToast()
-  const { session } = useResearchSession()
+  const { session, getSelectedPapers } = useResearchSession()
 
   // Writing task options
   const writingTasks = [
@@ -486,6 +490,7 @@ export function AIWritingAssistant({
         writingTask,
         ragEnabled,
         uploadedSourceCount: uploadedSources.length,
+        systemPromptAddon: preset?.systemPromptAddon,
       })
 
       // Call the AI generation API with authentication
@@ -523,7 +528,24 @@ export function AIWritingAssistant({
       }
       
       // Extract the actual content from the JSON response
-      const generatedContent = data.response || data.content
+      // Transform numeric citation markers into superscript links
+            const generatedContentRaw = data.response || data.content
+      const citationNumbers = extractCitationNumbers(generatedContentRaw)
+      // Build reference block using selected papers from Research Session (if any)
+      const refPapers = getSelectedPapers()
+      const referenceBlock = buildReferenceBlock(citationNumbers, refPapers)
+      const contentWithRefs = generatedContentRaw + referenceBlock
+      const generatedContent = transformInlineCitations(contentWithRefs)
+      // Run guardrails validation
+      const guard = await runGuardrails(generatedContent)
+      if (!guard.ok) {
+        toast({
+          title: "Quality issues detected",
+          description: guard.issues.join("; "),
+          variant: "destructive"
+        })
+      }
+
       setGeneratedText(generatedContent)
 
       // Extract citations (DOIs) from the generated text
