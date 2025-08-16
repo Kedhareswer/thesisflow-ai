@@ -258,8 +258,21 @@ export function AIWritingAssistant({
 
     if (session?.selectedPapers?.length > 0) {
       context += `Selected Papers: ${session.selectedPapers.length} papers\n`
-      session.selectedPapers.slice(0, 3).forEach((paper: any, index: number) => {
+      session.selectedPapers.slice(0, 5).forEach((paper: any, index: number) => {
+        const authors = paper.authors?.slice(0, 3).join(', ') || 'Unknown authors'
+        const year = paper.year || paper.publication_year || 'Unknown year'
+        const journal = paper.journal || paper.venue || ''
+        const doi = paper.doi || ''
+        
         context += `  ${index + 1}. ${paper.title || 'Untitled'}\n`
+        context += `     Authors: ${authors}\n`
+        context += `     Year: ${year}\n`
+        if (journal) context += `     Journal: ${journal}\n`
+        if (doi) context += `     DOI: ${doi}\n`
+        if (paper.abstract) {
+          context += `     Abstract: ${paper.abstract.slice(0, 200)}${paper.abstract.length > 200 ? '...' : ''}\n`
+        }
+        context += `\n`
       })
     }
 
@@ -357,21 +370,20 @@ export function AIWritingAssistant({
 
       if (!response.body) throw new Error('No response stream')
 
-      // Stream the response
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let partial = ''
+      // For now, handle as regular JSON response (streaming can be implemented later with SSE)
+      const data = await response.json()
       
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        partial += decoder.decode(value, { stream: true })
-        setGeneratedText(partial)
+      if (!data.success || !data.response) {
+        throw new Error(data.error || 'No content generated')
       }
+      
+      // Extract the actual content from the JSON response
+      const generatedContent = data.response || data.content
+      setGeneratedText(generatedContent)
 
       // Extract citations (DOIs) from the generated text
       const doiRegex = /(10\.\d{4,9}\/[-._;()\/:A-Z0-9]+)/gi
-      const dois = [...new Set((partial.match(doiRegex) || []))]
+      const dois = [...new Set((generatedContent.match(doiRegex) || []))]
       if (dois.length > 0) {
         toast({ 
           title: "Citations detected", 
