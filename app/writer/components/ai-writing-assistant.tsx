@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { FileProcessor, type FileProcessingResult } from "@/lib/file-processors"
 import { supabase } from "@/lib/supabase"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+import { searchSemanticScholar, getCitationData, transformSemanticScholarPaper } from "@/app/explorer/semantic-scholar"
 import {
   Sparkles,
   ChevronUp,
@@ -247,8 +248,117 @@ export function AIWritingAssistant({
     }
   }
 
+  // Enrich paper data with semantic scholar information
+  const enrichPaperData = async (papers: any[]) => {
+    const enrichedPapers = []
+    
+    for (const paper of papers) {
+      try {
+        // Try to get enhanced data from Semantic Scholar
+        let enhancedData = null
+        
+        // First try by DOI if available
+        if (paper.doi) {
+          enhancedData = await getCitationData(paper.doi, 'doi')
+        }
+        
+        // If no DOI or DOI lookup failed, try by title
+        if (!enhancedData && paper.title) {
+          const searchResults = await searchSemanticScholar(paper.title, 1)
+          if (searchResults.length > 0) {
+            enhancedData = searchResults[0]
+          }
+        }
+        
+        // Combine original paper data with enhanced data
+        if (enhancedData) {
+          const transformed = transformSemanticScholarPaper(enhancedData)
+          enrichedPapers.push({
+            ...paper,
+            ...transformed,
+            // Keep original data if enhanced is missing
+            title: paper.title || transformed.title,
+            authors: paper.authors?.length ? paper.authors : transformed.authors,
+            year: paper.year || transformed.year,
+            abstract: transformed.abstract || paper.abstract || 'Abstract not available',
+            journal: transformed.journal || paper.journal || paper.venue,
+            doi: paper.doi || transformed.doi,
+            citationCount: transformed.cited_by_count || 0,
+            methodology: extractMethodologyFromAbstract(transformed.abstract || paper.abstract || ''),
+            keyFindings: extractKeyFindingsFromAbstract(transformed.abstract || paper.abstract || ''),
+            enhanced: true
+          })
+        } else {
+          // Keep original paper but mark as not enhanced
+          enrichedPapers.push({
+            ...paper,
+            enhanced: false,
+            methodology: extractMethodologyFromAbstract(paper.abstract || ''),
+            keyFindings: extractKeyFindingsFromAbstract(paper.abstract || '')
+          })
+        }
+      } catch (error) {
+        console.warn(`Failed to enrich paper: ${paper.title}`, error)
+        enrichedPapers.push({ ...paper, enhanced: false })
+      }
+    }
+    
+    return enrichedPapers
+  }
+  
+  // Extract methodology hints from abstract
+  const extractMethodologyFromAbstract = (abstract: string): string => {
+    if (!abstract) return 'Not specified'
+    
+    const methodKeywords = [
+      'machine learning', 'deep learning', 'neural network', 'cnn', 'rnn', 'lstm',
+      'regression', 'classification', 'clustering', 'survey', 'review', 'analysis',
+      'experimental', 'empirical', 'simulation', 'case study', 'dataset', 'algorithm'
+    ]
+    
+    const foundMethods = methodKeywords.filter(keyword => 
+      abstract.toLowerCase().includes(keyword.toLowerCase())
+    )
+    
+    return foundMethods.length > 0 ? foundMethods.slice(0, 3).join(', ') : 'Literature analysis'
+  }
+  
+  // Extract key findings from abstract
+  const extractKeyFindingsFromAbstract = (abstract: string): string => {
+    if (!abstract) return 'Not specified'
+    
+    // Look for result indicators
+    const resultPatterns = [
+      /results?\s+(?:show|indicate|demonstrate|reveal)[^.]*\./gi,
+      /found\s+that[^.]*\./gi,
+      /achieved[^.]*\./gi,
+      /improved?[^.]*\./gi,
+      /accuracy[^.]*\./gi,
+      /performance[^.]*\./gi
+    ]
+    
+    for (const pattern of resultPatterns) {
+      const matches = abstract.match(pattern)
+      if (matches && matches[0]) {
+        return matches[0].trim().slice(0, 100) + (matches[0].length > 100 ? '...' : '')
+      }
+    }
+    
+    // Fallback: return first sentence that might contain findings
+    const sentences = abstract.split(/[.!?]+/)
+    for (const sentence of sentences) {
+      if (sentence.toLowerCase().includes('show') || 
+          sentence.toLowerCase().includes('found') ||
+          sentence.toLowerCase().includes('result')) {
+        return sentence.trim().slice(0, 100) + (sentence.length > 100 ? '...' : '')
+      }
+    }
+    
+    return 'Key contributions in ' + abstract.slice(0, 50) + '...'
+  }
+
   // Get research context for AI prompt
-  const getResearchContext = () => {
+  const getResearchContext = async () => {
     let context = 'Research Context:\n'
 
     // Add session data if available
@@ -257,28 +367,55 @@ export function AIWritingAssistant({
     }
 
     if (session?.selectedPapers?.length > 0) {
-      context += `\n=== SELECTED PAPERS FOR LITERATURE REVIEW ===\n`
-      context += `Total Papers: ${session.selectedPapers.length}\n\n`
+      // Enrich papers with semantic scholar data for literature review
+      let papersToUse = session.selectedPapers
       
-      session.selectedPapers.slice(0, 8).forEach((paper: any, index: number) => {
+      if (writingTask === 'literature_review') {
+        toast({
+          title: "Enriching paper data",
+          description: "Fetching detailed information from academic databases..."
+        })
+        
+        try {
+          papersToUse = await enrichPaperData(session.selectedPapers.slice(0, 8))
+        } catch (error) {
+          console.warn('Failed to enrich papers:', error)
+          toast({
+            title: "Using basic paper data", 
+            description: "Could not fetch enhanced data, using available information."
+          })
+        }
+      }
+      
+      context += `\n=== SELECTED PAPERS FOR LITERATURE REVIEW ===\n`
+      context += `Total Papers: ${papersToUse.length}\n\n`
+      
+      papersToUse.forEach((paper: any, index: number) => {
         const authors = paper.authors?.slice(0, 3).join(', ') || 'Authors not specified'
         const year = paper.year || paper.publication_year || paper.date?.slice(0, 4) || 'Year not specified'
         const journal = paper.journal || paper.venue || paper.source || ''
         const doi = paper.doi || ''
-        const methodology = paper.methodology || ''
+        const methodology = paper.methodology || 'Not specified'
+        const keyFindings = paper.keyFindings || 'Not specified'
+        const citationCount = paper.citationCount || paper.cited_by_count || 0
         
-        context += `PAPER ${index + 1}:\n`
+        context += `PAPER ${index + 1}${paper.enhanced ? ' (Enhanced)' : ''}:\n`
         context += `Title: ${paper.title || 'Title not specified'}\n`
         context += `Authors: ${authors}\n`
         context += `Year: ${year}\n`
         if (journal) context += `Journal/Venue: ${journal}\n`
         if (doi) context += `DOI: ${doi}\n`
-        if (methodology) context += `Methodology: ${methodology}\n`
+        context += `Citation Count: ${citationCount}\n`
+        context += `Methodology: ${methodology}\n`
+        context += `Key Findings: ${keyFindings}\n`
         if (paper.abstract) {
           context += `Abstract: ${paper.abstract}\n`
         }
         if (paper.keywords) {
           context += `Keywords: ${Array.isArray(paper.keywords) ? paper.keywords.join(', ') : paper.keywords}\n`
+        }
+        if (paper.tldr) {
+          context += `TL;DR: ${paper.tldr}\n`
         }
         context += `\n---\n\n`
       })
@@ -341,7 +478,7 @@ export function AIWritingAssistant({
       }
 
       const templateStyle = getTemplateStyle()
-      const researchContext = getResearchContext()
+      const researchContext = await getResearchContext()
 
       const fullPrompt = buildWritingPrompt({
         templateStyle,
