@@ -982,8 +982,8 @@ export default function CollaboratePage() {
               )} */}
               
               {selectedTeam ? (
-                <Card className="border-none shadow-sm h-full">
-                  <CardContent className="p-0">
+                <Card className="border-none shadow-sm flex flex-col max-h-[calc(100vh-200px)] h-full">
+                  <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
                     <Tabs defaultValue="chat" className="h-full">
                       <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-12">
                         <TabsTrigger value="chat" className="gap-2 data-[state=active]:bg-background">
@@ -1325,7 +1325,7 @@ export default function CollaboratePage() {
                 </Card>
               ) : (
                 /* Welcome State */
-                <Card className="border-none shadow-sm h-full">
+                <Card className="border-none shadow-sm flex flex-col max-h-[calc(100vh-200px)] h-full">
                   <CardContent className="pt-16">
                     <div className="text-center py-20 animate-fade-in">
                       <div className="mb-8">
