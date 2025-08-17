@@ -31,6 +31,8 @@ export default function Head({
   const description = dynamicDescription;
 
   const ogImage = `${baseUrl}/og-image-1200x630.png`;
+const ogImageSmall = `${baseUrl}/og-image-600x315.png`; // Fallback for Twitter Lite or small clients
+const imageAlt = "Bolt Research Hub AI Summarizer - Transform documents into intelligent summaries";
 
   // Structured Data Objects
   const softwareApplicationSchema = {
@@ -113,6 +115,50 @@ export default function Head({
     url,
   };
 
+  // FAQ Structured Data
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "What formats does the AI Summarizer support?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "It supports PDF, DOCX, TXT files and web URLs with automatic detection."
+        }
+      },
+      {
+        "@type": "Question",
+        name: "Is Bolt Research Hub free to use?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes, the AI Summarizer offers a free tier with generous limits."
+        }
+      }
+    ]
+  };
+
+  // Breadcrumb Structured Data
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: baseUrl
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "AI Summarizer",
+        item: url
+      }
+    ]
+  };
+
   return (
     <>
       <title>{title}</title>
@@ -130,9 +176,10 @@ export default function Head({
       <meta property="og:description" content={description} />
       <meta property="og:url" content={url} />
       <meta property="og:image" content={ogImage} />
+      <meta property="og:image" content={ogImageSmall} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
-      <meta property="og:image:alt" content="Bolt Research Hub AI Summarizer - Transform documents into intelligent summaries" />
+      <meta property="og:image:alt" content={imageAlt} />
 
       {/* Twitter Card */}
       <meta name="twitter:card" content="summary_large_image" />
@@ -141,7 +188,7 @@ export default function Head({
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={ogImage} />
-      <meta name="twitter:image:alt" content="Bolt Research Hub AI Summarizer - Advanced document analysis and summarization" />
+      <meta name="twitter:image:alt" content={imageAlt} />
 
       {/* International/Language Support */}
       <link rel="alternate" hrefLang="en" href={url} />
@@ -172,6 +219,16 @@ export default function Head({
       {/* Research-specific Structured Data */}
       <script type="application/ld+json">
         {JSON.stringify(webApplicationSchema)}
+      </script>
+
+      {/* FAQ Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify(faqSchema)}
+      </script>
+
+      {/* Breadcrumb Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify(breadcrumbSchema)}
       </script>
     </>
   );
