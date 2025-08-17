@@ -21,6 +21,7 @@ import {
   type UsageStatistics
 } from "./components/analytics-tab"
 import { ErrorDisplay } from "./components/error-display"
+import SummarizerSEOContent from "./components/SummarizerSEOContent"
 
 export default function SummarizerPage() {
   const { toast } = useToast()
@@ -389,6 +390,11 @@ export default function SummarizerPage() {
   }
 
   return (
+    <>
+      {/* Visible SEO Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <SummarizerSEOContent className="hidden lg:block" />
+      </div>
     <div className="min-h-screen bg-white text-black">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white hidden">
@@ -484,5 +490,6 @@ export default function SummarizerPage() {
         }}
       </SummarizerTabbedLayout>
     </div>
-  )
+    </>
+  );
 }
