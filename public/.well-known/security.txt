@@ -1,0 +1,32 @@
+Contact: https://ai-project-planner.vercel.app/contact
+Contact: mailto:security@boltresearchhub.com
+Expires: 2026-01-17T00:00:00.000Z
+Encryption: https://ai-project-planner.vercel.app/.well-known/pgp-key.txt
+Acknowledgments: https://ai-project-planner.vercel.app/security/acknowledgments
+Preferred-Languages: en
+Canonical: https://ai-project-planner.vercel.app/.well-known/security.txt
+
+# Security Policy for Bolt Research Hub
+# 
+# We take security seriously and appreciate responsible disclosure.
+# 
+# Scope:
+# - Main application: https://ai-project-planner.vercel.app
+# - API endpoints: https://ai-project-planner.vercel.app/api/*
+# - WebSocket connections
+# - File upload functionality
+# - Authentication systems
+# 
+# Out of scope:
+# - Social engineering attacks
+# - Physical attacks
+# - Third-party services (Supabase, AI providers)
+# - Denial of service attacks
+# 
+# Please report security vulnerabilities responsibly.
+# Do not publicly disclose until we have had time to address the issue.
+# 
+# Response time: We aim to respond within 48 hours.
+# Fix time: Critical issues will be addressed within 7 days.
+# 
+# Thank you for helping keep Bolt Research Hub secure!
