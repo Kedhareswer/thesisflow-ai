@@ -6,13 +6,13 @@ interface Paper {
   paperId: string
   title: string
   abstract?: string
-  authors?: { name: string }[]
+  authors?: { name: string; authorId?: string }[]
   year?: number
   referenceCount?: number
   citationCount?: number
   url?: string
-  references?: string[]
-  citations?: string[]
+  references?: { paperId: string }[]
+  citations?: { paperId: string }[]
   [k: string]: any
 }
 
@@ -33,8 +33,11 @@ const COOLDOWN_KEY = "s2_cooldown_until"
 
 /** Returns a paper either by id or query string. */
 export async function getPaper(idOrQuery: string): Promise<Paper | null> {
+  // Canonicalize identifier (strip doi.org prefix, lowercase)
+  const canonicalId = idOrQuery.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').toLowerCase()
+
   // 1. IndexedDB cache
-  const localKey = `s2_${idOrQuery}`
+  const localKey = `s2_${canonicalId}`
   const local = await get<Paper>(localKey)
   if (local) return local
 
@@ -42,7 +45,7 @@ export async function getPaper(idOrQuery: string): Promise<Paper | null> {
   const { data: row } = await supabase
     .from("papers_cache")
     .select("data")
-    .eq("id", idOrQuery)
+    .eq("id", canonicalId)
     .single()
   if (row?.data) {
     await set(localKey, row.data)
@@ -57,9 +60,8 @@ export async function getPaper(idOrQuery: string): Promise<Paper | null> {
   }
 
   // 3. Live fetch
-  const url = idOrQuery.startsWith("10.")
-    ? `${S2_ENDPOINT}DOI:${encodeURIComponent(idOrQuery)}?fields=${FIELDS}`
-    : `${S2_ENDPOINT}${encodeURIComponent(idOrQuery)}?fields=${FIELDS}`
+  const idParam = canonicalId.startsWith('10.') ? `DOI:${canonicalId}` : canonicalId
+  const url = `${S2_ENDPOINT}${encodeURIComponent(idParam)}?fields=${FIELDS}`
 
   const res = await fetchWithRetry(url, {}, 3)
   if (res.status === 429) {
@@ -73,7 +75,7 @@ export async function getPaper(idOrQuery: string): Promise<Paper | null> {
 
   // Persist to caches (TTL handled server-side by column)
   await set(localKey, data)
-  await supabase.from("papers_cache").upsert({ id: idOrQuery, data })
+  await supabase.from("papers_cache").upsert({ id: canonicalId, data })
 
   return data
 }
