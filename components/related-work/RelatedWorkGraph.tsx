@@ -73,9 +73,9 @@ export default function RelatedWorkGraph() {
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended)
-        )
-        .append('title')
-        .text(d => d.title)
+        );
+
+      node.append('title').text(d => d.title);
 
       simulation.on('tick', () => {
         link

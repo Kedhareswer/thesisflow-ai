@@ -13,25 +13,29 @@
 
 ```mermaid
 flowchart LR
-  subgraph Frontend
+  subgraph Frontend["Frontend"]
     A[Next.js 15 & React 19]
     B[TailwindCSS]
   end
-  subgraph Backend
+  
+  subgraph Backend["Backend"]
     C[Node.js 18 / Express]
     D[FastAPI (Python)]
   end
-  subgraph AI
+  
+  subgraph AI["AI"]
     E[OpenAI GPT-4o]
     F[Anthropic Claude-3]
     G[Google Gemini]
     H[Groq LLaMA]
   end
-  subgraph Data & Realtime
+  
+  subgraph Data["Data & Realtime"]
     I[Supabase PG]
     J[Redis Cache]
     K[Socket.io]
   end
+  
   A --> C
   A --> I
   C --> I
@@ -42,6 +46,11 @@ flowchart LR
   F --> C
   G --> C
   H --> C
+  
+  style Frontend fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+  style Backend fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+  style AI fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+  style Data fill:#fff3e0,stroke:#ff9800,stroke-width:2px
 ```
 
 
