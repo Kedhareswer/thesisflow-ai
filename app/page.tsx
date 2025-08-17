@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe } from "lucide-react"
+import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import DisplayCards from "@/components/ui/display-cards"
 import { Pricing } from "@/components/ui/pricing-cards"
@@ -89,8 +89,7 @@ export default function HomePage() {
             </Badge>
 
             <h1 className="text-display text-balance mb-6">
-              Bolt Research Hub
-              <span className="block">for research purposes</span>
+              Revolutionize Your Academic Research
             </h1>
 
             <p className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto leading-relaxed">
@@ -156,6 +155,53 @@ export default function HomePage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Research Challenges Section */}
+      <section className="py-16 bg-white dark:bg-background">
+        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+              Research Shouldn't Be This Hard
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Academic researchers waste 40% of their time on administrative tasks and tool-switching instead of actual research.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
+            <div className="bg-background p-6 rounded-xl shadow-sm">
+              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="w-6 h-6 text-gray-900 dark:text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Time Wasted</h3>
+              <p className="text-gray-600 dark:text-gray-300">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
+            </div>
+            
+            <div className="bg-background p-6 rounded-xl shadow-sm">
+              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Target className="w-6 h-6 text-gray-900 dark:text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Lost Focus</h3>
+              <p className="text-gray-600 dark:text-gray-300">Constant context switching breaks deep work and reduces research quality.</p>
+            </div>
+            
+            <div className="bg-background p-6 rounded-xl shadow-sm">
+              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="w-6 h-6 text-gray-900 dark:text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Team Chaos</h3>
+              <p className="text-gray-600 dark:text-gray-300">Fragmented communication and version control nightmares slow collaboration.</p>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Button className="bg-black hover:bg-gray-800 text-white px-8 py-4 rounded-lg transition-all transform hover:scale-105 font-semibold text-base shadow-lg">
+              Solve This Now
+              <ArrowRight className="w-5 h-5 inline ml-2" />
+            </Button>
           </div>
         </div>
       </section>
