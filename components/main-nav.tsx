@@ -202,7 +202,7 @@ export function MainNav() {
                   <SimpleAvatar size="md" />
                   <div className="flex flex-col space-y-1 leading-none">
                     <p className="font-medium text-sm">
-                      {user.user_metadata?.display_name || user.user_metadata?.name || "User"}
+                      {user.user_metadata?.full_name || user.user_metadata?.display_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : "User")}
                     </p>
                     <p className="w-[180px] truncate text-xs text-gray-600">{user.email}</p>
                   </div>

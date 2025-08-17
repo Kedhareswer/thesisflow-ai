@@ -36,7 +36,8 @@ import {
   PenLine,
   ArrowRight,
   Lightbulb,
-  MessageSquare
+  MessageSquare,
+  Upload
 } from "lucide-react"
 
 interface AIWritingAssistantProps {
@@ -608,20 +609,25 @@ export function AIWritingAssistant({
       )}
 
       {/* Show EmptyState when authenticated but no content */}
+      {/* Upload UI when no document content */}
       {isAuthenticated && !currentDocumentContent.trim() && (
-        <EmptyState
-          title="No Content to Work With"
-          description="Start writing in the editor above to get AI-powered suggestions and improvements."
-          icons={[PenLine, Lightbulb]}
-          action={{
-            label: "Start Writing",
-            onClick: () => {
-              // Focus the editor (this would need to be passed as a prop)
-              const editor = document.querySelector('[contenteditable="true"]') as HTMLElement
-              if (editor) editor.focus()
-            }
-          }}
-        />
+        <div className="border-2 border-dashed rounded-md p-8 flex flex-col items-center text-center">
+          <Upload className="h-8 w-8 mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-medium mb-1">Add source files</h3>
+          <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+            Upload PDF, DOCX or TXT files to provide context for the AI. These files will be indexed client-side and referenced via Retrieval-Augmented Generation (RAG).
+          </p>
+          <Input
+            type="file"
+            accept={FileProcessor.getSupportedTypes().join(",")}
+            onChange={(e) => e.target.files && handleFileInput(e.target.files[0])}
+          />
+          {uploadedSources.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              {uploadedSources.length} file{uploadedSources.length > 1 ? "s" : ""} added
+            </p>
+          )}
+        </div>
       )}
 
       {/* Settings Toggle */}
