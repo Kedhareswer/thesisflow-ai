@@ -169,7 +169,7 @@ export default function SummarizerPage() {
 
       // Automatically trigger summarization and switch to the Summary tab
       setTimeout(() => {
-        handleSummarize()
+        handleSummarize(data.content || "")
         handleTabChange('summary')
       }, 0)
 
@@ -221,8 +221,9 @@ export default function SummarizerPage() {
   )
 
   // Handle text summarization with progress
-  const handleSummarize = async (retryOptions?: any) => {
-    if (!content.trim()) {
+  const handleSummarize = async (contentOverride?: string, retryOptions?: any) => {
+    const textToSummarize = contentOverride ?? content;
+    if (!textToSummarize.trim()) {
       const validationError = ErrorHandler.processError(
         "No content provided for summarization",
         { operation: 'summarize-validation' }
@@ -256,11 +257,11 @@ export default function SummarizerPage() {
         model: selectedModel,
         style: summaryStyle,
         length: summaryLength,
-        contentLength: content.length
+        contentLength: textToSummarize.length
       })
 
       const result = await SummarizerService.summarizeText(
-        content,
+        textToSummarize,
         true,
         (progress) => setProcessingProgress(progress),
         {
@@ -283,7 +284,7 @@ export default function SummarizerPage() {
     } catch (error) {
       const processedError = ErrorHandler.processError(error, {
         operation: 'summarize-text',
-        contentLength: content.length
+        contentLength: textToSummarize.length
       })
       setError(processedError)
       completeProcessing(false)
