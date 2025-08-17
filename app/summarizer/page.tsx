@@ -166,6 +166,13 @@ export default function SummarizerPage() {
       }
 
       setContent(data.content || "")
+
+      // Automatically trigger summarization and switch to the Summary tab
+      setTimeout(() => {
+        handleSummarize()
+        handleTabChange('summary')
+      }, 0)
+
       toast({
         title: "URL Content Extracted",
         description: `Successfully extracted ${getWordCount(data.content || "")} words from the URL.`,

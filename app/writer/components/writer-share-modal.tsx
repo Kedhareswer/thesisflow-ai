@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import DocumentService from "@/lib/services/document.service";
+import { v4 as uuidv4 } from "uuid";
 import {
   Dialog,
   DialogContent,
@@ -102,13 +104,61 @@ export default function WriterShareModal({
     }
     try {
       setSharing(true);
-      const link = `${window.location.origin}/writer?id=${documentId}`;
+
+      // 1. Export current document as Markdown blob
+      const blob = await DocumentService.getInstance().exportDocument(
+        documentId!,
+        "markdown"
+      );
+      const fileNameSafe = documentTitle
+        .trim()
+        .replace(/[^a-z0-9\-]+/gi, "_")
+        .slice(0, 50);
+      const fileExt = "md";
+      const fileBaseName = `${fileNameSafe || "document"}.${fileExt}`;
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("No session");
+      if (!session?.access_token) throw new Error("Login required");
 
+      // Loop through selected teams and process sequentially to simplify error handling
       for (const teamId of selectedTeams) {
+        // 2. Upload file to Supabase Storage under documents bucket (teams/<id>/...)
+        const storagePath = `teams/${teamId}/${uuidv4()}-${fileBaseName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("documents")
+          .upload(storagePath, blob, {
+            contentType: "text/markdown",
+            upsert: false,
+            cacheControl: "3600",
+          });
+        if (uploadError) throw new Error(uploadError.message);
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("documents").getPublicUrl(storagePath);
+
+        // 3. Register file in Collaborate Files for the team
+        await fetch("/api/collaborate/files", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            teamId,
+            type: "file",
+            name: fileBaseName,
+            url: publicUrl,
+            fileType: "text/markdown",
+            fileSize: blob.size,
+            description: `Shared from Writer page`,
+            isPublic: false,
+          }),
+        });
+
+        // 4. Post system chat message with file reference
         await fetch("/api/collaborate/messages", {
           method: "POST",
           headers: {
@@ -117,15 +167,23 @@ export default function WriterShareModal({
           },
           body: JSON.stringify({
             teamId,
-            content: `📄 *${documentTitle}* shared: ${link}`,
+            content: `📎 *${documentTitle}* uploaded: ${publicUrl}`,
             type: "system",
           }),
         });
       }
-      toast({ title: "Shared", description: "Document sent to selected teams." });
+
+      toast({
+        title: "Shared",
+        description: "Document uploaded and shared with selected teams.",
+      });
       onOpenChange(false);
     } catch (e) {
-      toast({ title: "Error", description: "Failed to share document.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "Failed to share document.",
+        variant: "destructive",
+      });
     } finally {
       setSharing(false);
     }
