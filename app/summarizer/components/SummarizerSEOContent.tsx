@@ -1,5 +1,4 @@
 import React from 'react';
-import Link from 'next/link';
 
 interface SummarizerSEOContentProps {
   className?: string;
@@ -10,7 +9,7 @@ export default function SummarizerSEOContent({ className = "" }: SummarizerSEOCo
     <div className={`prose prose-slate max-w-none ${className}`}>
       {/* Main heading for SEO */}
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-        AI Document Summarizer
+        AI Document Summarizer - Advanced Research Tool
       </h1>
       
       {/* Introduction section */}
@@ -192,36 +191,28 @@ export default function SummarizerSEOContent({ className = "" }: SummarizerSEOCo
         
         <div className="grid md:grid-cols-2 gap-4">
           <div className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-              <Link href="/literature" className="hover:underline">Literature Explorer</Link>
-            </h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Literature Explorer</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Summarize research papers found through our multi-source academic search engine.
             </p>
           </div>
           
           <div className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-              <Link href="/writer" className="hover:underline">Academic Writer</Link>
-            </h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Academic Writer</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Use summaries as source material for your academic writing and citation management.
             </p>
           </div>
           
           <div className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-              <Link href="/collaborate" className="hover:underline">Team Collaboration</Link>
-            </h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Team Collaboration</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Share summaries with team members and collaborate on research projects in real-time.
             </p>
           </div>
           
           <div className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-              <Link href="/project-planner" className="hover:underline">Project Planner</Link>
-            </h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Project Planner</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Organize summaries within your research projects and track progress efficiently.
             </p>
