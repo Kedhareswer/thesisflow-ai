@@ -43,6 +43,7 @@ import { UserProfileAvatar } from "@/components/user-profile-avatar" // For user
 import { supabase } from "@/lib/supabase"
 import type { AIProvider } from "@/lib/ai-providers"
 import { WriterCommandMenu } from "./components/writer-command-menu"
+import WriterShareModal from "./components/writer-share-modal"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -69,6 +70,7 @@ export default function WriterPage() {
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
   const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
   const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
+  const [isShareOpen, setIsShareOpen] = useState(false)
 
   const [aiDetectionResult, setAiDetectionResult] = useState<string | null>(null)
   const [humanizedText, setHumanizedText] = useState<string | null>(null)
@@ -755,10 +757,10 @@ export default function WriterPage() {
               />
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" onClick={() => setIsShareOpen(true)}>
                     <Share2 className="h-4 w-4" />
                     <span className="sr-only">Share</span>
-                </Button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>Share</TooltipContent>
               </Tooltip>
@@ -945,6 +947,12 @@ export default function WriterPage() {
           </ScrollArea>
         </main>
       </div>
+    <WriterShareModal
+        open={isShareOpen}
+        onOpenChange={setIsShareOpen}
+        documentId={document?.id}
+        documentTitle={documentTitle}
+      />
     </TooltipProvider>
   )
 }
