@@ -11,7 +11,7 @@ export default function Head({
   summaryStyle, 
   customDescription 
 }: HeadProps = {}) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ai-project-planner.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bolt-research-hub.vercel.app";
   const url = `${baseUrl}/summarizer`;
   
   // Dynamic title generation
