@@ -1,0 +1,83 @@
+# Googlebot Configuration for Bolt Research Hub
+# Specific instructions for Google's web crawler
+# Site: https://ai-project-planner.vercel.app
+
+# Crawl rate settings
+User-agent: Googlebot
+Crawl-delay: 1
+
+# High priority pages for indexing
+Allow: /
+Allow: /explorer
+Allow: /summarizer  
+Allow: /writer
+Allow: /collaborate
+Allow: /planner
+Allow: /ai-assistant
+
+# Marketing and information pages
+Allow: /pricing
+Allow: /about
+Allow: /contact
+Allow: /help
+Allow: /docs
+Allow: /terms
+Allow: /privacy
+
+# Static assets and resources
+Allow: /_next/static/
+Allow: /images/
+Allow: /icons/
+Allow: /favicon.ico
+Allow: /og-image.png
+Allow: /sitemap.xml
+Allow: /robots.txt
+
+# Restrict private and sensitive areas
+Disallow: /api/
+Disallow: /auth/
+Disallow: /login
+Disallow: /signup
+Disallow: /dashboard/
+Disallow: /profile/
+Disallow: /settings/
+Disallow: /admin/
+Disallow: /checkout/
+Disallow: /billing/
+
+# Block dynamic parameters that create duplicate content
+Disallow: /*?*session*
+Disallow: /*?*token*
+Disallow: /*?*auth*
+Disallow: /*?*utm_*
+Disallow: /*?*key*
+Disallow: /*?*api_key*
+
+# Block user-generated content areas
+Disallow: /uploads/
+Disallow: /temp/
+Disallow: /cache/
+Disallow: /logs/
+
+# Block development and testing
+Disallow: /test/
+Disallow: /dev/
+Disallow: /debug/
+Disallow: /.git/
+Disallow: /.env
+Disallow: /node_modules/
+
+# Preferred indexing schedule
+# Peak hours: Avoid 9-17 UTC (business hours)
+# Preferred: 18-08 UTC (off-peak hours)
+
+# Content freshness indicators
+# Homepage: Daily checks
+# Feature pages: Weekly checks  
+# Documentation: Bi-weekly checks
+# Legal pages: Monthly checks
+
+# Special handling for research content
+# Academic papers and citations should be indexed carefully
+# Respect copyright and fair use guidelines
+# Prioritize original research insights over aggregated content

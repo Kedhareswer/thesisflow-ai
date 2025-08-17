@@ -1,0 +1,156 @@
+# Robots.txt for Bolt Research Hub
+# AI-Powered Research Platform
+# Site: https://ai-project-planner.vercel.app
+
+User-agent: *
+
+# Allow access to public pages and features
+Allow: /
+Allow: /explorer
+Allow: /summarizer
+Allow: /writer
+Allow: /collaborate
+Allow: /planner
+Allow: /pricing
+Allow: /about
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /help
+Allow: /docs
+
+# Allow static assets
+Allow: /favicon.ico
+Allow: /robots.txt
+Allow: /sitemap.xml
+Allow: /_next/static/
+Allow: /images/
+Allow: /icons/
+Allow: /og-image.png
+Allow: /placeholder-logo.png
+Allow: /placeholder-logo.svg
+Allow: /assistant-avatar.svg
+
+# Restrict API endpoints (backend functionality)
+Disallow: /api/
+Disallow: /api/auth/
+Disallow: /api/ai/
+Disallow: /api/search/
+Disallow: /api/collaborate/
+Disallow: /api/user-api-keys/
+Disallow: /api/stripe/
+Disallow: /api/analytics/
+Disallow: /api/files/
+Disallow: /api/teams/
+
+# Restrict user-specific and private areas
+Disallow: /dashboard/
+Disallow: /profile/
+Disallow: /settings/
+Disallow: /admin/
+Disallow: /team/*/private/
+Disallow: /project/*/private/
+Disallow: /document/*/private/
+
+# Restrict authentication and checkout flows
+Disallow: /auth/
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password
+Disallow: /checkout/
+Disallow: /billing/
+Disallow: /subscription/
+
+# Restrict development and testing areas
+Disallow: /test/
+Disallow: /dev/
+Disallow: /debug/
+Disallow: /_next/
+Disallow: /node_modules/
+Disallow: /.git/
+Disallow: /.env
+Disallow: /scripts/
+
+# Restrict file uploads and user content
+Disallow: /uploads/
+Disallow: /temp/
+Disallow: /cache/
+Disallow: /logs/
+
+# Restrict search parameters that might create duplicate content
+Disallow: /*?*utm_*
+Disallow: /*?*session*
+Disallow: /*?*token*
+Disallow: /*?*auth*
+Disallow: /*?*key*
+
+# Special rules for Googlebot
+User-agent: Googlebot
+Allow: /
+Allow: /explorer
+Allow: /summarizer
+Allow: /writer
+Allow: /collaborate
+Allow: /planner
+Allow: /pricing
+Allow: /about
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /help
+Allow: /docs
+Allow: /_next/static/
+Allow: /images/
+Allow: /og-image.png
+Disallow: /api/
+Disallow: /auth/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /*?*session*
+Disallow: /*?*token*
+
+# Special rules for Bingbot
+User-agent: Bingbot
+Allow: /
+Allow: /explorer
+Allow: /summarizer
+Allow: /writer
+Allow: /collaborate
+Allow: /planner
+Allow: /pricing
+Allow: /about
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Disallow: /api/
+Disallow: /auth/
+Disallow: /dashboard/
+Disallow: /admin/
+
+# Block AI training bots (optional - uncomment if desired)
+# User-agent: ChatGPT-User
+# Disallow: /
+
+# User-agent: GPTBot
+# Disallow: /
+
+# User-agent: Google-Extended
+# Disallow: /
+
+# User-agent: CCBot
+# Disallow: /
+
+# User-agent: anthropic-ai
+# Disallow: /
+
+# User-agent: Claude-Web
+# Disallow: /
+
+# Crawl delay for all bots (1 second)
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://ai-project-planner.vercel.app/sitemap.xml
+
+# Host directive (preferred domain)
+Host: https://ai-project-planner.vercel.app
