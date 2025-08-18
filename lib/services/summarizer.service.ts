@@ -129,31 +129,32 @@ export class SummarizerService {
         })
 
         const response = await api.post<GenerateResponse>("/api/ai/generate", {
-          prompt: `You are an expert research paper summarizer. Summarize the following text in a clear, concise manner. 
-          Focus on the main findings, methodology, and implications. 
+          prompt: `You are an expert research paper summarizer. Summarize the following text in a clear, concise manner.
+          Focus on the main findings, methodology, and implications. Do NOT repeat or quote large portions of the input. Do not copy the input verbatim.
           
           After the summary, provide exactly 5 key points from the text.
           
-          Format your response as:
+          Format your response EXACTLY as:
           
           SUMMARY:
-          [Your summary here, about 3-4 paragraphs]
+          [A concise 2-4 paragraph summary]
           
           KEY_POINTS:
-          - [Key point 1]
-          - [Key point 2]
-          - [Key point 3]
-          - [Key point 4]
-          - [Key point 5]
+          - [Point 1]
+          - [Point 2]
+          - [Point 3]
+          - [Point 4]
+          - [Point 5]
           
-          Here is the text to summarize:
-          
-          ${text}`,
+          Text to summarize (between BEGIN_TEXT and END_TEXT; do not echo it):
+          ===BEGIN_TEXT===
+          ${text}
+          ===END_TEXT===`,
           provider: options?.provider,
           model: options?.model
         })
 
-        const parsedResult = this.parseSummaryResponse(response, text.length)
+        const parsedResult = this.parseSummaryResponse(response, text.length, text)
 
         result = {
           ...parsedResult,
@@ -290,6 +291,15 @@ export class SummarizerService {
       // Create form data to upload the file
       const formData = new FormData()
       formData.append("file", file)
+      // Enable OCR automatically for PDFs and images
+      try {
+        const type = file.type || ''
+        if (type === 'application/pdf' || type.startsWith('image/')) {
+          formData.append('enableOCR', 'true')
+        }
+      } catch (_) {
+        // no-op
+      }
 
       // Upload and extract text from the file using direct fetch for FormData
       const response = await fetch("/api/extract-file", {
@@ -441,7 +451,7 @@ export class SummarizerService {
   /**
    * Parse the AI response to extract summary and key points
    */
-  private static parseSummaryResponse(responseData: any, originalLength: number): SummaryResult {
+  private static parseSummaryResponse(responseData: any, originalLength: number, originalText?: string): SummaryResult {
     // Extract content from response - handle both 'response' and 'content' fields for backward compatibility
     let content = ""
     if (responseData && typeof responseData === "object") {
@@ -464,6 +474,39 @@ export class SummarizerService {
     }
 
     console.log("AI Response content:", content.substring(0, 200) + "...");
+
+    // If the model echoed the original text, strip it out before parsing
+    try {
+      if (originalText && originalText.length > 200) {
+        const head = originalText.slice(0, 200)
+        const tail = originalText.slice(-200)
+        const echoedHead = content.indexOf(head)
+        const echoedTail = content.lastIndexOf(tail)
+
+        // Case 1: Full or large portion echoed verbatim
+        if (echoedHead !== -1 && echoedTail !== -1 && echoedTail > echoedHead) {
+          // Remove the segment that likely corresponds to the input text
+          const before = content.slice(0, echoedHead)
+          const after = content.slice(echoedTail + tail.length)
+          content = (before + "\n" + after).trim()
+        }
+
+        // Case 2: Echoed within code fences or after an instruction line
+        // Remove anything following a marker like "Here is the text to summarize:" or a fenced block that seems to contain the input
+        const echoMarkers = [
+          /Here is the text to summarize:\s*[\s\S]*$/i,
+          /```[\s\S]*?```/g,
+        ]
+        for (const marker of echoMarkers) {
+          // If content includes a long overlap with the original, strip those sections
+          if (originalText.length > 500 && content.includes(originalText.slice(0, 100))) {
+            content = content.replace(marker, "").trim()
+          }
+        }
+      }
+    } catch (_) {
+      // Non-fatal: continue with best-effort parsing
+    }
 
     // More flexible parsing to handle different response formats
     let summary = "";
@@ -494,20 +537,22 @@ export class SummarizerService {
 
     // Try to extract key points using various patterns
     const keyPointsPatterns = [
-      /KEY_POINTS:|KEY POINTS:|KEY INSIGHTS:([\s\S]*)/i,
+      /(KEY_POINTS:|KEY POINTS:|KEY INSIGHTS:)\s*([\s\S]*)/i,
       /Key Insights[\s\S]*?([\s\S]*)/i,
       /Key Points[\s\S]*?([\s\S]*)/i,
-      /\d+\.([\s\S]*)/i
+      /\n\s*(?:Key\s*Takeaways|Highlights|Bullets):\s*([\s\S]*)/i
     ];
 
     for (const pattern of keyPointsPatterns) {
       const match = content.match(pattern);
-      if (match && match[1]) {
-        const keyPointsText = match[1].trim();
+      // Use the last capturing group if multiple exist
+      const captured = match ? (match[2] ?? match[1]) : undefined
+      if (captured) {
+        const keyPointsText = String(captured).trim();
 
         // Try to extract numbered or bulleted points
         const pointsArray = keyPointsText
-          .split(/\n+|\d+\.\s+|•\s+|\*\s+|\-\s+/)
+          .split(/\n+|\r+|\d+\.\s+|•\s+|\*\s+|\-\s+/)
           .map(point => point.trim())
           .filter(point => point.length > 10);
 

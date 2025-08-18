@@ -23,7 +23,10 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
   const { toast } = useToast()
 
   const handleFileUpload = async (file: File) => {
-    if (!file) return
+    if (!file) {
+      onError("No file selected")
+      return
+    }
 
     // File size validation (10MB limit)
     if (file.size > 10 * 1024 * 1024) {
@@ -35,7 +38,7 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
           contentLength: file.size
         }
       )
-      onError(sizeError.message)
+      onError(sizeError.message || "File size exceeds 10MB limit")
       toast({
         title: sizeError.title,
         description: sizeError.message,
@@ -54,7 +57,7 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
           fileType: file.type
         }
       )
-      onError(typeError.message)
+      onError(typeError.message || `Unsupported file type: ${file.type}`)
       toast({
         title: typeError.title,
         description: typeError.message,
@@ -65,7 +68,7 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
 
     setProcessing(true)
     setUploadedFile(file)
-    onError("") // Clear any previous errors
+    // Don't clear errors here - let the parent component handle it
 
     try {
       const result = await FileProcessor.processFile(file)
@@ -94,11 +97,13 @@ export function FileUploader({ onFileProcessed, onError, className }: FileUpload
         fileType: file.type
       })
       
-      onError(processedError.message)
+      // Pass the error message, ensuring it's never empty
+      const errorMessage = processedError.message || "Failed to process file"
+      onError(errorMessage)
 
       toast({
-        title: processedError.title,
-        description: processedError.message,
+        title: processedError.title || "File Processing Failed",
+        description: errorMessage,
         variant: "destructive",
       })
 

@@ -412,25 +412,66 @@ IMPORTANT_DETAILS:
         chunkResults: ChunkProcessingResult[],
         originalContent: string,
         chunkingResult: any,
-        options: {
-            provider?: string
-            model?: string
-        } = {}
+        options: any
     ): Promise<SynthesizedResult> {
-        // Combine all summaries and key points
-        const allSummaries = chunkResults.map(r => r.summary).filter(s => s && !s.includes('processing failed'))
-        const allKeyPoints = chunkResults.flatMap(r => r.keyPoints).filter(p => p && !p.includes('processing failed'))
+        // Combine all summaries and key points from chunks, excluding failures
+        const allSummaries = chunkResults
+            .map(r => r.summary)
+            .filter(s => s && !/processing failed/i.test(s))
 
-        // Create final synthesis prompt
-        const synthesisPrompt = `Synthesize the following summaries from ${chunkResults.length} sections of a document into one coherent summary:
+        const allKeyPoints = chunkResults
+            .flatMap(r => (r.keyPoints || []))
+            .filter(p => p && !/processing failed/i.test(p))
 
-${allSummaries.map((summary, index) => `Section ${index + 1}: ${summary}`).join('\n\n')}
+        // If nothing usable came back from providers, perform a local heuristic summary
+        if (allSummaries.length === 0) {
+            const sentences = originalContent
+                .replace(/\s+/g, ' ')
+                .split(/[.!?]+\s/)
+                .map(s => s.trim())
+                .filter(s => s.length > 0)
+
+            const summaryText = sentences.slice(0, 3).join('. ') + (sentences.length > 0 ? '.' : '')
+
+            // Simple key point extraction: take first lines of distinct paragraphs or leading sentences
+            const paragraphs = originalContent.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+            let keyPoints = paragraphs
+                .map(p => p.replace(/\s+/g, ' ').split(/[.!?]+\s/)[0])
+                .filter(p => p && p.length > 10)
+                .slice(0, 5)
+
+            if (keyPoints.length === 0) {
+                keyPoints = sentences.slice(0, 5)
+            }
+
+            return {
+                summary: summaryText || originalContent.slice(0, 500),
+                keyPoints,
+                readingTime: Math.ceil(originalContent.length / 1000),
+                processingMethod: 'chunked',
+                confidence: this.calculateConfidence(chunkResults),
+                warnings: ['No chunk summaries produced; used heuristic summarization'],
+                suggestions: this.generateSuggestions(chunkResults, originalContent),
+                metadata: {
+                    originalLength: originalContent.length,
+                    totalChunks: chunkResults.length,
+                    averageChunkSize: chunkingResult?.metadata?.averageChunkSize ?? 0,
+                    totalProcessingTime: 0,
+                    chunkingStrategy: chunkingResult?.chunkingStrategy ?? 'unknown'
+                }
+            }
+        }
+
+        const synthesisPrompt = `Synthesize a final summary from multiple section summaries and key points.
+
+Section summaries:
+${allSummaries.map((s, i) => `Section ${i + 1}: ${s}`).join('\n\n')}
 
 All key points identified:
-${allKeyPoints.map(point => `- ${point}`).join('\n')}
+${allKeyPoints.map(p => `- ${p}`).join('\n')}
 
 Create:
-1. A comprehensive summary that combines all sections coherently
+1. A comprehensive summary that combines all sections coherently (6-10 sentences)
 2. The 5 most important key points from across all sections
 
 Format:
@@ -447,7 +488,7 @@ TOP_KEY_POINTS:
             const synthesisResult = await enhancedAIService.generateText({
                 prompt: synthesisPrompt,
                 maxTokens: 1000,
-                temperature: 0.5, // Lower temperature for more consistent synthesis
+                temperature: 0.5,
                 provider: options.provider,
                 model: options.model
             })
@@ -466,9 +507,9 @@ TOP_KEY_POINTS:
                     metadata: {
                         originalLength: originalContent.length,
                         totalChunks: chunkResults.length,
-                        averageChunkSize: chunkingResult.metadata.averageChunkSize,
+                        averageChunkSize: chunkingResult?.metadata?.averageChunkSize ?? 0,
                         totalProcessingTime: 0, // Will be set by caller
-                        chunkingStrategy: chunkingResult.chunkingStrategy
+                        chunkingStrategy: chunkingResult?.chunkingStrategy ?? 'unknown'
                     }
                 }
             }
@@ -488,9 +529,9 @@ TOP_KEY_POINTS:
             metadata: {
                 originalLength: originalContent.length,
                 totalChunks: chunkResults.length,
-                averageChunkSize: chunkingResult.metadata.averageChunkSize,
+                averageChunkSize: chunkingResult?.metadata?.averageChunkSize ?? 0,
                 totalProcessingTime: 0,
-                chunkingStrategy: chunkingResult.chunkingStrategy
+                chunkingStrategy: chunkingResult?.chunkingStrategy ?? 'unknown'
             }
         }
     }
