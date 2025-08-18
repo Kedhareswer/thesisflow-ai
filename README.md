@@ -9,51 +9,6 @@
 
 ![Bolt Research Hub](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
 
-## 🚀 Technology Stack
-
-```mermaid
-flowchart LR
-  subgraph Frontend["Frontend"]
-    A[Next.js 15 & React 19]
-    B[TailwindCSS]
-  end
-  
-  subgraph Backend["Backend"]
-    C[Node.js 18 / Express]
-    D[FastAPI (Python)]
-  end
-  
-  subgraph AI["AI"]
-    E[OpenAI GPT-4o]
-    F[Anthropic Claude-3]
-    G[Google Gemini]
-    H[Groq LLaMA]
-  end
-  
-  subgraph Data["Data & Realtime"]
-    I[Supabase PG]
-    J[Redis Cache]
-    K[Socket.io]
-  end
-  
-  A --> C
-  A --> I
-  C --> I
-  D --> I
-  C --> J
-  A --> K
-  E --> C
-  F --> C
-  G --> C
-  H --> C
-  
-  style Frontend fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
-  style Backend fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
-  style AI fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
-  style Data fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-```
-
-
 | Frontend | Backend | AI & ML | Database | Real-time |
 |----------|---------|---------|----------|-----------|
 | [![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black?style=flat-square&logo=next.js)](https://nextjs.org/) | [![Node.js](https://img.shields.io/badge/Node.js-18+-green?style=flat-square&logo=node.js)](https://nodejs.org/) | [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?style=flat-square&logo=openai)](https://openai.com/) | [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green?style=flat-square&logo=supabase)](https://supabase.io/) | [![Socket.io](https://img.shields.io/badge/Socket.io-4.8.1-black?style=flat-square&logo=socket.io)](https://socket.io/) |
