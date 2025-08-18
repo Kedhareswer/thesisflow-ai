@@ -1,6 +1,6 @@
 {
-  "name": "bolt-researcher",
-  "version": "1.1.1",
+  "name": "thesisflow-ai",
+  "version": "1.0.4",
   "private": true,
   "scripts": {
     "build": "next build",
