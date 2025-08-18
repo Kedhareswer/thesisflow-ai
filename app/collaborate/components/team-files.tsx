@@ -49,7 +49,7 @@ import {
 } from 'lucide-react'
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { formatDistanceToNow } from 'date-fns'
-import { CloudIntegrations } from './cloud-integrations'
+import { supabaseStorageManager, GoogleDriveOAuthHandler } from '@/lib/storage/supabase-storage-manager'
 
 interface TeamFile {
   id: string
@@ -132,6 +132,14 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
   const [linkPlatform, setLinkPlatform] = useState<string>('custom')
   const [linkDescription, setLinkDescription] = useState('')
   const [showLinkDialog, setShowLinkDialog] = useState(false)
+
+  // Google Drive integration states
+  const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false)
+  const [googleDriveUser, setGoogleDriveUser] = useState<any>(null)
+  const [connectingGoogleDrive, setConnectingGoogleDrive] = useState(false)
+  const [googleDriveFiles, setGoogleDriveFiles] = useState<any[]>([])
+  const [showGoogleDrivePicker, setShowGoogleDrivePicker] = useState(false)
+  const [googleDriveLoading, setGoogleDriveLoading] = useState(false)
 
   // Permissions
   const canUpload = ['owner', 'admin', 'editor'].includes(currentUserRole)
@@ -241,6 +249,31 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
     }
   }, [teamId, loadData, hasLoadedFromCache, files.length])
 
+  // Check Google Drive connection status
+  useEffect(() => {
+    checkGoogleDriveStatus()
+  }, [])
+
+  // Check Google Drive connection
+  const checkGoogleDriveStatus = async () => {
+    try {
+      const response = await fetch('/api/auth/google-drive', { credentials: 'include' })
+      const data = await response.json()
+      
+      if (data.success && data.connected) {
+        setIsGoogleDriveConnected(true)
+        setGoogleDriveUser(data.provider)
+        await supabaseStorageManager.loadUserProviders()
+      } else {
+        setIsGoogleDriveConnected(false)
+        setGoogleDriveUser(null)
+      }
+    } catch (error) {
+      console.error('Failed to check Google Drive status:', error)
+      setIsGoogleDriveConnected(false)
+    }
+  }
+
   // Clear cache when teamId changes
   useEffect(() => {
     setHasLoadedFromCache(false)
@@ -286,7 +319,7 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // Handle file upload
+  // Handle regular file upload (local)
   const handleFileUpload = async () => {
     if (!selectedFile || !canUpload) return
 
@@ -335,6 +368,119 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Could not upload file. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setUploadLoading(false)
+    }
+  }
+
+  // Connect to Google Drive
+  const handleConnectGoogleDrive = async () => {
+    try {
+      setConnectingGoogleDrive(true)
+      const oauthHandler = GoogleDriveOAuthHandler.getInstance()
+      await oauthHandler.authenticate()
+      
+      await checkGoogleDriveStatus()
+      toast({
+        title: "Google Drive connected",
+        description: "You can now upload files from Google Drive",
+      })
+    } catch (error) {
+      console.error('Failed to connect Google Drive:', error)
+      toast({
+        title: "Connection failed",
+        description: error instanceof Error ? error.message : "Could not connect to Google Drive",
+        variant: "destructive"
+      })
+    } finally {
+      setConnectingGoogleDrive(false)
+    }
+  }
+
+  // Disconnect Google Drive
+  const handleDisconnectGoogleDrive = async () => {
+    try {
+      await supabaseStorageManager.disconnectGoogleDrive()
+      setIsGoogleDriveConnected(false)
+      setGoogleDriveUser(null)
+      
+      toast({
+        title: "Google Drive disconnected",
+        description: "Google Drive integration has been removed",
+      })
+    } catch (error) {
+      console.error('Failed to disconnect Google Drive:', error)
+      toast({
+        title: "Disconnect failed",
+        description: error instanceof Error ? error.message : "Could not disconnect Google Drive",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Load Google Drive files
+  const loadGoogleDriveFiles = async () => {
+    if (!isGoogleDriveConnected) return
+    
+    try {
+      setGoogleDriveLoading(true)
+      const files = await supabaseStorageManager.listGoogleDriveFiles()
+      setGoogleDriveFiles(files.slice(0, 20)) // Limit to 20 files for UI
+    } catch (error) {
+      console.error('Failed to load Google Drive files:', error)
+      toast({
+        title: "Failed to load files",
+        description: "Could not load Google Drive files",
+        variant: "destructive"
+      })
+    } finally {
+      setGoogleDriveLoading(false)
+    }
+  }
+
+  // Upload from Google Drive
+  const handleGoogleDriveFileUpload = async (driveFile: any) => {
+    if (!canUpload) return
+
+    try {
+      setUploadLoading(true)
+
+      // Add to team files with Google Drive reference
+      const data = await apiCall('/api/collaborate/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId,
+          type: 'file',
+          name: driveFile.name,
+          url: driveFile.webViewUrl,
+          description: `Shared from Google Drive`,
+          tags: ['google-drive'],
+          isPublic: false,
+          fileType: driveFile.mimeType,
+          fileSize: driveFile.size,
+          cloudStorageId: driveFile.id,
+          cloudStorageProvider: 'google-drive'
+        }),
+      })
+
+      if (data.success) {
+        const updatedFiles = [data.file, ...files]
+        setFiles(updatedFiles)
+        saveCachedFiles(teamId, updatedFiles)
+        setShowGoogleDrivePicker(false)
+
+        toast({
+          title: "File shared",
+          description: `${driveFile.name} has been shared with the team`,
+        })
+      }
+    } catch (error) {
+      console.error('Error sharing Google Drive file:', error)
+      toast({
+        title: "Share failed",
+        description: error instanceof Error ? error.message : "Could not share file from Google Drive",
         variant: "destructive"
       })
     } finally {
@@ -457,7 +603,7 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="files">
             <File className="h-4 w-4 mr-2" />
             Files ({fileItems.length})
@@ -465,10 +611,6 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
           <TabsTrigger value="links">
             <Link className="h-4 w-4 mr-2" />
             Shared Links ({linkItems.length})
-          </TabsTrigger>
-          <TabsTrigger value="integrations">
-            <Cloud className="h-4 w-4 mr-2" />
-            Integrations
           </TabsTrigger>
         </TabsList>
 
@@ -509,12 +651,116 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="flex gap-2">
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Upload File
+                      </Button>
+                    </DialogTrigger>
+                  </Dialog>
+                  
+                  {/* Google Drive Integration */}
+                  {!isGoogleDriveConnected ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleConnectGoogleDrive}
+                      disabled={connectingGoogleDrive}
+                      className="gap-2"
+                    >
+                      <Cloud className="h-4 w-4" />
+                      {connectingGoogleDrive ? 'Connecting...' : 'Connect Google Drive'}
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Dialog open={showGoogleDrivePicker} onOpenChange={setShowGoogleDrivePicker}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowGoogleDrivePicker(true)
+                              loadGoogleDriveFiles()
+                            }}
+                            className="gap-2"
+                          >
+                            <Cloud className="h-4 w-4" />
+                            Share from Drive
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                          <DialogHeader>
+                            <DialogTitle>Select from Google Drive</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Cloud className="h-4 w-4" />
+                                Connected as {googleDriveUser?.provider_user_email}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDisconnectGoogleDrive}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Disconnect
+                              </Button>
+                            </div>
+                            
+                            {googleDriveLoading ? (
+                              <div className="flex items-center justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <span className="ml-2">Loading files...</span>
+                              </div>
+                            ) : (
+                              <div className="max-h-96 overflow-y-auto space-y-2">
+                                {googleDriveFiles.length === 0 ? (
+                                  <div className="text-center py-8 text-gray-500">
+                                    <FolderOpen className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                                    <p>No files found</p>
+                                  </div>
+                                ) : (
+                                  googleDriveFiles.map((file) => (
+                                    <div
+                                      key={file.id}
+                                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                      onClick={() => handleGoogleDriveFileUpload(file)}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-blue-100 rounded">
+                                          {getFileIcon(file.mimeType)}
+                                        </div>
+                                        <div>
+                                          <p className="font-medium text-sm">{file.name}</p>
+                                          <p className="text-xs text-gray-500">
+                                            {formatFileSize(file.size || 0)} • Modified {formatDistanceToNow(new Date(file.modifiedAt), { addSuffix: true })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <Button size="sm" variant="ghost">
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <CheckCircle className="h-3 w-3 text-green-600" />
+                        Drive Connected
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
                 <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                   <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Upload File
-                    </Button>
+                    <div style={{ display: 'none' }} />
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
@@ -935,9 +1181,6 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
           </Card>
         </TabsContent>
 
-        <TabsContent value="integrations">
-          <CloudIntegrations teamId={teamId} currentUserRole={currentUserRole} />
-        </TabsContent>
       </Tabs>
     </div>
   )
