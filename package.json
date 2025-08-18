@@ -48,6 +48,7 @@
     "@stripe/stripe-js": "^7.8.0",
     "@supabase/supabase-js": "latest",
     "@sveltejs/kit": "latest",
+    "@tabler/icons-react": "^3.34.1",
     "@tiptap/core": "latest",
     "@tiptap/extension-collaboration": "latest",
     "@tiptap/extension-collaboration-cursor": "latest",

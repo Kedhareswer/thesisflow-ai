@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import DisplayCards from "@/components/ui/display-cards"
 import { Pricing } from "@/components/ui/pricing-cards"
+import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
+import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 
 export default function HomePage() {
   const { user } = useSupabaseAuth()
@@ -59,6 +60,87 @@ export default function HomePage() {
       href: "/research-assistant",
     },
   ]
+
+  // Testimonials data
+  const testimonials = [
+    {
+      text:
+        "This ERP revolutionized our operations, streamlining finance and inventory. The cloud-based platform keeps us productive, even remotely.",
+      image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+      name: "Briana Patton",
+      role: "Operations Manager",
+    },
+    {
+      text:
+        "Implementing this ERP was smooth and quick. The customizable, user-friendly interface made team training effortless.",
+      image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=200&auto=format&fit=crop",
+      name: "Bilal Ahmed",
+      role: "IT Manager",
+    },
+    {
+      text:
+        "The support team is exceptional, guiding us through setup and providing ongoing assistance, ensuring our satisfaction.",
+      image: "https://images.unsplash.com/photo-1544005311-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+      name: "Saman Malik",
+      role: "Customer Support Lead",
+    },
+    {
+      text:
+        "This ERP's seamless integration enhanced our business operations and efficiency. Highly recommend for its intuitive interface.",
+      image: "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
+      name: "Omar Raza",
+      role: "CEO",
+    },
+    {
+      text:
+        "Its robust features and quick support have transformed our workflow, making us significantly more efficient.",
+      image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=200&auto=format&fit=crop",
+      name: "Zainab Hussain",
+      role: "Project Manager",
+    },
+    {
+      text:
+        "The smooth implementation exceeded expectations. It streamlined processes, improving overall business performance.",
+      image: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?q=80&w=200&auto=format&fit=crop",
+      name: "Aliza Khan",
+      role: "Business Analyst",
+    },
+    {
+      text:
+        "Our business functions improved with a user-friendly design and positive customer feedback.",
+      image: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=200&auto=format&fit=crop",
+      name: "Farhan Siddiqui",
+      role: "Marketing Director",
+    },
+    {
+      text:
+        "They delivered a solution that exceeded expectations, understanding our needs and enhancing our operations.",
+      image: "https://images.unsplash.com/photo-1544005316-04ce1f1a65a2?q=80&w=200&auto=format&fit=crop",
+      name: "Sana Sheikh",
+      role: "Sales Manager",
+    },
+    {
+      text:
+        "Using this ERP, our online presence and conversions significantly improved, boosting business performance.",
+      image: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=200&auto=format&fit=crop",
+      name: "Hassan Ali",
+      role: "E-commerce Manager",
+    },
+  ]
+
+  const firstColumn = testimonials.slice(0, 3)
+  const secondColumn = testimonials.slice(3, 6)
+  const thirdColumn = testimonials.slice(6, 9)
+
+  // Map existing features to the new hover component input shape
+  const hoverFeatures: FeatureItem[] = features.map((f) => {
+    const Icon = f.icon
+    return {
+      title: f.title,
+      description: f.description,
+      icon: <Icon className="h-6 w-6" />,
+    }
+  })
 
   const benefits = [
     {
@@ -113,7 +195,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Grid */}
+      {/* Features Grid — redesigned with hover effects */}
       <section className="section-spacing bg-muted/30">
         <div className="container">
           <div className="max-w-2xl mx-auto text-center mb-16">
@@ -122,39 +204,7 @@ export default function HomePage() {
               Comprehensive tools designed to streamline every aspect of your research workflow.
             </p>
           </div>
-
-          <div className="grid grid-auto-fit gap-8">
-            {features.map((feature, index) => (
-              <Card
-                key={feature.title}
-                className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm animate-fade-in"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-accent rounded-lg group-hover:bg-foreground group-hover:text-background transition-colors">
-                      <feature.icon className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="text-title">{feature.title}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <CardDescription className="text-body mb-4">{feature.description}</CardDescription>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="p-0 h-auto font-normal"
-                    onClick={() => handleProtectedAction(feature.href)}
-                  >
-                    <span className="inline-flex items-center text-sm">
-                      Learn more
-                      <ArrowRight className="ml-1 h-3 w-3" />
-                    </span>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <FeaturesSectionWithHoverEffects features={hoverFeatures} />
         </div>
       </section>
 
@@ -205,50 +255,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="section-spacing">
-        <div className="container">
-          <div className="max-w-2xl mx-auto text-center mb-16">
-            <h2 className="text-headline mb-4">Why choose our platform</h2>
-            <p className="text-body text-muted-foreground">
-              Built with modern technology and research best practices in mind.
-            </p>
+      {/* Testimonials Section (above Pricing) */}
+      <section className="bg-background my-20 relative">
+        <div className="container z-10 mx-auto">
+          <div className="flex flex-col items-center justify-center max-w-[540px] mx-auto">
+            <div className="flex justify-center">
+              <div className="border py-1 px-4 rounded-lg">Testimonials</div>
+            </div>
+
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tighter mt-5">
+              What our users say
+            </h2>
+            <p className="text-center mt-5 opacity-75">See what our customers have to say about us.</p>
           </div>
 
-          <div className="flex min-h-[350px] w-full items-center justify-center">
-            <div className="w-full max-w-2xl">
-              <DisplayCards 
-                cards={[
-                  {
-                    icon: <Zap className="size-4 text-blue-300" />,
-                    title: "Accelerated Research",
-                    description: "Reduce research time by 60% with AI-powered tools and automation.",
-                    iconClassName: "text-blue-500",
-                    titleClassName: "text-blue-500",
-                    className:
-                      "[grid-area:stack] hover:-translate-y-8 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-border before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-background/50 grayscale-[100%] hover:before:opacity-0 before:transition-opacity before:duration-700 hover:grayscale-0 before:left-0 before:top-0",
-                  },
-                  {
-                    icon: <Shield className="size-4 text-blue-300" />,
-                    title: "Enterprise Security",
-                    description: "Bank-grade security with encrypted data and secure API handling.",
-                    iconClassName: "text-blue-500",
-                    titleClassName: "text-blue-500",
-                    className:
-                      "[grid-area:stack] translate-x-12 translate-y-8 hover:-translate-y-1 before:absolute before:w-[100%] before:outline-1 before:rounded-xl before:outline-border before:h-[100%] before:content-[''] before:bg-blend-overlay before:bg-background/50 grayscale-[100%] hover:before:opacity-0 before:transition-opacity before:duration-700 hover:grayscale-0 before:left-0 before:top-0",
-                  },
-                  {
-                    icon: <Globe className="size-4 text-blue-300" />,
-                    title: "Global Collaboration",
-                    description: "Connect with researchers worldwide through real-time collaboration tools.",
-                    iconClassName: "text-blue-500",
-                    titleClassName: "text-blue-500",
-                    className:
-                      "[grid-area:stack] translate-x-24 translate-y-16 hover:translate-y-8",
-                  },
-                ]} 
-              />
-            </div>
+          <div className="flex justify-center gap-6 mt-10 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] max-h-[740px] overflow-hidden">
+            <TestimonialsColumn testimonials={firstColumn} duration={15} />
+            <TestimonialsColumn testimonials={secondColumn} className="hidden md:block" duration={19} />
+            <TestimonialsColumn testimonials={thirdColumn} className="hidden lg:block" duration={17} />
           </div>
         </div>
       </section>

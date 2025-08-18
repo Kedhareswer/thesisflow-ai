@@ -10,6 +10,7 @@ import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
+import { CookiePanel } from "@/components/ui/cookie-banner-1"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
     "research collaboration tool",
     "AI paper summarizer",
     "thesis assistant",
+    "research assistant",
     "research productivity software"
   ],
   generator: 'v0.dev'
@@ -46,6 +48,8 @@ export default function RootLayout({
                 <Toaster />
                 <AuthDebug />
                 <Analytics />
+                {/* Global Cookie Consent Banner */}
+                <CookiePanel />
               </ResearchSessionProvider>
             </SupabaseAuthProvider>
           </AuthErrorBoundary>
