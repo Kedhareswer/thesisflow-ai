@@ -6,7 +6,7 @@
 
   <!-- Main Pages -->
   <url>
-    <loc>https://ai-project-planner.vercel.app/</loc>
+    <loc>https://bolt-research-hub.vercel.app/</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
@@ -14,42 +14,49 @@
 
   <!-- Core Features -->
   <url>
-    <loc>https://ai-project-planner.vercel.app/explorer</loc>
+    <loc>https://bolt-research-hub.vercel.app/explorer</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/summarizer</loc>
+    <loc>https://bolt-research-hub.vercel.app/summarizer</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/writer</loc>
+    <loc>https://bolt-research-hub.vercel.app/writer</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/collaborate</loc>
+    <loc>https://bolt-research-hub.vercel.app/collaborate</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/planner</loc>
+    <loc>https://bolt-research-hub.vercel.app/planner</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/ai-assistant</loc>
+    <loc>https://bolt-research-hub.vercel.app/ai-assistant</loc>
+    <lastmod>2025-01-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://bolt-research-hub.vercel.app/research-assistant</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -57,35 +64,35 @@
 
   <!-- Information Pages -->
   <url>
-    <loc>https://ai-project-planner.vercel.app/pricing</loc>
+    <loc>https://bolt-research-hub.vercel.app/pricing</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/about</loc>
+    <loc>https://bolt-research-hub.vercel.app/about</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/contact</loc>
+    <loc>https://bolt-research-hub.vercel.app/contact</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/help</loc>
+    <loc>https://bolt-research-hub.vercel.app/help</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/docs</loc>
+    <loc>https://bolt-research-hub.vercel.app/docs</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -93,14 +100,14 @@
 
   <!-- Legal Pages -->
   <url>
-    <loc>https://ai-project-planner.vercel.app/terms</loc>
+    <loc>https://bolt-research-hub.vercel.app/terms</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <url>
-    <loc>https://ai-project-planner.vercel.app/privacy</loc>
+    <loc>https://bolt-research-hub.vercel.app/privacy</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
@@ -108,7 +115,7 @@
 
   <!-- Success Pages -->
   <url>
-    <loc>https://ai-project-planner.vercel.app/checkout/success</loc>
+    <loc>https://bolt-research-hub.vercel.app/checkout/success</loc>
     <lastmod>2025-01-17</lastmod>
     <changefreq>never</changefreq>
     <priority>0.1</priority>
