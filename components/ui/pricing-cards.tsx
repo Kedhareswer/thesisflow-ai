@@ -20,7 +20,7 @@ function Pricing() {
               Choose a Plan
             </h2>
             <p className="text-lg leading-relaxed tracking-tight text-muted-foreground max-w-xl text-center">
-              Unlock the full potential of Bolt Research Hub.
+              Unlock the full potential of Thesis Flow AI.
             </p>
           </div>
           <div className="grid pt-20 text-left grid-cols-1 lg:grid-cols-3 w-full gap-8">

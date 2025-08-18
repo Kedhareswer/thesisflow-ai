@@ -1,6 +1,6 @@
-# Robots.txt for Bolt Research Hub
+# Robots.txt for Thesis Flow AI
 # AI-Powered Research Platform
-# Site: https://bolt-research-hub.vercel.app
+# Site: https://thesisflow-ai.vercel.app
 
 User-agent: *
 
@@ -150,7 +150,7 @@ Disallow: /admin/
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://bolt-research-hub.vercel.app/sitemap.xml
+Sitemap: https://thesisflow-ai.vercel.app/sitemap.xml
 
 # Host directive (preferred domain)
-Host: bolt-research-hub.vercel.app
+Host: thesisflow-ai.vercel.app

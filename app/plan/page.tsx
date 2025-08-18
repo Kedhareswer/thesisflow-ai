@@ -122,7 +122,7 @@ export default function PlanPage() {
     // For free users, this could redirect to a signup or onboarding flow
     toast({
       title: "Get Started",
-      description: "You're already on the Free plan! Explore our features to get the most out of Bolt Research Hub.",
+      description: "You're already on the Free plan! Explore our features to get the most out of Thesis Flow AI.",
     })
   }
 
@@ -223,10 +223,10 @@ export default function PlanPage() {
 
   const handleContactSales = () => {
     // Open email client or contact form
-    const subject = encodeURIComponent("Enterprise Plan Inquiry - Bolt Research Hub")
+    const subject = encodeURIComponent("Enterprise Plan Inquiry - Thesis Flow AI")
     const body = encodeURIComponent(`Hello,
 
-I'm interested in learning more about the Enterprise plan for Bolt Research Hub.
+I'm interested in learning more about the Enterprise plan for Thesis Flow AI.
 
 Please provide information about:
 - Custom pricing options

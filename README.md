@@ -7,7 +7,7 @@
 
 *Transform your research workflow with intelligent AI-powered tools*
 
-![Bolt Research Hub](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
+![Thesis Flow AI](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
 
 | Frontend | Backend | AI & ML | Database | Real-time |
 |----------|---------|---------|----------|-----------|
@@ -20,7 +20,7 @@
 
 ```mermaid
 mindmap
-  root((Bolt Research Hub))
+  root((Thesis Flow AI))
     Literature Discovery
       Multi-source Search
       Citation Enhancement
