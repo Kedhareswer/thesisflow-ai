@@ -7,6 +7,6 @@ interface HeadProps {
   customDescription?: string;
 }
 
-export default function Head(props: HeadProps) {
+export default function Head(props: HeadProps = {}) {
   return <SummarizerSEOHead {...props} />
 }
