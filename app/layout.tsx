@@ -14,9 +14,17 @@ import { AuthDebug } from "@/components/auth-debug"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Research Hub - AI-Powered Research Platform",
-  description: "Generate, organize, and develop your research ideas with AI assistance and collaborative tools.",
-    generator: 'v0.dev'
+  title: "AI Research Platform — Discover, Summarize & Collaborate Smarter | Bolt Research Hub",
+  description: "Bolt Research Hub is an AI research hub where you can explore papers, generate instant summaries, organize projects, and collaborate with teams — all in one place.",
+  keywords: [
+    "AI research platform",
+    "academic summarizer",
+    "research collaboration tool",
+    "AI paper summarizer",
+    "thesis assistant",
+    "research productivity software"
+  ],
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({

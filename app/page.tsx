@@ -89,12 +89,11 @@ export default function HomePage() {
             </Badge>
 
             <h1 className="text-display text-balance mb-6">
-              Revolutionize Your Academic Research
+              Accelerate Your Research with AI
             </h1>
 
             <p className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto leading-relaxed">
-              Accelerate your research with AI-powered tools for discovery, analysis, and collaboration. Built for
-              researchers, by researchers.
+              Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
