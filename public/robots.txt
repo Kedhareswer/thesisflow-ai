@@ -1,6 +1,6 @@
 # Robots.txt for Bolt Research Hub
 # AI-Powered Research Platform
-# Site: https://ai-project-planner.vercel.app
+# Site: https://bolt-research-hub.vercel.app
 
 User-agent: *
 
@@ -150,7 +150,7 @@ Disallow: /admin/
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://ai-project-planner.vercel.app/sitemap.xml
+Sitemap: https://bolt-research-hub.vercel.app/sitemap.xml
 
 # Host directive (preferred domain)
-Host: https://ai-project-planner.vercel.app
+Host: bolt-research-hub.vercel.app
