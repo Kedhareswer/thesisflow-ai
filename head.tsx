@@ -5,7 +5,7 @@ interface HeadProps {
   customDescription?: string;
 }
 
-export default function Head({ 
+export default function SummarizerSEOHead({ 
   documentTitle, 
   documentType, 
   summaryStyle, 
@@ -176,9 +176,11 @@ const imageAlt = "Bolt Research Hub AI Summarizer - Transform documents into int
       <meta property="og:description" content={description} />
       <meta property="og:url" content={url} />
       <meta property="og:image" content={ogImage} />
-      <meta property="og:image" content={ogImageSmall} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
+      <meta property="og:image" content={ogImageSmall} />
+      <meta property="og:image:width" content="600" />
+      <meta property="og:image:height" content="315" />
       <meta property="og:image:alt" content={imageAlt} />
 
       {/* Twitter Card */}
@@ -197,12 +199,9 @@ const imageAlt = "Bolt Research Hub AI Summarizer - Transform documents into int
       <link rel="alternate" hrefLang="x-default" href={url} />
 
       {/* Performance and Core Web Vitals */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link rel="dns-prefetch" href="//api.openai.com" />
       <link rel="dns-prefetch" href="//api.anthropic.com" />
       <link rel="dns-prefetch" href="//generativelanguage.googleapis.com" />
-      <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
 
       {/* Additional SEO Meta Tags */}
       <meta name="author" content="Bolt Research Hub" />

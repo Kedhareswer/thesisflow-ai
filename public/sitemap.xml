@@ -55,6 +55,13 @@
     <priority>0.8</priority>
   </url>
 
+  <url>
+    <loc>https://bolt-research-hub.vercel.app/research-assistant</loc>
+    <lastmod>2025-01-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
   <!-- Information Pages -->
   <url>
     <loc>https://bolt-research-hub.vercel.app/pricing</loc>
