@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { type AIProvider, AI_PROVIDERS } from "@/lib/ai-providers"
 import { supabase } from "@/integrations/supabase/client"
-import { Loader2, Settings, Zap } from "lucide-react"
+import { Loader2, Settings, Zap, Bot } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface MinimalAIProviderSelectorProps {
@@ -85,6 +85,48 @@ export default function MinimalAIProviderSelector({
     return availableProviders.includes(provider) ? "available" : "unavailable"
   }
 
+  // Map provider → local logo assets placed under /public
+  const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
+    groq: "/groq-icon.svg",
+    mistral: "/mistral-ai-icon.svg",
+    gemini: "/gemini-icon.svg",
+    openai: "/openai-icon.svg",
+    anthropic: "/anthropic-icon.png",
+    aiml: "/ai-ml-icon.png"
+  }
+
+  const getProviderIcon = (provider: AIProvider) => {
+    const logo = PROVIDER_LOGOS[provider]
+    if (logo) {
+      return (
+        <img
+          src={logo}
+          alt={`${AI_PROVIDERS[provider].name} logo`}
+          className="h-5 w-5 object-contain"
+          loading="lazy"
+        />
+      )
+    }
+    
+    // Fallback icons if logo not found
+    switch (provider) {
+      case "gemini":
+        return <img src="/gemini-icon.svg" alt="Gemini" className="h-5 w-5 object-contain" />
+      case "groq":
+        return <Zap className="h-5 w-5 text-[#00AC47]" />
+      case "openai":
+        return <img src="/openai-icon.svg" alt="OpenAI" className="h-5 w-5 object-contain" />
+      case "anthropic":
+        return <img src="/anthropic-icon.png" alt="Anthropic" className="h-5 w-5 object-contain" />
+      case "mistral":
+        return <img src="/mistral-ai-icon.svg" alt="Mistral" className="h-5 w-5 object-contain" />
+      case "aiml":
+        return <img src="/ai-ml-icon.png" alt="AI/ML" className="h-5 w-5 object-contain" />
+      default:
+        return <Bot className="h-5 w-5 opacity-70" />
+    }
+  }
+
   const getProviderBadgeColor = (provider: AIProvider) => {
     return availableProviders.includes(provider)
       ? "bg-green-100 text-green-700 border-green-200"
@@ -120,7 +162,7 @@ export default function MinimalAIProviderSelector({
             {showFallbackOption && (
               <SelectItem value="auto">
                 <div className="flex items-center gap-2">
-                  <Zap className="h-3 w-3" />
+                  <Zap className="h-4 w-4 text-blue-500" />
                   <span>Auto</span>
                   <Badge variant="secondary" className="text-xs">
                     {availableProviders.length > 0 ? `${availableProviders.length} Available` : 'Fallback'}
@@ -131,10 +173,11 @@ export default function MinimalAIProviderSelector({
             {Object.entries(AI_PROVIDERS).map(([key, config]) => (
               <SelectItem key={key} value={key} disabled={!availableProviders.includes(key as AIProvider)}>
                 <div className="flex items-center gap-2">
+                  {getProviderIcon(key as AIProvider)}
                   <span>{config.name}</span>
                   {!availableProviders.includes(key as AIProvider) && (
-                    <Badge variant="outline" className="text-xs">
-                      Setup Required
+                    <Badge variant="outline" className="text-xs ml-1">
+                      Setup
                     </Badge>
                   )}
                 </div>

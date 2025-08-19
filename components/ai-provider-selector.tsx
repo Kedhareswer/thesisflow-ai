@@ -60,9 +60,9 @@ export default function AIProviderSelector({
 
   // Map provider → local logo assets placed under /public
   const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
-    groq: "/groq-icon.png",
-    mistral: "/mistral-ai-icon.png",
-    gemini: "/gemini-icon.png",
+    groq: "/groq-icon.svg",
+    mistral: "/mistral-ai-icon.svg",
+    gemini: "/gemini-icon.svg",
     openai: "/openai-icon.svg",
     anthropic: "/anthropic-icon.png",
   }
