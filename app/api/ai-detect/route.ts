@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { InferenceClient } from "@huggingface/inference"
 
 export async function POST(req: Request) {
   try {
@@ -8,16 +9,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid text provided" }, { status: 400 })
     }
 
-    // Simulate AI detection logic
-    const is_ai = Math.random() > 0.5
-    const ai_probability = Number.parseFloat((Math.random() * 100).toFixed(2))
+    // Perform AI content detection using Hugging Face Inference API
+    const hf = new InferenceClient(process.env.HUGGINGFACE_API_KEY)
+    const inferenceResult = await hf.textClassification({
+      model: "roberta-base-openai-detector",
+      inputs: text,
+    })
 
-    let message = ""
-    if (is_ai) {
-      message = `AI content detected with ${ai_probability}% probability.`
-    } else {
-      message = `Human-written content detected with ${100 - ai_probability}% probability.`
-    }
+    // Expected format: [{ label: "GPT-2", score: 0.87 }, ...]
+    const top = inferenceResult?.[0]
+    const is_ai = top?.label.toLowerCase().includes("gpt")
+    const ai_probability = top ? Number.parseFloat((top.score * 100).toFixed(2)) : 0
+
+    const message = is_ai
+      ? `AI content detected with ${ai_probability}% probability.`
+      : `Human-written content detected with ${100 - ai_probability}% probability.`
 
     return NextResponse.json({ is_ai, ai_probability, message })
   } catch (error) {

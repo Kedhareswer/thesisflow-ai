@@ -122,7 +122,8 @@
     "y-websocket": "latest",
     "yjs": "latest",
     "zod": "^3.25.76",
-    "zustand": "latest"
+    "zustand": "latest",
+    "@huggingface/inference": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.17.1",
