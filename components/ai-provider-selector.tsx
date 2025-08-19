@@ -139,7 +139,10 @@ export default function AIProviderSelector({
             <Label>Primary AI Provider</Label>
             <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select AI provider" />
+                <div className="flex items-center gap-2">
+                  {selectedProvider ? getProviderIcon(selectedProvider) : <Brain className="h-5 w-5" />}
+                  <SelectValue placeholder="Select AI provider" />
+                </div>
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(AI_PROVIDERS).map(([key, config]) => (

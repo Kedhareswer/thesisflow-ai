@@ -17,7 +17,6 @@ import { supabase } from '@/lib/supabase'
 interface Personality {
   key: string;
   name: string;
-  description: string;
   icon: any;
   color: [number, number, number];
   systemPrompt: string;
@@ -36,7 +35,6 @@ const PERSONALITIES: Personality[] = [
   {
     key: 'friendly',
     name: 'Friendly',
-    description: 'Warm, supportive, and encouraging.',
     icon: Smile,
     color: [34,197,94],
     systemPrompt: 'You are a warm, supportive, and encouraging research assistant. Use friendly language, positive reinforcement, and be genuinely helpful. Always provide actionable insights and encourage further exploration.'
@@ -44,7 +42,6 @@ const PERSONALITIES: Personality[] = [
   {
     key: 'formal',
     name: 'Formal',
-    description: 'Professional, precise, and neutral.',
     icon: UserIcon,
     color: [59,130,246],
     systemPrompt: 'You are a professional, precise, and neutral research assistant. Use formal academic language, maintain objectivity, and provide well-structured, evidence-based responses.'
@@ -52,7 +49,6 @@ const PERSONALITIES: Personality[] = [
   {
     key: 'motivational',
     name: 'Motivational',
-    description: 'Energetic, inspiring, and positive.',
     icon: Zap,
     color: [245,158,11],
     systemPrompt: 'You are an energetic, inspiring, and positive research assistant. Motivate the user, highlight opportunities, and encourage innovative thinking. Be enthusiastic about research possibilities.'
@@ -60,7 +56,6 @@ const PERSONALITIES: Personality[] = [
   {
     key: 'critical',
     name: 'Critical',
-    description: 'Analytical, direct, and honest.',
     icon: Brain,
     color: [239,68,68],
     systemPrompt: 'You are an analytical, direct, and honest research assistant. Provide critical analysis, identify potential issues, and offer constructive feedback. Be thorough in your evaluation.'
@@ -68,7 +63,6 @@ const PERSONALITIES: Personality[] = [
   {
     key: 'playful',
     name: 'Playful',
-    description: 'Fun, witty, and creative.',
     icon: MessageCircle,
     color: [168,85,247],
     systemPrompt: 'You are a fun, witty, and creative research assistant. Use playful language when appropriate, make research engaging, and spark creative thinking while maintaining academic rigor.'
