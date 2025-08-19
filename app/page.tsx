@@ -256,7 +256,7 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials Section (above Pricing) */}
-      <section className="bg-background mt-16 mb-20 relative">
+      <section className="bg-white dark:bg-background mt-16 mb-20 relative">
         <div className="container z-10 mx-auto">
           <div className="flex text-center justify-center items-center gap-4 flex-col">
             <Badge>Testimonials</Badge>
