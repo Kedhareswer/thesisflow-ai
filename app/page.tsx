@@ -209,7 +209,7 @@ export default function HomePage() {
       </section>
 
       {/* Research Challenges Section */}
-      <section className="pt-16 pb-0 bg-white dark:bg-background">
+      <section className="pt-16 pb-8 bg-background dark:bg-background">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
@@ -221,7 +221,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <div className="bg-background p-6 rounded-xl shadow-sm">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-sm">
               <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Clock className="w-6 h-6 text-gray-900 dark:text-white" />
               </div>
@@ -229,7 +229,7 @@ export default function HomePage() {
               <p className="text-gray-600 dark:text-gray-300">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
             </div>
             
-            <div className="bg-background p-6 rounded-xl shadow-sm">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-sm">
               <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="w-6 h-6 text-gray-900 dark:text-white" />
               </div>
@@ -237,7 +237,7 @@ export default function HomePage() {
               <p className="text-gray-600 dark:text-gray-300">Constant context switching breaks deep work and reduces research quality.</p>
             </div>
             
-            <div className="bg-background p-6 rounded-xl shadow-sm">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-xl shadow-sm">
               <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Users className="w-6 h-6 text-gray-900 dark:text-white" />
               </div>
@@ -256,7 +256,7 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials Section (above Pricing) */}
-      <section className="bg-white dark:bg-background mt-16 mb-20 relative">
+      <section className="bg-background dark:bg-background mt-0 mb-20 relative">
         <div className="container z-10 mx-auto">
           <div className="flex text-center justify-center items-center gap-4 flex-col">
             <Badge>Testimonials</Badge>
