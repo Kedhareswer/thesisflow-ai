@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine, Crown, Menu, Database } from "lucide-react"
+import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine, Crown, Menu } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,8 +15,6 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useEffect, useState, lazy, Suspense } from "react"
-import { UsageBadge } from "@/components/ui/bubble-button"
-import { useUsageSummary } from "@/lib/hooks/useUsageSummary"
 
 // Lazy load the notification bell
 const NotificationBell = lazy(() => import("@/app/collaborate/components/notification-bell"))
@@ -183,12 +181,10 @@ export function MainNav() {
             </Sheet>
           </div>
 
-          {/* Usage Badge + User Menu */}
+          {/* User Menu */}
           <div className="flex items-center space-x-4">
             {user && !isLoading ? (
               <>
-                {/* Global Usage Badge */}
-                <NavUsageBadge />
                 {/* Notification Bell */}
                 <Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
                   <NotificationBell />
@@ -253,63 +249,5 @@ export function MainNav() {
         </div>
       </div>
     </header>
-  )
-}
-
-// Small wrapper to keep the nav component clean
-function NavUsageBadge() {
-  const { loading, planName, items, totalLimit, totalRemaining, allUnlimited, error } = useUsageSummary()
-
-  // If loading or no data yet, keep space minimal
-  if (loading) {
-    return (
-      <div className="h-9 min-w-[160px] animate-pulse rounded-full bg-gray-100" aria-hidden />
-    )
-  }
-
-  // Compute display values
-  const displayPlan = planName || "Plan"
-  const remaining = allUnlimited ? Infinity : Math.max(0, totalRemaining)
-  const limit = allUnlimited ? Infinity : Math.max(0, totalLimit)
-
-  // Tooltip content
-  const tooltip = (
-    <div className="text-sm">
-      <p className="font-medium">{displayPlan}</p>
-      {allUnlimited ? (
-        <p>Unlimited usage</p>
-      ) : (
-        <p>{remaining}/{limit} remaining</p>
-      )}
-      {items?.length > 0 && (
-        <div className="mt-2 space-y-1 text-left">
-          {items.slice(0, 5).map((i) => (
-            <div key={i.feature_name} className="flex justify-between gap-3">
-              <span className="truncate">{i.feature_name}</span>
-              <span className="shrink-0 text-muted-foreground">
-                {i.is_unlimited ? "∞" : `${Math.max(0, i.remaining ?? 0)}/${i.limit_count ?? 0}`}
-              </span>
-            </div>
-          ))}
-          {items.length > 5 && <div className="text-muted-foreground">+{items.length - 5} more…</div>}
-        </div>
-      )}
-      {error && <p className="mt-2 text-red-500">{error}</p>}
-    </div>
-  )
-
-  // For the badge text, the component prints "usage/limit left"; pass remaining as usage to match the label.
-  const badgeUsage = allUnlimited ? 0 : remaining
-  const badgeLimit = allUnlimited ? 0 : limit
-
-  return (
-    <UsageBadge
-      icon={<Database className="h-4 w-4" />}
-      planName={displayPlan}
-      usage={badgeUsage}
-      limit={badgeLimit}
-      tooltipContent={tooltip}
-      className="hidden sm:inline-flex"
-    />
   )
 }
