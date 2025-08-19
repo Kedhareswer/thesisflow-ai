@@ -209,7 +209,7 @@ export default function HomePage() {
       </section>
 
       {/* Research Challenges Section */}
-      <section className="pt-16 pb-8 bg-background dark:bg-background">
+      <section className="pt-16 pb-16 bg-background dark:bg-background">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
