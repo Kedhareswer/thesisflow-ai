@@ -185,6 +185,31 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         } else {
           console.log("User profile and plan created successfully via RPC");
         }
+
+        // Also set user preferences (accepted terms, marketing opt-in) if provided
+        try {
+          const acceptedTerms = Boolean(metadata?.accepted_terms)
+          const acceptedAt = metadata?.accepted_terms_at ? new Date(metadata.accepted_terms_at).toISOString() : null
+          const marketingOptIn = Boolean(metadata?.email_marketing_opt_in)
+
+          // Only call when at least one preference is present
+          if (acceptedTerms || marketingOptIn || acceptedAt) {
+            const { error: prefsError } = await supabase.rpc('set_user_preferences', {
+              p_user_id: data.user.id,
+              p_accepted_terms: acceptedTerms,
+              p_accepted_terms_at: acceptedAt,
+              p_email_marketing_opt_in: marketingOptIn,
+            })
+            if (prefsError) {
+              console.error('Failed to set user preferences via RPC:', prefsError)
+            } else {
+              console.log('User preferences saved via RPC')
+            }
+          }
+        } catch (prefsCatchErr) {
+          console.error('Error while setting user preferences:', prefsCatchErr)
+          // Non-fatal: do not block signup completion
+        }
       }
 
       toast({

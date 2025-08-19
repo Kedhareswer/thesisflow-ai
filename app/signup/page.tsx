@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useToast } from "@/hooks/use-toast"
@@ -17,6 +18,8 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
   const [loading, setLoading] = useState(false)
+  const [agreePolicies, setAgreePolicies] = useState(false)
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const { signUp } = useSupabaseAuth()
   const { toast } = useToast()
 
@@ -41,12 +44,24 @@ export default function SignUpPage() {
       return
     }
 
+    if (!agreePolicies) {
+      toast({
+        title: "Please accept the terms",
+        description: "You must agree to the Terms of Service and Privacy Policy to create an account.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
 
     try {
       await signUp(email, password, {
         full_name: name,
         email: email,
+        accepted_terms: agreePolicies,
+        accepted_terms_at: new Date().toISOString(),
+        email_marketing_opt_in: marketingOptIn,
       })
       toast({
         title: "Account created!",
@@ -120,7 +135,34 @@ export default function SignUpPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <div className="space-y-3 pt-2">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="agreePolicies"
+                  checked={agreePolicies}
+                  onCheckedChange={(v) => setAgreePolicies(Boolean(v))}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="agreePolicies" className="leading-relaxed font-normal text-sm text-muted-foreground">
+                  I agree to the{' '}
+                  <Link href="/terms" className="text-primary font-medium underline-offset-4 hover:underline">Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" className="text-primary font-medium underline-offset-4 hover:underline">Privacy Policy</Link>.
+                </Label>
+              </div>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="marketingOptIn"
+                  checked={marketingOptIn}
+                  onCheckedChange={(v) => setMarketingOptIn(Boolean(v))}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="marketingOptIn" className="leading-relaxed font-normal text-sm text-muted-foreground">
+                  Send me research tips, product updates, and special offers.
+                </Label>
+              </div>
+            </div>
+            <Button type="submit" className="w-full" disabled={loading || !agreePolicies}>
               {loading ? "Creating account..." : "Create Account"}
             </Button>
           </form>
