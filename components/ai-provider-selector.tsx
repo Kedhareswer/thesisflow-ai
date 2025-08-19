@@ -58,19 +58,26 @@ export default function AIProviderSelector({
     }
   }
 
-  // Map provider → logo URL (using official/reputable SVG sources)
+  // Map provider → local logo assets placed under /public
   const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
-    groq: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Groq_logo.svg",
-    mistral: "https://upload.wikimedia.org/wikipedia/commons/4/49/Mistral_AI_logo_%282025%E2%80%93%29.svg",
-    gemini: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Google-gemini-icon.svg",
-    openai: "https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg",
-    anthropic: "https://upload.wikimedia.org/wikipedia/commons/5/54/Anthropic_AI_Logo.svg",
+    groq: "/groq-icon.png",
+    mistral: "/mistral-ai-icon.png",
+    gemini: "/gemini-icon.png",
+    openai: "/openai-icon.svg",
+    anthropic: "/anthropic-icon.png",
   }
 
   const getProviderIcon = (provider: AIProvider) => {
     const logo = PROVIDER_LOGOS[provider]
     if (logo) {
-      return <img src={logo} alt={`${AI_PROVIDERS[provider].name} logo`} className="h-4 w-4 object-contain" />
+      return (
+        <img
+          src={logo}
+          alt={`${AI_PROVIDERS[provider].name} logo`}
+          className="h-5 w-5 object-contain"
+          loading="lazy"
+        />
+      )
     }
     switch (provider) {
       case "gemini":
