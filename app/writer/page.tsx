@@ -44,6 +44,8 @@ import { supabase } from "@/lib/supabase"
 import type { AIProvider } from "@/lib/ai-providers"
 import { WriterCommandMenu } from "./components/writer-command-menu"
 import WriterShareModal from "./components/writer-share-modal"
+import AIDetectionBadge from "@/components/ai-detection-badge"
+import { aiDetectionService, AIDetectionResult } from "@/lib/services/ai-detection.service"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -72,7 +74,7 @@ export default function WriterPage() {
   const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
 
-  const [aiDetectionResult, setAiDetectionResult] = useState<string | null>(null)
+  const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
   const [humanizedText, setHumanizedText] = useState<string | null>(null)
   const [plagiarismCheckResult, setPlagiarismCheckResult] = useState<{
     detected: boolean
@@ -264,13 +266,28 @@ export default function WriterPage() {
       toast({ title: "No content", description: "Please write some text to detect.", variant: "destructive" })
       return
     }
-    setAiDetectionResult("Detecting...")
+    
+    if (!aiDetectionService.isTextLongEnough(documentContent)) {
+      toast({ 
+        title: "Text too short", 
+        description: "Please provide at least 10 words for meaningful AI detection.", 
+        variant: "destructive" 
+      })
+      return
+    }
+
+    setAiDetectionResult(null)
     try {
-      const result = await ResearchService.detectAI(documentContent)
-      setAiDetectionResult(result.message) // Use result.message from the API
+      const result = await aiDetectionService.detectAI(documentContent)
+      setAiDetectionResult(result)
+      toast({
+        title: "AI Detection Complete",
+        description: aiDetectionService.formatMessage(result),
+        variant: result.is_ai ? "destructive" : "default"
+      })
     } catch (err) {
       handleError(err, "AI Detection failed")
-      setAiDetectionResult("Error detecting AI content.")
+      setAiDetectionResult(null)
     }
   }
 
@@ -838,23 +855,67 @@ export default function WriterPage() {
                 <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5" /> AI Content Detection
+                    {aiDetectionResult && (
+                      <AIDetectionBadge 
+                        text={documentContent}
+                        showButton={false}
+                        className="ml-2"
+                        onDetectionComplete={setAiDetectionResult}
+                      />
+                    )}
                   </div>
                   {isAiDetectOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
                   <Card>
                     <CardContent className="p-4 space-y-4">
+                      <div className="flex items-center gap-4">
                         <Button 
-                        onClick={handleAiDetect}
-                        disabled={!documentContent || aiDetectionResult === "Detecting..."}
-                      >
-                        {aiDetectionResult === "Detecting..." ? "Detecting..." : "Run AI Detection"}
+                          onClick={handleAiDetect}
+                          disabled={!documentContent}
+                        >
+                          Run AI Detection
                         </Button>
+                        <AIDetectionBadge 
+                          text={documentContent}
+                          showButton={false}
+                          onDetectionComplete={setAiDetectionResult}
+                        />
+                      </div>
                       {aiDetectionResult && (
-                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
-                          <p className="text-sm font-medium">Result:</p>
-                          <p className="text-lg font-bold">{aiDetectionResult}</p>
-                    </div>
+                        <div className="space-y-3">
+                          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Detection Result</p>
+                              <div className={`px-2 py-1 rounded text-xs font-semibold ${
+                                aiDetectionResult.confidence === 'high' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                aiDetectionResult.confidence === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                              }`}>
+                                {aiDetectionResult.confidence} confidence
+                              </div>
+                            </div>
+                            <p className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">
+                              {aiDetectionService.formatMessage(aiDetectionResult)}
+                            </p>
+                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                              <div>
+                                <span className="font-medium">AI Probability:</span> {aiDetectionResult.ai_probability.toFixed(1)}%
+                              </div>
+                              <div>
+                                <span className="font-medium">Human Probability:</span> {aiDetectionResult.human_probability.toFixed(1)}%
+                              </div>
+                              <div>
+                                <span className="font-medium">Model:</span> {aiDetectionResult.model_used}
+                              </div>
+                              {aiDetectionResult.chunks_analyzed && (
+                                <div>
+                                  <span className="font-medium">Chunks Analyzed:</span> {aiDetectionResult.chunks_analyzed}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
