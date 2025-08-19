@@ -209,7 +209,7 @@ export default function HomePage() {
       </section>
 
       {/* Research Challenges Section */}
-      <section className="py-16 bg-white dark:bg-background">
+      <section className="pt-16 pb-0 bg-white dark:bg-background">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
@@ -256,7 +256,7 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials Section (above Pricing) */}
-      <section className="bg-background my-20 relative">
+      <section className="bg-background mb-20 relative">
         <div className="container z-10 mx-auto">
           <div className="flex flex-col items-center justify-center max-w-[540px] mx-auto">
             <div className="flex justify-center">
