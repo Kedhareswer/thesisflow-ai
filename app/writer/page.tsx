@@ -72,7 +72,8 @@ export default function WriterPage() {
   const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
 
-  const [aiDetectionResult, setAiDetectionResult] = useState<string | null>(null)
+  const [aiDetectionResult, setAiDetectionResult] = useState<any | null>(null)
+  const [isDetecting, setIsDetecting] = useState(false)
   const [humanizedText, setHumanizedText] = useState<string | null>(null)
   const [plagiarismCheckResult, setPlagiarismCheckResult] = useState<{
     detected: boolean
@@ -261,16 +262,49 @@ export default function WriterPage() {
 
   const handleAiDetect = async () => {
     if (!documentContent) {
-      toast({ title: "No content", description: "Please write some text to detect.", variant: "destructive" })
+      toast({
+        title: "No content",
+        description: "Please write some text to detect.",
+        variant: "destructive",
+      })
       return
     }
-    setAiDetectionResult("Detecting...")
+    
+    if (documentContent.length < 50) {
+      toast({
+        title: "Text too short",
+        description: "Please provide at least 50 characters for accurate AI detection.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    setIsDetecting(true)
+    setAiDetectionResult(null)
+    
     try {
-      const result = await ResearchService.detectAI(documentContent)
-      setAiDetectionResult(result.message) // Use result.message from the API
-    } catch (err) {
-      handleError(err, "AI Detection failed")
-      setAiDetectionResult("Error detecting AI content.")
+      // Import the service dynamically
+      const { aiDetectionService } = await import('@/lib/services/ai-detection.service')
+      const result = await aiDetectionService.detectAI(documentContent)
+      
+      setAiDetectionResult(result)
+      
+      const message = aiDetectionService.formatMessage(result)
+      toast({
+        title: "AI Detection Complete",
+        description: message,
+        variant: result.is_ai ? "destructive" : "default",
+      })
+    } catch (error: any) {
+      console.error("AI detection error:", error)
+      toast({
+        title: "Detection Failed",
+        description: error.message || "Failed to detect AI content.",
+        variant: "destructive",
+      })
+      setAiDetectionResult(null)
+    } finally {
+      setIsDetecting(false)
     }
   }
 
@@ -828,8 +862,8 @@ export default function WriterPage() {
                   <Card>
                     <CardContent className="p-4">
                       <CitationManager selectedTemplate="ieee" />
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
                 </CollapsibleContent>
               </Collapsible>
 
@@ -838,23 +872,175 @@ export default function WriterPage() {
                 <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5" /> AI Content Detection
+                    {aiDetectionResult && !isDetecting && (
+                      <span className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                        aiDetectionResult.is_ai 
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {aiDetectionResult.is_ai ? '🤖 AI Detected' : '👤 Human Content'}
+                      </span>
+                    )}
                   </div>
                   {isAiDetectOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
                   <Card>
                     <CardContent className="p-4 space-y-4">
-                        <Button 
+                      <Button 
                         onClick={handleAiDetect}
-                        disabled={!documentContent || aiDetectionResult === "Detecting..."}
+                        disabled={!documentContent || isDetecting || documentContent.length < 50}
+                        className="w-full"
                       >
-                        {aiDetectionResult === "Detecting..." ? "Detecting..." : "Run AI Detection"}
-                        </Button>
-                      {aiDetectionResult && (
-                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
-                          <p className="text-sm font-medium">Result:</p>
-                          <p className="text-lg font-bold">{aiDetectionResult}</p>
-                    </div>
+                        {isDetecting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyzing Text...
+                          </>
+                        ) : (
+                          '🔍 Run AI Detection'
+                        )}
+                      </Button>
+                      
+                      {aiDetectionResult && !isDetecting && (
+                        <div className="space-y-4">
+                          {/* Main Result Card */}
+                          <div className={`p-4 rounded-lg border-2 ${
+                            aiDetectionResult.is_ai 
+                              ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+                              : 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-lg font-bold">
+                                {aiDetectionResult.is_ai ? '🤖 AI-Generated Content' : '👤 Human-Written Content'}
+                              </h4>
+                              <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
+                                aiDetectionResult.confidence >= 0.85 ? 'bg-red-100 text-red-800' :
+                                aiDetectionResult.confidence >= 0.7 ? 'bg-orange-100 text-orange-800' :
+                                aiDetectionResult.confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
+                                aiDetectionResult.confidence >= 0.3 ? 'bg-blue-100 text-blue-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {Math.round(aiDetectionResult.confidence * 100)}% Confidence
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 mt-3">
+                              <div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">AI Probability</p>
+                                <p className="text-xl font-bold">
+                                  {Math.round((aiDetectionResult.fake_probability || 0) * 100)}%
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Human Probability</p>
+                                <p className="text-xl font-bold">
+                                  {Math.round((aiDetectionResult.real_probability || 0) * 100)}%
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Detection Method & Reliability */}
+                          {aiDetectionResult.detection_method && (
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Detection Method</p>
+                                  <p className="font-semibold capitalize">{aiDetectionResult.detection_method}</p>
+                                </div>
+                                {aiDetectionResult.reliability_score !== undefined && (
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Reliability Score</p>
+                                    <p className="font-semibold">
+                                      {Math.round(aiDetectionResult.reliability_score * 100)}%
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Model Results */}
+                          {aiDetectionResult.models_results && aiDetectionResult.models_results.length > 0 && (
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Model Analysis</p>
+                              <div className="space-y-2">
+                                {aiDetectionResult.models_results.map((model: any, idx: number) => (
+                                  <div key={idx} className="flex items-center justify-between text-sm">
+                                    <span className="font-medium">{model.model}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={model.is_ai ? 'text-red-600' : 'text-green-600'}>
+                                        {model.is_ai ? '🤖 AI' : '👤 Human'}
+                                      </span>
+                                      <span className="text-gray-500">
+                                        ({Math.round(model.confidence * 100)}%)
+                                      </span>
+                                      {model.response_time && (
+                                        <span className="text-xs text-gray-400">
+                                          {model.response_time}ms
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Text Statistics */}
+                          {aiDetectionResult.text_statistics && (
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Text Analysis</p>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <span className="text-gray-500">Total Words:</span>
+                                  <span className="ml-2 font-medium">{aiDetectionResult.text_statistics.total_words}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Avg Sentence:</span>
+                                  <span className="ml-2 font-medium">{aiDetectionResult.text_statistics.avg_sentence_length} words</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Vocabulary Diversity:</span>
+                                  <span className="ml-2 font-medium">
+                                    {Math.round(aiDetectionResult.text_statistics.vocabulary_diversity * 100)}%
+                                  </span>
+                                </div>
+                                {aiDetectionResult.text_statistics.burstiness_score !== undefined && (
+                                  <div>
+                                    <span className="text-gray-500">Burstiness:</span>
+                                    <span className="ml-2 font-medium">{aiDetectionResult.text_statistics.burstiness_score}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Additional Info */}
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {aiDetectionResult.chunks_analyzed && aiDetectionResult.chunks_analyzed > 1 && (
+                              <p>Analyzed {aiDetectionResult.chunks_analyzed} text segments</p>
+                            )}
+                            {aiDetectionResult.model_used && (
+                              <p>Model: {aiDetectionResult.model_used}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {!documentContent && (
+                        <div className="text-center py-4 text-gray-500">
+                          <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+                          <p>Please write some text to analyze</p>
+                        </div>
+                      )}
+                      
+                      {documentContent && documentContent.length < 50 && (
+                        <div className="text-center py-4 text-gray-500">
+                          <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+                          <p>Text too short ({documentContent.length}/50 characters minimum)</p>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
