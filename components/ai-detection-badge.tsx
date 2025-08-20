@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Loader2, Shield, AlertTriangle, CheckCircle, Info } from "lucide-react"
-import { aiDetectionService, AIDetectionResult, AIDetectionError } from "@/lib/services/ai-detection.service"
+import { aiDetectionService, AIDetectionResult, AIDetectionServiceError } from "@/lib/services/ai-detection.service"
 import { useToast } from "@/hooks/use-toast"
 
 interface AIDetectionBadgeProps {
@@ -52,11 +52,11 @@ export function AIDetectionBadge({
         variant: detectionResult.is_ai ? "destructive" : "default"
       })
     } catch (err) {
-      const error = err as Error | AIDetectionError
-      const errorMessage = error instanceof AIDetectionError ? error.message : "Detection failed"
+      const error = err as Error | AIDetectionServiceError
+      const errorMessage = error.message || "Detection failed"
       setError(errorMessage)
       
-      if (error instanceof AIDetectionError) {
+      if (error instanceof AIDetectionServiceError) {
         if (error.statusCode === 429) {
           toast({
             title: "Rate Limited",
@@ -139,11 +139,34 @@ export function AIDetectionBadge({
     const message = aiDetectionService.formatMessage(result)
     const details = [
       `Model: ${result.model_used}`,
-      `Confidence: ${result.confidence}`,
+      `Confidence: ${result.confidence}%`,
+      `Reliability: ${result.reliability_score}%`,
+      `AI Probability: ${result.ai_probability}%`,
+      `Human Probability: ${result.human_probability}%`,
+      `Chunks Analyzed: ${result.analysis_details.chunks_analyzed}`,
       `Word count: ${aiDetectionService.getWordCount(text)}`
     ].join('\n')
     
     return `${message}\n\n${details}`
+  }
+
+  const getBadgeClassName = (result: AIDetectionResult | null): string => {
+    const baseClasses = "cursor-pointer transition-all hover:scale-105"
+    
+    if (!result) return baseClasses
+    
+    const badge = aiDetectionService.getConfidenceBadge(result.confidence, result.reliability_score)
+    
+    // Use static Tailwind classes to ensure they're included in the build
+    const colorClasses: Record<string, string> = {
+      green: "bg-green-100 border-green-200 text-green-800 hover:bg-green-200",
+      blue: "bg-blue-100 border-blue-200 text-blue-800 hover:bg-blue-200",
+      yellow: "bg-yellow-100 border-yellow-200 text-yellow-800 hover:bg-yellow-200",
+      orange: "bg-orange-100 border-orange-200 text-orange-800 hover:bg-orange-200",
+      red: "bg-red-100 border-red-200 text-red-800 hover:bg-red-200"
+    }
+    
+    return `${baseClasses} ${colorClasses[badge.color] || colorClasses.blue}`
   }
 
   return (
@@ -165,9 +188,7 @@ export function AIDetectionBadge({
             <TooltipTrigger asChild>
               <Badge
                 variant={getBadgeVariant()}
-                className={`cursor-pointer transition-all hover:scale-105 ${
-                  result ? `bg-${aiDetectionService.getConfidenceBadge(result.confidence, result.reliability_score).color}-100 border-${aiDetectionService.getConfidenceBadge(result.confidence, result.reliability_score).color}-200` : ''
-                }`}
+                className={getBadgeClassName(result)}
                 onClick={!isDetecting && !result ? handleDetection : undefined}
               >
                 {getIcon()}
