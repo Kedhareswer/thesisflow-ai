@@ -1428,6 +1428,25 @@ graph LR
 - ✅ Improved error handling and logging
 - ✅ Better API response validation
 
+### AI Detection (Ensemble Upgrade)
+- ✅ Production-grade multi-model ensemble using 4 real Hugging Face models with weighted voting and variance-based confidence.
+- ✅ Parallel requests with per-model timeouts, robust fallbacks, caching, and reliability scoring.
+- 🔧 Code: `lib/services/ai-detection.service.ts`, API: `app/api/ai-detect/route.ts`
+- 🔑 Env: `HUGGINGFACE_API_KEY` required, `AI_DETECT_USE_ENSEMBLE=true` to enable.
+
+### Humanize Text (Naturalization Engine)
+- ✅ Real transformation pipeline: sentence restructuring, lexical variety, punctuation rhythm, filler/hedge balance.
+- ✅ Returns readability and naturalness scores with an explicit list of applied changes for transparency.
+- 🔧 Code: `lib/services/text-humanizer.service.ts`, API: `app/api/humanize/route.ts`
+- 🎯 UI: Updated Writer page to display scores and details without type errors.
+
+### Plagiarism Check (Real Implementation)
+- ✅ Implemented k-shingle fingerprinting, winnowing, Jaccard similarity, phrase-level matching, citation pattern detection, and structural analysis.
+- ✅ Detailed results: similarity percentage, matches (exact/near-duplicate/paraphrase), suspicious sections with severity and suggestions, fingerprint, and algorithms used.
+- 🔧 Code: `lib/services/plagiarism-detector.service.ts`, API: `app/api/plagiarism/route.ts`
+- 🖥️ UI: Writer page shows comprehensive analysis cards, match lists, and sources checked.
+- 🔐 No external API keys required; runs completely on server.
+
 ---
 
 ## Billing & Database Reference

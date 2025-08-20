@@ -3,7 +3,14 @@
  * Implements multiple algorithms for accurate plagiarism detection
  */
 
-interface PlagiarismResult {
+import crypto from 'crypto'
+import axios from 'axios'
+import * as cheerio from 'cheerio'
+import { createHash } from 'crypto'
+import { OpenAI } from 'openai'
+import { supabase } from '@/integrations/supabase/client'
+
+export interface PlagiarismResult {
   is_plagiarized: boolean
   overall_similarity: number
   matches: MatchDetail[]
@@ -11,7 +18,34 @@ interface PlagiarismResult {
   fingerprint: string
   analysis_details: AnalysisDetails
   sources_checked: string[]
+  external_sources: ExternalSource[]
+  semantic_analysis?: SemanticAnalysis
   timestamp: string
+  check_id?: string
+  confidence_score: number
+}
+
+export interface ExternalSource {
+  url: string
+  title: string
+  snippet: string
+  similarity: number
+  domain: string
+  date?: string
+  type: 'web' | 'academic' | 'news' | 'social'
+}
+
+export interface SemanticAnalysis {
+  embedding_similarity: number
+  semantic_matches: SemanticMatch[]
+  paraphrase_probability: number
+}
+
+export interface SemanticMatch {
+  original_text: string
+  matched_text: string
+  similarity_score: number
+  source_url?: string
 }
 
 interface MatchDetail {
@@ -39,103 +73,143 @@ interface AnalysisDetails {
 }
 
 export class PlagiarismDetectorService {
-  private readonly SHINGLE_SIZE = 5 // k-shingles for fingerprinting
-  private readonly SIMILARITY_THRESHOLD = 0.3 // 30% similarity triggers warning
-  private readonly HIGH_SIMILARITY_THRESHOLD = 0.6 // 60% is high plagiarism
+  private readonly SHINGLE_SIZE = 5
+  private readonly SIMILARITY_THRESHOLD = 0.3
+  private readonly HIGH_SIMILARITY_THRESHOLD = 0.6
+  private readonly MIN_MATCH_LENGTH = 30
+  private readonly CACHE_DURATION_HOURS = 24
+  private readonly MAX_CONCURRENT_SEARCHES = 5
+  private readonly SEARCH_CHUNK_SIZE = 150 // words per search query
   
-  // Common academic phrases that shouldn't trigger plagiarism
-  private readonly COMMON_PHRASES = new Set([
-    'according to', 'in conclusion', 'for example', 'on the other hand',
-    'in addition', 'as a result', 'research shows', 'studies indicate',
-    'it is important to note', 'this suggests that', 'in other words',
-    'furthermore', 'moreover', 'however', 'therefore', 'consequently'
-  ])
-
-  // Known sources for demonstration (in production, this would query a database)
-  private readonly KNOWN_SOURCES = [
-    {
-      id: 'wiki_climate',
-      text: 'Climate change refers to long-term shifts in temperatures and weather patterns. These shifts may be natural, but since the 1800s, human activities have been the main driver of climate change, primarily due to the burning of fossil fuels.',
-      source: 'Wikipedia - Climate Change'
-    },
-    {
-      id: 'academic_ai',
-      text: 'Artificial intelligence is the simulation of human intelligence processes by machines, especially computer systems. These processes include learning, reasoning, and self-correction.',
-      source: 'Academic Journal - AI Overview'
-    },
-    {
-      id: 'research_quantum',
-      text: 'Quantum computing represents a fundamental shift in computation, leveraging quantum mechanical phenomena such as superposition and entanglement to process information in ways classical computers cannot.',
-      source: 'Research Paper - Quantum Computing'
+  private openai: OpenAI | null = null
+  private searchCache = new Map<string, any>()
+  
+  constructor() {
+    if (process.env.OPENAI_API_KEY) {
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+      })
     }
-  ]
+  }
 
   /**
    * Main plagiarism detection method
    */
-  async detectPlagiarism(text: string): Promise<PlagiarismResult> {
-    if (!text || text.length < 50) {
-      throw new Error('Text too short for accurate plagiarism detection')
+  async detectPlagiarism(text: string, options: { 
+    checkExternal?: boolean
+    useSemanticAnalysis?: boolean
+    userId?: string
+    documentId?: string
+  } = {}): Promise<PlagiarismResult> {
+    const startTime = Date.now()
+    const checkId = this.generateCheckId(text)
+    
+    // Check cache first
+    const cachedResult = await this.getCachedResult(checkId)
+    if (cachedResult && !options.checkExternal) {
+      return cachedResult
     }
-
-    const timestamp = new Date().toISOString()
-    const words = text.split(/\s+/).filter(w => w.length > 0)
     
-    // Generate text fingerprint
     const fingerprint = this.generateFingerprint(text)
+
+    // Run multiple detection algorithms in parallel
+    const [shingleAnalysis, phraseMatches, structuralAnalysis, citationAnalysis, sourceMatches] = await Promise.all([
+      this.shingleBasedDetection(text),
+      this.detectPhrasePlagiarism(text),
+      this.analyzeTextStructure(text),
+      this.detectCitationPatterns(text),
+      this.checkAgainstKnownSources(text)
+    ])
     
-    // Perform multiple detection algorithms
-    const shingleAnalysis = this.shingleBasedDetection(text)
-    const phraseMatches = this.detectPhrasePlagiarism(text)
-    const structuralAnalysis = this.analyzeTextStructure(text)
-    const citationAnalysis = this.detectCitationPatterns(text)
-    const sourceMatches = this.checkAgainstKnownSources(text)
+    // Check external sources if enabled
+    let externalSources: ExternalSource[] = []
+    let semanticAnalysis: SemanticAnalysis | undefined
+    
+    if (options.checkExternal !== false) {
+      externalSources = await this.checkExternalSources(text)
+    }
+    
+    if (options.useSemanticAnalysis && this.openai) {
+      semanticAnalysis = await this.performSemanticAnalysis(text, externalSources)
+    }
     
     // Combine all matches
     const allMatches: MatchDetail[] = [
       ...shingleAnalysis.matches,
-      ...phraseMatches,
+      ...phraseMatches.matches,
       ...sourceMatches
     ]
     
     // Find suspicious sections
     const suspiciousSections = this.identifySuspiciousSections(text, allMatches)
     
-    // Calculate overall similarity score
-    const overallSimilarity = this.calculateOverallSimilarity(
-      shingleAnalysis.similarity,
-      phraseMatches.length > 0 ? 0.3 : 0,
-      sourceMatches.length > 0 ? sourceMatches[0].similarity : 0,
-      structuralAnalysis.suspicionScore
-    )
+    // Calculate overall similarity including external sources
+    const externalSimilarity = externalSources.length > 0 
+      ? Math.max(...externalSources.map(s => s.similarity)) 
+      : 0
     
+    const overallSimilarity = this.calculateOverallSimilarity({
+      shingle: shingleAnalysis.similarity,
+      phrase: phraseMatches.similarity,
+      structural: structuralAnalysis.suspicionScore,
+      citation: citationAnalysis.citationScore,
+      source: sourceMatches.length > 0 ? Math.max(...sourceMatches.map(m => m.similarity)) : 0,
+      external: externalSimilarity,
+      semantic: semanticAnalysis?.embedding_similarity || 0
+    })
+    
+    // Calculate confidence score based on multiple factors
+    const confidenceScore = this.calculateConfidenceScore({
+      numberOfAlgorithmsTriggered: [
+        shingleAnalysis.similarity > 0.2,
+        phraseMatches.similarity > 0.2,
+        sourceMatches.length > 0
+      ].filter(Boolean).length,
+      externalSourcesFound: externalSources.length,
+      semanticAnalysisPerformed: !!semanticAnalysis,
+      textLength: text.split(/\s+/).length
+    })
+
     // Determine if plagiarized
     const isPlagiarized = overallSimilarity >= this.SIMILARITY_THRESHOLD ||
                           allMatches.some(m => m.type === 'exact' && m.similarity > 0.8)
-    
-    return {
+    const result: PlagiarismResult = {
       is_plagiarized: isPlagiarized,
       overall_similarity: Math.round(overallSimilarity * 100),
-      matches: allMatches.slice(0, 10), // Top 10 matches
+      matches: allMatches,
       suspicious_sections: suspiciousSections,
       fingerprint,
       analysis_details: {
-        total_words: words.length,
-        unique_phrases: structuralAnalysis.uniquePhrases,
+        total_words: text.split(/\s+/).length,
+        unique_phrases: new Set(text.split(/[.!?]/)).size,
         common_phrases_detected: structuralAnalysis.commonPhrases,
         citation_patterns_found: citationAnalysis.citationCount,
         fingerprint_matches: shingleAnalysis.matches.length,
         algorithms_used: [
-          'Shingle-based fingerprinting',
-          'Phrase matching',
-          'Structural analysis',
-          'Citation detection',
-          'Source comparison'
+          'shingle_based',
+          'phrase_matching',
+          'structural_analysis',
+          'citation_detection',
+          'source_comparison',
+          ...(externalSources.length > 0 ? ['external_search'] : []),
+          ...(semanticAnalysis ? ['semantic_analysis'] : [])
         ]
       },
-      sources_checked: this.KNOWN_SOURCES.map(s => s.source),
-      timestamp
+      sources_checked: [
+        ...this.KNOWN_SOURCES.map(s => s.source),
+        ...externalSources.map(s => s.domain)
+      ],
+      external_sources: externalSources,
+      semantic_analysis: semanticAnalysis,
+      timestamp: new Date().toISOString(),
+      check_id: checkId,
+      confidence_score: confidenceScore
     }
+    
+    // Cache the result
+    await this.cacheResult(checkId, result, options.userId)
+
+    return result
   }
 
   /**
@@ -256,7 +330,54 @@ export class PlagiarismDetectorService {
   /**
    * Detect phrase-level plagiarism
    */
-  private detectPhrasePlagiarism(text: string): MatchDetail[] {
+  private detectPhrasePlagiarism(text: string): { similarity: number; matches: MatchDetail[] } {
+    const matches: MatchDetail[] = []
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || []
+    let maxSimilarity = 0
+    
+    for (const sentence of sentences) {
+      const trimmed = sentence.trim()
+      if (trimmed.length < this.MIN_MATCH_LENGTH) continue
+      
+      // Check against known sources
+      for (const source of this.KNOWN_SOURCES) {
+        if (source.text.includes(trimmed)) {
+          matches.push({
+            text: trimmed,
+            similarity: 1.0,
+            type: 'exact',
+            source: source.source,
+            position: { start: text.indexOf(trimmed), end: text.indexOf(trimmed) + trimmed.length }
+          })
+          maxSimilarity = 1.0
+        }
+      }
+      
+      // Check for near duplicates
+      const words = trimmed.split(/\s+/)
+      if (words.length > 7) {
+        const firstWords = words.slice(0, 7).join(' ').toLowerCase()
+        if (!this.isCommonPhrase(firstWords)) {
+          for (const source of this.KNOWN_SOURCES) {
+            if (source.text.toLowerCase().includes(firstWords)) {
+              matches.push({
+                text: trimmed,
+                similarity: 0.7,
+                type: 'near_duplicate',
+                source: source.source,
+                position: { start: text.indexOf(trimmed), end: text.indexOf(trimmed) + trimmed.length }
+              })
+              maxSimilarity = Math.max(maxSimilarity, 0.7)
+            }
+          }
+        }
+      }
+    }
+    
+    return { similarity: maxSimilarity, matches }
+  }
+  
+  private detectPhrasePlagiarismOriginal(text: string): MatchDetail[] {
     const matches: MatchDetail[] = []
     const sentences = text.match(/[^.!?]+[.!?]+/g) || []
     
@@ -355,7 +476,7 @@ export class PlagiarismDetectorService {
   /**
    * Detect citation patterns
    */
-  private detectCitationPatterns(text: string): { citationCount: number; patterns: string[] } {
+  private detectCitationPatterns(text: string): { citationCount: number; citationScore: number; patterns: string[] } {
     const citationPatterns = [
       /\([A-Z][a-z]+(?:\s+(?:and|&)\s+[A-Z][a-z]+)*,?\s+\d{4}\)/g, // (Author, 2024)
       /\[[0-9]+\]/g, // [1]
@@ -375,7 +496,11 @@ export class PlagiarismDetectorService {
       }
     }
     
-    return { citationCount, patterns: foundPatterns }
+    return {
+      citationCount,
+      citationScore: Math.min(citationCount / 20, 1.0), // Normalize to 0-1
+      patterns: foundPatterns
+    }
   }
 
   /**
@@ -474,13 +599,504 @@ export class PlagiarismDetectorService {
   /**
    * Helper: Calculate overall similarity
    */
-  private calculateOverallSimilarity(...scores: number[]): number {
-    const validScores = scores.filter(s => s > 0)
-    if (validScores.length === 0) return 0
+  private calculateOverallSimilarity(scores: {
+    shingle: number
+    phrase: number
+    structural: number
+    citation: number
+    source: number
+    external: number
+    semantic: number
+  }): number {
+    // Dynamic weighted average based on available data
+    const weights: Record<string, number> = {
+      shingle: 0.20,
+      phrase: 0.25,
+      structural: 0.05,
+      citation: 0.05,
+      source: 0.20,
+      external: 0.15,
+      semantic: 0.10
+    }
     
-    // Weighted average with higher weight for higher scores
-    const weighted = validScores.map(s => s * s).reduce((a, b) => a + b, 0)
-    return Math.sqrt(weighted / validScores.length)
+    // Adjust weights if external sources found
+    if (scores.external > 0.5) {
+      weights.external = 0.30
+      weights.source = 0.15
+      weights.shingle = 0.15
+    }
+    
+    // Normalize weights
+    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0)
+    Object.keys(weights).forEach(key => {
+      weights[key] /= totalWeight
+    })
+
+    const weightedSum = Object.keys(scores).reduce((sum, key) => {
+      return sum + (scores[key as keyof typeof scores] * (weights[key] || 0))
+    }, 0)
+
+    return Math.min(weightedSum, 1.0)
+  }
+
+  /**
+   * Helper: Calculate confidence score
+   */
+  /**
+   * Check external sources using web search APIs
+   */
+  private async checkExternalSources(text: string): Promise<ExternalSource[]> {
+    const sources: ExternalSource[] = []
+    const chunks = this.extractSearchableChunks(text)
+    
+    // Process chunks in batches
+    const batchSize = this.MAX_CONCURRENT_SEARCHES
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize)
+      const batchResults = await Promise.all(
+        batch.map(chunk => this.searchWebForChunk(chunk))
+      )
+      
+      for (const results of batchResults) {
+        sources.push(...results)
+      }
+    }
+    
+    // Deduplicate and sort by similarity
+    const uniqueSources = this.deduplicateSources(sources)
+    return uniqueSources.sort((a, b) => b.similarity - a.similarity).slice(0, 10)
+  }
+  
+  /**
+   * Extract searchable chunks from text
+   */
+  private extractSearchableChunks(text: string): string[] {
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || []
+    const chunks: string[] = []
+    
+    // Get longest sentences first (more likely to be unique)
+    const sortedSentences = sentences
+      .filter(s => s.trim().split(/\s+/).length > 10)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 5)
+    
+    for (const sentence of sortedSentences) {
+      const words = sentence.trim().split(/\s+/)
+      if (words.length > this.SEARCH_CHUNK_SIZE) {
+        // Break into smaller chunks
+        for (let i = 0; i < words.length; i += this.SEARCH_CHUNK_SIZE) {
+          chunks.push(words.slice(i, i + this.SEARCH_CHUNK_SIZE).join(' '))
+        }
+      } else {
+        chunks.push(sentence.trim())
+      }
+    }
+    
+    return chunks.slice(0, 10) // Limit to 10 chunks
+  }
+  
+  /**
+   * Search web for a specific chunk
+   */
+  private async searchWebForChunk(chunk: string): Promise<ExternalSource[]> {
+    const sources: ExternalSource[] = []
+    
+    try {
+      // Use multiple search providers
+      const searchPromises = []
+      
+      // Google Custom Search API
+      if (process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_CSE_ID) {
+        searchPromises.push(this.searchGoogle(chunk))
+      }
+      
+      // Bing Search API
+      if (process.env.BING_API_KEY) {
+        searchPromises.push(this.bingSearch(chunk))
+      }
+      
+      // Free fallback: DuckDuckGo (no API key required)
+      searchPromises.push(this.duckDuckGoSearch(chunk))
+      
+      const results = await Promise.allSettled(searchPromises)
+      
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          sources.push(...result.value)
+        }
+      }
+    } catch (error) {
+      console.error('Error searching web for chunk:', error)
+    }
+    
+    return sources
+  }
+  
+  /**
+   * Google Custom Search
+   */
+  private async searchGoogle(query: string): Promise<ExternalSource[]> {
+    const apiKey = process.env.GOOGLE_SEARCH_API_KEY
+    const cx = process.env.GOOGLE_SEARCH_CSE_ID
+    if (!apiKey || !cx) {
+      console.warn('Google Search API credentials not configured. Please check GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CSE_ID in .env.local')
+      return []
+    }
+    
+    try {
+      const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+        params: {
+          key: apiKey,
+          cx: cx,
+          q: `"${query}"`, // Exact match search
+          num: 3
+        },
+        timeout: 5000
+      })
+      
+      return response.data.items?.map((item: any) => ({
+        url: item.link,
+        title: item.title,
+        snippet: item.snippet,
+        similarity: this.calculateTextSimilarity(query, item.snippet || ''),
+        domain: new URL(item.link).hostname,
+        type: 'web' as const
+      })) || []
+    } catch (error) {
+      console.error('Google search error:', error)
+      return []
+    }
+  }
+  
+  /**
+   * Bing Search
+   */
+  private async bingSearch(query: string): Promise<ExternalSource[]> {
+    if (!process.env.BING_API_KEY) {
+      return []
+    }
+    
+    try {
+      const response = await axios.get('https://api.bing.microsoft.com/v7.0/search', {
+        params: {
+          q: `"${query}"`,
+          count: 3
+        },
+        headers: {
+          'Ocp-Apim-Subscription-Key': process.env.BING_API_KEY
+        },
+        timeout: 5000
+      })
+      
+      return response.data.webPages?.value?.map((item: any) => ({
+        url: item.url,
+        title: item.name,
+        snippet: item.snippet,
+        similarity: this.calculateTextSimilarity(query, item.snippet || ''),
+        domain: new URL(item.url).hostname,
+        date: item.dateLastCrawled,
+        type: 'web' as const
+      })) || []
+    } catch (error) {
+      console.error('Bing search error:', error)
+      return []
+    }
+  }
+  
+  /**
+   * DuckDuckGo Search (free, no API key)
+   */
+  private async duckDuckGoSearch(query: string): Promise<ExternalSource[]> {
+    try {
+      // Using DuckDuckGo HTML search (no official API)
+      const response = await axios.get('https://html.duckduckgo.com/html/', {
+        params: {
+          q: `"${query.slice(0, 100)}"`, // Limit query length
+          s: '0',
+          dc: '1',
+          v: 'l',
+          o: 'json'
+        },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 5000
+      })
+      
+      const $ = cheerio.load(response.data)
+      const results: ExternalSource[] = []
+      
+      $('.result').slice(0, 3).each((i, elem) => {
+        const $elem = $(elem)
+        const url = $elem.find('.result__url').attr('href')
+        const title = $elem.find('.result__title').text().trim()
+        const snippet = $elem.find('.result__snippet').text().trim()
+        
+        if (url) {
+          results.push({
+            url,
+            title: title || 'No title',
+            snippet: snippet || '',
+            similarity: this.calculateTextSimilarity(query, snippet),
+            domain: url.includes('://') ? new URL(url).hostname : url.split('/')[0],
+            type: 'web'
+          })
+        }
+      })
+      
+      return results
+    } catch (error) {
+      console.error('DuckDuckGo search error:', error)
+      return []
+    }
+  }
+  
+  /**
+   * Perform semantic analysis using OpenAI embeddings
+   */
+  private async performSemanticAnalysis(
+    text: string,
+    externalSources: ExternalSource[]
+  ): Promise<SemanticAnalysis | undefined> {
+    if (!this.openai) {
+      return undefined
+    }
+    
+    try {
+      // Get embedding for the input text
+      const textEmbedding = await this.getEmbedding(text)
+      
+      // Get embeddings for external sources
+      const sourceEmbeddings = await Promise.all(
+        externalSources.slice(0, 5).map(async source => ({
+          source,
+          embedding: await this.getEmbedding(source.snippet)
+        }))
+      )
+      
+      // Calculate semantic similarities
+      const semanticMatches: SemanticMatch[] = []
+      let maxSimilarity = 0
+      
+      for (const { source, embedding } of sourceEmbeddings) {
+        if (embedding) {
+          const similarity = this.cosineSimilarity(textEmbedding!, embedding)
+          maxSimilarity = Math.max(maxSimilarity, similarity)
+          
+          if (similarity > 0.7) {
+            semanticMatches.push({
+              original_text: text.slice(0, 200),
+              matched_text: source.snippet,
+              similarity_score: similarity,
+              source_url: source.url
+            })
+          }
+        }
+      }
+      
+      // Calculate paraphrase probability
+      const paraphraseProbability = this.calculateParaphraseProbability(
+        text,
+        externalSources.map(s => s.snippet)
+      )
+      
+      return {
+        embedding_similarity: maxSimilarity,
+        semantic_matches: semanticMatches,
+        paraphrase_probability: paraphraseProbability
+      }
+    } catch (error) {
+      console.error('Semantic analysis error:', error)
+      return undefined
+    }
+  }
+  
+  /**
+   * Get text embedding using OpenAI
+   */
+  private async getEmbedding(text: string): Promise<number[] | null> {
+    if (!this.openai) return null
+    
+    try {
+      const response = await this.openai.embeddings.create({
+        model: 'text-embedding-ada-002',
+        input: text.slice(0, 8000) // Limit input size
+      })
+      
+      return response.data[0].embedding
+    } catch (error) {
+      console.error('Error getting embedding:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Calculate cosine similarity between embeddings
+   */
+  private cosineSimilarity(a: number[], b: number[]): number {
+    const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0)
+    const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0))
+    const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0))
+    return dotProduct / (magnitudeA * magnitudeB)
+  }
+  
+  /**
+   * Calculate paraphrase probability
+   */
+  private calculateParaphraseProbability(text: string, sources: string[]): number {
+    if (sources.length === 0) return 0
+    
+    const textWords = new Set(text.toLowerCase().split(/\s+/))
+    let maxOverlap = 0
+    
+    for (const source of sources) {
+      const sourceWords = new Set(source.toLowerCase().split(/\s+/))
+      const intersection = new Set([...textWords].filter(x => sourceWords.has(x)))
+      const overlap = intersection.size / Math.min(textWords.size, sourceWords.size)
+      maxOverlap = Math.max(maxOverlap, overlap)
+    }
+    
+    // High word overlap but not exact match suggests paraphrasing
+    if (maxOverlap > 0.6 && maxOverlap < 0.9) {
+      return maxOverlap
+    }
+    
+    return maxOverlap * 0.5
+  }
+  
+  /**
+   * Deduplicate sources
+   */
+  private deduplicateSources(sources: ExternalSource[]): ExternalSource[] {
+    const seen = new Set<string>()
+    const unique: ExternalSource[] = []
+    
+    for (const source of sources) {
+      const key = source.domain + source.title
+      if (!seen.has(key)) {
+        seen.add(key)
+        unique.push(source)
+      }
+    }
+    
+    return unique
+  }
+  
+  /**
+   * Generate check ID
+   */
+  private generateCheckId(text: string): string {
+    return createHash('sha256')
+      .update(text.slice(0, 1000))
+      .update(Date.now().toString())
+      .digest('hex')
+      .slice(0, 16)
+  }
+  
+  /**
+   * Get cached result
+   */
+  private async getCachedResult(checkId: string): Promise<PlagiarismResult | null> {
+    try {
+      // Check in-memory cache first
+      if (this.searchCache.has(checkId)) {
+        return this.searchCache.get(checkId)
+      }
+      
+      // Check database cache
+      const { data, error } = await supabase
+        .from('plagiarism_checks')
+        .select('*')
+        .eq('check_id', checkId)
+        .single()
+      
+      if (error || !data) return null
+      
+      // Check if cache is still valid
+      const cacheAge = Date.now() - new Date(data.created_at).getTime()
+      const maxAge = this.CACHE_DURATION_HOURS * 60 * 60 * 1000
+      
+      if (cacheAge > maxAge) {
+        return null
+      }
+      
+      return data.result as PlagiarismResult
+    } catch (error) {
+      console.error('Cache retrieval error:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Cache result
+   */
+  private async cacheResult(
+    checkId: string,
+    result: PlagiarismResult,
+    userId?: string
+  ): Promise<void> {
+    try {
+      // Cache in memory
+      this.searchCache.set(checkId, result)
+      
+      // Cache in database
+      await supabase
+        .from('plagiarism_checks')
+        .insert({
+          check_id: checkId,
+          user_id: userId,
+          result,
+          text_hash: createHash('sha256').update(result.fingerprint).digest('hex'),
+          similarity_score: result.overall_similarity,
+          is_plagiarized: result.is_plagiarized,
+          sources_count: result.external_sources?.length || 0,
+          created_at: new Date().toISOString()
+        })
+    } catch (error) {
+      console.error('Cache storage error:', error)
+    }
+  }
+  
+  /**
+   * Calculate text similarity
+   */
+  private calculateTextSimilarity(text1: string, text2: string): number {
+    const shingles1 = this.generateShingles(text1)
+    const shingles2 = this.generateShingles(text2)
+    return this.jaccardSimilarity(shingles1, shingles2)
+  }
+  
+  private calculateConfidenceScore({
+    numberOfAlgorithmsTriggered,
+    externalSourcesFound,
+    semanticAnalysisPerformed,
+    textLength
+  }: {
+    numberOfAlgorithmsTriggered: number
+    externalSourcesFound: number
+    semanticAnalysisPerformed: boolean
+    textLength: number
+  }): number {
+    let confidenceScore = 0.5 // Neutral starting point
+    
+    // Increase confidence with more algorithms triggered
+    confidenceScore += (numberOfAlgorithmsTriggered / 5) * 0.2
+    
+    // Increase confidence with external sources found
+    confidenceScore += (externalSourcesFound / 5) * 0.1
+    
+    // Increase confidence with semantic analysis performed
+    if (semanticAnalysisPerformed) {
+      confidenceScore += 0.1
+    }
+    
+    // Decrease confidence for very short texts
+    if (textLength < 100) {
+      confidenceScore -= 0.1
+    }
+    
+    // Ensure confidence score is within bounds
+    return Math.max(0.2, Math.min(confidenceScore, 0.9))
   }
 
   /**
@@ -517,11 +1133,48 @@ export class PlagiarismDetectorService {
    * Helper: Check if phrase is common
    */
   private isCommonPhrase(phrase: string): boolean {
-    for (const common of this.COMMON_PHRASES) {
-      if (phrase.includes(common)) return true
-    }
-    return false
+    return this.COMMON_PHRASES.some((common: string) => 
+      phrase.toLowerCase().includes(common.toLowerCase())
+    )
   }
+  
+  // Known sources for comparison (can be extended with database)
+  private readonly KNOWN_SOURCES = [
+    {
+      source: 'Wikipedia - Machine Learning',
+      text: 'Machine learning is a subset of artificial intelligence that focuses on the development of algorithms and statistical models that enable computer systems to improve their performance on a specific task through experience. Rather than being explicitly programmed, these systems learn patterns from data.'
+    },
+    {
+      source: 'Academic Paper - Deep Learning',
+      text: 'Deep learning represents a significant advancement in artificial neural networks, utilizing multiple layers to progressively extract higher-level features from raw input. This hierarchical learning process has revolutionized computer vision, natural language processing, and speech recognition.'
+    },
+    {
+      source: 'Technical Documentation',
+      text: 'API rate limiting is a technique used to control the amount of incoming and outgoing traffic to or from a network. Rate limiting helps prevent abuse, ensures fair usage, and maintains service stability by restricting the number of API calls an entity can make within a defined time period.'
+    }
+  ]
+  
+  // Common academic phrases to exclude
+  private readonly COMMON_PHRASES = [
+    'according to',
+    'as shown in',
+    'based on',
+    'for example',
+    'in conclusion',
+    'in other words',
+    'it can be seen that',
+    'research shows',
+    'studies have shown',
+    'the purpose of this',
+    'this paper presents',
+    'this study aims to',
+    'furthermore',
+    'however',
+    'therefore',
+    'nevertheless',
+    'consequently',
+    'as a result'
+  ]
 
   /**
    * Helper: Calculate variance

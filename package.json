@@ -15,6 +15,7 @@
     "@google/generative-ai": "latest",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.10.0",
+    "@huggingface/inference": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
@@ -56,6 +57,7 @@
     "@tiptap/react": "latest",
     "@tiptap/starter-kit": "latest",
     "@tiptap/y-tiptap": "latest",
+    "@types/cheerio": "^1.0.0",
     "@types/d3": "^7.4.3",
     "@types/tesseract.js": "^2.0.0",
     "@types/unist": "^3.0.3",
@@ -64,6 +66,7 @@
     "@uiw/react-md-editor": "latest",
     "@vercel/analytics": "latest",
     "autoprefixer": "^10.4.21",
+    "axios": "^1.11.0",
     "cheerio": "latest",
     "child_process": "latest",
     "class-variance-authority": "^0.7.1",
@@ -87,6 +90,7 @@
     "motion": "latest",
     "next": "15.2.4",
     "next-themes": "latest",
+    "openai": "^5.13.1",
     "path": "latest",
     "pdf-parse": "latest",
     "react": "^19.1.1",
@@ -122,8 +126,7 @@
     "y-websocket": "latest",
     "yjs": "latest",
     "zod": "^3.25.76",
-    "zustand": "latest",
-    "@huggingface/inference": "latest"
+    "zustand": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.17.1",
