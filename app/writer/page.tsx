@@ -675,8 +675,12 @@ export default function WriterPage() {
         <main className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
           {/* Top Bar */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0">
-            <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2">
               {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+            </div>
+
+            {/* Center – Quick Actions */}
+            <div className="flex items-center justify-center">
               <WriterCommandMenu
                 onFormatImage={handleFormatImage}
                 onFormatTable={handleFormatTable}
@@ -713,6 +717,10 @@ export default function WriterPage() {
                 onKeyboardShortcuts={handleKeyboardShortcuts}
                 onAccessibility={handleAccessibility}
               />
+            </div>
+
+            {/* Right section */}
+            <div className="flex-1 flex items-center justify-end gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={() => setIsShareOpen(true)}>
@@ -723,7 +731,7 @@ export default function WriterPage() {
                 <TooltipContent>Share</TooltipContent>
               </Tooltip>
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <UserProfileAvatar className="h-6 w-6" /> {/* Using UserProfileAvatar for user editing */}
+                <UserProfileAvatar className="h-6 w-6" />
                 <span>1 user editing</span>
               </div>
             </div>
