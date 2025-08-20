@@ -68,6 +68,7 @@ interface AnalysisDetails {
   citation_patterns_found: number
   fingerprint_matches: number
   algorithms_used: string[]
+  original_text?: string
 }
 
 export class PlagiarismDetectorService {
