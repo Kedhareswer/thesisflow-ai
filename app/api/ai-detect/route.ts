@@ -171,7 +171,11 @@ async function detectChunk(text: string, modelEndpoint: string) {
   }
 }
 
+
 export async function POST(req: Request) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+  
   try {
     const body = await req.json()
     
@@ -250,6 +254,14 @@ export async function POST(req: Request) {
     } else if (!result.is_ai && result.real_probability < threshold) {
       result.is_ai = true
     }
+  }
+  
+  if (currentChunk) {
+    chunks.push(currentChunk + (currentChunk.endsWith('.') ? '' : '.'))
+  }
+
+  return chunks
+}
 
     // Cache result
     detectionCache.set(cacheKey, {
@@ -303,4 +315,6 @@ export async function POST(req: Request) {
       { status: 500 }
     )
   }
+  
+  throw lastError
 }

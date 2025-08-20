@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server"
 import { FileProcessor } from "@/lib/file-processors"
+import { FileProcessorWithOCR } from "@/lib/file-processors-with-ocr"
 import { ErrorHandler } from '@/lib/utils/error-handler'
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
     const file = formData.get("file") as File
+    const enableOCRRaw = formData.get("enableOCR")
+    const enableOCR = enableOCRRaw === 'true' || enableOCRRaw === '1'
 
     if (!file) {
       const validationError = ErrorHandler.processError(
@@ -37,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // Check if file type is supported
-    const supportedTypes = FileProcessor.getSupportedTypes()
+    const supportedTypes = (enableOCR ? FileProcessorWithOCR : FileProcessor).getSupportedTypes()
     if (!supportedTypes.includes(file.type)) {
       const unsupportedError = ErrorHandler.processError(
         `Unsupported file type: ${file.type}`,
@@ -53,8 +56,9 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Use the existing FileProcessor class for proper file processing
-      const result = await FileProcessor.processFile(file)
+      // Use the appropriate processor (with OCR support if enabled)
+      const processor = enableOCR ? FileProcessorWithOCR : FileProcessor
+      const result = await processor.processFile(file)
 
       // Validate that we extracted meaningful content
       if (!result.content || result.content.trim().length < 10) {
@@ -80,7 +84,9 @@ export async function POST(request: Request) {
         metadata: {
           wordCount: result.metadata.wordCount,
           pages: result.metadata.pages,
-          processingMethod: "FileProcessor"
+          processingMethod: (result as any).metadata?.processingMethod || (enableOCR ? "FileProcessorWithOCR" : "FileProcessor"),
+          ocrConfidence: (result as any).metadata?.ocrConfidence,
+          hasImages: (result as any).metadata?.hasImages
         }
       })
 

@@ -23,6 +23,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.62.0(react@19.1.1))
+      '@huggingface/inference':
+        specifier: latest
+        version: 4.7.1
       '@radix-ui/react-accordion':
         specifier: latest
         version: 1.2.11(@types/react-dom@19.1.7(@types/react@19.1.10))(@types/react@19.1.10)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -122,6 +125,9 @@ importers:
       '@sveltejs/kit':
         specifier: latest
         version: 2.28.0(@sveltejs/vite-plugin-svelte@5.1.0(svelte@5.38.1)(vite@7.0.3(@types/node@22.17.1)(jiti@1.21.7)(yaml@2.8.1)))(svelte@5.38.1)(vite@7.0.3(@types/node@22.17.1)(jiti@1.21.7)(yaml@2.8.1))
+      '@tabler/icons-react':
+        specifier: ^3.34.1
+        version: 3.34.1(react@19.1.1)
       '@tiptap/core':
         specifier: latest
         version: 3.1.0(@tiptap/pm@3.1.0)
@@ -146,6 +152,9 @@ importers:
       '@types/d3':
         specifier: ^7.4.3
         version: 7.4.3
+      '@types/tesseract.js':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@types/unist':
         specifier: ^3.0.3
         version: 3.0.3
@@ -302,6 +311,9 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.17)
+      tesseract.js:
+        specifier: ^6.0.1
+        version: 6.0.1
       unified:
         specifier: ^11.0.5
         version: 11.0.5
@@ -629,6 +641,17 @@ packages:
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
     peerDependencies:
       react-hook-form: ^7.0.0
+
+  '@huggingface/inference@4.7.1':
+    resolution: {integrity: sha512-gXrMocGDsE6kUZPEj82c3O+/OKnIfbHvg9rYjGA6svbWrYVmHCIAdCrrgCwNl2v5GELfPJrrfIv0bvzCTfa64A==}
+    engines: {node: '>=18'}
+
+  '@huggingface/jinja@0.5.1':
+    resolution: {integrity: sha512-yUZLld4lrM9iFxHCwFQ7D1HW2MWMwSbeB7WzWqFYDWK+rEb+WldkLdAJxUPOmgICMHZLzZGVcVjFh3w/YGubng==}
+    engines: {node: '>=18'}
+
+  '@huggingface/tasks@0.19.36':
+    resolution: {integrity: sha512-oBXkEndtoLScX4aljFM1mXlFvAI6kYzCjhLV+2/ekyU1vn4Ypl2csDuAI6PRLGWGW8g0q9uGtBtFHfS4uMiYPQ==}
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -1918,6 +1941,14 @@ packages:
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
+  '@tabler/icons-react@3.34.1':
+    resolution: {integrity: sha512-Ld6g0NqOO05kyyHsfU8h787PdHBm7cFmOycQSIrGp45XcXYDuOK2Bs0VC4T2FWSKZ6bx5g04imfzazf/nqtk1A==}
+    peerDependencies:
+      react: '>= 16'
+
+  '@tabler/icons@3.34.1':
+    resolution: {integrity: sha512-9gTnUvd7Fd/DmQgr3MKY+oJLa1RfNsQo8c/ir3TJAWghOuZXodbtbVp0QBY2DxWuuvrSZFys0HEbv1CoiI5y6A==}
+
   '@tiptap/core@3.1.0':
     resolution: {integrity: sha512-GDxoCrA+ggdzhUcelcWWVsMcmoOYXWmpjIviYXZTyHR/fds8G/mNjG0ZpFqXNmFnZ7Rs16bAsSX2tjDZ9MyTFg==}
     peerDependencies:
@@ -2252,6 +2283,10 @@ packages:
   '@types/react@19.1.10':
     resolution: {integrity: sha512-EhBeSYX0Y6ye8pNebpKrwFJq7BoQ8J5SO6NlvNwwHjSj6adXJViPQrKlsyPw7hLBLvckEMO1yxeGdR82YBBlDg==}
 
+  '@types/tesseract.js@2.0.0':
+    resolution: {integrity: sha512-t0uNy5L9Ynp/O/fu0+75/ot7lWZZRlwsVwaPQOeYud/V6a0B/JjfYvwnrA4TV6+R9xc1ioRLukqjhI8Spy5diw==}
+    deprecated: This is a stub types definition. tesseract.js provides its own type definitions, so you do not need this installed.
+
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
@@ -2445,6 +2480,9 @@ packages:
 
   bluebird@3.4.7:
     resolution: {integrity: sha512-iD3898SR7sWVRHbiQv+sHUtHnMvC1o3nW5rAcqnq3uOn07DSAppZYUkIGslDz6gXC7HfunPe7YVBgoEJASPcHA==}
+
+  bmp-js@0.1.0:
+    resolution: {integrity: sha512-vHdS19CnY3hwiNdkaqk93DvjVLfbEcI8mys4UjuWrlX1haDmroo8o4xCzh4wD6DGV6HxRCyauwhHRqMTfERtjw==}
 
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
@@ -3238,6 +3276,9 @@ packages:
   is-reference@3.0.3:
     resolution: {integrity: sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw==}
 
+  is-url@1.2.4:
+    resolution: {integrity: sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==}
+
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
 
@@ -3607,6 +3648,15 @@ packages:
   node-ensure@0.0.0:
     resolution: {integrity: sha512-DRI60hzo2oKN1ma0ckc6nQWlHU69RH6xN0sjQTjMpChPfTYvKZdcQFfdYK2RWbJcKyUizSIy/l8OTGxMAM1QDw==}
 
+  node-fetch@2.7.0:
+    resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
+    engines: {node: 4.x || >=6.0.0}
+    peerDependencies:
+      encoding: ^0.1.0
+    peerDependenciesMeta:
+      encoding:
+        optional: true
+
   node-releases@2.0.19:
     resolution: {integrity: sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw==}
 
@@ -3632,6 +3682,10 @@ packages:
   object-inspect@1.13.4:
     resolution: {integrity: sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew==}
     engines: {node: '>= 0.4'}
+
+  opencollective-postinstall@2.0.3:
+    resolution: {integrity: sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q==}
+    hasBin: true
 
   option@0.2.4:
     resolution: {integrity: sha512-pkEqbDyl8ou5cpq+VsnQbe/WlEy5qS7xPzMS1U55OCG9KPvwFD46zDbxQIj3egJSFc3D+XhYOPUzz49zQAVy7A==}
@@ -4033,6 +4087,9 @@ packages:
   refractor@4.9.0:
     resolution: {integrity: sha512-nEG1SPXFoGGx+dcjftjv8cAjEusIh6ED1xhf5DG3C0x/k+rmZ2duKnc3QLpt6qeHv5fPb8uwN3VWN2BT7fr3Og==}
 
+  regenerator-runtime@0.13.11:
+    resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
+
   rehype-attr@3.0.3:
     resolution: {integrity: sha512-Up50Xfra8tyxnkJdCzLBIBtxOcB2M1xdeKe1324U06RAvSjYm7ULSeoM+b/nYPQPVd7jsXJ9+39IG1WAJPXONw==}
     engines: {node: '>=16'}
@@ -4310,6 +4367,12 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
+  tesseract.js-core@6.0.0:
+    resolution: {integrity: sha512-1Qncm/9oKM7xgrQXZXNB+NRh19qiXGhxlrR8EwFbK5SaUbPZnS5OMtP/ghtqfd23hsr1ZvZbZjeuAGcMxd/ooA==}
+
+  tesseract.js@6.0.1:
+    resolution: {integrity: sha512-/sPvMvrCtgxnNRCjbTYbr7BRu0yfWDsMZQ2a/T5aN/L1t8wUQN6tTWv6p6FwzpoEBA0jrN2UD2SX4QQFRdoDbA==}
+
   thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
     engines: {node: '>=0.8'}
@@ -4570,6 +4633,9 @@ packages:
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
 
+  wasm-feature-detect@1.8.0:
+    resolution: {integrity: sha512-zksaLKM2fVlnB5jQQDqKXXwYHLQUVH9es+5TOOHwGOVJOCeRBCiPjwSg+3tN2AdTCzjgli4jijCH290kXb/zWQ==}
+
   web-namespaces@2.0.1:
     resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
 
@@ -4669,6 +4735,9 @@ packages:
 
   zimmerframe@1.1.2:
     resolution: {integrity: sha512-rAbqEGa8ovJy4pyBxZM70hg4pE6gDgaQ0Sl9M3enG3I0d6H4XSAM3GeNGLKnsBpuijUow064sf7ww1nutC5/3w==}
+
+  zlibjs@0.3.1:
+    resolution: {integrity: sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==}
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
@@ -4881,6 +4950,15 @@ snapshots:
   '@hookform/resolvers@3.10.0(react-hook-form@7.62.0(react@19.1.1))':
     dependencies:
       react-hook-form: 7.62.0(react@19.1.1)
+
+  '@huggingface/inference@4.7.1':
+    dependencies:
+      '@huggingface/jinja': 0.5.1
+      '@huggingface/tasks': 0.19.36
+
+  '@huggingface/jinja@0.5.1': {}
+
+  '@huggingface/tasks@0.19.36': {}
 
   '@iconify/types@2.0.0': {}
 
@@ -6145,6 +6223,13 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  '@tabler/icons-react@3.34.1(react@19.1.1)':
+    dependencies:
+      '@tabler/icons': 3.34.1
+      react: 19.1.1
+
+  '@tabler/icons@3.34.1': {}
+
   '@tiptap/core@3.1.0(@tiptap/pm@3.1.0)':
     dependencies:
       '@tiptap/pm': 3.1.0
@@ -6533,6 +6618,12 @@ snapshots:
     dependencies:
       csstype: 3.1.3
 
+  '@types/tesseract.js@2.0.0':
+    dependencies:
+      tesseract.js: 6.0.1
+    transitivePeerDependencies:
+      - encoding
+
   '@types/trusted-types@2.0.7':
     optional: true
 
@@ -6724,6 +6815,8 @@ snapshots:
   binary-extensions@2.3.0: {}
 
   bluebird@3.4.7: {}
+
+  bmp-js@0.1.0: {}
 
   boolbase@1.0.0: {}
 
@@ -7652,6 +7745,8 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.8
 
+  is-url@1.2.4: {}
+
   isarray@1.0.0: {}
 
   isexe@2.0.0: {}
@@ -8259,6 +8354,10 @@ snapshots:
 
   node-ensure@0.0.0: {}
 
+  node-fetch@2.7.0:
+    dependencies:
+      whatwg-url: 5.0.0
+
   node-releases@2.0.19: {}
 
   normalize-path@3.0.0: {}
@@ -8274,6 +8373,8 @@ snapshots:
   object-hash@3.0.0: {}
 
   object-inspect@1.13.4: {}
+
+  opencollective-postinstall@2.0.3: {}
 
   option@0.2.4: {}
 
@@ -8761,6 +8862,8 @@ snapshots:
       hastscript: 7.2.0
       parse-entities: 4.0.2
 
+  regenerator-runtime@0.13.11: {}
+
   rehype-attr@3.0.3:
     dependencies:
       unified: 11.0.5
@@ -9215,6 +9318,22 @@ snapshots:
     transitivePeerDependencies:
       - ts-node
 
+  tesseract.js-core@6.0.0: {}
+
+  tesseract.js@6.0.1:
+    dependencies:
+      bmp-js: 0.1.0
+      idb-keyval: 6.2.2
+      is-url: 1.2.4
+      node-fetch: 2.7.0
+      opencollective-postinstall: 2.0.3
+      regenerator-runtime: 0.13.11
+      tesseract.js-core: 6.0.0
+      wasm-feature-detect: 1.8.0
+      zlibjs: 0.3.1
+    transitivePeerDependencies:
+      - encoding
+
   thenify-all@1.6.0:
     dependencies:
       thenify: 3.3.1
@@ -9461,6 +9580,8 @@ snapshots:
 
   w3c-keyname@2.2.8: {}
 
+  wasm-feature-detect@1.8.0: {}
+
   web-namespaces@2.0.1: {}
 
   webidl-conversions@3.0.1: {}
@@ -9529,6 +9650,8 @@ snapshots:
       lib0: 0.2.114
 
   zimmerframe@1.1.2: {}
+
+  zlibjs@0.3.1: {}
 
   zod@3.25.76: {}
 

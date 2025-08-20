@@ -10,18 +10,20 @@ import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
+import { CookiePanel } from "@/components/ui/cookie-banner-1"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AI Research Platform — Discover, Summarize & Collaborate Smarter | Bolt Research Hub",
-  description: "Bolt Research Hub is an AI research hub where you can explore papers, generate instant summaries, organize projects, and collaborate with teams — all in one place.",
+  title: "AI Research Platform — Discover, Summarize & Collaborate Smarter | Thesis Flow AI",
+  description: "Thesis Flow AI is an AI research hub where you can explore papers, generate instant summaries, organize projects, and collaborate with teams — all in one place.",
   keywords: [
     "AI research platform",
     "academic summarizer",
     "research collaboration tool",
     "AI paper summarizer",
     "thesis assistant",
+    "research assistant",
     "research productivity software"
   ],
   generator: 'v0.dev'
@@ -46,6 +48,8 @@ export default function RootLayout({
                 <Toaster />
                 <AuthDebug />
                 <Analytics />
+                {/* Global Cookie Consent Banner */}
+                <CookiePanel />
               </ResearchSessionProvider>
             </SupabaseAuthProvider>
           </AuthErrorBoundary>

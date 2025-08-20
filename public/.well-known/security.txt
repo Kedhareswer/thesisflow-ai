@@ -1,18 +1,18 @@
-Contact: https://ai-project-planner.vercel.app/contact
+Contact: https://thesisflow-ai.vercel.app/contact
 Contact: mailto:security@boltresearchhub.com
 Expires: 2026-01-17T00:00:00.000Z
-Encryption: https://ai-project-planner.vercel.app/.well-known/pgp-key.txt
-Acknowledgments: https://ai-project-planner.vercel.app/security/acknowledgments
+Encryption: https://thesisflow-ai.vercel.app/.well-known/pgp-key.txt
+Acknowledgments: https://thesisflow-ai.vercel.app/security/acknowledgments
 Preferred-Languages: en
-Canonical: https://ai-project-planner.vercel.app/.well-known/security.txt
+Canonical: https://thesisflow-ai.vercel.app/.well-known/security.txt
 
-# Security Policy for Bolt Research Hub
+# Security Policy for Thesis Flow AI
 # 
 # We take security seriously and appreciate responsible disclosure.
 # 
 # Scope:
-# - Main application: https://ai-project-planner.vercel.app
-# - API endpoints: https://ai-project-planner.vercel.app/api/*
+# - Main application: https://thesisflow-ai.vercel.app
+# - API endpoints: https://thesisflow-ai.vercel.app/api/*
 # - WebSocket connections
 # - File upload functionality
 # - Authentication systems
@@ -29,4 +29,4 @@ Canonical: https://ai-project-planner.vercel.app/.well-known/security.txt
 # Response time: We aim to respond within 48 hours.
 # Fix time: Critical issues will be addressed within 7 days.
 # 
-# Thank you for helping keep Bolt Research Hub secure!
+# Thank you for helping keep Thesis Flow AI secure!

@@ -692,7 +692,7 @@ export function InputTab({
 
               {/* Generate Summary Button */}
               <Button
-                onClick={onStartProcessing}
+                onClick={() => onStartProcessing()}
                 disabled={isProcessing || !hasContent}
                 className="w-full h-12 bg-black hover:bg-gray-800 text-white border-0 font-light tracking-wide"
               >

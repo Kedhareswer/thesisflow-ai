@@ -44,6 +44,8 @@ import { supabase } from "@/lib/supabase"
 import type { AIProvider } from "@/lib/ai-providers"
 import { WriterCommandMenu } from "./components/writer-command-menu"
 import WriterShareModal from "./components/writer-share-modal"
+import AIDetectionBadge from "@/components/ai-detection-badge"
+import { aiDetectionService, AIDetectionResult } from "@/lib/services/ai-detection.service"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -71,7 +73,6 @@ export default function WriterPage() {
   const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
   const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
-
   const [aiDetectionResult, setAiDetectionResult] = useState<any | null>(null)
   const [isDetecting, setIsDetecting] = useState(false)
   const [humanizedText, setHumanizedText] = useState<string | null>(null)

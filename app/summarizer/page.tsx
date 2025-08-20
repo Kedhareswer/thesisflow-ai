@@ -168,10 +168,13 @@ export default function SummarizerPage() {
       setContent(data.content || "")
 
       // Automatically trigger summarization and switch to the Summary tab
-      setTimeout(() => {
-        handleSummarize(data.content || "")
-        handleTabChange('summary')
-      }, 0)
+      // Ensure content is available before triggering
+      if (data.content && data.content.trim().length > 10) {
+        setTimeout(() => {
+          handleSummarize(data.content)
+          handleTabChange('summary')
+        }, 100)
+      }
 
       toast({
         title: "URL Content Extracted",
@@ -196,20 +199,66 @@ export default function SummarizerPage() {
   // Handle file processing
   const handleFileProcessed = useCallback(
     (fileContent: string, metadata: any) => {
+      console.log('File processed, content length:', fileContent?.length)
+      console.log('File metadata:', metadata)
+      
+      // Ensure content is properly set
+      if (!fileContent || fileContent.trim().length === 0) {
+        const noContentError: UserFriendlyError = {
+          title: "No Content Extracted",
+          message: "The file appears to be empty or could not be read. Please try a different file.",
+          actions: [
+            "Try uploading a different file",
+            "Ensure the file contains readable text",
+            "Use the Text tab to paste content manually"
+          ],
+          errorType: 'validation'
+        }
+        setError(noContentError)
+        return
+      }
+      
       setContent(fileContent)
+      setError(null) // Clear any previous errors
+      
       toast({
         title: "File Processed",
         description: `Successfully extracted ${getWordCount(fileContent)} words from ${metadata?.name || "the file"}.`,
       })
+      
+      // Auto-trigger summarization if provider is selected and content is valid
+      if (selectedProvider && fileContent && fileContent.trim().length > 10) {
+        console.log('Auto-triggering summarization with file content:', fileContent.substring(0, 100))
+        setTimeout(() => {
+          handleSummarize(fileContent)
+        }, 100)
+      } else if (selectedProvider) {
+        console.log('Provider selected but content invalid:', {
+          hasContent: !!fileContent,
+          length: fileContent?.length,
+          trimmedLength: fileContent?.trim()?.length
+        })
+      }
     },
-    [getWordCount],
+    [getWordCount, selectedProvider, toast],
   )
 
   const handleFileError = useCallback(
-    (error: string) => {
-      const processedError = ErrorHandler.processError(error, {
-        operation: 'file-processing'
-      })
+    (error: string | UserFriendlyError) => {
+      // Check if error is already a UserFriendlyError object
+      let processedError: UserFriendlyError
+      
+      if (typeof error === 'object' && 'title' in error && 'message' in error) {
+        // Already a UserFriendlyError
+        processedError = error as UserFriendlyError
+      } else {
+        // Process the error string
+        const errorMessage = typeof error === 'string' ? error : 'Unknown file processing error'
+        processedError = ErrorHandler.processError(errorMessage, {
+          operation: 'file-processing'
+        })
+      }
+      
       setError(processedError)
       toast({
         title: "File Processing Failed",
@@ -221,17 +270,36 @@ export default function SummarizerPage() {
   )
 
   // Handle text summarization with progress
-  const handleSummarize = async (contentOverride?: string, retryOptions?: any) => {
-    const textToSummarize = contentOverride ?? content;
-    if (!textToSummarize.trim()) {
+  const handleSummarize = async (contentOverride?: unknown, retryOptions?: any) => {
+    const textToSummarize = typeof contentOverride === 'string' ? contentOverride : content
+    
+    const preview = (val: unknown) => typeof val === 'string' ? val.slice(0, 100) : undefined
+    const safeLen = (val: unknown) => typeof val === 'string' ? val.length : undefined
+    const safeTrimLen = (val: unknown) => typeof val === 'string' ? val.trim().length : undefined
+
+    console.log('HandleSummarize called with:', {
+      hasOverride: typeof contentOverride !== 'undefined',
+      overrideType: typeof contentOverride,
+      contentOverridePreview: preview(contentOverride),
+      contentPreview: preview(content),
+      textToSummarizePreview: preview(textToSummarize),
+      length: safeLen(textToSummarize),
+      trimmedLength: safeTrimLen(textToSummarize)
+    });
+    
+    // More lenient validation - only check for truly empty content
+    if (typeof textToSummarize !== 'string' || textToSummarize.trim().length < 10) {
       const validationError = ErrorHandler.processError(
-        "No content provided for summarization",
-        { operation: 'summarize-validation' }
+        "Content is too short or empty. Please provide at least 10 characters of text to summarize.",
+        {
+          operation: 'summarization-validation',
+          contentLength: typeof content === 'string' ? content.length : 0
+        }
       )
       setError(validationError)
       toast({
-        title: "No Content",
-        description: "Please provide content to summarize.",
+        title: "No Content Provided",
+        description: validationError.message,
         variant: "destructive",
       })
       return
@@ -272,10 +340,25 @@ export default function SummarizerPage() {
         }
       )
 
+      console.log('Summarizer: Raw result returned:', {
+        hasSummary: !!result?.summary,
+        summaryPreview: result?.summary?.slice(0, 160),
+        keyPointsCount: Array.isArray(result?.keyPoints) ? result.keyPoints.length : 0,
+        method: result?.processingMethod,
+      })
+
       const enhancedResult = enhanceResult(result)
+      console.log('Summarizer: Enhanced result:', {
+        readingTime: enhancedResult.readingTime,
+        summaryLength: enhancedResult.summaryLength,
+        compressionRatio: enhancedResult.compressionRatio,
+        keyPoints: enhancedResult.keyPoints,
+      })
       setResult(enhancedResult)
       setHasActiveSummary(true)
       completeProcessing(true)
+      // Ensure Summary tab is shown after successful generation
+      handleTabChange('summary')
 
       toast({
         title: "Summary Generated",
@@ -284,7 +367,7 @@ export default function SummarizerPage() {
     } catch (error) {
       const processedError = ErrorHandler.processError(error, {
         operation: 'summarize-text',
-        contentLength: textToSummarize.length
+        contentLength: typeof textToSummarize === 'string' ? textToSummarize.length : 0
       })
       setError(processedError)
       completeProcessing(false)

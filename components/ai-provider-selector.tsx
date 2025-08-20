@@ -58,7 +58,27 @@ export default function AIProviderSelector({
     }
   }
 
+  // Map provider → local logo assets placed under /public
+  const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
+    groq: "/groq-icon.svg",
+    mistral: "/mistral-ai-icon.svg",
+    gemini: "/gemini-icon.svg",
+    openai: "/openai-icon.svg",
+    anthropic: "/anthropic-icon.png",
+  }
+
   const getProviderIcon = (provider: AIProvider) => {
+    const logo = PROVIDER_LOGOS[provider]
+    if (logo) {
+      return (
+        <img
+          src={logo}
+          alt={`${AI_PROVIDERS[provider].name} logo`}
+          className="h-5 w-5 object-contain"
+          loading="lazy"
+        />
+      )
+    }
     switch (provider) {
       case "gemini":
         return <Brain className="h-4 w-4" />
@@ -67,6 +87,8 @@ export default function AIProviderSelector({
       case "aiml":
         return <Brain className="h-4 w-4" />
       case "openai":
+        return <Brain className="h-4 w-4" />
+      case "anthropic":
         return <Brain className="h-4 w-4" />
       default:
         return <Brain className="h-4 w-4" />
@@ -117,7 +139,10 @@ export default function AIProviderSelector({
             <Label>Primary AI Provider</Label>
             <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select AI provider" />
+                <div className="flex items-center gap-2">
+                  {selectedProvider ? getProviderIcon(selectedProvider) : <Brain className="h-5 w-5" />}
+                  <SelectValue placeholder="Select AI provider" />
+                </div>
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(AI_PROVIDERS).map(([key, config]) => (

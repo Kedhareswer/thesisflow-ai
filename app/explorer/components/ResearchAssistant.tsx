@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2 } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -82,7 +82,48 @@ export function ResearchAssistant({
   const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
 
-  // Memoized icon component for the currently selected personality
+  // Map provider → local logo assets placed under /public
+  const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
+    groq: "/groq-icon.svg",
+    mistral: "/mistral-ai-icon.svg",
+    gemini: "/gemini-icon.svg",
+    openai: "/openai-icon.svg",
+    anthropic: "/anthropic-icon.png",
+    aiml: "/ai-ml-icon.png"
+  }
+
+  const getProviderIcon = (provider: AIProvider) => {
+    const logo = PROVIDER_LOGOS[provider]
+    if (logo) {
+      return (
+        <img
+          src={logo}
+          alt={`${AI_PROVIDERS[provider].name} logo`}
+          className="h-5 w-5 object-contain"
+          loading="lazy"
+        />
+      )
+    }
+    
+    // Fallback icons if logo not found
+    switch (provider) {
+      case "gemini":
+        return <img src="/gemini-icon.svg" alt="Gemini" className="h-5 w-5 object-contain" />
+      case "groq":
+        return <Zap className="h-5 w-5 text-[#00AC47]" />
+      case "openai":
+        return <img src="/openai-icon.svg" alt="OpenAI" className="h-5 w-5 object-contain" />
+      case "anthropic":
+        return <img src="/anthropic-icon.png" alt="Anthropic" className="h-5 w-5 object-contain" />
+      case "mistral":
+        return <img src="/mistral-ai-icon.svg" alt="Mistral" className="h-5 w-5 object-contain" />
+      case "aiml":
+        return <img src="/ai-ml-icon.png" alt="AI/ML" className="h-5 w-5 object-contain" />
+      default:
+        return <Bot className="h-5 w-5 opacity-70" />
+    }
+  }
+
   const SelectedPersonalityIcon = selectedPersonality?.icon
 
   // Auto-resize textarea
@@ -265,19 +306,6 @@ ASSISTANT:`
     })
   }
 
-  const getProviderIcon = (provider: AIProvider) => {
-    const config = AI_PROVIDERS[provider]
-    if (config.name === "OpenAI") {
-      return "🤖"
-    } else if (config.name === "Google Gemini") {
-      return "✨"
-    } else if (config.name === "Anthropic") {
-      return "🧠"
-    } else if (config.name === "Mistral AI") {
-      return "🌊"
-    }
-    return <Bot className="w-4 h-4" />
-  }
 
   return (
     <div className="flex flex-col h-[75vh] md:h-[80vh] lg:h-[85vh] bg-white rounded-lg border">

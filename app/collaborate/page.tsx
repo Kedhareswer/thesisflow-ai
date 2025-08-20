@@ -11,7 +11,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { Check } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -19,27 +18,37 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Users,
   MessageSquare,
-  Share,
-  UserPlus,
-  Globe,
-  Search,
+  Plus,
+  MoreHorizontal,
   Settings,
+  LogOut,
+  Search,
   Crown,
-  Shield,
-  Eye,
+  Edit,
+  Trash,
+  Check,
+  X,
   Send,
   Video,
-  Plus,
+  ChevronDown,
+  Clock,
   Loader2,
-  AlertCircle,
-  X,
-  MoreHorizontal,
-  Bell,
-  FileText,
-  Zap,
-  Lock,
+  UserPlus,
+  Mail,
+  ExternalLink,
+  Share,
+  Shield,
   ChevronRight,
-  ChevronDown
+  Home,
+  User,
+  DollarSign,
+  Sparkles,
+  Zap,
+  FileText,
+  Eye,
+  AlertCircle,
+  Globe,
+  Lock
 } from "lucide-react"
 
 import { useSocket } from "@/components/socket-provider"
@@ -51,6 +60,7 @@ import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
 import { InvitationsDialog } from "./components/invitations-dialog"
 import { DevelopmentNotice } from "@/components/ui/development-notice"
+import IntegrationsSection from "@/components/ui/integrations-component"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { PlanStatus } from "@/components/ui/plan-status"
 import { TeamLimitBanner } from "@/components/ui/smart-upgrade-banner"
@@ -985,7 +995,7 @@ export default function CollaboratePage() {
                 <Card className="border-none shadow-sm h-full">
                   <CardContent className="p-0">
                     <Tabs defaultValue="chat" className="h-full">
-                      <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-12">
+                      <TabsList className="grid w-full grid-cols-4 bg-transparent border-b rounded-none h-12">
                         <TabsTrigger value="chat" className="gap-2 data-[state=active]:bg-background">
                           <MessageSquare className="h-4 w-4" />
                           Chat
@@ -997,6 +1007,10 @@ export default function CollaboratePage() {
                         <TabsTrigger value="files" className="gap-2 data-[state=active]:bg-background">
                           <Share className="h-4 w-4" />
                           Files
+                        </TabsTrigger>
+                        <TabsTrigger value="integrations" className="gap-2 data-[state=active]:bg-background">
+                          <Zap className="h-4 w-4" />
+                          Integrations
                         </TabsTrigger>
                       </TabsList>
 
@@ -1314,11 +1328,11 @@ export default function CollaboratePage() {
                       </TabsContent>
 
                       <TabsContent value="files" className="mt-0 p-6">
-                        <TeamFiles 
-                          teamId={selectedTeam.id} 
-                          currentUserRole={currentUserRole} 
-                          apiCall={apiCall}
-                        />
+                        <TeamFiles teamId={selectedTeam.id} currentUserRole={currentUserRole} />
+                      </TabsContent>
+
+                      <TabsContent value="integrations" className="mt-0 p-6">
+                        <IntegrationsSection />
                       </TabsContent>
                     </Tabs>
                   </CardContent>

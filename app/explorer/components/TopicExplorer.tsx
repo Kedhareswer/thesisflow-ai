@@ -19,6 +19,7 @@ import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ui/reasoning"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
@@ -126,6 +127,7 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
   const [additionalContext, setAdditionalContext] = useState("")
   const [localProvider, setLocalProvider] = useState<AIProvider | undefined>(selectedProvider)
   const [localModel, setLocalModel] = useState<string | undefined>(selectedModel)
+  const [reasoningText, setReasoningText] = useState("")
 
   const topicExploration = useAsync<{
     content: string
@@ -168,6 +170,29 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
     debounceTimeoutRef.current = setTimeout(async () => {
       try {
         const depthNumber = parseInt(depth, 10)
+        const contextPrompt = additionalContext ? `\n\nAdditional Context: ${additionalContext}` : ""
+        const prompt = `Research overview: "${topic}" | Depth: ${depthNumber}/5${contextPrompt}
+
+## Key Concepts
+[Core definitions, terminology]
+
+## Current Research State
+[Active areas, methodologies, leading institutions]
+
+## Breakthroughs & Trends
+[Recent advances, emerging directions]
+
+## Research Gaps
+[Underexplored areas, opportunities]
+
+## Applications
+[Current uses, future potential]
+
+## Future Directions
+[Promising research paths]
+
+${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
+        setReasoningText(prompt)
         await topicExploration.execute(topic, depthNumber, additionalContext, localProvider, localModel)
 
         // Add topic to research session after successful execution
@@ -312,6 +337,14 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
               </>
             )}
           </Button>
+
+          {/* Reasoning UI: shows the exact prompt sent to the AI and auto-expands while generating */}
+          <Reasoning isStreaming={topicExploration.loading} className="mt-2">
+            <ReasoningTrigger>Show reasoning</ReasoningTrigger>
+            <ReasoningContent className="ml-2 border-l-2 border-l-slate-200 px-2 pb-1 dark:border-l-slate-700">
+              {reasoningText}
+            </ReasoningContent>
+          </Reasoning>
 
           {topicExploration.error && (
             <div className="text-red-500 mt-2">

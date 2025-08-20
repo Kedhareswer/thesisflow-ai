@@ -7,52 +7,7 @@
 
 *Transform your research workflow with intelligent AI-powered tools*
 
-![Bolt Research Hub](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
-
-## 🚀 Technology Stack
-
-```mermaid
-flowchart LR
-  subgraph Frontend["Frontend"]
-    A[Next.js 15 & React 19]
-    B[TailwindCSS]
-  end
-  
-  subgraph Backend["Backend"]
-    C[Node.js 18 / Express]
-    D[FastAPI (Python)]
-  end
-  
-  subgraph AI["AI"]
-    E[OpenAI GPT-4o]
-    F[Anthropic Claude-3]
-    G[Google Gemini]
-    H[Groq LLaMA]
-  end
-  
-  subgraph Data["Data & Realtime"]
-    I[Supabase PG]
-    J[Redis Cache]
-    K[Socket.io]
-  end
-  
-  A --> C
-  A --> I
-  C --> I
-  D --> I
-  C --> J
-  A --> K
-  E --> C
-  F --> C
-  G --> C
-  H --> C
-  
-  style Frontend fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
-  style Backend fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
-  style AI fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
-  style Data fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-```
-
+![Thesis Flow AI](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
 
 | Frontend | Backend | AI & ML | Database | Real-time |
 |----------|---------|---------|----------|-----------|
@@ -65,7 +20,7 @@ flowchart LR
 
 ```mermaid
 mindmap
-  root((Bolt Research Hub))
+  root((Thesis Flow AI))
     Literature Discovery
       Multi-source Search
       Citation Enhancement
@@ -130,7 +85,7 @@ AI Research Hub is a comprehensive research platform designed to revolutionize t
 |------------------|-------|-----|------------|------------------|
 | **🔍 Literature Discovery** | ✅ | ✅ | ✅ | Multi-source search, PDF viewer, citation enhancement |
 | **📝 Smart Summarization** | ✅ | ✅ | ✅ | PDF/DOCX/URL support, sentiment analysis, export options |
-| **✍️ Academic Writing** | ✅ | ✅ | ✅ | AI-assisted writing, citation manager, templates |
+| **✍️ Academic Writing** | ✅ | ✅ | ✅ | AI-assisted writing, citation manager, templates, AI detection |
 | **📋 Project Management** | ✅ | ✅ | ✅ | Task tracking, progress monitoring, team coordination |
 | **👥 Team Collaboration** | ❌ | ✅ | ✅ | Real-time chat, file sharing, role management |
 | **🤖 AI Providers** | 2 | 4 | 6 | OpenAI, Gemini, Claude, Groq, Mistral, AIML |
@@ -243,6 +198,7 @@ graph LR
 
 - **Rich Text Editor:** Advanced document editor with Markdown and LaTeX support, real-time collaboration, and formatting tools
 - **AI Writing Assistant:** Context-aware AI assistance with multiple writing personalities (Academic, Technical, Creative)
+- **AI Content Detection:** Advanced AI-generated content detection using Hugging Face models with confidence scoring
 - **Citation Manager:** Import citations from research, generate formatted references in multiple styles (APA, MLA, Chicago, IEEE, Harvard)
 - **Document Manager:** Organize and manage multiple documents with version control
 - **Visual Content Renderer:** Support for charts, diagrams, and multimedia content
@@ -468,6 +424,7 @@ flowchart TD
   AI --> Anthropic[Anthropic Claude]
   AI --> Mistral[Mistral AI]
   AI --> AIML[AIML API]
+  AI --> HuggingFace[Hugging Face Detection]
 
   Python --> Literature[Literature APIs]
   Literature --> OpenAlex[OpenAlex API]
@@ -600,6 +557,7 @@ cp env.template .env.local
 | `GEMINI_API_KEY` | 🆓 Free tier | Google AI | `AIza...` |
 | `SUPABASE_URL` | ✅ Required | Database URL | `https://...` |
 | `SUPABASE_ANON_KEY` | ✅ Required | Database key | `eyJ...` |
+| `HUGGINGFACE_API_KEY` | ✅ Required | AI detection | `hf_...` |
 | `NEXTAUTH_SECRET` | ✅ Required | Auth secret | Random string |
 
 </details>

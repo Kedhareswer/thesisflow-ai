@@ -9,6 +9,7 @@ import { Loader2, Send, Users, Minimize2 } from "lucide-react"
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from "@/hooks/use-toast"
 import { useSocket, SocketEvent } from '@/lib/services/socket.service'
+import { MentionInput, MentionData, MessageWithMentions } from '@/components/ui/mention-input'
 
 interface User {
   id: string
@@ -41,6 +42,7 @@ interface ChatMessage {
   teamId: string
   type: "text" | "system"
   senderAvatar?: string
+  mentions?: MentionData[]
 }
 
 interface TeamChatProps {
@@ -55,9 +57,11 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
+  const [currentMentions, setCurrentMentions] = useState<MentionData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [isTyping, setIsTyping] = useState<Record<string, boolean>>({})
+  const [teamFiles, setTeamFiles] = useState<MentionData[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
   
@@ -99,6 +103,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
           timestamp: msg.created_at,
           teamId: msg.team_id,
           type: msg.message_type || "text",
+          mentions: msg.mentions ? JSON.parse(msg.mentions) : [],
         }))
         
         setMessages(formattedMessages)
@@ -115,12 +120,45 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     }
   }, [team?.id, apiCall, toast])
   
+  // Load team files for mentions
+  const loadTeamFiles = useCallback(async () => {
+    if (!team?.id) {
+      console.log('No team ID for loading files')
+      return
+    }
+    
+    try {
+      const data = await apiCall(`/api/collaborate/files?teamId=${team.id}&limit=20`)
+      
+      if (data.success && data.files) {
+        const fileData: MentionData[] = data.files.map((file: any) => ({
+          id: file.id,
+          type: 'file' as const,
+          name: file.name,
+          fileType: file.file_type,
+          fileSize: file.file_size?.toString(),
+          fileUrl: file.file_url,
+        }))
+        
+        console.log('Team files loaded:', fileData.length, 'files')
+        setTeamFiles(fileData)
+      } else {
+        console.log('No files returned from API')
+        setTeamFiles([])
+      }
+    } catch (error) {
+      console.error('Error loading team files:', error)
+      setTeamFiles([]) // Set empty array on error
+    }
+  }, [team?.id, apiCall])
+
   // Initialize data
   useEffect(() => {
     if (team?.id) {
       loadMessages()
+      loadTeamFiles()
     }
-  }, [team?.id, loadMessages])
+  }, [team?.id, loadMessages, loadTeamFiles])
   
   // Socket event handlers
   useEffect(() => {
@@ -137,6 +175,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
           timestamp: data.timestamp,
           teamId: data.teamId,
           type: data.type || "text",
+          mentions: data.mentions || [],
         }
         setMessages(prev => [...prev, newMessage])
         
@@ -223,12 +262,14 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
         body: JSON.stringify({
           teamId: team.id,
           content: newMessage.trim(),
+          mentions: currentMentions,
           type: 'text',
         }),
       })
       
       if (data.success) {
         setNewMessage('')
+        setCurrentMentions([])
         // Message will be added via socket event
       }
     } catch (error) {
@@ -251,6 +292,32 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       teamId: team.id,
       userId: user.id,
     })
+  }
+  
+  // Handle mention input changes
+  const handleMentionChange = (value: string, mentions: MentionData[]) => {
+    setNewMessage(value)
+    setCurrentMentions(mentions)
+    handleTypingIndicator()
+  }
+  
+  // Get team members as mention data
+  const getTeamMentions = (): MentionData[] => {
+    if (!team?.members) {
+      console.log('No team members available for mentions')
+      return []
+    }
+    
+    const mentions = team.members.map(member => ({
+      id: member.id,
+      type: 'user' as const,
+      name: member.name,
+      email: member.email,
+      avatar: member.avatar,
+    }))
+    
+    console.log('Team mentions prepared:', mentions)
+    return mentions
   }
   
   // Get user status based on team members
@@ -435,9 +502,12 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                             <span className="font-medium text-sm">{message.senderName}</span>
                             <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
                           </div>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                            {message.content}
-                          </p>
+                          <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                            <MessageWithMentions 
+                              content={message.content}
+                              mentions={message.mentions}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -467,18 +537,24 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       {/* Message input */}
       <div className="p-4 border-t bg-gray-50 rounded-b-lg">
         <form onSubmit={handleSendMessage} className="flex gap-2">
-          <Input
-            placeholder="Type your message..."
+          <MentionInput
             value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value)
-              handleTypingIndicator()
-            }}
-            className="flex-1"
+            onChange={handleMentionChange}
+            placeholder="Type your message... Use @ to mention team members, Nova AI, or files"
             disabled={isSending}
+            className="flex-1"
+            users={getTeamMentions()}
+            files={teamFiles}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+                e.preventDefault()
+                handleSendMessage(e)
+              }
+            }}
           />
           <Button 
-            type="submit" 
+            type="button"
+            onClick={handleSendMessage}
             disabled={!newMessage.trim() || isSending}
             size="sm"
           >

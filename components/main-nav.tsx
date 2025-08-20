@@ -78,10 +78,10 @@ export function MainNav() {
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-black text-white text-sm font-bold">
-                Bolt
+              <div className="inline-flex h-8 items-center justify-center rounded bg-black text-white text-xs font-bold px-2 whitespace-nowrap">
+                Thesis
               </div>
-              <span className="text-lg font-semibold text-black">Research Hub</span>
+              <span className="text-lg font-semibold text-black">Flow-AI</span>
             </Link>
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="sm" asChild>
@@ -103,10 +103,10 @@ export function MainNav() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-black text-white text-sm font-bold">
-              Bolt
+            <div className="inline-flex h-8 items-center justify-center rounded bg-black text-white text-xs font-bold px-2 whitespace-nowrap">
+              Thesis
             </div>
-            <span className="text-lg font-semibold text-black">Research Hub</span>
+            <span className="text-lg font-semibold text-black">Flow AI</span>
           </Link>
 
           {/* Navigation */}

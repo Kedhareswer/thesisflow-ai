@@ -15,7 +15,7 @@ export default function SummarizerSEOContent({ className = "" }: SummarizerSEOCo
       {/* Introduction section */}
       <section className="mb-8">
         <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-          Transform lengthy documents into concise, intelligent summaries with Bolt Research Hub's 
+          Transform lengthy documents into concise, intelligent summaries with Thesis Flow AI's 
           AI-powered summarization tool. Our advanced platform supports multiple file formats, 
           AI providers, and summary styles to meet your research and professional needs.
         </p>
@@ -186,7 +186,7 @@ export default function SummarizerSEOContent({ className = "" }: SummarizerSEOCo
         </h2>
         
         <p className="text-gray-700 dark:text-gray-300 mb-4">
-          The AI Summarizer seamlessly integrates with other Bolt Research Hub tools:
+          The AI Summarizer seamlessly integrates with other Thesis Flow AI tools:
         </p>
         
         <div className="grid md:grid-cols-2 gap-4">

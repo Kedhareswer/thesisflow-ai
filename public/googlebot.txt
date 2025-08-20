@@ -1,6 +1,6 @@
-# Googlebot Configuration for Bolt Research Hub
+# Googlebot Configuration for Thesis Flow AI
 # Specific instructions for Google's web crawler
-# Site: https://ai-project-planner.vercel.app
+# Site: https://thesisflow-ai.vercel.app
 
 # Crawl rate settings
 User-agent: Googlebot
