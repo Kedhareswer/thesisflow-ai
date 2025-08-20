@@ -13,7 +13,6 @@ import {
   Lightbulb,
   FileText,
   Copy,
-  Gavel,
   BookOpen,
   MessageSquare,
   ChevronDown,
@@ -71,7 +70,6 @@ export default function WriterPage() {
   const [isCitationManagerOpen, setIsCitationManagerOpen] = useState(false)
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
   const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
-  const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
 
   const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
@@ -81,34 +79,6 @@ export default function WriterPage() {
     readability_score?: number
     naturalness_score?: number
   }>({})
-  const [plagiarismCheckResult, setPlagiarismCheckResult] = useState<{
-    detected: boolean
-    details: string
-    percentage: number
-    matches?: Array<{
-      text: string
-      similarity: number
-      type: string
-      source?: string
-      position: { start: number; end: number }
-    }>
-    suspicious_sections?: Array<{
-      text: string
-      reason: string
-      severity: string
-      suggestions: string[]
-    }>
-    analysis_details?: {
-      total_words: number
-      unique_phrases: number
-      common_phrases_detected: number
-      citation_patterns_found: number
-      fingerprint_matches: number
-      algorithms_used: string[]
-    }
-    sources_checked?: string[]
-    fingerprint?: string
-  } | null>(null)
 
   const [documentTitle, setDocumentTitle] = useState("Untitled document")
   const [documentContent, setDocumentContent] = useState("")
@@ -324,33 +294,6 @@ export default function WriterPage() {
     }
   }
 
-  const handlePlagiarismCheck = async () => {
-    if (!documentContent) return
-
-    setPlagiarismCheckResult({ detected: false, percentage: 0, details: "Checking..." })
-
-    try {
-      const result = await ResearchService.checkPlagiarism(documentContent)
-      setPlagiarismCheckResult({
-        detected: result.detected,
-        percentage: result.percentage,
-        details: result.details,
-        matches: result.matches,
-        suspicious_sections: result.suspicious_sections,
-        analysis_details: result.analysis_details,
-        sources_checked: result.sources_checked,
-        fingerprint: result.fingerprint
-      })
-    } catch (error) {
-      console.error("Plagiarism check error:", error)
-      setPlagiarismCheckResult({
-        detected: false,
-        percentage: 0,
-        details: "Failed to check for plagiarism. Please try again.",
-      })
-    }
-  }
-
   // Command menu handlers
   const handleSaveDocument = () => {
     // Trigger save
@@ -394,10 +337,6 @@ export default function WriterPage() {
 
   const handleToggleHumanize = () => {
     setIsHumanizeOpen(!isHumanizeOpen)
-  }
-
-  const handleTogglePlagiarismCheck = () => {
-    setIsPlagiarismCheckOpen(!isPlagiarismCheckOpen)
   }
 
   // Formatting handlers
@@ -738,27 +677,7 @@ export default function WriterPage() {
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0">
             <div className="flex items-center gap-2">
               {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
-              {!saving && <CheckCircle className="h-4 w-4 text-green-500" />}
-              <span className="text-sm text-gray-500 dark:text-gray-400">{saving ? "Saving..." : "Saved"}</span>
-            </div>
-            <div className="flex items-center gap-4">
-              {/* Command Menu */}
               <WriterCommandMenu
-                onNewDocument={handleNewDocument}
-                onSaveDocument={handleSaveDocument}
-                onExportDocument={handleExportDocument}
-                onImportDocument={handleImportDocument}
-                onShareDocument={handleShareDocument}
-                onToggleAiAssistant={handleToggleAiAssistant}
-                onToggleCitationManager={handleToggleCitationManager}
-                onToggleAiDetection={handleToggleAiDetection}
-                onToggleHumanize={handleToggleHumanize}
-                onTogglePlagiarismCheck={handleTogglePlagiarismCheck}
-                onFormatBold={handleFormatBold}
-                onFormatItalic={handleFormatItalic}
-                onFormatList={handleFormatList}
-                onFormatQuote={handleFormatQuote}
-                onFormatLink={handleFormatLink}
                 onFormatImage={handleFormatImage}
                 onFormatTable={handleFormatTable}
                 onFormatCode={handleFormatCode}
@@ -1040,225 +959,6 @@ export default function WriterPage() {
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Plagiarism Check */}
-              <Collapsible open={isPlagiarismCheckOpen} onOpenChange={setIsPlagiarismCheckOpen} className="mb-6">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Gavel className="h-5 w-5" /> Plagiarism Check
-                  </div>
-                  {isPlagiarismCheckOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-                    <CardContent className="p-4 space-y-4">
-                      <Button
-                        onClick={handlePlagiarismCheck}
-                        disabled={!documentContent || plagiarismCheckResult?.details === "Checking..."}
-                      >
-                        {plagiarismCheckResult?.details === "Checking..." ? "Checking..." : "Run Plagiarism Check"}
-                      </Button>
-                      
-                      {plagiarismCheckResult && plagiarismCheckResult.details !== "Checking..." && (
-                        <div className="space-y-4">
-                          {/* Overall Result */}
-                          <div className={`p-4 rounded-lg ${
-                            plagiarismCheckResult.detected 
-                              ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' 
-                              : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                          }`}>
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  {plagiarismCheckResult.detected ? (
-                                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                                  ) : (
-                                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                  )}
-                                  <h4 className={`text-lg font-bold ${
-                                    plagiarismCheckResult.detected 
-                                      ? 'text-red-700 dark:text-red-300' 
-                                      : 'text-green-700 dark:text-green-300'
-                                  }`}>
-                                    {plagiarismCheckResult.detected ? 'Plagiarism Detected' : 'Original Content'}
-                                  </h4>
-                                </div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  {plagiarismCheckResult.details}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <div className={`text-3xl font-bold ${
-                                  plagiarismCheckResult.percentage > 60 
-                                    ? 'text-red-600 dark:text-red-400' 
-                                    : plagiarismCheckResult.percentage > 30 
-                                    ? 'text-amber-600 dark:text-amber-400' 
-                                    : 'text-green-600 dark:text-green-400'
-                                }`}>
-                                  {plagiarismCheckResult.percentage}%
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-500">similarity</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Analysis Details */}
-                          {plagiarismCheckResult.analysis_details && (
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <h5 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                <FileText className="h-4 w-4" /> Analysis Summary
-                              </h5>
-                              <div className="grid grid-cols-2 gap-3 text-xs">
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Total Words:</span>
-                                  <span className="ml-2 font-medium">{plagiarismCheckResult.analysis_details.total_words}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Unique Phrases:</span>
-                                  <span className="ml-2 font-medium">{plagiarismCheckResult.analysis_details.unique_phrases}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Citations Found:</span>
-                                  <span className="ml-2 font-medium">{plagiarismCheckResult.analysis_details.citation_patterns_found}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Fingerprint Matches:</span>
-                                  <span className="ml-2 font-medium">{plagiarismCheckResult.analysis_details.fingerprint_matches}</span>
-                                </div>
-                              </div>
-                              {plagiarismCheckResult.fingerprint && (
-                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                  <p className="text-xs text-gray-500">
-                                    Document Fingerprint: <code className="font-mono">{plagiarismCheckResult.fingerprint.substring(0, 20)}...</code>
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Suspicious Sections */}
-                          {plagiarismCheckResult.suspicious_sections && plagiarismCheckResult.suspicious_sections.length > 0 && (
-                            <div className="space-y-3">
-                              <h5 className="text-sm font-semibold flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" /> 
-                                Suspicious Sections
-                              </h5>
-                              {plagiarismCheckResult.suspicious_sections.map((section, idx) => (
-                                <div key={idx} className={`p-3 rounded-md border ${
-                                  section.severity === 'high' 
-                                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' 
-                                    : section.severity === 'medium' 
-                                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' 
-                                    : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-                                }`}>
-                                  <div className="flex items-start justify-between mb-2">
-                                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                      "{section.text.substring(0, 100)}..."
-                                    </p>
-                                    <span className={`text-xs px-2 py-1 rounded ${
-                                      section.severity === 'high' 
-                                        ? 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200' 
-                                        : section.severity === 'medium' 
-                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-800 dark:text-amber-200' 
-                                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200'
-                                    }`}>
-                                      {section.severity}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                                    <strong>Reason:</strong> {section.reason}
-                                  </p>
-                                  {section.suggestions && section.suggestions.length > 0 && (
-                                    <div className="text-xs">
-                                      <strong className="text-gray-600 dark:text-gray-400">Suggestions:</strong>
-                                      <ul className="mt-1 space-y-1">
-                                        {section.suggestions.map((suggestion, sIdx) => (
-                                          <li key={sIdx} className="flex items-start text-gray-500 dark:text-gray-500">
-                                            <span className="mr-1">•</span>
-                                            <span>{suggestion}</span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Matches Found */}
-                          {plagiarismCheckResult.matches && plagiarismCheckResult.matches.length > 0 && (
-                            <div className="space-y-3">
-                              <h5 className="text-sm font-semibold flex items-center gap-2">
-                                <Copy className="h-4 w-4" /> Similarity Matches
-                              </h5>
-                              <div className="max-h-60 overflow-y-auto space-y-2">
-                                {plagiarismCheckResult.matches.map((match, idx) => (
-                                  <div key={idx} className="p-2 bg-gray-50 dark:bg-gray-900 rounded text-xs">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className={`px-2 py-0.5 rounded text-xs ${
-                                        match.type === 'exact' 
-                                          ? 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200' 
-                                          : match.type === 'near_duplicate' 
-                                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-800 dark:text-amber-200' 
-                                          : 'bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200'
-                                      }`}>
-                                        {match.type.replace('_', ' ')}
-                                      </span>
-                                      <span className="text-gray-500">
-                                        {Math.round(match.similarity * 100)}% match
-                                      </span>
-                                    </div>
-                                    <p className="text-gray-600 dark:text-gray-400 italic">
-                                      "{match.text}"
-                                    </p>
-                                    {match.source && (
-                                      <p className="text-gray-500 dark:text-gray-500 mt-1">
-                                        Source: {match.source}
-                                      </p>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Sources Checked */}
-                          {plagiarismCheckResult.sources_checked && plagiarismCheckResult.sources_checked.length > 0 && (
-                            <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                                <strong>Sources Checked:</strong>
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {plagiarismCheckResult.sources_checked.map((source, idx) => (
-                                  <span key={idx} className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
-                                    {source}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Algorithms Used */}
-                          {plagiarismCheckResult.analysis_details?.algorithms_used && (
-                            <div className="text-xs text-gray-500 dark:text-gray-500">
-                              <details className="cursor-pointer">
-                                <summary className="hover:text-gray-700 dark:hover:text-gray-300">
-                                  Detection Methods Used
-                                </summary>
-                                <ul className="mt-2 ml-4 space-y-1">
-                                  {plagiarismCheckResult.analysis_details.algorithms_used.map((algo, idx) => (
-                                    <li key={idx}>• {algo}</li>
-                                  ))}
-                                </ul>
-                              </details>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
             </div>
           </ScrollArea>
         </main>

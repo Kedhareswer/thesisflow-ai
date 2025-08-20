@@ -20,7 +20,6 @@ import {
   Lightbulb,
   BookOpen,
   Users,
-  Gavel,
   Save,
   Download,
   Upload,
@@ -125,8 +124,6 @@ interface WriterCommandMenuProps {
   onToggleCitationManager?: () => void;
   onToggleAiDetection?: () => void;
   onToggleHumanize?: () => void;
-  onTogglePlagiarismCheck?: () => void;
-  onToggleVisualContent?: () => void;
   onFormatBold?: () => void;
   onFormatItalic?: () => void;
   onFormatList?: () => void;
@@ -201,8 +198,6 @@ export function WriterCommandMenu({
   onToggleCitationManager,
   onToggleAiDetection,
   onToggleHumanize,
-  onTogglePlagiarismCheck,
-  onToggleVisualContent,
   onFormatBold,
   onFormatItalic,
   onFormatList,
@@ -317,18 +312,13 @@ export function WriterCommandMenu({
             <CommandMenuItem icon={<Users />} index={8} onSelect={onToggleHumanize}>
               Humanize Text
             </CommandMenuItem>
-            <CommandMenuItem icon={<Gavel />} index={9} onSelect={onTogglePlagiarismCheck}>
-              Plagiarism Check
-            </CommandMenuItem>
-            <CommandMenuItem icon={<Sparkles />} index={10} onSelect={onToggleVisualContent}>
-              Visual Content
-            </CommandMenuItem>
+
           </CommandMenuGroup>
           
           <CommandMenuSeparator />
           
           <CommandMenuGroup heading="Formatting">
-            <CommandMenuItem icon={<Bold />} index={11} shortcut="cmd+b" onSelect={onFormatBold}>
+            <CommandMenuItem icon={<Bold />} index={10} shortcut="cmd+b" onSelect={onFormatBold}>
               Bold
             </CommandMenuItem>
             <CommandMenuItem icon={<Italic />} index={12} shortcut="cmd+i" onSelect={onFormatItalic}>
