@@ -3,10 +3,8 @@
  * Implements multiple algorithms for accurate plagiarism detection
  */
 
-import crypto from 'crypto'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { createHash } from 'crypto'
 import { OpenAI } from 'openai'
 import { supabase } from '@/integrations/supabase/client'
 
@@ -102,7 +100,7 @@ export class PlagiarismDetectorService {
     documentId?: string
   } = {}): Promise<PlagiarismResult> {
     const startTime = Date.now()
-    const checkId = this.generateCheckId(text)
+    const checkId = await this.generateCheckId(text)
     
     // Check cache first
     const cachedResult = await this.getCachedResult(checkId)
@@ -110,7 +108,7 @@ export class PlagiarismDetectorService {
       return cachedResult
     }
     
-    const fingerprint = this.generateFingerprint(text)
+    const fingerprint = await this.generateFingerprint(text)
 
     // Run multiple detection algorithms in parallel
     const [shingleAnalysis, phraseMatches, structuralAnalysis, citationAnalysis, sourceMatches] = await Promise.all([
@@ -213,29 +211,16 @@ export class PlagiarismDetectorService {
   }
 
   /**
-   * Generate fingerprint using winnowing algorithm
+   * Generate document fingerprint using Web Crypto API
    */
-  private generateFingerprint(text: string): string {
-    const normalized = text.toLowerCase().replace(/[^\w\s]/g, '')
-    const words = normalized.split(/\s+/)
-    const hashes: number[] = []
-    
-    // Generate k-shingles
-    for (let i = 0; i <= words.length - this.SHINGLE_SIZE; i++) {
-      const shingle = words.slice(i, i + this.SHINGLE_SIZE).join(' ')
-      hashes.push(this.hashString(shingle))
-    }
-    
-    // Winnowing: select minimum hash in each window
-    const windowSize = 4
-    const fingerprints: number[] = []
-    for (let i = 0; i <= hashes.length - windowSize; i++) {
-      const window = hashes.slice(i, i + windowSize)
-      fingerprints.push(Math.min(...window))
-    }
-    
-    // Create unique fingerprint string
-    return fingerprints.slice(0, 10).map(h => h.toString(16)).join('-')
+  private async generateFingerprint(text: string): Promise<string> {
+    const words = text.toLowerCase().split(/\s+/)
+    const uniqueWords = [...new Set(words)].sort()
+    const encoder = new TextEncoder()
+    const data = encoder.encode(uniqueWords.join(''))
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 12)
   }
 
   /**
@@ -983,14 +968,14 @@ export class PlagiarismDetectorService {
   }
   
   /**
-   * Generate check ID
+   * Generate unique check ID using Web Crypto API
    */
-  private generateCheckId(text: string): string {
-    return createHash('sha256')
-      .update(text.slice(0, 1000))
-      .update(Date.now().toString())
-      .digest('hex')
-      .slice(0, 16)
+  private async generateCheckId(text: string): Promise<string> {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(text + Date.now().toString())
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8)
   }
   
   /**
@@ -1036,7 +1021,7 @@ export class PlagiarismDetectorService {
     userId?: string
   ): Promise<void> {
     try {
-      // Cache in memory
+      const textHash = await this.generateTextHash(result.analysis_details.original_text || '')
       this.searchCache.set(checkId, result)
       
       // Cache in database
@@ -1046,7 +1031,7 @@ export class PlagiarismDetectorService {
           check_id: checkId,
           user_id: userId,
           result,
-          text_hash: createHash('sha256').update(result.fingerprint).digest('hex'),
+          text_hash: textHash,
           similarity_score: result.overall_similarity,
           is_plagiarized: result.is_plagiarized,
           sources_count: result.external_sources?.length || 0,
@@ -1057,6 +1042,17 @@ export class PlagiarismDetectorService {
     }
   }
   
+  /**
+   * Generate hash for text caching using Web Crypto API
+   */
+  private async generateTextHash(text: string): Promise<string> {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(text)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16)
+  }
+
   /**
    * Calculate text similarity
    */
