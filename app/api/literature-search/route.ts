@@ -1,0 +1,249 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { LiteratureSearchService } from '@/lib/services/literature-search.service';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Initialize literature search service
+const literatureSearch = new LiteratureSearchService(supabase);
+
+interface RateLimitResult {
+  allowed: boolean;
+  current_count: number;
+  reset_time: string;
+}
+
+export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('query');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
+    const userId = searchParams.get('userId'); // Optional for authenticated requests
+
+    // Validate query
+    if (!query || query.trim().length < 3) {
+      return NextResponse.json({
+        success: false,
+        error: 'Query must be at least 3 characters long',
+        papers: []
+      }, { status: 400 });
+    }
+
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(request);
+    
+    // Check rate limits (100 requests per hour per user/IP)
+    const rateLimitResult = await checkRateLimit(userId, clientIP);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json({
+        success: false,
+        error: 'Rate limit exceeded. Please try again later.',
+        papers: [],
+        rateLimitInfo: {
+          limit: 100,
+          remaining: 0,
+          resetTime: rateLimitResult.reset_time
+        }
+      }, { 
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': '100',
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString()
+        }
+      });
+    }
+
+    // Perform literature search
+    const result = await literatureSearch.searchPapers(query.trim(), limit);
+
+    // Track usage
+    if (userId) {
+      await trackUsage(userId, query, result);
+    }
+
+    // Add rate limit info to response
+    const response = {
+      ...result,
+      rateLimitInfo: {
+        limit: 100,
+        remaining: Math.max(0, 100 - rateLimitResult.current_count),
+        resetTime: rateLimitResult.reset_time
+      },
+      processingTime: Date.now() - startTime
+    };
+
+    return NextResponse.json(response, { 
+      status: result.success ? 200 : 500,
+      headers: {
+        'X-RateLimit-Limit': '100',
+        'X-RateLimit-Remaining': Math.max(0, 100 - rateLimitResult.current_count).toString(),
+        'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString(),
+        'Cache-Control': result.cached ? 'public, max-age=3600' : 'public, max-age=300'
+      }
+    });
+
+  } catch (error) {
+    console.error('Literature search API error:', error);
+    
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error',
+      papers: [],
+      processingTime: Date.now() - startTime
+    }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { query, limit = 10, userId } = body;
+
+    // Validate input
+    if (!query || typeof query !== 'string' || query.trim().length < 3) {
+      return NextResponse.json({
+        success: false,
+        error: 'Valid query is required (minimum 3 characters)',
+        papers: []
+      }, { status: 400 });
+    }
+
+    const clientIP = getClientIP(request);
+    
+    // Check rate limits
+    const rateLimitResult = await checkRateLimit(userId, clientIP);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json({
+        success: false,
+        error: 'Rate limit exceeded',
+        papers: [],
+        rateLimitInfo: {
+          limit: 100,
+          remaining: 0,
+          resetTime: rateLimitResult.reset_time
+        }
+      }, { status: 429 });
+    }
+
+    // Perform search
+    const result = await literatureSearch.searchPapers(query.trim(), Math.min(limit, 50));
+
+    // Track usage
+    if (userId) {
+      await trackUsage(userId, query, result);
+    }
+
+    return NextResponse.json({
+      ...result,
+      rateLimitInfo: {
+        limit: 100,
+        remaining: Math.max(0, 100 - rateLimitResult.current_count),
+        resetTime: rateLimitResult.reset_time
+      }
+    });
+
+  } catch (error) {
+    console.error('Literature search POST error:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error',
+      papers: []
+    }, { status: 500 });
+  }
+}
+
+// Utility functions
+
+function getClientIP(request: NextRequest): string {
+  // Try various headers to get the real client IP
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIP = request.headers.get('x-real-ip');
+  const cfConnectingIP = request.headers.get('cf-connecting-ip');
+  
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  if (realIP) {
+    return realIP;
+  }
+  if (cfConnectingIP) {
+    return cfConnectingIP;
+  }
+  
+  return '127.0.0.1'; // Fallback
+}
+
+async function checkRateLimit(userId: string | null, ipAddress: string): Promise<RateLimitResult> {
+  try {
+    // Use user ID if available, otherwise use IP address
+    const identifier = userId || ipAddress;
+    
+    const { data, error } = await supabase.rpc('check_literature_search_rate_limit', {
+      p_user_id: userId ? userId : null,
+      p_ip_address: ipAddress,
+      p_limit: 100,
+      p_window_minutes: 60
+    });
+
+    if (error) {
+      console.error('Rate limit check error:', error);
+      // Allow request if rate limit check fails
+      return {
+        allowed: true,
+        current_count: 0,
+        reset_time: new Date(Date.now() + 3600000).toISOString()
+      };
+    }
+
+    return data[0] || {
+      allowed: true,
+      current_count: 0,
+      reset_time: new Date(Date.now() + 3600000).toISOString()
+    };
+
+  } catch (error) {
+    console.error('Rate limit error:', error);
+    // Allow request if rate limit check fails
+    return {
+      allowed: true,
+      current_count: 0,
+      reset_time: new Date(Date.now() + 3600000).toISOString()
+    };
+  }
+}
+
+async function trackUsage(userId: string, query: string, result: any): Promise<void> {
+  try {
+    await supabase
+      .from('literature_search_usage')
+      .insert({
+        user_id: userId,
+        query: query.substring(0, 500), // Limit query length
+        source: result.source || 'unknown',
+        results_count: result.count || 0,
+        search_time_ms: result.searchTime || 0,
+        cached: result.cached || false
+      });
+  } catch (error) {
+    console.error('Usage tracking error:', error);
+    // Don't fail the request if usage tracking fails
+  }
+}
+
+// Health check endpoint
+export async function HEAD() {
+  return new NextResponse(null, { 
+    status: 200,
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Content-Type': 'application/json'
+    }
+  });
+}
