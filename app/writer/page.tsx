@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   Edit,
@@ -71,8 +71,6 @@ export default function WriterPage() {
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
   const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
-  // Ref for hidden file input used for import
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
   const [humanizedText, setHumanizedText] = useState("")
@@ -296,22 +294,87 @@ export default function WriterPage() {
     }
   }
 
-  const handleImportDocument = () => {
-    fileInputRef.current?.click()
+  // Command menu handlers
+  const handleSaveDocument = async () => {
+    try {
+      await saveDocument()
+      toast({ title: "Saved", description: "Document saved successfully." })
+    } catch (e) {
+      // saveDocument already handles error toast
+    }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = reader.result as string
-      setDocumentContent(text)
-      toast({ title: "Import successful", description: `Loaded content from ${file.name}` })
+  const handleExportDocument = async () => {
+    try {
+      // Ensure we have a saved document with an ID
+      if (!document?.id) {
+        await saveDocument()
+      }
+      const currentId = document?.id
+      if (!currentId) {
+        toast({ title: "Export failed", description: "Please add some content and try saving first.", variant: "destructive" })
+        return
+      }
+      const blob = await DocumentService.getInstance().exportDocument(currentId, 'markdown')
+      const fileNameSafe = (documentTitle || 'document').trim().replace(/[^a-z0-9\-]+/gi, '_').slice(0, 50)
+      const fileName = `${fileNameSafe || 'document'}.md`
+      const url = URL.createObjectURL(blob)
+      const docEl = typeof window !== 'undefined' ? (window.document as any) : null
+      if (!docEl) throw new Error('Document not available')
+      const a = docEl.createElement('a') as HTMLAnchorElement
+      a.href = url
+      a.download = fileName
+      docEl.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast({ title: "Exported", description: `Downloaded ${fileName}` })
+    } catch (e) {
+      handleError(e, "Failed to export document")
     }
-    reader.onerror = () => toast({ title: "Import failed", description: "Could not read file", variant: "destructive" })
-    reader.readAsText(file)
-    e.target.value = ""
+  }
+
+  const handleImportDocument = () => {
+    const docEl = typeof window !== 'undefined' ? (window.document as any) : null
+    if (!docEl) {
+      handleError(new Error('Document not available'), 'Unable to open file picker')
+      return
+    }
+    const input = docEl.createElement('input') as HTMLInputElement
+    input.type = 'file'
+    input.accept = '.md,.txt,text/markdown,text/plain'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const baseName = file.name.replace(/\.[^.]+$/, '')
+        if (!documentTitle || documentTitle === 'Untitled document') {
+          setDocumentTitle(baseName)
+        }
+        setDocumentContent(text)
+        toast({ title: "Imported", description: `Loaded ${file.name} into the editor.` })
+      } catch (e) {
+        handleError(e, "Failed to import file")
+      }
+    }
+    input.click()
+  }
+
+  const handleShareDocument = async () => {
+    try {
+      // Ensure saved so modal can access a documentId
+      if (!document?.id) {
+        await saveDocument()
+      }
+      setIsShareOpen(true)
+    } catch (e) {
+      // saveDocument already toasts on error
+    }
+  }
+
+  const handleToggleAiAssistant = () => {
+    setIsAiAssistantOpen(!isAiAssistantOpen)
   }
 
   const handleToggleCitationManager = () => {
@@ -324,60 +387,6 @@ export default function WriterPage() {
 
   const handleToggleHumanize = () => {
     setIsHumanizeOpen(!isHumanizeOpen)
-  }
-
-  // Command menu handlers
-  const handleShareDocument = () => {
-    setIsShareOpen(true)
-  }
-  const handleSaveDocument = async () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to save your document.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSaving(true)
-    try {
-      const savedDoc = await DocumentService.getInstance().saveDocumentFromWriter(
-        debouncedDocumentTitle || "Untitled document",
-        debouncedDocumentContent,
-        "paper"
-      )
-      setDocument(savedDoc)
-      toast({
-        title: "Document saved",
-        description: "Your changes have been successfully saved.",
-      })
-    } catch (err) {
-      handleError(err, "Failed to save document")
-    } finally {
-      setSaving(false)
-    }
-  }
-  const handleExportDocument = async () => {
-    if (!document?.id) {
-      toast({ title: "No document", description: "Please save the document before exporting.", variant: "destructive" })
-      return
-    }
-    try {
-      toast({ title: "Exporting…", description: "Preparing download…" })
-      const blob = await DocumentService.getInstance().exportDocument(document.id, "markdown")
-      const url = URL.createObjectURL(blob)
-      const link = window.document.createElement("a")
-      link.href = url
-      link.download = `${document.title || "document"}.md`
-      window.document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
-      toast({ title: "Export complete", description: "Markdown file downloaded." })
-    } catch (err) {
-      handleError(err, "Failed to export document")
-    }
   }
 
   // Formatting handlers
@@ -723,6 +732,20 @@ export default function WriterPage() {
             {/* Center – Quick Actions */}
             <div className="flex items-center justify-center">
               <WriterCommandMenu
+                onNewDocument={handleNewDocument}
+                onSaveDocument={handleSaveDocument}
+                onExportDocument={handleExportDocument}
+                onImportDocument={handleImportDocument}
+                onShareDocument={handleShareDocument}
+                onToggleAiAssistant={handleToggleAiAssistant}
+                onToggleCitationManager={handleToggleCitationManager}
+                onToggleAiDetection={handleToggleAiDetection}
+                onToggleHumanize={handleToggleHumanize}
+                onFormatBold={handleFormatBold}
+                onFormatItalic={handleFormatItalic}
+                onFormatList={handleFormatList}
+                onFormatQuote={handleFormatQuote}
+                onFormatLink={handleFormatLink}
                 onFormatImage={handleFormatImage}
                 onFormatTable={handleFormatTable}
                 onFormatCode={handleFormatCode}
@@ -1017,14 +1040,6 @@ export default function WriterPage() {
         onOpenChange={setIsShareOpen}
         documentId={document?.id}
         documentTitle={documentTitle}
-      />
-      {/* Hidden file input for import */}
-      <input
-        type="file"
-        accept=".md,.txt,.markdown"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
       />
     </TooltipProvider>
   )
