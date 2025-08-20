@@ -31,6 +31,30 @@ export class AIDetectionService {
   private readonly CHUNK_SIZE = 500 // words per chunk
   private readonly MAX_CHUNKS = 10
   private readonly HF_API_URL = 'https://api-inference.huggingface.co/models'
+  
+  // State-of-the-art models for AI detection
+  private readonly DETECTION_MODELS = [
+    {
+      name: 'openai-community/roberta-large-openai-detector',
+      weight: 0.35,
+      description: 'RoBERTa Large trained on GPT-2 outputs'
+    },
+    {
+      name: 'Hello-SimpleAI/chatgpt-detector-roberta',
+      weight: 0.25,
+      description: 'Fine-tuned for ChatGPT detection'
+    },
+    {
+      name: 'umm-maybe/AI-text-detector',
+      weight: 0.20,
+      description: 'General AI text detector'
+    },
+    {
+      name: 'PirateXX/AI-Content-Detector',
+      weight: 0.20,
+      description: 'Multi-model AI content detector'
+    }
+  ]
 
   /**
    * Detect if text is AI-generated using multiple heuristics
@@ -60,31 +84,40 @@ export class AIDetectionService {
     const chunks = this.splitTextIntoChunks(text)
     const analysisResults = await this.analyzeChunks(chunks)
 
-    // Try to enrich with HF model probability if configured
-    const modelFromEnv = process.env.HUGGINGFACE_DETECT_MODEL || 'openai-community/roberta-base-openai-detector'
+    // Configuration from environment
     const threshold = parseFloat(process.env.AI_DETECT_THRESHOLD || '0.5')
     const useDebug = (process.env.AI_DETECT_DEBUG || 'false').toLowerCase() === 'true'
+    const useEnsemble = (process.env.AI_DETECT_USE_ENSEMBLE || 'true').toLowerCase() === 'true'
 
-    let hfProbAI: number | null = null
-    let modelUsed = modelFromEnv
+    let modelPredictions: { model: string; probability: number; weight: number }[] = []
+    let primaryModel = 'ensemble'
 
     if (process.env.HUGGINGFACE_API_KEY) {
-      try {
-        // Use the first ~1000 words to keep request efficient
-        const limitedText = text.split(/\s+/).slice(0, 1000).join(' ')
-        hfProbAI = await this.queryHuggingFaceModel(limitedText, modelFromEnv)
-      } catch (e) {
-        if (useDebug) {
-          // eslint-disable-next-line no-console
-          console.warn('HF detection failed, falling back to heuristics only:', e)
+      // Use the first ~1000 words to keep request efficient
+      const limitedText = text.split(/\s+/).slice(0, 1000).join(' ')
+      
+      if (useEnsemble) {
+        // Query multiple models in parallel for ensemble prediction
+        modelPredictions = await this.getEnsemblePredictions(limitedText, useDebug)
+        primaryModel = modelPredictions.length > 0 ? 'ensemble' : 'heuristics-only'
+      } else {
+        // Use single model specified in env or default
+        const modelFromEnv = process.env.HUGGINGFACE_DETECT_MODEL || this.DETECTION_MODELS[0].name
+        try {
+          const prob = await this.queryHuggingFaceModel(limitedText, modelFromEnv)
+          modelPredictions = [{ model: modelFromEnv, probability: prob, weight: 1.0 }]
+          primaryModel = modelFromEnv
+        } catch (e) {
+          if (useDebug) {
+            console.warn('HF detection failed, falling back to heuristics:', e)
+          }
         }
       }
     } else if (useDebug) {
-      // eslint-disable-next-line no-console
       console.warn('HUGGINGFACE_API_KEY not set. Using heuristic-only detection.')
     }
 
-    return this.aggregateResults(analysisResults, text, hfProbAI, modelUsed, threshold)
+    return this.aggregateResults(analysisResults, text, modelPredictions, primaryModel, threshold)
   }
 
   /**
@@ -112,6 +145,56 @@ export class AIDetectionService {
   }
 
   /**
+   * Get ensemble predictions from multiple models
+   */
+  private async getEnsemblePredictions(
+    text: string, 
+    debug: boolean = false
+  ): Promise<{ model: string; probability: number; weight: number }[]> {
+    const predictions: { model: string; probability: number; weight: number }[] = []
+    
+    // Query all models in parallel with timeout
+    const promises = this.DETECTION_MODELS.map(async (modelConfig) => {
+      try {
+        const timeoutPromise = new Promise<number>((_, reject) => 
+          setTimeout(() => reject(new Error('Model timeout')), 10000)
+        )
+        
+        const prob = await Promise.race([
+          this.queryHuggingFaceModel(text, modelConfig.name),
+          timeoutPromise
+        ])
+        
+        return { 
+          model: modelConfig.name, 
+          probability: prob, 
+          weight: modelConfig.weight 
+        }
+      } catch (e) {
+        if (debug) {
+          console.warn(`Model ${modelConfig.name} failed:`, e)
+        }
+        return null
+      }
+    })
+    
+    const results = await Promise.all(promises)
+    
+    // Filter out failed predictions
+    for (const result of results) {
+      if (result !== null) {
+        predictions.push(result)
+      }
+    }
+    
+    if (debug && predictions.length > 0) {
+      console.log('Ensemble predictions:', predictions)
+    }
+    
+    return predictions
+  }
+
+  /**
    * Call Hugging Face Inference API to get AI probability (0..1) when available
    * Supports common text classification outputs.
    */
@@ -124,9 +207,15 @@ export class AIDetectionService {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-wait-for-model': 'true' // Wait for model to load if needed
       },
-      body: JSON.stringify({ inputs: text })
+      body: JSON.stringify({ 
+        inputs: text,
+        options: {
+          wait_for_model: true
+        }
+      })
     })
 
     if (!res.ok) {
@@ -162,19 +251,27 @@ export class AIDetectionService {
     // Normalize labels and pick AI vs Human probabilities when possible
     let aiScore: number | undefined
     let humanScore: number | undefined
+    
     for (const item of items) {
       const label: string = String(item.label || '').toLowerCase()
       const score: number = typeof item.score === 'number' ? item.score : Number(item.probability || 0)
-      if (label.includes('ai') || label.includes('fake') || label.includes('generated')) {
+      
+      // Enhanced label matching for various model outputs
+      const aiLabels = ['ai', 'fake', 'generated', 'gpt', 'chatgpt', 'machine', 'synthetic', 'artificial', 'label_1', 'false']
+      const humanLabels = ['human', 'real', 'authentic', 'genuine', 'natural', 'original', 'label_0', 'true']
+      
+      if (aiLabels.some(l => label.includes(l))) {
         aiScore = Math.max(aiScore ?? 0, score)
       }
-      if (label.includes('human') || label.includes('real')) {
+      if (humanLabels.some(l => label.includes(l))) {
         humanScore = Math.max(humanScore ?? 0, score)
       }
     }
+    
     if (typeof aiScore === 'number') return Math.min(Math.max(aiScore, 0), 1)
     if (typeof humanScore === 'number') return Math.min(Math.max(1 - humanScore, 0), 1)
-    // Fallback: average all scores if nothing recognized
+    
+    // Fallback: use first score if labels don't match known patterns
     const scores = items.map(i => (typeof i.score === 'number' ? i.score : Number(i.probability || 0))).filter((n: number) => !isNaN(n))
     if (scores.length) return Math.min(Math.max(scores[0], 0), 1)
     return 0.5
@@ -329,7 +426,13 @@ export class AIDetectionService {
   /**
    * Aggregate analysis results
    */
-  private aggregateResults(analysisResults: any[], originalText: string, hfProbAI: number | null = null, modelUsed: string = 'roberta-base-openai-detector', threshold: number = 0.5): AIDetectionResult {
+  private aggregateResults(
+    analysisResults: any[], 
+    originalText: string, 
+    modelPredictions: { model: string; probability: number; weight: number }[] = [],
+    modelUsed: string = 'heuristics-only', 
+    threshold: number = 0.5
+  ): AIDetectionResult {
     // Calculate weighted scores
     let totalPerplexity = 0
     let totalBurstiness = 0
@@ -387,24 +490,52 @@ export class AIDetectionService {
     
     const confidence = Math.round((confidenceFromLength * 0.6 + confidenceFromChunks * 0.4) * 100)
     let finalProb = aiScore // heuristics-only baseline
+    let ensembleConfidence = confidence
 
-    if (typeof hfProbAI === 'number') {
-      // Blend HF probability with heuristics
-      // If reliability (from length/chunks) is higher, weight HF a bit more
-      const heuristicWeight = 0.4
-      const modelWeight = 0.6
-      finalProb = Math.min(Math.max(modelWeight * hfProbAI + heuristicWeight * aiScore, 0), 1)
+    if (modelPredictions.length > 0) {
+      // Calculate weighted ensemble probability
+      let totalWeight = 0
+      let weightedSum = 0
+      
+      for (const pred of modelPredictions) {
+        weightedSum += pred.probability * pred.weight
+        totalWeight += pred.weight
+      }
+      
+      const ensembleProb = totalWeight > 0 ? weightedSum / totalWeight : 0.5
+      
+      // Calculate variance for confidence adjustment
+      const variance = this.calculatePredictionVariance(modelPredictions, ensembleProb)
+      
+      // Blend ensemble with heuristics (more weight to ensemble when multiple models agree)
+      const heuristicWeight = variance > 0.1 ? 0.35 : 0.25 // More heuristic weight when models disagree
+      const ensembleWeight = 1 - heuristicWeight
+      
+      finalProb = Math.min(Math.max(ensembleWeight * ensembleProb + heuristicWeight * aiScore, 0), 1)
+      
+      // Adjust confidence based on model agreement
+      const agreementBonus = Math.max(0, (1 - variance * 2) * 20) // Up to 20% bonus for agreement
+      ensembleConfidence = Math.min(100, confidence + agreementBonus)
+      
+      // Add model details to modelUsed string
+      if (modelPredictions.length > 1) {
+        modelUsed = `ensemble(${modelPredictions.length} models)`
+      } else {
+        modelUsed = modelPredictions[0].model
+      }
     }
 
     const aiProbability = Math.round(finalProb * 100)
     const humanProbability = 100 - aiProbability
     
-    // Calculate reliability score
-    const reliability = this.calculateReliability(wordCount, count, avgPerplexity, avgBurstiness)
+    // Calculate reliability score (enhanced for ensemble)
+    const modelBonus = modelPredictions.length > 1 ? 15 : (modelPredictions.length === 1 ? 10 : 0)
+    const baseReliability = this.calculateReliability(wordCount, count, avgPerplexity, avgBurstiness)
+    const reliability = Math.min(100, baseReliability + modelBonus)
     
     return {
       is_ai: finalProb > threshold,
-      confidence,
+      confidence: ensembleConfidence,
       ai_probability: aiProbability,
       human_probability: humanProbability,
       reliability_score: reliability,
@@ -419,6 +550,27 @@ export class AIDetectionService {
       },
       timestamp: new Date().toISOString()
     }
+  }
+
+  /**
+   * Calculate variance in model predictions for confidence adjustment
+   */
+  private calculatePredictionVariance(
+    predictions: { model: string; probability: number; weight: number }[],
+    mean: number
+  ): number {
+    if (predictions.length <= 1) return 0
+    
+    let weightedVariance = 0
+    let totalWeight = 0
+    
+    for (const pred of predictions) {
+      const diff = pred.probability - mean
+      weightedVariance += (diff * diff) * pred.weight
+      totalWeight += pred.weight
+    }
+    
+    return totalWeight > 0 ? Math.sqrt(weightedVariance / totalWeight) : 0
   }
 
   /**
