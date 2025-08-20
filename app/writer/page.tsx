@@ -75,7 +75,12 @@ export default function WriterPage() {
   const [isShareOpen, setIsShareOpen] = useState(false)
 
   const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
-  const [humanizedText, setHumanizedText] = useState<string | null>(null)
+  const [humanizedText, setHumanizedText] = useState("")
+  const [humanizationDetails, setHumanizationDetails] = useState<{
+    changes_made?: string[]
+    readability_score?: number
+    naturalness_score?: number
+  }>({})
   const [plagiarismCheckResult, setPlagiarismCheckResult] = useState<{
     detected: boolean
     details: string
@@ -276,12 +281,23 @@ export default function WriterPage() {
       return
     }
     setHumanizedText("Humanizing...")
+    setHumanizationDetails({})
     try {
       const result = await ResearchService.humanizeText(documentContent)
       setHumanizedText(result.humanized_text)
+      setHumanizationDetails({
+        changes_made: result.changes_made,
+        readability_score: result.readability_score,
+        naturalness_score: result.naturalness_score
+      })
+      toast({
+        title: "Text Humanized Successfully",
+        description: `Applied ${result.changes_made?.length || 0} transformations to make text more natural`,
+      })
     } catch (err) {
       handleError(err, "Humanization failed")
-      setHumanizedText("Error humanizing text.")
+      setHumanizedText("")
+      setHumanizationDetails({})
     }
   }
 
@@ -913,30 +929,89 @@ export default function WriterPage() {
                       <Button onClick={handleHumanize} disabled={!documentContent || humanizedText === "Humanizing..."}>
                         {humanizedText === "Humanizing..." ? "Humanizing..." : "Humanize Text"}
                       </Button>
-                      {humanizedText && (
-                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
-                          <p className="text-sm font-medium">Humanized Version:</p>
-                          <Textarea value={humanizedText} readOnly className="mt-2 min-h-[150px]" />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 bg-transparent"
-                                  onClick={() => {
-                              setDocumentContent(humanizedText)
-                                    toast({
-                                title: "Text updated",
-                                description: "Document content replaced with humanized text.",
-                              })
-                            }}
-                          >
-                            <Copy className="h-4 w-4 mr-2" /> Use Humanized Text
-                          </Button>
+                      {humanizedText && humanizedText !== "Humanizing..." && (
+                        <div className="space-y-4">
+                          {/* Scores Display */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                              <p className="text-xs text-gray-600 dark:text-gray-400">Readability Score</p>
+                              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                {humanizationDetails.readability_score || 0}/100
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                {(humanizationDetails.readability_score ?? 0) >= 60 ? "Easy to read" : 
+                                 (humanizationDetails.readability_score ?? 0) >= 30 ? "Moderate" : "Complex"}
+                              </p>
+                            </div>
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
+                              <p className="text-xs text-gray-600 dark:text-gray-400">Naturalness Score</p>
+                              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                {humanizationDetails.naturalness_score || 0}/100
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                {(humanizationDetails.naturalness_score ?? 0) >= 70 ? "Very natural" :
+                                 (humanizationDetails.naturalness_score ?? 0) >= 40 ? "Moderately natural" : "Needs work"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Changes Made */}
+                          {humanizationDetails.changes_made && humanizationDetails.changes_made.length > 0 && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md">
+                              <p className="text-sm font-medium mb-2">Transformations Applied:</p>
+                              <ul className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
+                                {humanizationDetails.changes_made.map((change, idx) => (
+                                  <li key={idx} className="flex items-start">
+                                    <CheckCircle className="h-3 w-3 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                                    {change}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Humanized Text */}
+                          <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                            <p className="text-sm font-medium mb-2">Humanized Version:</p>
+                            <Textarea 
+                              value={humanizedText} 
+                              readOnly 
+                              className="mt-2 min-h-[200px] font-mono text-sm" 
+                            />
+                            <div className="flex gap-2 mt-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(humanizedText)
+                                  toast({
+                                    title: "Copied",
+                                    description: "Humanized text copied to clipboard",
+                                  })
+                                }}
+                              >
+                                <Copy className="h-4 w-4 mr-2" /> Copy
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setDocumentContent(humanizedText)
+                                  toast({
+                                    title: "Text updated",
+                                    description: "Document content replaced with humanized text.",
+                                  })
+                                }}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" /> Use Humanized Text
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       )}
-                      </CardContent>
-                    </Card>
-                      </CollapsibleContent>
-                    </Collapsible>
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
 
               {/* Plagiarism Check */}
               <Collapsible open={isPlagiarismCheckOpen} onOpenChange={setIsPlagiarismCheckOpen} className="mb-6">

@@ -1,43 +1,51 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
+import { textHumanizerService } from '@/lib/services/text-humanizer.service'
 
-export const runtime = "edge" // Use the edge runtime for humanization
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { text } = await req.json()
 
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Invalid text provided" }, { status: 400 })
+    // Validate input
+    if (!text || typeof text !== 'string') {
+      return NextResponse.json(
+        { error: 'Text is required and must be a string' },
+        { status: 400 }
+      )
     }
 
-    // Simulate humanization logic
-    // A very basic example: replace some common AI-like phrases or simplify complex sentences
-    let humanized_text = text
-      .replace(/utilize/g, "use")
-      .replace(/leverage/g, "use")
-      .replace(/paradigm/g, "approach")
-      .replace(/synergy/g, "cooperation")
-      .replace(/delve into/g, "explore")
-      .replace(/furthermore/g, "also")
-      .replace(/however/g, "but")
-      .replace(/therefore/g, "so")
-      .replace(/in order to/g, "to")
-      .replace(/It is important to note that/g, "Note that")
-      .replace(/This highlights the fact that/g, "This shows that")
-
-    // Add some random human-like imperfections or variations
-    const humanTouches = ["You know,", "I think it's fair to say,", "To be honest,", "It's kind of like,", "Basically,"]
-    const sentences = humanized_text.split(/(?<=[.!?])\s+/)
-    if (sentences.length > 1) {
-      const randomIndex = Math.floor(Math.random() * sentences.length)
-      sentences[randomIndex] =
-        humanTouches[Math.floor(Math.random() * humanTouches.length)] + " " + sentences[randomIndex]
+    if (text.trim().length < 10) {
+      return NextResponse.json(
+        { error: 'Text must be at least 10 characters long' },
+        { status: 400 }
+      )
     }
-    humanized_text = sentences.join(" ")
 
-    return NextResponse.json({ humanized_text })
+    if (text.length > 10000) {
+      return NextResponse.json(
+        { error: 'Text must not exceed 10,000 characters' },
+        { status: 400 }
+      )
+    }
+
+    // Humanize the text using the comprehensive service
+    const result = await textHumanizerService.humanizeText(text)
+
+    return NextResponse.json({
+      humanized_text: result.humanized_text,
+      original_text: result.original_text,
+      changes_made: result.changes_made,
+      readability_score: result.readability_score,
+      naturalness_score: result.naturalness_score,
+      timestamp: result.timestamp
+    })
   } catch (error) {
-    console.error("Error in humanize API:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error('Error in humanize API:', error)
+    return NextResponse.json(
+      { 
+        error: 'Failed to humanize text',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
   }
 }

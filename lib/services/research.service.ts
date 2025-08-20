@@ -14,7 +14,14 @@ export class ResearchService {
     return response.json()
   }
 
-  static async humanizeText(text: string): Promise<{ humanized_text: string }> {
+  static async humanizeText(text: string): Promise<{
+    humanized_text: string
+    original_text?: string
+    changes_made?: string[]
+    readability_score?: number
+    naturalness_score?: number
+    timestamp?: string
+  }> {
     const response = await fetch(`${API_BASE_URL}/humanize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
