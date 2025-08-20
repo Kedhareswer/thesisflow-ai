@@ -219,14 +219,17 @@ class AIDetectionService {
   ): number {
     let calibrated = rawConfidence
     
+    // Convert modelName to lowercase and ensure it's null/undefined-safe
+    const name = (modelName || '').toLowerCase()
+    
     // Model-specific calibration curves
-    if (modelName.includes('roberta-large')) {
+    if (name.includes('roberta-large')) {
       // This model tends to be overconfident
       calibrated = Math.pow(rawConfidence, 1.15)
-    } else if (modelName.includes('roberta-base')) {
+    } else if (name.includes('roberta-base')) {
       // Slight adjustment for base model
       calibrated = Math.pow(rawConfidence, 1.08)
-    } else if (modelName.includes('AI-text-detector')) {
+    } else if (name.includes('ai-text-detector')) {
       // This model needs stronger calibration
       calibrated = Math.pow(rawConfidence, 1.25)
     }
