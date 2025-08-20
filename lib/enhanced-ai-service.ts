@@ -60,8 +60,52 @@ class EnhancedAIService {
   })
 
   async loadUserApiKeys(userId?: string): Promise<UserApiKey[]> {
+    // Handle anonymous users (userId is 'anonymous' or undefined)
+    if (!userId || userId === 'anonymous') {
+      console.log("Enhanced AI Service: Loading default API keys for anonymous user")
+      const defaultKeys: UserApiKey[] = []
+      
+      if (process.env.GROQ_API_KEY) {
+        defaultKeys.push({
+          provider: "groq",
+          decrypted_key: process.env.GROQ_API_KEY,
+          is_active: true,
+          test_status: "valid"
+        })
+      }
+      
+      if (process.env.OPENAI_API_KEY) {
+        defaultKeys.push({
+          provider: "openai",
+          decrypted_key: process.env.OPENAI_API_KEY,
+          is_active: true,
+          test_status: "valid"
+        })
+      }
+      
+      if (process.env.ANTHROPIC_API_KEY) {
+        defaultKeys.push({
+          provider: "anthropic",
+          decrypted_key: process.env.ANTHROPIC_API_KEY,
+          is_active: true,
+          test_status: "valid"
+        })
+      }
+      
+      if (process.env.GEMINI_API_KEY) {
+        defaultKeys.push({
+          provider: "gemini",
+          decrypted_key: process.env.GEMINI_API_KEY,
+          is_active: true,
+          test_status: "valid"
+        })
+      }
+      
+      return defaultKeys
+    }
+
     // If userId is provided, use admin client (server-side)
-    if (userId) {
+    if (userId && userId !== 'anonymous') {
       try {
         console.log("Enhanced AI Service: [SERVER] Loading user API keys for userId:", userId)
         const { createSupabaseAdmin } = await import("@/lib/auth-utils")

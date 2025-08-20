@@ -108,9 +108,31 @@ class APIClient {
       try {
         console.log(`[API] Fetching ${url} (attempt ${attempt}/${maxAttempts})`)
         
+        // Build headers and attach auth token automatically on the client
+        const headers = new Headers(options.headers || {})
+        if (typeof window !== 'undefined') {
+          // Only attach if not already set
+          if (!headers.has('Authorization')) {
+            try {
+              const sessionRaw = localStorage.getItem('ai-research-platform-auth')
+              if (sessionRaw) {
+                const parsed = JSON.parse(sessionRaw)
+                const token = parsed?.access_token
+                if (token) {
+                  headers.set('Authorization', `Bearer ${token}`)
+                }
+              }
+            } catch (_) {
+              // ignore parse errors
+            }
+          }
+        }
+
         const response = await fetch(url, {
           ...options,
-          
+          headers,
+          // Include credentials for same-origin to allow cookie-based fallbacks if needed
+          credentials: options.credentials || 'same-origin',
         })
 
         if (!response.ok) {

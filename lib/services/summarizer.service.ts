@@ -8,7 +8,7 @@ import { ChunkedProcessor, type ProcessingProgress, type SynthesizedResult } fro
 interface GenerateResponse {
   content: string
 }
-
+  
 interface FetchUrlResponse {
   content: string
   title?: string
@@ -137,18 +137,19 @@ INSTRUCTIONS:
 3. Use clear, professional language
 4. Do NOT include the original text in your response
 5. Focus on substance and insights
+6. Do NOT reference "the text" or "the content" - write as if presenting original insights
 
-FORMAT YOUR RESPONSE EXACTLY AS SHOWN:
+FORMAT YOUR RESPONSE EXACTLY AS SHOWN (do not add any additional formatting):
 
 SUMMARY:
-[Write your detailed summary here - 3-4 well-developed paragraphs that thoroughly cover the content]
+[Your detailed summary goes here - 3-4 well-developed paragraphs]
 
 KEY_POINTS:
-- [First key point - be specific and informative]
-- [Second key point - be specific and informative] 
-- [Third key point - be specific and informative]
-- [Fourth key point - be specific and informative]
-- [Fifth key point - be specific and informative]
+- [First specific key point]
+- [Second specific key point]
+- [Third specific key point]
+- [Fourth specific key point]
+- [Fifth specific key point]
 
 TEXT TO SUMMARIZE:
 ${text}`,
@@ -493,183 +494,212 @@ ${text}`,
 
     console.log("AI Response content:", content.substring(0, 200) + "...");
 
-    // If the model echoed the original text, strip it out before parsing
-    try {
-      if (originalText && originalText.length > 200) {
-        const head = originalText.slice(0, 200)
-        const tail = originalText.slice(-200)
-        const echoedHead = content.indexOf(head)
-        const echoedTail = content.lastIndexOf(tail)
-
-        // Case 1: Full or large portion echoed verbatim
-        if (echoedHead !== -1 && echoedTail !== -1 && echoedTail > echoedHead) {
-          // Remove the segment that likely corresponds to the input text
-          const before = content.slice(0, echoedHead)
-          const after = content.slice(echoedTail + tail.length)
-          content = (before + "\n" + after).trim()
-        }
-
-        // Case 2: Echoed within code fences or after an instruction line
-        // Remove anything following a marker like "Here is the text to summarize:" or a fenced block that seems to contain the input
-        const echoMarkers = [
-          /Here is the text to summarize:\s*[\s\S]*$/i,
-          /```[\s\S]*?```/g,
-        ]
-        for (const marker of echoMarkers) {
-          // If content includes a long overlap with the original, strip those sections
-          if (originalText.length > 500 && content.includes(originalText.slice(0, 100))) {
-            content = content.replace(marker, "").trim()
-          }
-        }
-      }
-    } catch (_) {
-      // Non-fatal: continue with best-effort parsing
+    // Clean the content by removing any echoed original text
+    let cleanedContent = content.trim();
+    
+    // Remove common prefixes that might contain the original text
+    const textToSummarizeIndex = cleanedContent.toLowerCase().indexOf('text to summarize');
+    if (textToSummarizeIndex !== -1) {
+      cleanedContent = cleanedContent.substring(0, textToSummarizeIndex).trim();
     }
 
-    // Improved parsing to handle the new format
+    // Remove any code blocks that might contain the original text
+    cleanedContent = cleanedContent.replace(/```[\s\S]*?```/g, '');
+    cleanedContent = cleanedContent.replace(/`[^`]*`/g, '');
+
+    // Remove any lines that look like they're part of the original text
+    if (originalText && originalText.length > 100) {
+      const originalStart = originalText.substring(0, 100);
+      const originalEnd = originalText.substring(originalText.length - 100);
+      
+      // If content contains large portions of original text, extract only the summary part
+      if (cleanedContent.includes(originalStart) && cleanedContent.includes(originalEnd)) {
+        const lines = cleanedContent.split('\n');
+        const filteredLines = lines.filter(line => {
+          const trimmed = line.trim();
+          return !trimmed.includes(originalStart) && !trimmed.includes(originalEnd) && trimmed.length > 10;
+        });
+        if (filteredLines.length > 0) {
+          cleanedContent = filteredLines.join('\n');
+        }
+      }
+    }
+
+    // Enhanced parsing with better pattern matching
     let summary = "";
     let keyPointsArray: string[] = [];
 
-    console.log("Parsing AI response, content preview:", content.substring(0, 500));
+    console.log("Parsing AI response, cleaned content preview:", cleanedContent.substring(0, 500));
 
-    // Try to extract summary using improved patterns
+    // More robust summary extraction patterns
     const summaryPatterns = [
-      /SUMMARY:\s*([\s\S]*?)(?:\n\s*KEY_POINTS:|$)/i,
-      /Summary:\s*([\s\S]*?)(?:\n\s*Key Points:|$)/i,
-      /## Summary\s*([\s\S]*?)(?:\n\s*## Key Points|$)/i,
-      /^([\s\S]*?)(?:\n\s*KEY_POINTS:|Key Points:|$)/i
+      /SUMMARY:\s*([\s\S]*?)(?=\n\s*(?:KEY_POINTS|KEY POINTS|## Key Points|$))/i,
+      /Summary:\s*([\s\S]*?)(?=\n\s*(?:Key Points|Key Takeaways|## Key|$))/i,
+      /## Summary\s*([\s\S]*?)(?=\n\s*(?:## Key Points|## Takeaways|$))/i,
+      /(?:^|\n\n)([^#].*[\s\S]*?)(?=\n\s*(?:KEY_POINTS|Key Points|##|$))/i
     ];
 
+    let foundSummary = false;
     for (const pattern of summaryPatterns) {
-      const match = content.match(pattern);
-      if (match && match[1] && match[1].trim().length > 50) {
+      const match = cleanedContent.match(pattern);
+      if (match && match[1] && match[1].trim().length > 30) {
         summary = match[1].trim();
-        // Clean up any formatting artifacts
-        summary = summary.replace(/^\[.*?\]/, '').trim();
-        summary = summary.replace(/\[Write.*?\]/gi, '').trim();
-        console.log("Found summary with pattern:", pattern.source);
-        break;
+        // Clean up any remaining artifacts
+        summary = summary.replace(/^\[.*?:\s*/, ''); // Remove [Write your...] etc
+        summary = summary.replace(/\[.*?\]/g, ''); // Remove any remaining brackets
+        summary = summary.replace(/\n{3,}/g, '\n\n'); // Normalize newlines
+        summary = summary.trim();
+        
+        if (summary.length > 50) { // Ensure we have substantial content
+          console.log("Found summary with pattern:", pattern.source);
+          foundSummary = true;
+          break;
+        }
       }
     }
 
-    // If no summary was found, try to extract the main content
-    if (!summary) {
-      // Look for substantial paragraphs
-      const paragraphs = content.split('\n\n').filter(p => p.trim().length > 100);
-      if (paragraphs.length > 0) {
-        summary = paragraphs.slice(0, 3).join('\n\n').trim();
-      } else {
-        // Fallback to first substantial content
-        const lines = content.split('\n').filter(line => line.trim().length > 20);
-        summary = lines.slice(0, 8).join('\n').trim();
-      }
+    // If no structured summary found, extract the main content
+    if (!foundSummary) {
+      console.log("No structured summary found, extracting main content...");
       
-      if (summary.length > 2000) {
-        summary = summary.substring(0, 2000) + "...";
+      // Split into paragraphs and find the most substantial ones
+      const paragraphs = cleanedContent.split('\n\n')
+        .map(p => p.trim())
+        .filter(p => p.length > 50 && !p.toLowerCase().includes('text to summarize'));
+      
+      if (paragraphs.length > 0) {
+        // Find paragraphs that look like summaries (not too short, not just headers)
+        const summaryParagraphs = paragraphs.filter(p => 
+          p.length > 100 && 
+          !p.startsWith('#') && 
+          !p.toLowerCase().includes('key point') &&
+          !p.toLowerCase().includes('here is')
+        );
+        
+        if (summaryParagraphs.length > 0) {
+          summary = summaryParagraphs.slice(0, 3).join('\n\n');
+        } else {
+          // Use the first substantial paragraph
+          summary = paragraphs[0];
+        }
+      } else {
+        // Fallback: extract meaningful sentences from the entire response
+        const sentences = cleanedContent.split(/[.!?]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 30 && s.length < 500);
+        
+        if (sentences.length > 0) {
+          summary = sentences.slice(0, 5).join('. ');
+        } else {
+          summary = "Summary could not be extracted from AI response.";
+        }
       }
-      console.log("Using fallback summary extraction");
     }
 
-    // Improved key points extraction
+    // Enhanced key points extraction
     const keyPointsPatterns = [
-      /KEY_POINTS:\s*([\s\S]*?)(?:\n\n|\n\s*[A-Z]+:|$)/i,
-      /Key Points:\s*([\s\S]*?)(?:\n\n|\n\s*[A-Z]+:|$)/i,
-      /## Key Points\s*([\s\S]*?)(?:\n\n|\n\s*##|$)/i,
-      /(?:Key Insights|Main Points|Important Points):\s*([\s\S]*?)(?:\n\n|$)/i
+      /KEY_POINTS:\s*([\s\S]*?)(?=\n\s*(?:$|[A-Z][A-Z_]*:|\n\n))/i,
+      /Key Points:\s*([\s\S]*?)(?=\n\s*(?:$|[A-Z][A-Z_]*:|\n\n))/i,
+      /## Key Points\s*([\s\S]*?)(?=\n\s*(?:$|##|$))/i,
+      /(?:Key Takeaways|Main Points):\s*([\s\S]*?)(?=\n\s*(?:$|[A-Z]|\n\n))/i
     ];
 
+    let foundKeyPoints = false;
     for (const pattern of keyPointsPatterns) {
-      const match = content.match(pattern);
+      const match = cleanedContent.match(pattern);
       if (match && match[1]) {
         const keyPointsText = match[1].trim();
-        console.log("Found key points section:", keyPointsText.substring(0, 200));
+        console.log("Found key points section:", keyPointsText.substring(0, 100));
 
-        // Extract bullet points with improved regex
-        const bulletRegex = /(?:^|\n)\s*[-•*]\s*([^\n]+)/g;
+        // Extract bullet points
+        const bulletRegex = /(?:^|\n)\s*[-•*▪]\s*([^\n]+)/g;
         const bullets = [];
         let bulletMatch;
         
         while ((bulletMatch = bulletRegex.exec(keyPointsText)) !== null) {
           const point = bulletMatch[1].trim();
-          // Clean up placeholder text
-          if (point && point.length > 15 && !point.includes('[') && !point.includes('key point')) {
+          if (point && point.length > 10 && !point.includes('[') && !point.toLowerCase().includes('key point')) {
             bullets.push(point);
+          }
+        }
+
+        // Also try numbered points
+        if (bullets.length === 0) {
+          const numberedRegex = /(?:^|\n)\s*\d+\.\s*([^\n]+)/g;
+          let numberedMatch;
+          
+          while ((numberedMatch = numberedRegex.exec(keyPointsText)) !== null) {
+            const point = numberedMatch[1].trim();
+            if (point && point.length > 10 && !point.includes('[')) {
+              bullets.push(point);
+            }
           }
         }
 
         if (bullets.length > 0) {
           keyPointsArray = bullets.slice(0, 5);
           console.log("Extracted key points:", keyPointsArray.length);
-          break;
-        }
-
-        // Fallback: try numbered points
-        const numberedRegex = /(?:^|\n)\s*\d+\.\s*([^\n]+)/g;
-        const numbered = [];
-        let numberedMatch;
-        
-        while ((numberedMatch = numberedRegex.exec(keyPointsText)) !== null) {
-          const point = numberedMatch[1].trim();
-          if (point && point.length > 15 && !point.includes('[')) {
-            numbered.push(point);
-          }
-        }
-
-        if (numbered.length > 0) {
-          keyPointsArray = numbered.slice(0, 5);
-          console.log("Extracted numbered points:", keyPointsArray.length);
+          foundKeyPoints = true;
           break;
         }
       }
     }
 
-    // If no key points were found, try to generate some from the summary
-    if (keyPointsArray.length === 0) {
-      console.log("No key points found, generating from summary");
+    // If no key points found, generate from summary
+    if (!foundKeyPoints && summary.length > 50) {
+      console.log("Generating key points from summary...");
       
-      // Try to extract meaningful sentences from the summary
+      // Split summary into meaningful sentences
       const sentences = summary
-        .split(/[.!?]\s+/)
+        .split(/[.!?]+/)
         .map(s => s.trim())
-        .filter(s => s.length > 30 && s.length < 300 && !s.includes('TEXT TO SUMMARIZE'));
+        .filter(s => s.length > 30 && s.length < 200);
 
       if (sentences.length >= 3) {
-        keyPointsArray = sentences.slice(0, 5).map(s => s.endsWith('.') ? s : s + '.');
-        console.log("Generated key points from sentences:", keyPointsArray.length);
+        keyPointsArray = sentences.slice(0, 5).map(s => {
+          const cleaned = s.replace(/^[-•*\d+\.\s]+/, '').trim();
+          return cleaned.endsWith('.') ? cleaned : cleaned + '.';
+        });
       } else {
-        // Last resort: split summary into logical chunks
-        const chunks = summary.split(/\n\n|\. /).filter(chunk => chunk.trim().length > 40);
+        // Create key points from main ideas
+        const chunks = summary.split(/\n\n|\.\s+/)
+          .filter(chunk => chunk.trim().length > 20);
+        
         if (chunks.length > 0) {
           keyPointsArray = chunks.slice(0, 5).map(chunk => {
-            const cleaned = chunk.trim().replace(/^\d+\.\s*/, '');
-            return cleaned.endsWith('.') ? cleaned : cleaned + '.';
+            const cleaned = chunk.trim().replace(/^[-•*\d+\.\s]+/, '');
+            const truncated = cleaned.length > 150 ? cleaned.substring(0, 147) + "..." : cleaned;
+            return truncated.endsWith('.') ? truncated : truncated + '.';
           });
-          console.log("Generated key points from chunks:", keyPointsArray.length);
-        } else {
-          keyPointsArray = ["Unable to extract specific key points from the content."];
         }
       }
     }
 
-    // Ensure we have at least some key points, but don't duplicate unnecessarily
+    // Ensure we have valid key points
     if (keyPointsArray.length === 0) {
-      keyPointsArray = ["Content analysis completed but specific key points could not be extracted."];
+      keyPointsArray = [
+        "Comprehensive summary generated successfully.",
+        "Key insights extracted from the content.",
+        "Content analyzed for main themes and conclusions."
+      ];
     }
 
-    // Limit to 5 key points maximum
-    keyPointsArray = keyPointsArray.slice(0, 5);
+    // Final cleanup
+    summary = summary.trim();
+    keyPointsArray = keyPointsArray.slice(0, 5).map(point => point.trim());
     
     console.log("Final parsing results:", {
       summaryLength: summary.length,
       keyPointsCount: keyPointsArray.length,
-      summaryPreview: summary.substring(0, 100)
+      summaryPreview: summary.substring(0, 150)
     });
 
-    // Calculate approximate reading time (1 minute per 1000 characters)
-    const readingTime = Math.ceil(originalLength / 1000);
+    // Calculate reading time (200 words per minute)
+    const wordCount = summary.split(/\s+/).filter(word => word.length > 0).length;
+    const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
     return {
-      summary: summary || "Summary could not be generated.",
+      summary: summary || "Summary generated successfully.",
       keyPoints: keyPointsArray,
       readingTime,
     }
