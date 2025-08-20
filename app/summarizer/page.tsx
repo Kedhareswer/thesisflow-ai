@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import { ErrorHandler, type UserFriendlyError } from "@/lib/utils/error-handler"
 import { SummarizerService, type SummaryResult } from "@/lib/services/summarizer.service"
 import type { ProcessingProgress } from "@/lib/utils/chunked-processor"
+import { supabase } from "@/integrations/supabase/client"
+import type { Summary } from "@/integrations/supabase/types"
 
 // Import the new tabbed layout and tab components
 import {
@@ -54,8 +56,9 @@ export default function SummarizerPage() {
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null)
 
   // Initialize with proper default data for better UX
-  const [summaryHistory] = useState<SummaryHistoryItem[]>([])
-  const [usageStatistics] = useState<UsageStatistics>({
+  const [summaryHistory, setSummaryHistory] = useState<SummaryHistoryItem[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [usageStatistics, setUsageStatistics] = useState<UsageStatistics>({
     totalSummaries: 0,
     averageCompressionRatio: 75,
     mostUsedInputMethod: 'text',
@@ -64,7 +67,6 @@ export default function SummarizerPage() {
     totalTimeSaved: 0,
     summariesByMonth: [],
     topTopics: [],
-    // Enhanced statistics with proper defaults
     averageConfidence: 0.85,
     successRate: 95,
     mostUsedDifficulty: 'intermediate',
@@ -87,6 +89,195 @@ export default function SummarizerPage() {
       { sentiment: 'negative', count: 0, percentage: 15 }
     ]
   })
+
+  // Fetch summary history and calculate statistics on mount
+  useEffect(() => {
+    fetchSummaryHistory()
+  }, [])
+
+  const fetchSummaryHistory = async () => {
+    try {
+      setHistoryLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        setHistoryLoading(false)
+        return
+      }
+
+      // Fetch summaries from database
+      const { data: summaries, error } = await supabase
+        .from('summaries')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (error) {
+        console.error('Error fetching summaries:', error)
+        setHistoryLoading(false)
+        return
+      }
+
+      if (summaries && summaries.length > 0) {
+        // Convert database summaries to history items
+        const historyItems: SummaryHistoryItem[] = summaries.map(summary => {
+          const keyPoints = Array.isArray(summary.key_points) 
+            ? summary.key_points 
+            : typeof summary.key_points === 'string' 
+              ? JSON.parse(summary.key_points || '[]')
+              : []
+          
+          const originalWordCount = summary.original_length || getWordCount(summary.original_content || '')
+          const summaryWordCount = getWordCount(summary.summary_content)
+          const compressionRatio = originalWordCount > 0 
+            ? `${Math.round((1 - summaryWordCount / originalWordCount) * 100)}%` 
+            : '0%'
+
+          return {
+            id: summary.id,
+            title: summary.title || 'Untitled Summary',
+            originalSource: (summary.source_type as 'file' | 'url' | 'text' | 'search') || 'text',
+            sourceDetails: summary.source_url || summary.source_type || 'Text input',
+            summary: summary.summary_content,
+            keyPoints: keyPoints as string[],
+            statistics: {
+              originalLength: originalWordCount,
+              summaryLength: summaryWordCount,
+              compressionRatio,
+              readingTime: summary.reading_time || Math.ceil(summaryWordCount / 200),
+              confidence: 0.9
+            },
+            timestamp: new Date(summary.created_at),
+            tags: extractTopics(summary.summary_content, keyPoints as string[]),
+            sentiment: analyzeSentiment(summary.summary_content),
+            topics: extractTopics(summary.summary_content, keyPoints as string[]),
+            difficulty: determineDifficulty(summary.summary_content, originalWordCount),
+            provider: 'openai',
+            processingMethod: 'direct'
+          }
+        })
+
+        setSummaryHistory(historyItems)
+        
+        // Calculate real statistics from the data
+        calculateStatistics(historyItems)
+      }
+    } catch (error) {
+      console.error('Error in fetchSummaryHistory:', error)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const calculateStatistics = (items: SummaryHistoryItem[]) => {
+    if (items.length === 0) return
+
+    // Calculate total words processed
+    const totalWordsProcessed = items.reduce((sum, item) => sum + item.statistics.originalLength, 0)
+    const totalSummaryWords = items.reduce((sum, item) => sum + item.statistics.summaryLength, 0)
+    
+    // Calculate average compression ratio
+    const avgCompression = Math.round(
+      items.reduce((sum, item) => {
+        const ratio = parseInt(item.statistics.compressionRatio.replace('%', ''))
+        return sum + ratio
+      }, 0) / items.length
+    )
+
+    // Calculate time saved (assuming 200 words per minute reading speed)
+    const totalTimeSaved = Math.round((totalWordsProcessed - totalSummaryWords) / 200)
+
+    // Calculate breakdown by input method
+    const inputMethodCounts: Record<string, number> = {}
+    items.forEach(item => {
+      const method = item.originalSource || 'text'
+      inputMethodCounts[method] = (inputMethodCounts[method] || 0) + 1
+    })
+
+    // Calculate input method breakdown
+    const inputMethodBreakdown = Object.entries(inputMethodCounts).map(([method, count]) => ({
+      method,
+      count,
+      percentage: Math.round((count / items.length) * 100)
+    }))
+
+    // Calculate breakdown by sentiment
+    const sentimentCounts: Record<string, number> = {}
+    items.forEach(item => {
+      const sentiment = item.sentiment || 'neutral'
+      sentimentCounts[sentiment] = (sentimentCounts[sentiment] || 0) + 1
+    })
+
+    // Calculate sentiment breakdown
+    const sentimentBreakdown = Object.entries(sentimentCounts).map(([sentiment, count]) => ({
+      sentiment,
+      count,
+      percentage: Math.round((count / items.length) * 100)
+    }))
+
+    // Extract all topics and count occurrences
+    const topicCounts: Record<string, number> = {}
+    items.forEach(item => {
+      (item.topics || []).forEach(topic => {
+        topicCounts[topic] = (topicCounts[topic] || 0) + 1
+      })
+    })
+
+    const topTopics = Object.entries(topicCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([topic, count]) => ({ topic, count }))
+
+    // Calculate monthly summaries
+    const monthCounts: Record<string, number> = {}
+    items.forEach(item => {
+      const month = item.timestamp.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+      monthCounts[month] = (monthCounts[month] || 0) + 1
+    })
+
+    // Get last 6 months of data
+    const sortedMonths = Object.entries(monthCounts)
+      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+      .slice(-6)
+      .map(([month, count]) => ({ month, count }))
+
+    // Calculate average confidence
+    const avgConfidence = items.reduce((sum, item) => sum + (item.statistics.confidence || 0.8), 0) / items.length
+
+    // Calculate average processing time (simulated based on word count)
+    const avgProcessingTime = items.reduce((sum, item) => sum + (item.statistics.originalLength || 1000), 0) / items.length / 500 // Rough estimate: 1 second per 1000 words
+
+    // Determine most used difficulty
+    const difficultyCounts = items.reduce((acc, item) => {
+      const difficulty = item.difficulty || 'intermediate'
+      acc[difficulty] = (acc[difficulty] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    const mostUsedDifficulty = Object.entries(difficultyCounts)
+      .sort(([, a], [, b]) => b - a)[0]?.[0] as 'beginner' | 'intermediate' | 'advanced' || 'intermediate'
+
+    setUsageStatistics({
+      totalSummaries: items.length,
+      averageCompressionRatio: avgCompression,
+      mostUsedInputMethod: (inputMethodBreakdown[0]?.method || 'text') as any,
+      mostUsedProvider: 'openai', // We can enhance this later
+      totalWordsProcessed,
+      totalTimeSaved,
+      summariesByMonth: sortedMonths,
+      topTopics,
+      averageConfidence: avgConfidence,
+      successRate: 95, // Can be calculated if we track failures
+      mostUsedDifficulty,
+      averageProcessingTime: avgProcessingTime,
+      inputMethodBreakdown: inputMethodBreakdown as any,
+      providerBreakdown: [
+        { provider: 'openai', count: items.length, percentage: 100 }
+      ],
+      sentimentBreakdown: sentimentBreakdown as any
+    })
+  }
 
   // Utility functions
   const getWordCount = useCallback((text: string) => {
@@ -451,6 +642,48 @@ export default function SummarizerPage() {
       // Ensure Summary tab is shown after successful generation
       handleTabChange('summary')
 
+      // Save the summary to the database
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: savedSummary, error } = await supabase
+          .from('summaries')
+          .insert([
+            {
+              user_id: user.id,
+            title: 'Untitled Summary',
+            summary_content: enhancedResult.summary,
+            key_points: JSON.stringify(enhancedResult.keyPoints),
+            original_content: textToSummarize,
+            reading_time: enhancedResult.readingTime,
+            source_type: currentTab,
+            source_url: currentTab === 'url' ? url : undefined,
+            compression_ratio: enhancedResult.compressionRatio,
+            sentiment: enhancedResult.sentiment,
+            topics: JSON.stringify(enhancedResult.topics),
+            difficulty: enhancedResult.difficulty,
+            confidence: enhancedResult.confidence
+          }
+            ]
+          )
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Error saving summary:', error)
+        } else {
+          if (savedSummary) {
+            console.log("Summary saved to database with ID:", savedSummary.id)
+          }
+          
+          // Refresh history after saving new summary
+          if (result && savedSummary) {
+            // Refresh history to include the new summary
+            await fetchSummaryHistory()
+          }
+        }
+      }
+
       toast({
         title: "Summary Generated",
         description: `Successfully created summary using ${result.processingMethod} processing.`,
@@ -536,30 +769,150 @@ export default function SummarizerPage() {
 
   // Analytics handlers
   const handleViewHistoryItem = (item: SummaryHistoryItem) => {
-    // In a real implementation, this would load the historical summary
-    console.log('Viewing history item:', item)
+    // Load the historical summary into the current view
+    const enhancedResult: EnhancedSummaryResult = {
+      summary: item.summary,
+      keyPoints: item.keyPoints,
+      readingTime: item.statistics.readingTime,
+      originalLength: item.statistics.originalLength,
+      summaryLength: item.statistics.summaryLength,
+      compressionRatio: item.statistics.compressionRatio,
+      sentiment: item.sentiment,
+      topics: item.topics,
+      difficulty: item.difficulty,
+      confidence: item.statistics.confidence,
+      metadata: {
+        source: item.originalSource as any,
+        sourceDetails: item.sourceDetails || 'Text input'
+      },
+      processingMethod: item.processingMethod || 'direct',
+      tables: [],
+      graphs: []
+    }
+    
+    setResult(enhancedResult)
+    setHasActiveSummary(true)
+    handleTabChange('summary')
+    
     toast({
-      title: "History Item",
-      description: `Viewing summary: ${item.title}`,
+      title: "Summary Loaded",
+      description: `Loaded summary: ${item.title}`,
     })
   }
 
-  const handleDeleteHistoryItem = (id: string) => {
-    // In a real implementation, this would delete from localStorage/backend
-    console.log('Deleting history item:', id)
-    toast({
-      title: "Item Deleted",
-      description: "Summary has been removed from history.",
-    })
+  const handleDeleteHistoryItem = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('summaries')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        throw error
+      }
+
+      // Update local state
+      const updatedHistory = summaryHistory.filter(item => item.id !== id)
+      setSummaryHistory(updatedHistory)
+      
+      // Recalculate statistics
+      if (updatedHistory.length > 0) {
+        calculateStatistics(updatedHistory)
+      } else {
+        // Reset to default statistics if no items left
+        setUsageStatistics({
+          totalSummaries: 0,
+          averageCompressionRatio: 0,
+          mostUsedInputMethod: 'text',
+          mostUsedProvider: 'openai',
+          totalWordsProcessed: 0,
+          totalTimeSaved: 0,
+          summariesByMonth: [],
+          topTopics: [],
+          averageConfidence: 0,
+          successRate: 0,
+          mostUsedDifficulty: 'intermediate',
+          averageProcessingTime: 0,
+          inputMethodBreakdown: [],
+          providerBreakdown: [],
+          sentimentBreakdown: []
+        })
+      }
+
+      toast({
+        title: "Summary Deleted",
+        description: "Summary has been removed from your history.",
+      })
+    } catch (error) {
+      console.error('Error deleting summary:', error)
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the summary. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleExportHistory = () => {
-    // In a real implementation, this would export all history data
-    console.log('Exporting history')
-    toast({
-      title: "Export Started",
-      description: "History data is being prepared for download.",
-    })
+    if (summaryHistory.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "You don't have any summaries to export yet.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Create a comprehensive export object
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        statistics: usageStatistics,
+        summaries: summaryHistory.map(item => ({
+          id: item.id,
+          title: item.title,
+          timestamp: item.timestamp.toISOString(),
+          summary: item.summary,
+          keyPoints: item.keyPoints,
+          originalLength: item.statistics.originalLength,
+          summaryLength: item.statistics.summaryLength,
+          compressionRatio: item.statistics.compressionRatio,
+          readingTime: item.statistics.readingTime,
+          sourceType: item.originalSource,
+          sourceDetails: item.sourceDetails,
+          sentiment: item.sentiment,
+          topics: item.topics,
+          difficulty: item.difficulty,
+          confidence: item.statistics.confidence
+        }))
+      }
+
+      // Convert to JSON and create blob
+      const jsonString = JSON.stringify(exportData, null, 2)
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      
+      // Create download link
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `summary-history-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Complete",
+        description: `Successfully exported ${summaryHistory.length} summaries with statistics.`,
+      })
+    } catch (error) {
+      console.error('Error exporting history:', error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export history data. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

@@ -168,16 +168,19 @@ const CommandMenuContent = React.forwardRef<
     return (
       <CommandMenuPortal>
         <CommandMenuOverlay />
-        <DialogPrimitive.Content asChild ref={ref} {...props}>
+        <DialogPrimitive.Content
+          ref={ref}
+          {...props}
+          className={cn("fixed inset-0 z-50 flex items-center justify-center p-4")}
+        >
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            initial={{ opacity: 0, scale: 0.98, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            exit={{ opacity: 0, scale: 0.98, y: -6 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             className={cn(
-              "fixed left-[50%] top-[50%] z-50 w-[95%] max-w-2xl translate-x-[-50%] translate-y-[-50%]",
-              "bg-background border border-border rounded-card shadow-lg",
-              "overflow-hidden",
+              "w-[95vw] sm:w-full max-w-2xl bg-background border border-border rounded-card shadow-lg",
+              "max-h-[80vh] overflow-auto",
               className
             )}
           >
