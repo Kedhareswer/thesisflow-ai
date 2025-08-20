@@ -48,8 +48,9 @@ interface ArxivEntry {
 
 export class LiteratureSearchService {
   private cache = new Map<string, { data: SearchResult; timestamp: number }>();
+  private inflight = new Map<string, Promise<SearchResult>>();
   private readonly CACHE_DURATION = 3600000; // 1 hour
-  private readonly REQUEST_TIMEOUT = 8000; // 8 seconds per API call
+  private readonly REQUEST_TIMEOUT = 6000; // 6 seconds per API call
   private readonly MAX_CONCURRENT_REQUESTS = 3;
 
   constructor(private supabaseClient?: any) {}
@@ -61,21 +62,10 @@ export class LiteratureSearchService {
     const startTime = Date.now();
     const cacheKey = `${query.toLowerCase().trim()}_${limit}`;
 
-    // Check in-memory cache first
-    const cached = this.getCachedResult(cacheKey);
-    if (cached) {
-      return {
-        ...cached,
-        cached: true,
-        searchTime: Date.now() - startTime
-      };
-    }
-
     // Check database cache
     if (this.supabaseClient) {
       const dbCached = await this.getFromDatabaseCache(cacheKey);
       if (dbCached) {
-        this.cache.set(cacheKey, { data: dbCached, timestamp: Date.now() });
         return {
           ...dbCached,
           cached: true,
@@ -84,72 +74,130 @@ export class LiteratureSearchService {
       }
     }
 
-    try {
-      // Run multiple search APIs in parallel with race conditions for speed
-      const searchPromises = [
-        this.searchOpenAlex(query, limit),
-        this.searchArxiv(query, limit),
-        this.searchCrossRef(query, limit)
-      ];
+    // Coalesce duplicate concurrent requests
+    const existing = this.inflight.get(cacheKey);
+    if (existing) return existing;
 
-      // Use Promise.allSettled to get results from all APIs, even if some fail
-      const results = await Promise.allSettled(
-        searchPromises.map(promise => 
-          Promise.race([
-            promise,
-            this.timeoutPromise(this.REQUEST_TIMEOUT)
-          ])
-        )
-      );
+    const run = (async (): Promise<SearchResult> => {
+      try {
+        // Check database cache
+        if (this.supabaseClient) {
+          const dbCached = await this.getFromDatabaseCache(cacheKey);
+          if (dbCached) {
+            this.cache.set(cacheKey, { data: dbCached, timestamp: Date.now() });
+            return {
+              ...dbCached,
+              cached: true,
+              searchTime: Date.now() - startTime
+            };
+          }
+        }
 
-      // Combine results from successful APIs
-      const papers = this.combineResults(results, limit);
-      
-      if (papers.length === 0) {
-        // If all parallel requests failed, try sequential backup
-        const backupResult = await this.fallbackSequentialSearch(query, limit);
-        if (backupResult.papers.length > 0) {
-          await this.cacheResult(cacheKey, backupResult);
+        try {
+          // Run parallel API calls with timeouts
+          const openAlexPromise = this.searchOpenAlex(query, limit);
+          const arxivPromise = this.searchArxiv(query, limit);
+          const crossRefPromise = this.searchCrossRef(query, Math.min(20, Math.max(limit, 10))); // CrossRef can be slower
+
+          // Fast-path: return immediately if OpenAlex returns enough results within ~1.8s
+          try {
+            const fastOpenAlex = await Promise.race([
+              openAlexPromise,
+              this.timeoutPromise(1800)
+            ]);
+            if (Array.isArray(fastOpenAlex) && fastOpenAlex.length >= limit) {
+              const result: SearchResult = {
+                success: true,
+                papers: fastOpenAlex.slice(0, limit),
+                source: 'openalex-fast',
+                count: fastOpenAlex.length,
+                searchTime: Date.now() - startTime
+              };
+              // Fire-and-forget: compute combined results and cache for subsequent calls
+              (async () => {
+                const fullResults = await Promise.allSettled([
+                  Promise.race([openAlexPromise, this.timeoutPromise(this.REQUEST_TIMEOUT)]),
+                  Promise.race([arxivPromise, this.timeoutPromise(this.REQUEST_TIMEOUT)]),
+                  Promise.race([crossRefPromise, this.timeoutPromise(this.REQUEST_TIMEOUT)])
+                ]);
+                const papers = this.combineResults(fullResults, Math.max(50, limit));
+                const combined: SearchResult = {
+                  success: true,
+                  papers: papers.slice(0, limit),
+                  source: 'combined',
+                  count: papers.length,
+                  searchTime: Date.now() - startTime
+                };
+                await this.cacheResult(cacheKey, combined);
+              })().catch(() => {});
+              return result;
+            }
+          } catch {
+            // Ignore fast-path timeout; continue with normal flow
+          }
+
+          // Race with global timeout for all sources
+          const results = await Promise.allSettled([
+            Promise.race([openAlexPromise, this.timeoutPromise(this.REQUEST_TIMEOUT)]),
+            Promise.race([arxivPromise, this.timeoutPromise(this.REQUEST_TIMEOUT)]),
+            Promise.race([crossRefPromise, this.timeoutPromise(this.REQUEST_TIMEOUT)])
+          ]);
+
+          // Combine results from successful APIs
+          const papers = this.combineResults(results, limit);
+
+          if (papers.length === 0) {
+            // If all parallel requests failed, try sequential backup
+            const backupResult = await this.fallbackSequentialSearch(query, limit);
+            if (backupResult.papers.length > 0) {
+              await this.cacheResult(cacheKey, backupResult);
+              return {
+                ...backupResult,
+                searchTime: Date.now() - startTime
+              };
+            }
+
+            return {
+              success: false,
+              papers: [],
+              source: 'none',
+              count: 0,
+              error: 'No results found from any source',
+              searchTime: Date.now() - startTime
+            };
+          }
+
+          const result: SearchResult = {
+            success: true,
+            papers: papers.slice(0, limit),
+            source: 'combined',
+            count: papers.length,
+            searchTime: Date.now() - startTime
+          };
+
+          // Cache the successful result
+          await this.cacheResult(cacheKey, result);
+
+          return result;
+
+        } catch (error) {
+          console.error('Literature search error:', error);
           return {
-            ...backupResult,
+            success: false,
+            papers: [],
+            source: 'error',
+            count: 0,
+            error: error instanceof Error ? error.message : 'Unknown error',
             searchTime: Date.now() - startTime
           };
         }
-        
-        return {
-          success: false,
-          papers: [],
-          source: 'none',
-          count: 0,
-          error: 'No results found from any source',
-          searchTime: Date.now() - startTime
-        };
+      } finally {
+        this.inflight.delete(cacheKey);
       }
+    })();
 
-      const result: SearchResult = {
-        success: true,
-        papers: papers.slice(0, limit),
-        source: 'combined',
-        count: papers.length,
-        searchTime: Date.now() - startTime
-      };
-
-      // Cache the successful result
-      await this.cacheResult(cacheKey, result);
-      
-      return result;
-
-    } catch (error) {
-      console.error('Literature search error:', error);
-      return {
-        success: false,
-        papers: [],
-        source: 'error',
-        count: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        searchTime: Date.now() - startTime
-      };
-    }
+    this.inflight.set(cacheKey, run);
+    return run;
   }
 
   /**
