@@ -149,19 +149,19 @@ export function SummaryStatistics({ result, getWordCount, className }: SummarySt
         <CardContent>
           <div className="space-y-4">
             {/* Confidence Score */}
-            {result.confidence !== undefined && (
+            {Number.isFinite(result.confidence as number) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Confidence Score</span>
                   <Badge className={getConfidenceColor(result.confidence)}>
-                    {Math.round(result.confidence * 100)}%
+                    {Math.round((result.confidence as number) * 100)}%
                   </Badge>
                 </div>
-                <Progress value={result.confidence * 100} className="h-2" />
+                <Progress value={(result.confidence as number) * 100} className="h-2" />
                 <p className="text-xs text-gray-600">
-                  {result.confidence > 0.8 
+                  {(result.confidence as number) > 0.8 
                     ? "High confidence - Summary accurately represents the content"
-                    : result.confidence > 0.6
+                    : (result.confidence as number) > 0.6
                     ? "Medium confidence - Summary is generally accurate"
                     : "Low confidence - Consider reviewing or regenerating"
                   }

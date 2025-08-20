@@ -540,8 +540,13 @@ TOP_KEY_POINTS:
      * Calculate confidence score based on chunk processing results
      */
     private static calculateConfidence(chunkResults: ChunkProcessingResult[]): number {
-        const successfulChunks = chunkResults.filter(r => !r.summary.includes('processing failed')).length
         const totalChunks = chunkResults.length
+        // Guard: if no chunks, return a conservative default to avoid NaN
+        if (totalChunks === 0) {
+            return 0.5
+        }
+
+        const successfulChunks = chunkResults.filter(r => !r.summary.includes('processing failed')).length
 
         const successRate = successfulChunks / totalChunks
         const avgProcessingTime = chunkResults.reduce((sum, r) => sum + r.processingTime, 0) / totalChunks
@@ -549,7 +554,10 @@ TOP_KEY_POINTS:
         // Lower confidence for very fast processing (might indicate errors)
         const timeConfidence = avgProcessingTime > 1000 ? 1.0 : 0.8
 
-        return Math.round((successRate * timeConfidence) * 100) / 100
+        const score = successRate * timeConfidence
+        const rounded = Math.round((score) * 100) / 100
+        // Ensure finite result
+        return Number.isFinite(rounded) ? rounded : 0.5
     }
 
     /**

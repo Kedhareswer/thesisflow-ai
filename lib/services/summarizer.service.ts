@@ -129,27 +129,29 @@ export class SummarizerService {
         })
 
         const response = await api.post<GenerateResponse>("/api/ai/generate", {
-          prompt: `You are an expert research paper summarizer. Summarize the following text in a clear, concise manner.
-          Focus on the main findings, methodology, and implications. Do NOT repeat or quote large portions of the input. Do not copy the input verbatim.
-          
-          After the summary, provide exactly 5 key points from the text.
-          
-          Format your response EXACTLY as:
-          
-          SUMMARY:
-          [A concise 2-4 paragraph summary]
-          
-          KEY_POINTS:
-          - [Point 1]
-          - [Point 2]
-          - [Point 3]
-          - [Point 4]
-          - [Point 5]
-          
-          Text to summarize (between BEGIN_TEXT and END_TEXT; do not echo it):
-          ===BEGIN_TEXT===
-          ${text}
-          ===END_TEXT===`,
+          prompt: `You are an expert content summarizer. Create a comprehensive summary of the following text.
+
+INSTRUCTIONS:
+1. Write a detailed 3-4 paragraph summary covering the main topics, findings, and key information
+2. Extract exactly 5 key points that capture the most important aspects
+3. Use clear, professional language
+4. Do NOT include the original text in your response
+5. Focus on substance and insights
+
+FORMAT YOUR RESPONSE EXACTLY AS SHOWN:
+
+SUMMARY:
+[Write your detailed summary here - 3-4 well-developed paragraphs that thoroughly cover the content]
+
+KEY_POINTS:
+- [First key point - be specific and informative]
+- [Second key point - be specific and informative] 
+- [Third key point - be specific and informative]
+- [Fourth key point - be specific and informative]
+- [Fifth key point - be specific and informative]
+
+TEXT TO SUMMARIZE:
+${text}`,
           provider: options?.provider,
           model: options?.model
         })
@@ -180,21 +182,28 @@ export class SummarizerService {
       // Save to database if user is authenticated and saveToDatabase is true
       if (saveToDatabase) {
         try {
-          const title = text.length > 50
-            ? text.substring(0, 50) + "..."
-            : text
+          // Check if user is authenticated before attempting to save
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const title = text.length > 50
+              ? text.substring(0, 50) + "..."
+              : text
 
-          const savedSummary = await this.saveSummary(
-            title,
-            text,
-            result.summary,
-            result.keyPoints,
-            'text',
-            undefined,
-            result.readingTime
-          )
+            const savedSummary = await this.saveSummary(
+              title,
+              text,
+              result.summary,
+              result.keyPoints,
+              'text',
+              undefined,
+              result.readingTime
+            )
 
-          result.id = savedSummary.id
+            result.id = savedSummary.id
+            console.log("Summary saved to database with ID:", result.id)
+          } else {
+            console.log("User not authenticated, skipping database save")
+          }
         } catch (dbError) {
           console.warn("Failed to save summary to database:", dbError)
           // Don't throw error here, just continue without saving
@@ -337,17 +346,26 @@ export class SummarizerService {
       // Save to database if user is authenticated and saveToDatabase is true
       if (saveToDatabase) {
         try {
-          const savedSummary = await this.saveSummary(
-            file.name,
-            extractedText,
-            result.summary,
-            result.keyPoints,
-            'file',
-            undefined,
-            result.readingTime
-          )
+          // Check if user is authenticated before attempting to save
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const title = file.name || "Uploaded file"
 
-          result.id = savedSummary.id
+            const savedSummary = await this.saveSummary(
+              title,
+              extractedText,
+              result.summary,
+              result.keyPoints,
+              'file',
+              undefined,
+              result.readingTime
+            )
+
+            result.id = savedSummary.id
+            console.log("File summary saved to database with ID:", result.id)
+          } else {
+            console.log("User not authenticated, skipping database save for file summary")
+          }
         } catch (dbError) {
           console.warn("Failed to save file summary to database:", dbError)
           // Don't throw error here, just continue without saving
@@ -508,56 +526,98 @@ export class SummarizerService {
       // Non-fatal: continue with best-effort parsing
     }
 
-    // More flexible parsing to handle different response formats
+    // Improved parsing to handle the new format
     let summary = "";
     let keyPointsArray: string[] = [];
 
-    // Try to extract summary using various patterns
+    console.log("Parsing AI response, content preview:", content.substring(0, 500));
+
+    // Try to extract summary using improved patterns
     const summaryPatterns = [
-      /SUMMARY:([\s\S]*?)(?:KEY_POINTS:|KEY POINTS:|KEY INSIGHTS:|$)/i,
-      /Executive Summary[\s\S]*?([\s\S]*?)(?:Key Insights|Key Points|$)/i,
-      /^([\s\S]*?)(?:Key Insights|Key Points|\d+\.)/i
+      /SUMMARY:\s*([\s\S]*?)(?:\n\s*KEY_POINTS:|$)/i,
+      /Summary:\s*([\s\S]*?)(?:\n\s*Key Points:|$)/i,
+      /## Summary\s*([\s\S]*?)(?:\n\s*## Key Points|$)/i,
+      /^([\s\S]*?)(?:\n\s*KEY_POINTS:|Key Points:|$)/i
     ];
 
     for (const pattern of summaryPatterns) {
       const match = content.match(pattern);
-      if (match && match[1] && match[1].trim().length > 20) {
+      if (match && match[1] && match[1].trim().length > 50) {
         summary = match[1].trim();
+        // Clean up any formatting artifacts
+        summary = summary.replace(/^\[.*?\]/, '').trim();
+        summary = summary.replace(/\[Write.*?\]/gi, '').trim();
+        console.log("Found summary with pattern:", pattern.source);
         break;
       }
     }
 
-    // If no summary was found, use the first part of the content
+    // If no summary was found, try to extract the main content
     if (!summary) {
-      summary = content.split('\n').slice(0, 5).join('\n').trim();
-      if (summary.length > 1000) {
-        summary = summary.substring(0, 1000) + "...";
+      // Look for substantial paragraphs
+      const paragraphs = content.split('\n\n').filter(p => p.trim().length > 100);
+      if (paragraphs.length > 0) {
+        summary = paragraphs.slice(0, 3).join('\n\n').trim();
+      } else {
+        // Fallback to first substantial content
+        const lines = content.split('\n').filter(line => line.trim().length > 20);
+        summary = lines.slice(0, 8).join('\n').trim();
       }
+      
+      if (summary.length > 2000) {
+        summary = summary.substring(0, 2000) + "...";
+      }
+      console.log("Using fallback summary extraction");
     }
 
-    // Try to extract key points using various patterns
+    // Improved key points extraction
     const keyPointsPatterns = [
-      /(KEY_POINTS:|KEY POINTS:|KEY INSIGHTS:)\s*([\s\S]*)/i,
-      /Key Insights[\s\S]*?([\s\S]*)/i,
-      /Key Points[\s\S]*?([\s\S]*)/i,
-      /\n\s*(?:Key\s*Takeaways|Highlights|Bullets):\s*([\s\S]*)/i
+      /KEY_POINTS:\s*([\s\S]*?)(?:\n\n|\n\s*[A-Z]+:|$)/i,
+      /Key Points:\s*([\s\S]*?)(?:\n\n|\n\s*[A-Z]+:|$)/i,
+      /## Key Points\s*([\s\S]*?)(?:\n\n|\n\s*##|$)/i,
+      /(?:Key Insights|Main Points|Important Points):\s*([\s\S]*?)(?:\n\n|$)/i
     ];
 
     for (const pattern of keyPointsPatterns) {
       const match = content.match(pattern);
-      // Use the last capturing group if multiple exist
-      const captured = match ? (match[2] ?? match[1]) : undefined
-      if (captured) {
-        const keyPointsText = String(captured).trim();
+      if (match && match[1]) {
+        const keyPointsText = match[1].trim();
+        console.log("Found key points section:", keyPointsText.substring(0, 200));
 
-        // Try to extract numbered or bulleted points
-        const pointsArray = keyPointsText
-          .split(/\n+|\r+|\d+\.\s+|•\s+|\*\s+|\-\s+/)
-          .map(point => point.trim())
-          .filter(point => point.length > 10);
+        // Extract bullet points with improved regex
+        const bulletRegex = /(?:^|\n)\s*[-•*]\s*([^\n]+)/g;
+        const bullets = [];
+        let bulletMatch;
+        
+        while ((bulletMatch = bulletRegex.exec(keyPointsText)) !== null) {
+          const point = bulletMatch[1].trim();
+          // Clean up placeholder text
+          if (point && point.length > 15 && !point.includes('[') && !point.includes('key point')) {
+            bullets.push(point);
+          }
+        }
 
-        if (pointsArray.length > 0) {
-          keyPointsArray = pointsArray.slice(0, 5);
+        if (bullets.length > 0) {
+          keyPointsArray = bullets.slice(0, 5);
+          console.log("Extracted key points:", keyPointsArray.length);
+          break;
+        }
+
+        // Fallback: try numbered points
+        const numberedRegex = /(?:^|\n)\s*\d+\.\s*([^\n]+)/g;
+        const numbered = [];
+        let numberedMatch;
+        
+        while ((numberedMatch = numberedRegex.exec(keyPointsText)) !== null) {
+          const point = numberedMatch[1].trim();
+          if (point && point.length > 15 && !point.includes('[')) {
+            numbered.push(point);
+          }
+        }
+
+        if (numbered.length > 0) {
+          keyPointsArray = numbered.slice(0, 5);
+          console.log("Extracted numbered points:", keyPointsArray.length);
           break;
         }
       }
@@ -565,27 +625,45 @@ export class SummarizerService {
 
     // If no key points were found, try to generate some from the summary
     if (keyPointsArray.length === 0) {
-      // Try to extract sentences that might be key points
+      console.log("No key points found, generating from summary");
+      
+      // Try to extract meaningful sentences from the summary
       const sentences = summary
-        .split(/\.\s+|\n+/)
+        .split(/[.!?]\s+/)
         .map(s => s.trim())
-        .filter(s => s.length > 20 && s.length < 200);
+        .filter(s => s.length > 30 && s.length < 300 && !s.includes('TEXT TO SUMMARIZE'));
 
       if (sentences.length >= 3) {
-        keyPointsArray = sentences.slice(0, 5);
+        keyPointsArray = sentences.slice(0, 5).map(s => s.endsWith('.') ? s : s + '.');
+        console.log("Generated key points from sentences:", keyPointsArray.length);
       } else {
-        keyPointsArray = ["Key points could not be extracted."];
+        // Last resort: split summary into logical chunks
+        const chunks = summary.split(/\n\n|\. /).filter(chunk => chunk.trim().length > 40);
+        if (chunks.length > 0) {
+          keyPointsArray = chunks.slice(0, 5).map(chunk => {
+            const cleaned = chunk.trim().replace(/^\d+\.\s*/, '');
+            return cleaned.endsWith('.') ? cleaned : cleaned + '.';
+          });
+          console.log("Generated key points from chunks:", keyPointsArray.length);
+        } else {
+          keyPointsArray = ["Unable to extract specific key points from the content."];
+        }
       }
     }
 
-    // Ensure we have exactly 5 key points or fewer if that's all we could extract
-    while (keyPointsArray.length < 5 && keyPointsArray.length > 0 && keyPointsArray[0] !== "Key points could not be extracted.") {
-      // Duplicate some existing points if we need to fill in
-      keyPointsArray.push(keyPointsArray[keyPointsArray.length % keyPointsArray.length]);
+    // Ensure we have at least some key points, but don't duplicate unnecessarily
+    if (keyPointsArray.length === 0) {
+      keyPointsArray = ["Content analysis completed but specific key points could not be extracted."];
     }
 
-    // Limit to 5 key points
+    // Limit to 5 key points maximum
     keyPointsArray = keyPointsArray.slice(0, 5);
+    
+    console.log("Final parsing results:", {
+      summaryLength: summary.length,
+      keyPointsCount: keyPointsArray.length,
+      summaryPreview: summary.substring(0, 100)
+    });
 
     // Calculate approximate reading time (1 minute per 1000 characters)
     const readingTime = Math.ceil(originalLength / 1000);

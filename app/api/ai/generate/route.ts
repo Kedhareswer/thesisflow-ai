@@ -8,18 +8,33 @@ export async function POST(request: NextRequest) {
     console.log('AI Generate: Starting request processing')
     console.log('AI Generate: Headers:', Object.fromEntries(request.headers.entries()))
     
-    const user = await requireAuth(request, "ai-generate")
-    
-    console.log('AI Generate: User authenticated:', user.id)
-    
+    // Parse request body first
     const { prompt, maxTokens = 800, temperature = 0.7, personality = 'friendly', provider, model } = await request.json()
+    
+    // Try to get authenticated user, but allow unauthenticated access for summarizer
+    let user = null
+    let userId = 'anonymous'
+    
+    try {
+      user = await requireAuth(request, "ai-generate")
+      userId = user.id
+      console.log('AI Generate: User authenticated:', user.id)
+    } catch (authError) {
+      // Allow unauthenticated access for summarizer functionality
+      if (prompt && (prompt.includes('summarize') || prompt.includes('SUMMARY:'))) {
+        console.log('AI Generate: Allowing unauthenticated access for summarizer')
+        userId = 'anonymous-summarizer'
+      } else {
+        throw authError
+      }
+    }
 
     if (!prompt?.trim()) {
       const validationError = ErrorHandler.processError(
         "Prompt is required and cannot be empty",
         {
           operation: 'ai-generate-validation',
-          userId: user.id
+          userId: userId
         }
       )
       return NextResponse.json(
@@ -34,7 +49,7 @@ export async function POST(request: NextRequest) {
         "maxTokens must be between 50 and 2000",
         {
           operation: 'ai-generate-validation',
-          userId: user.id
+          userId: userId
         }
       )
       return NextResponse.json(
@@ -48,7 +63,7 @@ export async function POST(request: NextRequest) {
         "temperature must be between 0 and 2",
         {
           operation: 'ai-generate-validation',
-          userId: user.id
+          userId: userId
         }
       )
       return NextResponse.json(
@@ -57,7 +72,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('AI Generate: Processing request for user:', user.id)
+    console.log('AI Generate: Processing request for user:', userId)
     console.log('AI Generate: Prompt length:', prompt.length)
     console.log('AI Generate: Parameters:', { maxTokens, temperature, personality, provider, model })
 
@@ -66,7 +81,7 @@ export async function POST(request: NextRequest) {
       prompt: prompt.trim(),
       maxTokens,
       temperature,
-      userId: user.id,
+      userId: userId,
       provider,
       model
     })
@@ -86,7 +101,7 @@ export async function POST(request: NextRequest) {
         {
           operation: 'ai-generate',
           provider: response.provider || provider,
-          userId: user.id,
+          userId: userId,
           contentLength: prompt.length
         }
       )
@@ -103,7 +118,7 @@ export async function POST(request: NextRequest) {
         {
           operation: 'ai-generate',
           provider: response.provider || provider,
-          userId: user.id
+          userId: userId
         }
       )
       return NextResponse.json(

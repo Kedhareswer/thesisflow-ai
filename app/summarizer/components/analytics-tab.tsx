@@ -141,6 +141,11 @@ function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
+// Safe Date helper
+function toDate(value: any): Date {
+  return value instanceof Date ? value : new Date(value)
+}
+
 // Generate mock analytics data for demonstration
 function generateMockAnalytics(summary: EnhancedSummaryResult): DetailedAnalytics {
   const sentences = summary.summary.split(/[.!?]+/).filter(s => s.trim().length > 0)
@@ -211,7 +216,12 @@ export function AnalyticsTab({
     const storedHistory = loadFromStorage<SummaryHistoryItem[]>(STORAGE_KEYS.SUMMARY_HISTORY, [])
     const storedStats = loadFromStorage<UsageStatistics>(STORAGE_KEYS.USAGE_STATISTICS, propUsageStatistics)
     
-    setSummaryHistory(storedHistory)
+    // Normalize timestamps that may have been stringified in localStorage
+    const normalizedHistory = (storedHistory || []).map((item) => ({
+      ...item,
+      timestamp: toDate((item as any).timestamp),
+    }))
+    setSummaryHistory(normalizedHistory)
     setUsageStatistics(storedStats)
   }, [propUsageStatistics])
 
@@ -267,7 +277,7 @@ export function AnalyticsTab({
       setSummaryHistory(prev => {
         const exists = prev.some(item => {
           const summaryMatch = item.summary.slice(0, 100) === historyItem.summary.slice(0, 100)
-          const timeMatch = Math.abs(item.timestamp.getTime() - historyItem.timestamp.getTime()) < 30000 // 30 seconds
+          const timeMatch = Math.abs(toDate(item.timestamp).getTime() - toDate(historyItem.timestamp).getTime()) < 30000 // 30 seconds
           return summaryMatch && timeMatch
         })
         
@@ -384,9 +394,8 @@ export function AnalyticsTab({
         quarter: 90 * 24 * 60 * 60 * 1000,
         year: 365 * 24 * 60 * 60 * 1000
       }
-      
       const cutoff = new Date(now.getTime() - timeRanges[selectedTimeRange])
-      filtered = filtered.filter(item => item.timestamp >= cutoff)
+      filtered = filtered.filter(item => toDate(item.timestamp).getTime() >= cutoff.getTime())
     }
 
     // Apply sorting
@@ -395,7 +404,7 @@ export function AnalyticsTab({
       
       switch (sortBy) {
         case 'date':
-          comparison = a.timestamp.getTime() - b.timestamp.getTime()
+          comparison = toDate(a.timestamp).getTime() - toDate(b.timestamp).getTime()
           break
         case 'title':
           comparison = a.title.localeCompare(b.title)

@@ -2,6 +2,54 @@ import { NextResponse } from "next/server"
 import { FileProcessor } from "@/lib/file-processors"
 import { FileProcessorWithOCR } from "@/lib/file-processors-with-ocr"
 import { ErrorHandler } from '@/lib/utils/error-handler'
+import mammoth from 'mammoth'
+
+// Server-side PDF processing to avoid recursion
+const processPDFServerSide = async (file: File) => {
+  try {
+    const pdfParse = await import('pdf-parse')
+    const pdfParseFunc = pdfParse.default || pdfParse
+    const arrayBuffer = await file.arrayBuffer()
+    const data = await pdfParseFunc(Buffer.from(arrayBuffer))
+
+    return {
+      content: data.text,
+      pages: data.numpages,
+      wordCount: data.text.trim().split(/\s+/).filter((word: string) => word.length > 0).length
+    }
+  } catch (error) {
+    throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the PDF is not password protected and contains readable text.`)
+  }
+}
+
+// Server-side Word processing
+const processWordServerSide = async (file: File) => {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const result = await mammoth.extractRawText({ arrayBuffer })
+    
+    if ('messages' in result && Array.isArray(result.messages) && result.messages.length > 0) {
+      console.warn('Word file processing warnings:', result.messages)
+    }
+    
+    const content = result.value
+    return {
+      content,
+      wordCount: content.trim().split(/\s+/).filter((word: string) => word.length > 0).length
+    }
+  } catch (error) {
+    throw new Error(`Failed to process Word document: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+// Server-side text processing
+const processTextServerSide = async (file: File) => {
+  const content = await file.text()
+  return {
+    content,
+    wordCount: content.trim().split(/\s+/).filter((word: string) => word.length > 0).length
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -56,9 +104,38 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Use the appropriate processor (with OCR support if enabled)
-      const processor = enableOCR ? FileProcessorWithOCR : FileProcessor
-      const result = await processor.processFile(file)
+      let result: { content: string; wordCount: number; pages?: number }
+
+      // Use OCR processor for enhanced processing if enabled
+      if (enableOCR) {
+        const processor = FileProcessorWithOCR
+        const ocrResult = await processor.processFile(file)
+        result = {
+          content: ocrResult.content,
+          wordCount: ocrResult.metadata.wordCount,
+          pages: ocrResult.metadata.pages
+        }
+      } else {
+        // Use direct server-side processing to avoid recursion
+        switch (file.type) {
+          case 'text/plain':
+            result = await processTextServerSide(file)
+            break
+          
+          case 'application/pdf':
+            result = await processPDFServerSide(file)
+            break
+          
+          case 'application/msword':
+          case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            result = await processWordServerSide(file)
+            break
+          
+          default:
+            // Try to read as text for other formats
+            result = await processTextServerSide(file)
+        }
+      }
 
       // Validate that we extracted meaningful content
       if (!result.content || result.content.trim().length < 10) {
@@ -82,11 +159,9 @@ export async function POST(request: Request) {
         size: file.size,
         type: file.type,
         metadata: {
-          wordCount: result.metadata.wordCount,
-          pages: result.metadata.pages,
-          processingMethod: (result as any).metadata?.processingMethod || (enableOCR ? "FileProcessorWithOCR" : "FileProcessor"),
-          ocrConfidence: (result as any).metadata?.ocrConfidence,
-          hasImages: (result as any).metadata?.hasImages
+          wordCount: result.wordCount,
+          pages: result.pages,
+          processingMethod: enableOCR ? "FileProcessorWithOCR" : "DirectServerProcessing"
         }
       })
 
