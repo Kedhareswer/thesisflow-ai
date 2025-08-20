@@ -44,6 +44,8 @@ import { supabase } from "@/lib/supabase"
 import type { AIProvider } from "@/lib/ai-providers"
 import { WriterCommandMenu } from "./components/writer-command-menu"
 import WriterShareModal from "./components/writer-share-modal"
+import { AIDetectionBadge } from "@/components/ai-detection-badge"
+import { AIDetectionResult } from "@/lib/services/ai-detection.service"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -72,7 +74,7 @@ export default function WriterPage() {
   const [isPlagiarismCheckOpen, setIsPlagiarismCheckOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
 
-  const [aiDetectionResult, setAiDetectionResult] = useState<string | null>(null)
+  const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
   const [humanizedText, setHumanizedText] = useState<string | null>(null)
   const [plagiarismCheckResult, setPlagiarismCheckResult] = useState<{
     detected: boolean
@@ -259,19 +261,13 @@ export default function WriterPage() {
     }
   }
 
-  const handleAiDetect = async () => {
-    if (!documentContent) {
-      toast({ title: "No content", description: "Please write some text to detect.", variant: "destructive" })
-      return
-    }
-    setAiDetectionResult("Detecting...")
-    try {
-      const result = await ResearchService.detectAI(documentContent)
-      setAiDetectionResult(result.message) // Use result.message from the API
-    } catch (err) {
-      handleError(err, "AI Detection failed")
-      setAiDetectionResult("Error detecting AI content.")
-    }
+  const handleAiDetectionComplete = (result: AIDetectionResult) => {
+    setAiDetectionResult(result)
+    toast({
+      title: "AI Detection Complete", 
+      description: `Analysis complete: ${result.is_ai ? 'AI-generated' : 'Human-written'} content detected with ${result.confidence}% confidence`,
+      variant: result.is_ai ? "destructive" : "default"
+    })
   }
 
   const handleHumanize = async () => {
@@ -844,17 +840,59 @@ export default function WriterPage() {
                 <CollapsibleContent className="mt-4">
                   <Card>
                     <CardContent className="p-4 space-y-4">
-                        <Button 
-                        onClick={handleAiDetect}
-                        disabled={!documentContent || aiDetectionResult === "Detecting..."}
-                      >
-                        {aiDetectionResult === "Detecting..." ? "Detecting..." : "Run AI Detection"}
-                        </Button>
-                      {aiDetectionResult && (
-                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
-                          <p className="text-sm font-medium">Result:</p>
-                          <p className="text-lg font-bold">{aiDetectionResult}</p>
-                    </div>
+                      {documentContent ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium">Detection Status:</span>
+                            <AIDetectionBadge
+                              text={documentContent}
+                              onDetectionComplete={handleAiDetectionComplete}
+                              showButton={true}
+                            />
+                          </div>
+                          
+                          {aiDetectionResult && (
+                            <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-lg font-semibold">
+                                  {aiDetectionResult.is_ai ? "⚠️ AI-Generated Content" : "✅ Human-Written Content"}
+                                </h4>
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                  Confidence: {aiDetectionResult.confidence}%
+                                </span>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-600 dark:text-gray-400">AI Probability:</span>
+                                  <span className="ml-2 font-medium">{aiDetectionResult.ai_probability}%</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600 dark:text-gray-400">Human Probability:</span>
+                                  <span className="ml-2 font-medium">{aiDetectionResult.human_probability}%</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600 dark:text-gray-400">Reliability:</span>
+                                  <span className="ml-2 font-medium">{aiDetectionResult.reliability_score}%</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600 dark:text-gray-400">Chunks Analyzed:</span>
+                                  <span className="ml-2 font-medium">{aiDetectionResult.analysis_details.chunks_analyzed}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="text-xs text-gray-500">
+                                Analysis completed using {aiDetectionResult.model_used} at {new Date(aiDetectionResult.timestamp).toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Write some content in the document to analyze for AI detection.</p>
+                          <p className="text-sm mt-2">Minimum 10 words required for accurate analysis.</p>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
