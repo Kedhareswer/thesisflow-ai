@@ -175,7 +175,7 @@ const CommandMenuContent = React.forwardRef<
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className={cn(
-              "fixed left-[50%] top-[30%] z-50 w-[95%] max-w-2xl translate-x-[-50%] translate-y-[-50%]",
+              "fixed left-[50%] top-1/2 z-50 w-[95%] max-w-2xl translate-x-[-50%] translate-y-[-50%]",
               "bg-background border border-border rounded-card shadow-lg",
               "overflow-hidden",
               className
