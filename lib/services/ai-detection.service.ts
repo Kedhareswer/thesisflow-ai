@@ -30,6 +30,7 @@ export class AIDetectionService {
   private readonly MIN_WORD_COUNT = 10
   private readonly CHUNK_SIZE = 500 // words per chunk
   private readonly MAX_CHUNKS = 10
+  private readonly HF_API_URL = 'https://api-inference.huggingface.co/models'
 
   /**
    * Detect if text is AI-generated using multiple heuristics
@@ -39,10 +40,51 @@ export class AIDetectionService {
       throw new Error('Text too short for meaningful analysis')
     }
 
+    // If running in the browser, call the API route to avoid exposing API keys
+    if (typeof window !== 'undefined') {
+      const res = await fetch('/api/ai-detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new AIDetectionServiceError(data?.error || 'Detection failed', res.status, data)
+      }
+
+      return res.json()
+    }
+
+    // Server-side path: perform local heuristics and optional HF inference
     const chunks = this.splitTextIntoChunks(text)
     const analysisResults = await this.analyzeChunks(chunks)
-    
-    return this.aggregateResults(analysisResults, text)
+
+    // Try to enrich with HF model probability if configured
+    const modelFromEnv = process.env.HUGGINGFACE_DETECT_MODEL || 'openai-community/roberta-base-openai-detector'
+    const threshold = parseFloat(process.env.AI_DETECT_THRESHOLD || '0.5')
+    const useDebug = (process.env.AI_DETECT_DEBUG || 'false').toLowerCase() === 'true'
+
+    let hfProbAI: number | null = null
+    let modelUsed = modelFromEnv
+
+    if (process.env.HUGGINGFACE_API_KEY) {
+      try {
+        // Use the first ~1000 words to keep request efficient
+        const limitedText = text.split(/\s+/).slice(0, 1000).join(' ')
+        hfProbAI = await this.queryHuggingFaceModel(limitedText, modelFromEnv)
+      } catch (e) {
+        if (useDebug) {
+          // eslint-disable-next-line no-console
+          console.warn('HF detection failed, falling back to heuristics only:', e)
+        }
+      }
+    } else if (useDebug) {
+      // eslint-disable-next-line no-console
+      console.warn('HUGGINGFACE_API_KEY not set. Using heuristic-only detection.')
+    }
+
+    return this.aggregateResults(analysisResults, text, hfProbAI, modelUsed, threshold)
   }
 
   /**
@@ -67,6 +109,75 @@ export class AIDetectionService {
    */
   private async analyzeChunks(chunks: string[]): Promise<any[]> {
     return chunks.map(chunk => this.analyzeChunk(chunk))
+  }
+
+  /**
+   * Call Hugging Face Inference API to get AI probability (0..1) when available
+   * Supports common text classification outputs.
+   */
+  private async queryHuggingFaceModel(text: string, model: string): Promise<number> {
+    const apiKey = process.env.HUGGINGFACE_API_KEY
+    if (!apiKey) throw new AIDetectionServiceError('Missing HUGGINGFACE_API_KEY', 500)
+
+    const url = `${this.HF_API_URL}/${encodeURIComponent(model)}`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ inputs: text })
+    })
+
+    if (!res.ok) {
+      let details: any = undefined
+      try { details = await res.json() } catch {}
+      throw new AIDetectionServiceError('Hugging Face inference failed', res.status, details)
+    }
+
+    const data = await res.json()
+    // Try to parse various response shapes
+    // Case 1: [{label: 'AI', score: 0.87}, {label: 'Human', score: 0.13}]
+    if (Array.isArray(data)) {
+      return this.extractAIProbabilityFromLabels(data)
+    }
+    // Case 2: [[{label:'LABEL_0', score:..}, ...]] nested
+    if (Array.isArray(data?.[0]) && Array.isArray(data[0])) {
+      return this.extractAIProbabilityFromLabels(data[0])
+    }
+    // Case 3: {scores:[...] or similar}
+    if (data && data.scores && Array.isArray(data.scores)) {
+      return this.extractAIProbabilityFromLabels(data.scores)
+    }
+
+    // Unknown shape: try to find best guess
+    if (process.env.AI_DETECT_DEBUG === 'true') {
+      // eslint-disable-next-line no-console
+      console.warn('Unknown HF response shape, defaulting to 0.5', data)
+    }
+    return 0.5
+  }
+
+  private extractAIProbabilityFromLabels(items: any[]): number {
+    // Normalize labels and pick AI vs Human probabilities when possible
+    let aiScore: number | undefined
+    let humanScore: number | undefined
+    for (const item of items) {
+      const label: string = String(item.label || '').toLowerCase()
+      const score: number = typeof item.score === 'number' ? item.score : Number(item.probability || 0)
+      if (label.includes('ai') || label.includes('fake') || label.includes('generated')) {
+        aiScore = Math.max(aiScore ?? 0, score)
+      }
+      if (label.includes('human') || label.includes('real')) {
+        humanScore = Math.max(humanScore ?? 0, score)
+      }
+    }
+    if (typeof aiScore === 'number') return Math.min(Math.max(aiScore, 0), 1)
+    if (typeof humanScore === 'number') return Math.min(Math.max(1 - humanScore, 0), 1)
+    // Fallback: average all scores if nothing recognized
+    const scores = items.map(i => (typeof i.score === 'number' ? i.score : Number(i.probability || 0))).filter((n: number) => !isNaN(n))
+    if (scores.length) return Math.min(Math.max(scores[0], 0), 1)
+    return 0.5
   }
 
   /**
@@ -218,7 +329,7 @@ export class AIDetectionService {
   /**
    * Aggregate analysis results
    */
-  private aggregateResults(analysisResults: any[], originalText: string): AIDetectionResult {
+  private aggregateResults(analysisResults: any[], originalText: string, hfProbAI: number | null = null, modelUsed: string = 'roberta-base-openai-detector', threshold: number = 0.5): AIDetectionResult {
     // Calculate weighted scores
     let totalPerplexity = 0
     let totalBurstiness = 0
@@ -244,7 +355,7 @@ export class AIDetectionService {
     const avgRepetition = totalRepetition / count
     const avgPatterns = totalPatterns / count
     
-    // Calculate AI probability based on multiple factors
+    // Calculate heuristic AI probability based on multiple factors
     let aiScore = 0
     
     // Low perplexity suggests AI (weight: 30%)
@@ -275,19 +386,29 @@ export class AIDetectionService {
     const confidenceFromChunks = Math.min(count / 5, 1)
     
     const confidence = Math.round((confidenceFromLength * 0.6 + confidenceFromChunks * 0.4) * 100)
-    const aiProbability = Math.round(aiScore * 100)
+    let finalProb = aiScore // heuristics-only baseline
+
+    if (typeof hfProbAI === 'number') {
+      // Blend HF probability with heuristics
+      // If reliability (from length/chunks) is higher, weight HF a bit more
+      const heuristicWeight = 0.4
+      const modelWeight = 0.6
+      finalProb = Math.min(Math.max(modelWeight * hfProbAI + heuristicWeight * aiScore, 0), 1)
+    }
+
+    const aiProbability = Math.round(finalProb * 100)
     const humanProbability = 100 - aiProbability
     
     // Calculate reliability score
     const reliability = this.calculateReliability(wordCount, count, avgPerplexity, avgBurstiness)
     
     return {
-      is_ai: aiProbability > 50,
+      is_ai: finalProb > threshold,
       confidence,
       ai_probability: aiProbability,
       human_probability: humanProbability,
       reliability_score: reliability,
-      model_used: 'roberta-base-openai-detector',
+      model_used: modelUsed,
       analysis_details: {
         perplexity_score: Math.round(avgPerplexity),
         burstiness_score: Math.round(avgBurstiness * 100),
