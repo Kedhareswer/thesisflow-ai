@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import type { ChangeEvent } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   Edit,
@@ -84,6 +85,7 @@ export default function WriterPage() {
   const [documentContent, setDocumentContent] = useState("")
   const [debouncedDocumentContent, setDebouncedDocumentContent] = useState("")
   const [debouncedDocumentTitle, setDebouncedDocumentTitle] = useState("Untitled document")
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // AI Provider state management (similar to Summarizer)
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>()
@@ -298,79 +300,59 @@ export default function WriterPage() {
   const handleSaveDocument = async () => {
     try {
       await saveDocument()
-      toast({ title: "Saved", description: "Document saved successfully." })
-    } catch (e) {
-      // saveDocument already handles error toast
+    } catch (err) {
+      handleError(err, "Failed to save document")
     }
   }
 
   const handleExportDocument = async () => {
     try {
-      // Ensure we have a saved document with an ID
-      if (!document?.id) {
-        await saveDocument()
+      let blob: Blob
+      if (document?.id) {
+        blob = await DocumentService.getInstance().exportDocument(document.id, 'markdown')
+      } else {
+        const content = `# ${documentTitle}\n\n${documentContent}`
+        blob = new Blob([content], { type: 'text/markdown' })
       }
-      const currentId = document?.id
-      if (!currentId) {
-        toast({ title: "Export failed", description: "Please add some content and try saving first.", variant: "destructive" })
-        return
-      }
-      const blob = await DocumentService.getInstance().exportDocument(currentId, 'markdown')
-      const fileNameSafe = (documentTitle || 'document').trim().replace(/[^a-z0-9\-]+/gi, '_').slice(0, 50)
-      const fileName = `${fileNameSafe || 'document'}.md`
       const url = URL.createObjectURL(blob)
-      const docEl = typeof window !== 'undefined' ? (window.document as any) : null
-      if (!docEl) throw new Error('Document not available')
-      const a = docEl.createElement('a') as HTMLAnchorElement
+      const a = window.document.createElement('a')
       a.href = url
-      a.download = fileName
-      docEl.body.appendChild(a)
+      a.download = `${(documentTitle || 'document').replace(/\s+/g, '-').toLowerCase()}.md`
+      window.document.body.appendChild(a)
       a.click()
-      a.remove()
+      window.document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast({ title: "Exported", description: `Downloaded ${fileName}` })
-    } catch (e) {
-      handleError(e, "Failed to export document")
+      toast({ title: 'Exported', description: 'Markdown file downloaded.' })
+    } catch (err) {
+      handleError(err, 'Failed to export document')
     }
   }
 
   const handleImportDocument = () => {
-    const docEl = typeof window !== 'undefined' ? (window.document as any) : null
-    if (!docEl) {
-      handleError(new Error('Document not available'), 'Unable to open file picker')
-      return
-    }
-    const input = docEl.createElement('input') as HTMLInputElement
-    input.type = 'file'
-    input.accept = '.md,.txt,text/markdown,text/plain'
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-      try {
-        const text = await file.text()
-        const baseName = file.name.replace(/\.[^.]+$/, '')
-        if (!documentTitle || documentTitle === 'Untitled document') {
-          setDocumentTitle(baseName)
-        }
-        setDocumentContent(text)
-        toast({ title: "Imported", description: `Loaded ${file.name} into the editor.` })
-      } catch (e) {
-        handleError(e, "Failed to import file")
-      }
-    }
-    input.click()
+    fileInputRef.current?.click()
   }
 
-  const handleShareDocument = async () => {
+  const handleFileSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
     try {
-      // Ensure saved so modal can access a documentId
-      if (!document?.id) {
-        await saveDocument()
+      const text = await file.text()
+      setDocumentContent(text)
+      if (!documentTitle || documentTitle === 'Untitled document') {
+        const base = file.name.replace(/\.[^/.]+$/, '')
+        setDocumentTitle(base || 'Imported document')
       }
-      setIsShareOpen(true)
-    } catch (e) {
-      // saveDocument already toasts on error
+      toast({ title: 'Imported', description: `Loaded ${file.name}` })
+    } catch (err) {
+      handleError(err, 'Failed to import file')
+    } finally {
+      // reset input value so the same file can be selected again later
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const handleShareDocument = () => {
+    setIsShareOpen(true)
   }
 
   const handleToggleAiAssistant = () => {
@@ -1035,6 +1017,14 @@ export default function WriterPage() {
           </ScrollArea>
         </main>
       </div>
+    {/* Hidden file input for Import */}
+    <input
+        ref={fileInputRef}
+        type="file"
+        accept=".md,.markdown,.txt,.json"
+        className="hidden"
+        onChange={handleFileSelected}
+      />
     <WriterShareModal
         open={isShareOpen}
         onOpenChange={setIsShareOpen}
