@@ -13,6 +13,7 @@ const detectRequestSchema = z.object({
 // Cache for detection results
 const detectionCache = new Map<string, { result: any; timestamp: number }>()
 const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+const REQUEST_TIMEOUT = 60000 // 60 seconds
 
 // Hugging Face model configurations - REAL production models only
 const MODELS = {
@@ -254,14 +255,6 @@ export async function POST(req: Request) {
     } else if (!result.is_ai && result.real_probability < threshold) {
       result.is_ai = true
     }
-  }
-  
-  if (currentChunk) {
-    chunks.push(currentChunk + (currentChunk.endsWith('.') ? '' : '.'))
-  }
-
-  return chunks
-}
 
     // Cache result
     detectionCache.set(cacheKey, {
@@ -314,7 +307,7 @@ export async function POST(req: Request) {
       { error: 'Internal server error' },
       { status: 500 }
     )
+  } finally {
+    clearTimeout(timeoutId)
   }
-  
-  throw lastError
 }
