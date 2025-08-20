@@ -74,6 +74,7 @@ export class LiteratureSearchService {
       }
     }
 
+
     // Coalesce duplicate concurrent requests
     const existing = this.inflight.get(cacheKey);
     if (existing) return existing;
@@ -198,6 +199,166 @@ export class LiteratureSearchService {
 
     this.inflight.set(cacheKey, run);
     return run;
+  }
+
+  /**
+   * Stream papers per item via callback as they arrive from sources.
+   * This preserves existing normalization, de-duplicates, and emits early.
+   */
+  async streamPapers(
+    query: string,
+    limit: number,
+    onPaper: (paper: Paper) => void,
+    onError?: (source: string, error: string) => void
+  ): Promise<{ count: number }> {
+    const startTime = Date.now();
+    const seen = new Set<string>(); // by normalized title
+    let emitted = 0;
+
+    const emitArray = (arr: Paper[], source: string) => {
+      for (const p of arr) {
+        if (!p?.title) continue;
+        const key = p.title.toLowerCase().trim();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        onPaper(p);
+        emitted++;
+        if (emitted >= limit) break;
+      }
+    };
+
+    const withCatch = async (name: string, fn: () => Promise<Paper[]>) => {
+      try {
+        const res = await Promise.race([fn(), this.timeoutPromise(this.REQUEST_TIMEOUT)]);
+        if (Array.isArray(res)) emitArray(res, name);
+      } catch (e) {
+        onError?.(name, e instanceof Error ? e.message : String(e));
+      }
+    };
+
+    const tasks: Promise<void>[] = [
+      withCatch('openalex', () => this.searchOpenAlex(query, limit)),
+      withCatch('arxiv', () => this.searchArxiv(query, limit)),
+      withCatch('crossref', () => this.searchCrossRef(query, Math.min(20, Math.max(limit, 10)))),
+      withCatch('openaire', () => this.searchOpenAIRE(query, limit)),
+      withCatch('doaj', () => this.searchDOAJ(query, limit)),
+    ];
+    // Optional sources
+    if (process.env.CORE_API_KEY) {
+      tasks.push(withCatch('core', () => this.searchCORE(query, limit)));
+    }
+    tasks.push(withCatch('pubmed', () => this.searchPubMed(query, limit)));
+    // Keyless extras (best-effort HTML parsing)
+    tasks.push(withCatch('scholar', () => this.searchGoogleScholarLite(query, limit)));
+    tasks.push(withCatch('shodhganga', () => this.searchShodhganga(query, limit)));
+    tasks.push(withCatch('jstor', () => this.searchJSTORLite(query, limit)));
+
+    await Promise.allSettled(tasks);
+
+    // Optionally cache final combined for the query key
+    const cacheKey = `${query.toLowerCase().trim()}_${limit}`;
+    const combined: SearchResult = {
+      success: true,
+      papers: [], // stream already delivered; cache empty or skip
+      source: 'stream',
+      count: emitted,
+      searchTime: Date.now() - startTime
+    };
+    try { await this.cacheResult(cacheKey, combined); } catch {}
+
+    return { count: emitted };
+  }
+
+  /**
+   * Search OpenAIRE API (minimal). If API shape changes, safely returns [].
+   */
+  private async searchOpenAIRE(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const url = new URL('https://api.openaire.eu/search/publications');
+      url.searchParams.set('title', query);
+      url.searchParams.set('size', Math.min(50, Math.max(10, limit)).toString());
+      url.searchParams.set('format', 'json');
+
+      const response = await fetch(url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
+        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
+      });
+      if (!response.ok) throw new Error(`OpenAIRE API error: ${response.status}`);
+
+      const data = await response.json().catch(() => null);
+      const records = (data?.response?.results?.result || []) as any[];
+
+      return records.map((r: any) => {
+        const md = r?.metadata || r?.result?.metadata || {};
+        const title = md?.title?.value || md?.title || 'No title';
+        const authors = Array.isArray(md?.creator)
+          ? md.creator.map((c: any) => c?.name || c).filter(Boolean)
+          : [];
+        const abstract = md?.description?.value || md?.description || '';
+        const year = (md?.dateofacceptance || md?.date || '').toString().slice(0, 4);
+        const doi = md?.doi || md?.identifier?.find?.((id: any) => (id?.value || '').startsWith('10.'))?.value;
+        const url = md?.identifier?.find?.((id: any) => (id?.value || '').startsWith('http'))?.value || '';
+        return {
+          id: doi || url || title,
+          title,
+          authors,
+          abstract,
+          year,
+          journal: md?.source || md?.publisher || 'OpenAIRE',
+          url: doi ? `https://doi.org/${doi}` : url,
+          citations: 0,
+          source: 'openaire',
+          doi
+        } as Paper;
+      });
+    } catch (error) {
+      console.warn('OpenAIRE search failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Search DOAJ API (open access journals)
+   */
+  private async searchDOAJ(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const url = new URL('https://doaj.org/api/v2/search/articles/' + encodeURIComponent(query));
+      url.searchParams.set('pageSize', Math.min(50, Math.max(10, limit)).toString());
+
+      const response = await fetch(url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
+        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
+      });
+      if (!response.ok) throw new Error(`DOAJ API error: ${response.status}`);
+
+      const data = await response.json();
+      const results = (data?.results || []) as any[];
+      return results.map((item: any) => {
+        const b = item?.bibjson || {};
+        const title = b.title || 'No title';
+        const authors = (b.author || []).map((a: any) => `${a.name || ''}`.trim()).filter(Boolean);
+        const abstract = b.abstract || '';
+        const year = (b.year || '').toString();
+        const doi = (b.identifier || []).find((id: any) => id.type === 'doi')?.id;
+        const url = b.link?.find?.((l: any) => l.type === 'fulltext')?.url || (doi ? `https://doi.org/${doi}` : '');
+        const journal = b.journal?.title || b.journal || 'DOAJ';
+        return {
+          id: doi || url || title,
+          title,
+          authors,
+          abstract,
+          year,
+          journal,
+          url,
+          citations: 0,
+          source: 'doaj',
+          doi
+        } as Paper;
+      });
+    } catch (error) {
+      console.warn('DOAJ search failed:', error);
+      return [];
+    }
   }
 
   /**
@@ -501,6 +662,376 @@ export class LiteratureSearchService {
     return new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Request timeout')), ms);
     });
+  }
+
+  /**
+   * Parse simple Google-style operators from the query.
+   * Supports: site:example.com and filetype:pdf
+   */
+  private parseQueryOperators(raw: string): { cleaned: string; site?: string; filetype?: string } {
+    const parts = (raw || '').split(/\s+/).filter(Boolean);
+    let site: string | undefined;
+    let filetype: string | undefined;
+    const rest: string[] = [];
+    for (const p of parts) {
+      const low = p.toLowerCase();
+      if (low.startsWith('site:')) {
+        site = p.slice(5);
+      } else if (low.startsWith('filetype:')) {
+        filetype = p.slice(9);
+      } else {
+        rest.push(p);
+      }
+    }
+    return { cleaned: rest.join(' ').trim(), site, filetype };
+  }
+
+  /**
+   * Resolve various seed formats to an OpenAlex work ID (e.g., W2741809807)
+   */
+  private async resolveOpenAlexWorkId(seed: string): Promise<string | null> {
+    try {
+      const s = seed.trim();
+      // Already an OpenAlex URL or ID
+      const wMatch = s.match(/(?:openalex\.org\/)?(W\d+)/i);
+      if (wMatch) return wMatch[1].toUpperCase();
+
+      // DOI URL -> DOI
+      const doiFromUrl = s.match(/doi\.org\/(10\.[^\s\/]+\/[^\s]+)$/i)?.[1];
+      const doi = doiFromUrl || (s.startsWith('10.') ? s : '');
+      if (doi) {
+        const url = new URL('https://api.openalex.org/works');
+        url.searchParams.set('filter', `doi:${encodeURIComponent(doi)}`);
+        url.searchParams.set('per-page', '1');
+        url.searchParams.set('mailto', 'research@example.com');
+        const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+        const data = await resp.json().catch(() => null);
+        const id = data?.results?.[0]?.id as string | undefined;
+        const idMatch = id?.match(/openalex\.org\/(W\d+)/i)?.[1];
+        if (idMatch) return idMatch.toUpperCase();
+      }
+
+      // Fallback: treat seed as a title; search and pick first
+      const url = new URL('https://api.openalex.org/works');
+      url.searchParams.set('search', s);
+      url.searchParams.set('per-page', '1');
+      url.searchParams.set('mailto', 'research@example.com');
+      const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      const data = await resp.json().catch(() => null);
+      const id = data?.results?.[0]?.id as string | undefined;
+      const idMatch = id?.match(/openalex\.org\/(W\d+)/i)?.[1];
+      return idMatch ? idMatch.toUpperCase() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * OpenAlex forward citations: works that cite the seed work.
+   */
+  async searchOpenAlexCitationsForward(seed: string, limit: number): Promise<Paper[]> {
+    try {
+      const workId = await this.resolveOpenAlexWorkId(seed);
+      if (!workId) return [];
+      const url = new URL('https://api.openalex.org/works');
+      url.searchParams.set('filter', `cites:${workId}`);
+      url.searchParams.set('per-page', Math.min(50, Math.max(10, limit)).toString());
+      url.searchParams.set('mailto', 'research@example.com');
+      const response = await fetch(url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
+        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
+      });
+      if (!response.ok) throw new Error(`OpenAlex citations (forward) error: ${response.status}`);
+      const data = await response.json();
+      return (data?.results || []).map((work: OpenAlexWork) => ({
+        id: work.id || '',
+        title: work.title || 'No title',
+        authors: work.authorships?.map(a => a.author?.display_name).filter(Boolean) || [],
+        abstract: this.reconstructAbstract(work.abstract_inverted_index) || '',
+        year: work.publication_year?.toString() || '',
+        journal: work.primary_location?.source?.display_name || 'Unknown',
+        url: work.doi || work.id || '',
+        citations: work.cited_by_count || 0,
+        source: 'openalex-forward',
+        doi: work.doi
+      }));
+    } catch (e) {
+      console.warn('OpenAlex forward citations failed:', e);
+      return [];
+    }
+  }
+
+  /**
+   * OpenAlex backward citations: references of the seed work.
+   */
+  async searchOpenAlexCitationsBackward(seed: string, limit: number): Promise<Paper[]> {
+    try {
+      const workId = await this.resolveOpenAlexWorkId(seed);
+      if (!workId) return [];
+      // Fetch the seed work to get referenced_works list
+      const workUrl = new URL(`https://api.openalex.org/works/${workId}`);
+      workUrl.searchParams.set('mailto', 'research@example.com');
+      const workResp = await fetch(workUrl.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      if (!workResp.ok) throw new Error(`OpenAlex work fetch error: ${workResp.status}`);
+      const workJson: any = await workResp.json().catch(() => null);
+      const refs: string[] = Array.isArray(workJson?.referenced_works) ? workJson.referenced_works : [];
+      if (refs.length === 0) return [];
+      const ids = refs.slice(0, Math.min(limit, 50))
+        .map((u: string) => u.match(/openalex\.org\/(W\d+)/i)?.[1])
+        .filter(Boolean)
+        .join('|');
+      if (!ids) return [];
+      const url = new URL('https://api.openalex.org/works');
+      url.searchParams.set('filter', `ids:${ids}`);
+      url.searchParams.set('per-page', Math.min(50, Math.max(10, limit)).toString());
+      url.searchParams.set('mailto', 'research@example.com');
+      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      if (!response.ok) throw new Error(`OpenAlex citations (backward) error: ${response.status}`);
+      const data = await response.json();
+      return (data?.results || []).map((w: OpenAlexWork) => ({
+        id: w.id || '',
+        title: w.title || 'No title',
+        authors: w.authorships?.map(a => a.author?.display_name).filter(Boolean) || [],
+        abstract: this.reconstructAbstract(w.abstract_inverted_index) || '',
+        year: w.publication_year?.toString() || '',
+        journal: w.primary_location?.source?.display_name || 'Unknown',
+        url: w.doi || w.id || '',
+        citations: w.cited_by_count || 0,
+        source: 'openalex-backward',
+        doi: w.doi
+      }));
+    } catch (e) {
+      console.warn('OpenAlex backward citations failed:', e);
+      return [];
+    }
+  }
+
+  /**
+   * CORE search (requires CORE_API_KEY). Returns [] if unavailable.
+   */
+  private async searchCORE(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const apiKey = process.env.CORE_API_KEY;
+      if (!apiKey) return [];
+      const url = new URL('https://api.core.ac.uk/v3/search/works');
+      url.searchParams.set('q', query);
+      url.searchParams.set('limit', Math.min(50, Math.max(10, limit)).toString());
+      const response = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
+      });
+      if (!response.ok) throw new Error(`CORE API error: ${response.status}`);
+      const data = await response.json();
+      const results = Array.isArray(data?.results) ? data.results : [];
+      return results.map((item: any) => {
+        const title = item?.title || 'No title';
+        const authors: string[] = (item?.authors || []).map((a: any) => a?.name || '').filter(Boolean);
+        const abstract = item?.abstract || '';
+        const year = (item?.year || '').toString();
+        const doi: string | undefined = item?.doi;
+        const url = doi ? `https://doi.org/${doi}` : (item?.downloadUrl || item?.urls?.[0] || '');
+        const citations = Number(item?.citations || 0) || 0;
+        return {
+          id: doi || url || title,
+          title,
+          authors,
+          abstract,
+          year,
+          journal: item?.publisher || 'CORE',
+          url,
+          citations,
+          source: 'core',
+          doi
+        } as Paper;
+      });
+    } catch (e) {
+      console.warn('CORE search failed:', e);
+      return [];
+    }
+  }
+
+  /**
+   * PubMed search via NCBI E-utilities (ESearch + ESummary)
+   */
+  private async searchPubMed(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+      // ESearch to get IDs
+      const esearch = new URL(`${base}/esearch.fcgi`);
+      esearch.searchParams.set('db', 'pubmed');
+      esearch.searchParams.set('term', query);
+      esearch.searchParams.set('retmode', 'json');
+      esearch.searchParams.set('retmax', Math.min(50, Math.max(10, limit)).toString());
+      const esResp = await fetch(esearch.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      if (!esResp.ok) throw new Error(`PubMed ESearch error: ${esResp.status}`);
+      const esJson: any = await esResp.json().catch(() => null);
+      const ids: string[] = esJson?.esearchresult?.idlist || [];
+      if (!ids.length) return [];
+      // ESummary to fetch details
+      const esum = new URL(`${base}/esummary.fcgi`);
+      esum.searchParams.set('db', 'pubmed');
+      esum.searchParams.set('id', ids.slice(0, Math.min(limit, 50)).join(','));
+      esum.searchParams.set('retmode', 'json');
+      const sumResp = await fetch(esum.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      if (!sumResp.ok) throw new Error(`PubMed ESummary error: ${sumResp.status}`);
+      const sumJson: any = await sumResp.json().catch(() => null);
+      const result: Paper[] = [];
+      const uidList: string[] = sumJson?.result?.uids || [];
+      for (const uid of uidList) {
+        const it = sumJson.result[uid];
+        if (!it) continue;
+        const title = it?.title || 'No title';
+        const authors: string[] = (it?.authors || []).map((a: any) => [a?.name, a?.authtype].filter(Boolean).join(' ')).filter(Boolean);
+        const year = (it?.pubdate || '').toString().slice(0, 4);
+        const journal = it?.fulljournalname || it?.source || 'PubMed';
+        const url = it?.elocationid?.startsWith('10.') ? `https://doi.org/${it.elocationid}` : `https://pubmed.ncbi.nlm.nih.gov/${uid}/`;
+        const doi = it?.elocationid?.startsWith('10.') ? it.elocationid : undefined;
+        result.push({
+          id: doi || url || title,
+          title,
+          authors,
+          abstract: '',
+          year,
+          journal,
+          url,
+          citations: 0,
+          source: 'pubmed',
+          doi
+        });
+      }
+      return result;
+    } catch (e) {
+      console.warn('PubMed search failed:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Google Scholar (best-effort HTML parsing). No API key. Subject to blocking; returns [] on failure.
+   */
+  private async searchGoogleScholarLite(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const { cleaned, site, filetype } = this.parseQueryOperators(query);
+      let q = cleaned;
+      if (site) q += ` site:${site}`;
+      if (filetype) q += ` filetype:${filetype}`;
+      const url = new URL('https://scholar.google.com/scholar');
+      url.searchParams.set('q', q);
+      url.searchParams.set('hl', 'en');
+      const resp = await fetch(url.toString(), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' },
+        signal: AbortSignal.timeout(Math.min(this.REQUEST_TIMEOUT, 4000))
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      const html = await resp.text();
+      const results: Paper[] = [];
+      const re = /<h3 class=\"gs_rt\">[\s\S]*?<a href=\"([^\"]+)\"[\s\S]*?>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html)) && results.length < limit) {
+        const href = m[1];
+        const title = m[2].replace(/<[^>]+>/g, '').trim();
+        if (!title) continue;
+        results.push({
+          id: href || title,
+          title,
+          authors: [],
+          abstract: '',
+          year: '',
+          journal: 'Google Scholar',
+          url: href,
+          citations: 0,
+          source: 'scholar'
+        });
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Shodhganga (DSpace) search via simple-search HTML. No API key.
+   */
+  private async searchShodhganga(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const { cleaned } = this.parseQueryOperators(query);
+      const url = new URL('https://shodhganga.inflibnet.ac.in/simple-search');
+      url.searchParams.set('query', cleaned);
+      const resp = await fetch(url.toString(), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' },
+        signal: AbortSignal.timeout(Math.min(this.REQUEST_TIMEOUT, 5000))
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      const html = await resp.text();
+      const results: Paper[] = [];
+      const re = /<a[^>]*class=\"ds-artifact-title\"[^>]*href=\"([^\"]+)\"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html)) && results.length < limit) {
+        const path = m[1];
+        const title = m[2].replace(/<[^>]+>/g, '').trim();
+        const href = path.startsWith('http') ? path : `https://shodhganga.inflibnet.ac.in${path}`;
+        results.push({
+          id: href || title,
+          title: title || 'Shodhganga Result',
+          authors: [],
+          abstract: '',
+          year: '',
+          journal: 'Shodhganga',
+          url: href,
+          citations: 0,
+          source: 'shodhganga'
+        });
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * JSTOR basic search (HTML). Often gated; return [] if blocked.
+   */
+  private async searchJSTORLite(query: string, limit: number): Promise<Paper[]> {
+    try {
+      const { cleaned } = this.parseQueryOperators(query);
+      const url = new URL('https://www.jstor.org/action/doBasicSearch');
+      url.searchParams.set('Query', cleaned);
+      const resp = await fetch(url.toString(), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' },
+        signal: AbortSignal.timeout(Math.min(this.REQUEST_TIMEOUT, 4000))
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      const html = await resp.text();
+      const results: Paper[] = [];
+      const re = /<a[^>]*class=\"title\"[^>]*href=\"([^\"]+)\"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(html)) && results.length < limit) {
+        const path = m[1];
+        const href = path.startsWith('http') ? path : `https://www.jstor.org${path}`;
+        const title = m[2].replace(/<[^>]+>/g, '').trim();
+        results.push({
+          id: href || title,
+          title: title || 'JSTOR Result',
+          authors: [],
+          abstract: '',
+          year: '',
+          journal: 'JSTOR',
+          url: href,
+          citations: 0,
+          source: 'jstor'
+        });
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Microsoft Academic has been discontinued; use OpenAlex under an alias.
+   */
+  private async searchMicrosoftAcademic(query: string, limit: number): Promise<Paper[]> {
+    return this.searchOpenAlex(query, limit);
   }
 
   /**

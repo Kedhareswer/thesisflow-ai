@@ -25,12 +25,22 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('query');
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
     const userId = searchParams.get('userId'); // Optional for authenticated requests
+    const mode = (searchParams.get('mode') || '').toLowerCase(); // forward | backward
+    const seed = searchParams.get('seed') || '';
 
-    // Validate query
-    if (!query || query.trim().length < 3) {
+    // Validate inputs: allow citation mode without query if seed is provided
+    const isCitationMode = mode === 'forward' || mode === 'backward';
+    if (!isCitationMode && (!query || query.trim().length < 3)) {
       return NextResponse.json({
         success: false,
         error: 'Query must be at least 3 characters long',
+        papers: []
+      }, { status: 400 });
+    }
+    if (isCitationMode && !seed) {
+      return NextResponse.json({
+        success: false,
+        error: 'Citation search requires a seed (DOI, title, or OpenAlex ID)',
         papers: []
       }, { status: 400 });
     }
@@ -60,12 +70,26 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Perform literature search
-    const result = await literatureSearch.searchPapers(query.trim(), limit);
+    // Perform search (standard or citation)
+    let result: any;
+    if (isCitationMode) {
+      const papers = mode === 'forward'
+        ? await literatureSearch.searchOpenAlexCitationsForward(seed, limit)
+        : await literatureSearch.searchOpenAlexCitationsBackward(seed, limit);
+      result = {
+        success: true,
+        papers,
+        source: mode === 'forward' ? 'openalex-forward' : 'openalex-backward',
+        count: papers.length,
+        searchTime: Date.now() - startTime
+      };
+    } else {
+      result = await literatureSearch.searchPapers(query!.trim(), limit);
+    }
 
     // Track usage
     if (userId) {
-      await trackUsage(userId, query, result);
+      await trackUsage(userId, isCitationMode ? `${mode}:${seed}` : (query as string), result);
     }
 
     // Add rate limit info to response
@@ -104,13 +128,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, limit = 10, userId } = body;
+    const { query, limit = 10, userId, mode: rawMode, seed = '' } = body;
+    const mode: string = (rawMode || '').toLowerCase();
+    const isCitationMode = mode === 'forward' || mode === 'backward';
 
     // Validate input
-    if (!query || typeof query !== 'string' || query.trim().length < 3) {
+    if (!isCitationMode && (!query || typeof query !== 'string' || query.trim().length < 3)) {
       return NextResponse.json({
         success: false,
         error: 'Valid query is required (minimum 3 characters)',
+        papers: []
+      }, { status: 400 });
+    }
+    if (isCitationMode && !seed) {
+      return NextResponse.json({
+        success: false,
+        error: 'Citation search requires a seed (DOI, title, or OpenAlex ID)',
         papers: []
       }, { status: 400 });
     }
@@ -133,11 +166,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Perform search
-    const result = await literatureSearch.searchPapers(query.trim(), Math.min(limit, 50));
+    let result: any;
+    if (isCitationMode) {
+      const papers = mode === 'forward'
+        ? await literatureSearch.searchOpenAlexCitationsForward(seed, Math.min(limit, 50))
+        : await literatureSearch.searchOpenAlexCitationsBackward(seed, Math.min(limit, 50));
+      result = {
+        success: true,
+        papers,
+        source: mode === 'forward' ? 'openalex-forward' : 'openalex-backward',
+        count: papers.length,
+        searchTime: 0
+      };
+    } else {
+      result = await literatureSearch.searchPapers(query.trim(), Math.min(limit, 50));
+    }
 
     // Track usage
     if (userId) {
-      await trackUsage(userId, query, result);
+      await trackUsage(userId, isCitationMode ? `${mode}:${seed}` : query, result);
     }
 
     return NextResponse.json({
