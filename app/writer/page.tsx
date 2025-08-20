@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   Edit,
@@ -71,6 +71,8 @@ export default function WriterPage() {
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
   const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
+  // Ref for hidden file input used for import
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
   const [humanizedText, setHumanizedText] = useState("")
@@ -294,37 +296,22 @@ export default function WriterPage() {
     }
   }
 
-  // Command menu handlers
-  const handleSaveDocument = () => {
-    // Trigger save
-    setSaving(true)
-    // Save logic would be implemented here
-    setTimeout(() => setSaving(false), 1000)
-  }
-
-  const handleExportDocument = () => {
-    toast({
-      title: "Export",
-      description: "Export functionality coming soon!",
-    })
-  }
-
   const handleImportDocument = () => {
-    toast({
-      title: "Import",
-      description: "Import functionality coming soon!",
-    })
+    fileInputRef.current?.click()
   }
 
-  const handleShareDocument = () => {
-    toast({
-      title: "Share",
-      description: "Share functionality coming soon!",
-    })
-  }
-
-  const handleToggleAiAssistant = () => {
-    setIsAiAssistantOpen(!isAiAssistantOpen)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = reader.result as string
+      setDocumentContent(text)
+      toast({ title: "Import successful", description: `Loaded content from ${file.name}` })
+    }
+    reader.onerror = () => toast({ title: "Import failed", description: "Could not read file", variant: "destructive" })
+    reader.readAsText(file)
+    e.target.value = ""
   }
 
   const handleToggleCitationManager = () => {
@@ -337,6 +324,60 @@ export default function WriterPage() {
 
   const handleToggleHumanize = () => {
     setIsHumanizeOpen(!isHumanizeOpen)
+  }
+
+  // Command menu handlers
+  const handleShareDocument = () => {
+    setIsShareOpen(true)
+  }
+  const handleSaveDocument = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save your document.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSaving(true)
+    try {
+      const savedDoc = await DocumentService.getInstance().saveDocumentFromWriter(
+        debouncedDocumentTitle || "Untitled document",
+        debouncedDocumentContent,
+        "paper"
+      )
+      setDocument(savedDoc)
+      toast({
+        title: "Document saved",
+        description: "Your changes have been successfully saved.",
+      })
+    } catch (err) {
+      handleError(err, "Failed to save document")
+    } finally {
+      setSaving(false)
+    }
+  }
+  const handleExportDocument = async () => {
+    if (!document?.id) {
+      toast({ title: "No document", description: "Please save the document before exporting.", variant: "destructive" })
+      return
+    }
+    try {
+      toast({ title: "Exporting…", description: "Preparing download…" })
+      const blob = await DocumentService.getInstance().exportDocument(document.id, "markdown")
+      const url = URL.createObjectURL(blob)
+      const link = window.document.createElement("a")
+      link.href = url
+      link.download = `${document.title || "document"}.md`
+      window.document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast({ title: "Export complete", description: "Markdown file downloaded." })
+    } catch (err) {
+      handleError(err, "Failed to export document")
+    }
   }
 
   // Formatting handlers
@@ -976,6 +1017,14 @@ export default function WriterPage() {
         onOpenChange={setIsShareOpen}
         documentId={document?.id}
         documentTitle={documentTitle}
+      />
+      {/* Hidden file input for import */}
+      <input
+        type="file"
+        accept=".md,.txt,.markdown"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
       />
     </TooltipProvider>
   )
