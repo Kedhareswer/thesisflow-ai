@@ -45,6 +45,7 @@
     "@radix-ui/react-tooltip": "latest",
     "@radix-ui/react-visually-hidden": "^1.2.3",
     "@remix-run/react": "latest",
+    "@sentry/nextjs": "^10.5.0",
     "@stripe/react-stripe-js": "^3.9.0",
     "@stripe/stripe-js": "^7.8.0",
     "@supabase/supabase-js": "latest",
