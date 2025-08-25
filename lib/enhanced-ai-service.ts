@@ -60,48 +60,33 @@ class EnhancedAIService {
   })
 
   async loadUserApiKeys(userId?: string): Promise<UserApiKey[]> {
-    // Handle anonymous users (userId is 'anonymous' or undefined)
-    if (!userId || userId === 'anonymous') {
+    // Helper to read default keys from env (server-only, gated by ALLOW_ANONYMOUS_AI)
+    const readDefaultKeys = (): UserApiKey[] => {
+      // Never expose provider keys on the client
+      if (typeof window !== "undefined") {
+        return []
+      }
+      // Require explicit opt-in for anonymous usage
+      if (process.env.ALLOW_ANONYMOUS_AI !== "true") {
+        return []
+      }
+      const keys: UserApiKey[] = []
+      const groq = process.env.GROQ_API_KEY
+      const openai = process.env.OPENAI_API_KEY
+      const anthropic = process.env.ANTHROPIC_API_KEY
+      const gemini = process.env.GEMINI_API_KEY
+
+      if (groq) keys.push({ provider: "groq", decrypted_key: groq, is_active: true, test_status: "valid" })
+      if (openai) keys.push({ provider: "openai", decrypted_key: openai, is_active: true, test_status: "valid" })
+      if (anthropic) keys.push({ provider: "anthropic", decrypted_key: anthropic, is_active: true, test_status: "valid" })
+      if (gemini) keys.push({ provider: "gemini", decrypted_key: gemini, is_active: true, test_status: "valid" })
+      return keys
+    }
+
+    // Handle explicit anonymous users only
+    if (userId === 'anonymous') {
       console.log("Enhanced AI Service: Loading default API keys for anonymous user")
-      const defaultKeys: UserApiKey[] = []
-      
-      if (process.env.GROQ_API_KEY) {
-        defaultKeys.push({
-          provider: "groq",
-          decrypted_key: process.env.GROQ_API_KEY,
-          is_active: true,
-          test_status: "valid"
-        })
-      }
-      
-      if (process.env.OPENAI_API_KEY) {
-        defaultKeys.push({
-          provider: "openai",
-          decrypted_key: process.env.OPENAI_API_KEY,
-          is_active: true,
-          test_status: "valid"
-        })
-      }
-      
-      if (process.env.ANTHROPIC_API_KEY) {
-        defaultKeys.push({
-          provider: "anthropic",
-          decrypted_key: process.env.ANTHROPIC_API_KEY,
-          is_active: true,
-          test_status: "valid"
-        })
-      }
-      
-      if (process.env.GEMINI_API_KEY) {
-        defaultKeys.push({
-          provider: "gemini",
-          decrypted_key: process.env.GEMINI_API_KEY,
-          is_active: true,
-          test_status: "valid"
-        })
-      }
-      
-      return defaultKeys
+      return readDefaultKeys()
     }
 
     // If userId is provided, use admin client (server-side)
@@ -145,7 +130,7 @@ class EnhancedAIService {
       }
 
       if (!session) {
-        console.log("Enhanced AI Service: No active session found")
+        console.log("Enhanced AI Service: No active session found; skipping env fallback to preserve plan limits")
         return []
       }
 
@@ -184,7 +169,7 @@ class EnhancedAIService {
         providers: data.apiKeys?.map((key: UserApiKey) => key.provider) || [],
       })
 
-      if (!data.success) {
+      if (data.success === false) {
         console.error("Enhanced AI Service: API returned error:", data.error)
         return []
       }
