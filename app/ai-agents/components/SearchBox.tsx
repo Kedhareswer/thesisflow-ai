@@ -12,8 +12,6 @@ const wantTemplates: Record<string, string> = {
   search_papers: "Search research papers on __________",
   write_report: "Write a report on __________",
   review_literature: "Review literature on __________",
-  analyse_data: "Analyse data on __________",
-  find_grants: "Find grants for __________",
   extract_data: "Extract data from __________",
   review_writing: "Review my writing about __________",
   search_patents: "Search patents related to __________",
@@ -35,10 +33,8 @@ const makeLabels: Record<string, string> = {
   latex_manuscript: "a LaTeX manuscript",
   data_visualisation: "a Data visualisation",
   ppt_presentation: "a PPT presentation",
-  latex_poster: "a LaTeX poster",
   word_document: "a Word document",
   pdf_report: "a PDF report",
-  interactive_app: "an Interactive app",
 }
 
 function composeSuffix(use: string[], make: string[]) {
@@ -208,9 +204,9 @@ export default function SearchBox({
         />
 
         {/* bottom bar */}
-        <div className="mt-2 grid grid-cols-3 items-center gap-2 rounded-md border-t border-gray-100 px-2 py-2">
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">
           {/* left: paperclip */}
-          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50 justify-self-start" title="Attach files">
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50" title="Attach files">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 11-8.49-8.49l9.19-9.19a4 4 0 115.66 5.66L9.88 17.94a2 2 0 11-2.83-2.83l8.49-8.49" />
             </svg>
@@ -219,7 +215,7 @@ export default function SearchBox({
           {/* center-left: Deep Search pill */}
           <button
             onClick={toggleDeep}
-            className={`ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors justify-self-center ${
+            className={`ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors ${
               deepOn ? "border-orange-500 bg-orange-50 text-orange-700" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
             }`}
             title="Deep Review"
@@ -231,7 +227,7 @@ export default function SearchBox({
           {/* right: submit */}
           <button
             onClick={onSubmit}
-            className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-500 hover:to-orange-700 justify-self-end"
+            className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-500 hover:to-orange-700"
           >
             Submit
           </button>

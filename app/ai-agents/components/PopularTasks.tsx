@@ -14,14 +14,14 @@ export default function PopularTasks({ onPick }: PopularTasksProps) {
   ]
 
   return (
-    <section className="mx-auto w-full max-w-4xl px-4 text-center">
+    <section className="mx-auto w-full max-w-4xl px-4">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-600">Popular Tasks</h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 justify-items-center">
+      <div className="grid gap-3 sm:grid-cols-2">
         {examples.map((ex, idx) => (
           <button
             key={idx}
             onClick={() => onPick(ex.want, ex.subject, ex.use, ex.make)}
-            className="w-full rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm hover:shadow"
+            className="rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm hover:shadow"
           >
             <div className="text-sm text-gray-500">Example</div>
             <div className="mt-1 font-medium text-gray-800">{ex.want.replace(/_/g, " ")}</div>
