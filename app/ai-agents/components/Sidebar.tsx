@@ -4,6 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus } from "lucide-react"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 type SidebarProps = {
   collapsed: boolean
@@ -24,6 +25,7 @@ const navItems = [
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
+  const { user, isLoading } = useSupabaseAuth()
 
   return (
     <aside
@@ -32,11 +34,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       }`}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 px-3 py-3">
-        <div className="h-7 w-7 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 text-white grid place-items-center font-semibold">T</div>
-        {!collapsed && (
-          <span className="text-sm font-semibold text-gray-800">ThesisFlow-AI</span>
-        )}
+      <div className="flex items-center px-3 py-3">
         <button
           aria-label="Toggle sidebar"
           onClick={onToggle}
@@ -98,8 +96,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* Bottom card - hide entirely when collapsed */}
-      {!collapsed && (
+      {/* Bottom card - show only when not collapsed AND unauthenticated */}
+      {!collapsed && !isLoading && !user && (
         <div className="mt-4 px-3 pb-6">
           <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
             <div className="mb-2 flex items-center gap-2 text-sm text-yellow-800">
