@@ -195,7 +195,16 @@ export default function BuilderPage() {
     let ignore = false
     ;(async () => {
       try {
-        const res = await fetch("/api/ai/providers", { method: "GET" })
+        // Attach Authorization header using Supabase session if available
+        let headers: Record<string, string> = {}
+        try {
+          const { supabase } = await import("@/integrations/supabase/client")
+          const sess = await supabase.auth.getSession()
+          const token = sess.data.session?.access_token
+          if (token) headers["Authorization"] = `Bearer ${token}`
+        } catch {}
+
+        const res = await fetch("/api/ai/providers", { method: "GET", headers })
         if (!res.ok) throw new Error("failed")
         const data = await res.json()
         if (!ignore && data?.providers) {
@@ -261,9 +270,18 @@ export default function BuilderPage() {
     setError(null)
     try {
       const prompt = buildPrompt({ query, make, want, use })
+      // Include Supabase access token in Authorization header
+      let headers: Record<string, string> = { "Content-Type": "application/json" }
+      try {
+        const { supabase } = await import("@/integrations/supabase/client")
+        const sess = await supabase.auth.getSession()
+        const token = sess.data.session?.access_token
+        if (token) headers["Authorization"] = `Bearer ${token}`
+      } catch {}
+
       const res = await fetch("/api/ai/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ prompt, maxTokens: 1500, temperature: 0.4, provider, model }),
       })
       if (res.status === 401) {

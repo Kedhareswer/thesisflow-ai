@@ -64,6 +64,51 @@ export default function ChatPage() {
     isStreaming,
   } = useDeepSearch()
 
+  // Simple chat generation state (when Deep Search is off)
+  const [simpleLoading, setSimpleLoading] = React.useState(false)
+  const [simpleError, setSimpleError] = React.useState<string | null>(null)
+  const [simpleContent, setSimpleContent] = React.useState<string | null>(null)
+  const [simpleProvider, setSimpleProvider] = React.useState<AIProvider | undefined>(undefined)
+  const [simpleModel, setSimpleModel] = React.useState<string | undefined>(undefined)
+
+  const generateSimple = React.useCallback(async (prompt: string) => {
+    setSimpleLoading(true)
+    setSimpleError(null)
+    setSimpleContent(null)
+    setSimpleProvider(undefined)
+    setSimpleModel(undefined)
+    try {
+      let headers: Record<string, string> = { "Content-Type": "application/json" }
+      try {
+        const { supabase } = await import("@/integrations/supabase/client")
+        const sess = await supabase.auth.getSession()
+        const token = sess.data.session?.access_token
+        if (token) headers["Authorization"] = `Bearer ${token}`
+      } catch {}
+
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ prompt, maxTokens: 1800, temperature: 0.7, provider: providerParam, model: modelParam }),
+      })
+      if (res.status === 401) {
+        setSimpleError("Please sign in to use AI chat.")
+        return
+      }
+      const data = await res.json()
+      if (!data.success) {
+        throw new Error(data.error || "Generation failed")
+      }
+      setSimpleContent(data.content || data.response || "")
+      setSimpleProvider((data.provider || providerParam) as AIProvider | undefined)
+      setSimpleModel((data.model || modelParam) as string | undefined)
+    } catch (e: any) {
+      setSimpleError(e?.message || "Something went wrong")
+    } finally {
+      setSimpleLoading(false)
+    }
+  }, [modelParam, providerParam])
+
   const onSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim()) return
@@ -71,9 +116,9 @@ export default function ChatPage() {
       try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: true }) } catch {}
       start({ query: input, provider: providerParam, model: modelParam, limit: 20 })
     } else {
-      // fallback: no deep search
-      console.log("Submit query:", input)
+      // Non-deep: call simple generation using authorized user's providers with fallback
       try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: false }) } catch {}
+      generateSimple(input)
     }
   }
 
@@ -158,6 +203,48 @@ export default function ChatPage() {
               </ol>
             </div>
           </div>
+
+          {/* Simple chat response panel (when Deep Search is off) */}
+          {!deepOn && (simpleLoading || simpleError || simpleContent) && (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <h2 className="text-[18px] font-semibold leading-6 text-gray-900">Response</h2>
+                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">chat</span>
+              </div>
+
+              {simpleLoading && (
+                <div className="mb-3 flex items-center gap-2 text-sm text-gray-700">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating…
+                </div>
+              )}
+
+              {simpleError && (
+                <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{simpleError}</div>
+              )}
+
+              {simpleContent && (
+                <div className="rounded-md border border-orange-200 bg-orange-50 p-3">
+                  <div className="mb-1 text-sm font-semibold text-orange-800">Answer</div>
+                  {(simpleProvider || simpleModel || providerParam || modelParam) && (
+                    <div className="mb-2 flex flex-wrap gap-2 text-xs text-orange-800">
+                      {(simpleProvider || providerParam) && (
+                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
+                          Provider: {simpleProvider || providerParam}
+                        </span>
+                      )}
+                      {(simpleModel || modelParam) && (
+                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
+                          Model: {simpleModel || modelParam}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="prose prose-sm max-w-none text-orange-900" dangerouslySetInnerHTML={{ __html: (simpleContent || '').replace(/\n/g, '<br/>') }} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Streaming results panel */}
           {(deepOn && (isLoading || error || items.length > 0 || summary || warnings.length || notices.length)) && (
