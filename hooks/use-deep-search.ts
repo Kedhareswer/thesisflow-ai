@@ -96,7 +96,7 @@ export function useDeepSearch(options: UseDeepSearchOptions = {}) {
     })
   }, [closeCurrent])
 
-  const start = useCallback(({ query, provider, model, limit = 20 }: StartDeepSearchParams) => {
+  const start = useCallback(async ({ query, provider, model, limit = 20 }: StartDeepSearchParams) => {
     const q = (query || '').trim()
     if (q.length < 3) {
       setState((s) => ({ ...s, error: 'Query must be at least 3 characters', isLoading: false }))
@@ -128,6 +128,14 @@ export function useDeepSearch(options: UseDeepSearchOptions = {}) {
     params.set('limit', String(Math.max(5, Math.min(50, limit || 20))))
     if (provider) params.set('provider', provider)
     if (model) params.set('model', model)
+
+    // Attach access_token for SSE auth. We cannot set custom headers on EventSource
+    try {
+      const { supabase } = await import('@/integrations/supabase/client')
+      const sess = await supabase.auth.getSession()
+      const token = sess.data.session?.access_token
+      if (token) params.set('access_token', token)
+    } catch {}
 
     const url = `/api/deep-search?${params.toString()}`
     const es = new EventSource(url, { withCredentials: true })
