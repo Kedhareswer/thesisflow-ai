@@ -16,6 +16,8 @@ type Props = {
   css?: string
   onChangeHtml?: (next: string) => void
   onChangeCss?: (next: string) => void
+  // Optional: extra controls to render on the right side of the top toolbar
+  toolbarRight?: React.ReactNode
 }
 
 function useDebounced<T>(value: T, delay = 300) {
@@ -28,7 +30,7 @@ function useDebounced<T>(value: T, delay = 300) {
 }
 
 const LiveCodeWorkbench = React.forwardRef<LiveCodeWorkbenchHandle, Props>(function LiveCodeWorkbench(
-  { initialHtml = "", initialCss = "", title = "Builder", html: controlledHtml, css: controlledCss, onChangeHtml, onChangeCss }: Props,
+  { initialHtml = "", initialCss = "", title = "Builder", html: controlledHtml, css: controlledCss, onChangeHtml, onChangeCss, toolbarRight }: Props,
   ref
 ) {
   const [tab, setTab] = React.useState<"html" | "css">("html")
@@ -122,6 +124,7 @@ const LiveCodeWorkbench = React.forwardRef<LiveCodeWorkbenchHandle, Props>(funct
           <button onClick={() => setTab("css")} className={`rounded-md border px-2 py-1 ${tab === "css" ? "border-orange-500 bg-orange-50 text-orange-700" : "border-gray-200 bg-white text-gray-700"}`}>CSS</button>
         </div>
         <div className="flex items-center gap-2">
+          {toolbarRight}
           <button onClick={downloadHtml} className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Download HTML</button>
           {slideMode && (
             <>

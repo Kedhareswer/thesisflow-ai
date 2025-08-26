@@ -172,7 +172,12 @@ export function useDeepSearch(options: UseDeepSearchOptions = {}) {
           case 'progress':
             return { ...prev, progress: { message: data.message, total: data.total } }
           case 'summary':
-            return { ...prev, summary: data.content as string }
+            return {
+              ...prev,
+              summary: data.content as string,
+              provider: (data.provider as any) || prev.provider,
+              model: (data.model as string) || prev.model,
+            }
           case 'notice':
             return { ...prev, notices: [...prev.notices, data.message || ''] }
           case 'done': {

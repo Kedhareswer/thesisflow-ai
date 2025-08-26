@@ -56,6 +56,8 @@ export default function ChatPage() {
     infos,
     isLoading,
     error,
+    provider,
+    model,
     start,
     stop,
     reset,
@@ -242,6 +244,20 @@ export default function ChatPage() {
               {summary && (
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-3">
                   <div className="mb-1 text-sm font-semibold text-orange-800">Summary</div>
+                  {(provider || model || providerParam || modelParam) && (
+                    <div className="mb-2 flex flex-wrap gap-2 text-xs text-orange-800">
+                      {(provider || providerParam) && (
+                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
+                          Provider: {provider || providerParam}
+                        </span>
+                      )}
+                      {(model || modelParam) && (
+                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
+                          Model: {model || modelParam}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="prose prose-sm max-w-none text-orange-900" dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />
                 </div>
               )}

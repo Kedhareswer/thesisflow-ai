@@ -291,45 +291,12 @@ export default function BuilderPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-[#F8F9FA]">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-gray-500">Builder</div>
-            <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
-            {loadedFromAutosave && (
-              <div className="mt-0.5 text-xs text-gray-500">Loaded autosave • {loadedFromAutosave}</div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {error && <span className="text-sm text-red-600">{error}</span>}
-            {/* Provider/Model selectors */}
-            <div className="hidden md:flex items-center gap-2">
-              <select value={provider || ""} onChange={(e) => setProvider((e.target.value || undefined) as AIProvider)} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800">
-                <option value="">Provider</option>
-                {providersInfo?.map((p) => (
-                  <option key={p.provider} value={p.provider}>{p.name}</option>
-                ))}
-              </select>
-              <select value={model || ""} onChange={(e) => setModel(e.target.value || undefined)} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800">
-                <option value="">Model</option>
-                {(providersInfo?.find((p) => p.provider === provider)?.models || []).map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            {/* Slide controls (conditional) */}
-            {slideMode && (
-              <>
-                <button onClick={() => editorRef.current?.prevSlide()} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50">Prev</button>
-                <button onClick={() => editorRef.current?.nextSlide()} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50">Next</button>
-                <button onClick={() => editorRef.current?.printPreview()} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50">Export PDF</button>
-              </>
-            )}
-            <button disabled={loading} onClick={generateWithAI} className="rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60">{loading ? "Generating..." : "Generate with AI"}</button>
-            <button onClick={() => router.push("/ai-agents")} className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Back</button>
-          </div>
+      {/* Removed duplicate header for a cleaner, single-toolbar layout. Show autosave hint inline above editor if present. */}
+      {loadedFromAutosave && (
+        <div className="mx-auto w-full max-w-6xl px-4 pt-3">
+          <div className="text-xs text-gray-500">Loaded autosave • {loadedFromAutosave}</div>
         </div>
-      </header>
+      )}
 
       {/* Recent projects quick list */}
       {recent.length > 0 && (
@@ -346,7 +313,37 @@ export default function BuilderPage() {
         </div>
       )}
 
-      <LiveCodeWorkbench ref={editorRef} initialHtml={html} initialCss={css} title={title} html={htmlState} css={cssState} onChangeHtml={setHtmlState} onChangeCss={setCssState} />
+      <LiveCodeWorkbench
+        ref={editorRef}
+        initialHtml={html}
+        initialCss={css}
+        title={title}
+        html={htmlState}
+        css={cssState}
+        onChangeHtml={setHtmlState}
+        onChangeCss={setCssState}
+        toolbarRight={
+          <div className="flex items-center gap-2">
+            {error && <span className="text-sm text-red-600">{error}</span>}
+            <div className="hidden md:flex items-center gap-2">
+              <select value={provider || ""} onChange={(e) => setProvider((e.target.value || undefined) as AIProvider)} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800">
+                <option value="">Provider</option>
+                {providersInfo?.map((p) => (
+                  <option key={p.provider} value={p.provider}>{p.name}</option>
+                ))}
+              </select>
+              <select value={model || ""} onChange={(e) => setModel(e.target.value || undefined)} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800">
+                <option value="">Model</option>
+                {(providersInfo?.find((p) => p.provider === provider)?.models || []).map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <button disabled={loading} onClick={generateWithAI} className="rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60">{loading ? "Generating..." : "Generate with AI"}</button>
+            <button onClick={() => router.push("/ai-agents")} className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Back</button>
+          </div>
+        }
+      />
     </div>
   )
 }
