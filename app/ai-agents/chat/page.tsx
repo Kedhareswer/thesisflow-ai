@@ -1,14 +1,17 @@
 "use client"
 
-import React from "react"
-import { Bot, ChevronUp, Loader2, Paperclip, Image as ImageIcon, Smile } from "lucide-react"
-import { useDeepSearch } from "@/hooks/use-deep-search"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useSearchParams } from "next/navigation"
-import type { AIProvider } from "@/lib/ai-providers"
-import { addRecentChat } from "@/lib/services/recent-chats"
+import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Copy, Download, ChevronRight, CornerRightDown, PlusCircle, ListPlus, Loader2, Bot, Paperclip, Image as ImageIcon, Smile, ChevronUp } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import SearchBox from '@/app/ai-agents/components/SearchBox'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useDeepSearch } from '@/hooks/use-deep-search'
+import { AIProvider } from '@/lib/ai-providers'
+import { PlannerChat } from '../components/PlannerChat'
+import { TaskPlan } from '@/lib/services/task-planner.service'
+import { OrchestratorEvent } from '@/lib/services/task-orchestrator.service'
 
-// Helpers to derive a friendly title/tag from the query (same logic style as SearchBox)
 function stripTrailingSuffix(text: string): string {
   return text.replace(/\s+(using\s+[^.]+)?(\s+and create\s+[^.]+)?\s*\.*\s*$/i, "")
 }
@@ -42,11 +45,35 @@ function toTitleCase(input: string) {
 
 export default function ChatPage() {
   const searchParams = useSearchParams()
-  const [deepOn, setDeepOn] = React.useState(true)
-  const [input, setInput] = React.useState("")
   const startedRef = React.useRef(false)
+  const searchBoxRef = useRef<any>(null)
   const providerParam = React.useMemo(() => (searchParams?.get("provider") || undefined) as AIProvider | undefined, [searchParams])
   const modelParam = React.useMemo(() => searchParams?.get("model") || undefined, [searchParams])
+  
+  // Shared UI state
+  const [deepOn, setDeepOn] = React.useState(true)
+  const [input, setInput] = React.useState("")
+  const [isGenerating, setIsGenerating] = React.useState(false)
+  
+  // AI provider/model state
+  const [selectedProvider, setSelectedProvider] = React.useState<string>(providerParam || "")
+  const [selectedModel, setSelectedModel] = React.useState<string>(modelParam || "")
+  
+  // Simple generation state (when Deep Search is off)
+  const [simpleLoading, setSimpleLoading] = React.useState(false)
+  const [simpleError, setSimpleError] = React.useState<string | null>(null)
+  const [simpleContent, setSimpleContent] = React.useState<string | null>(null)
+  const [simpleProvider, setSimpleProvider] = React.useState<AIProvider | undefined>()
+  const [simpleModel, setSimpleModel] = React.useState<string | undefined>()
+  
+  // Planning and execution state
+  const [isPlanning, setIsPlanning] = React.useState(false)
+  const [isExecuting, setIsExecuting] = React.useState(false)
+  const [currentPlan, setCurrentPlan] = React.useState<TaskPlan | undefined>()
+  const [orchestratorEvents, setOrchestratorEvents] = React.useState<OrchestratorEvent[]>([])
+  const [showPlannerView, setShowPlannerView] = React.useState(false)
+  
+  // Deep search hook
   const {
     items,
     summary,
@@ -63,13 +90,6 @@ export default function ChatPage() {
     reset,
     isStreaming,
   } = useDeepSearch()
-
-  // Simple chat generation state (when Deep Search is off)
-  const [simpleLoading, setSimpleLoading] = React.useState(false)
-  const [simpleError, setSimpleError] = React.useState<string | null>(null)
-  const [simpleContent, setSimpleContent] = React.useState<string | null>(null)
-  const [simpleProvider, setSimpleProvider] = React.useState<AIProvider | undefined>(undefined)
-  const [simpleModel, setSimpleModel] = React.useState<string | undefined>(undefined)
 
   const generateSimple = React.useCallback(async (prompt: string) => {
     setSimpleLoading(true)
@@ -108,15 +128,133 @@ export default function ChatPage() {
       setSimpleLoading(false)
     }
   }, [modelParam, providerParam])
+  
+  const handlePlanAndExecute = async (want: string, use: string[], make: string[], subject: string, prompt: string) => {
+    setShowPlannerView(true)
+    setIsPlanning(true)
+    setOrchestratorEvents([])
+    setCurrentPlan(undefined)
+
+    try {
+      const response = await fetch('/api/ai/plan-and-execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          want,
+          use,
+          make,
+          subject,
+          prompt,
+          provider: selectedProvider,
+          model: selectedModel,
+          execute: true
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to start planning')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response stream')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') {
+              setIsPlanning(false)
+              setIsExecuting(false)
+              continue
+            }
+
+            try {
+              const event = JSON.parse(data)
+              
+              if (event.type === 'plan_created' || event.type === 'plan_refined') {
+                setCurrentPlan(event.plan)
+                setIsPlanning(false)
+                setIsExecuting(true)
+              } else if (event.type === 'validation_complete') {
+                if (currentPlan) {
+                  setCurrentPlan(prev => ({ ...prev!, validation: event.validation }))
+                }
+              } else if (['step_started', 'step_completed', 'step_failed', 'plan_completed', 'plan_failed'].includes(event.type)) {
+                setOrchestratorEvents(prev => [...prev, event])
+                
+                // Update step status in plan
+                if (event.stepId && currentPlan) {
+                  setCurrentPlan(prev => {
+                    if (!prev) return prev
+                    const updatedSteps = prev.steps.map(step => {
+                      if (step.id === event.stepId) {
+                        if (event.type === 'step_started') {
+                          return { ...step, status: 'in_progress' as const }
+                        } else if (event.type === 'step_completed') {
+                          return { ...step, status: 'completed' as const, result: event.data }
+                        } else if (event.type === 'step_failed') {
+                          return { ...step, status: 'failed' as const, error: event.data?.error }
+                        }
+                      }
+                      return step
+                    })
+                    return { ...prev, steps: updatedSteps }
+                  })
+                }
+              }
+            } catch (e) {
+              console.error('Failed to parse event:', e)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Plan and execute error:', error)
+      setIsPlanning(false)
+      setIsExecuting(false)
+    }
+  }
+  
+  const addRecentChat = (chat: any) => {
+    // Add to recent chats if service is available
+    try {
+      // Placeholder for recent chat service integration
+      console.log('Adding to recent chats:', chat)
+    } catch (e) {
+      console.error('Failed to add recent chat:', e)
+    }
+  }
 
   const onSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim()) return
+
+    // Get current SearchBox state
+    const searchBoxState = searchBoxRef.current?.getState?.()
+    const hasSelections = searchBoxState?.want || searchBoxState?.use?.length > 0 || searchBoxState?.make?.length > 0
+
+    // If there are want/use/make selections, use the planner
+    if (hasSelections) {
+      const want = searchBoxState?.want || ''
+      const use = searchBoxState?.use || []
+      const make = searchBoxState?.make || []
+      const subject = extractSubjectFromPrompt(input)
+      handlePlanAndExecute(want, use, make, subject, input)
+      return
+    }
+    
     if (deepOn) {
       try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: true }) } catch {}
       start({ query: input, provider: providerParam, model: modelParam, limit: 20 })
     } else {
-      // Non-deep: call simple generation using authorized user's providers with fallback
       try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: false }) } catch {}
       generateSimple(input)
     }
@@ -156,12 +294,35 @@ export default function ChatPage() {
     <div className="flex min-h-screen flex-col">
       {/* Top toolbar area */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
-          <h1 className="text-[15px] font-semibold text-gray-900">{topicTitle}</h1>
-          <div className="flex items-center gap-2">
-            <button className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Outputs</button>
+        {/* Planner View */}
+        {showPlannerView ? (
+          <PlannerChat
+            plan={currentPlan}
+            events={orchestratorEvents}
+            isPlanning={isPlanning}
+            isExecuting={isExecuting}
+            onSendMessage={(msg) => {
+              // Handle additional messages during execution
+              console.log('Additional message during execution:', msg)
+            }}
+            onRetryStep={(stepId) => {
+              // Implement retry logic
+              console.log('Retry step:', stepId)
+            }}
+            onCancelExecution={() => {
+              setIsExecuting(false)
+              setShowPlannerView(false)
+            }}
+            className="flex-1"
+          />
+        ) : (
+          <div className={`flex-1 flex flex-col ${deepOn ? '' : 'overflow-y-auto'} px-4 py-6`}>
+            <h1 className="text-[15px] font-semibold text-gray-900">{topicTitle}</h1>
+            <div className="flex items-center gap-2">
+              <button className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Outputs</button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Main content area */}
@@ -259,7 +420,7 @@ export default function ChatPage() {
               {isLoading && items.length === 0 && !summary && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Bot className="h-4 w-4 text-gray-600" />
+                    <Bot className="h-5 w-5 text-white" />
                     <span className="font-medium">Executing Plan...</span>
                   </div>
                   <div className="mt-3 text-[15px] leading-relaxed text-gray-800">
@@ -302,9 +463,9 @@ export default function ChatPage() {
               {/* Loading skeletons before first results */}
               {isLoading && items.length === 0 && !summary && (
                 <div className="mb-4 space-y-2">
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-4/6" />
-                  <Skeleton className="h-4 w-3/6" />
+                  <div className="h-4 w-64 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-56 bg-gray-200 rounded animate-pulse" />
                 </div>
               )}
 
@@ -404,7 +565,7 @@ export default function ChatPage() {
               {/* left accessories */}
               <div className="flex items-center gap-1 text-gray-500">
                 <button type="button" className="rounded-md p-1 hover:bg-gray-100" title="Attach">
-                  <Paperclip className="h-4 w-4" />
+                  <Paperclip className="h-4 w-4 text-gray-500" />
                 </button>
                 <button type="button" className="rounded-md p-1 hover:bg-gray-100" title="Insert image">
                   <ImageIcon className="h-4 w-4" />
@@ -440,7 +601,7 @@ export default function ChatPage() {
                   type="submit"
                   className="inline-flex items-center gap-2 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 px-3 py-2 text-sm font-semibold text-white shadow hover:from-orange-500 hover:to-orange-700"
                 >
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4 text-gray-500" />
                 </button>
               </div>
             </div>
