@@ -4,6 +4,8 @@ import React from "react"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import type { AIProvider } from "@/lib/ai-providers"
 import { useDeepSearch } from "@/hooks/use-deep-search"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Loader2, Bot } from "lucide-react"
 
 export type SelectionState = {
   want: string
@@ -106,6 +108,10 @@ function replaceSuffixKeepingBase(current: string, newSuffix: string): string {
   return baseOnly + newSuffix
 }
 
+function toTitleCase(input: string) {
+  return (input || "").replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+}
+
 export default function SearchBox({
   selection,
   setSelection,
@@ -145,6 +151,13 @@ export default function SearchBox({
     const suffix = composeSuffix(selection.use, selection.make)
     return base + suffix
   }, [selection.want, selection.use, selection.make, subject])
+
+  // Topic extraction for header/tag
+  const topicTitle = React.useMemo(() => toTitleCase(subject), [subject])
+  const topicTag = React.useMemo(() => {
+    const words = (subject || "").split(/\s+/).filter(Boolean)
+    return words.slice(0, 2).join(" ").toLowerCase() || "topic"
+  }, [subject])
 
   // Sync rules
   React.useEffect(() => {
@@ -287,27 +300,63 @@ export default function SearchBox({
       {/* Streaming results panel */}
       {(deepOn && (isLoading || error || items.length > 0 || summary || warnings.length || notices.length)) && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-medium text-gray-700">ThesisFlow-AI Deep Search</div>
-            <div className="flex items-center gap-2">
-              {isStreaming && (
-                <span className="text-xs text-orange-700">Streaming…</span>
-              )}
-              {isLoading && (
-                <button onClick={stop} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Cancel</button>
-              )}
-              {!isLoading && (items.length > 0 || summary) && (
-                <button onClick={reset} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Clear</button>
-              )}
-            </div>
+          {/* Header: Topic + Tag */}
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <h2 className="text-[18px] font-semibold leading-6 text-gray-900">{topicTitle}</h2>
+            <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">{topicTag}</span>
           </div>
 
-          {progress?.message && (
-            <div className="mb-3 text-xs text-gray-600">{progress.message}{progress.total ? ` • ${progress.total} items` : ""}</div>
+          {/* Executing Plan preamble while loading and before results */}
+          {isLoading && items.length === 0 && !summary && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <Bot className="h-4 w-4 text-gray-600" />
+                <span className="font-medium">Executing Plan...</span>
+              </div>
+              <div className="mt-3 text-[15px] leading-relaxed text-gray-800">
+                <p>I understand you're interested in deep review for <span className="font-semibold">{topicTitle}</span>. To provide the most valuable and focused assistance, here are a few quick questions to narrow down your research focus:</p>
+                <ol className="mt-3 list-decimal space-y-2 pl-5">
+                  <li><span className="font-semibold">What specific aspect</span> of this topic interests you most?</li>
+                  <li><span className="font-semibold">What's your primary goal</span> with this research (learn, build, evaluate, stay current)?</li>
+                  <li><span className="font-semibold">Which application domains</span> are most relevant to you?</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
+          {/* Agent running card */}
+          {isLoading && (
+            <div className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Agent is running...
+              </div>
+              <div className="mt-2 rounded-xl border border-gray-200 bg-white/90 p-3 text-sm text-gray-600">
+                You can step in with instructions while the task runs...
+              </div>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                {isStreaming && <span className="text-xs text-orange-700">Streaming…</span>}
+                <button onClick={stop} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-100">Cancel</button>
+              </div>
+            </div>
           )}
 
           {error && (
-            <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
+
+          {/* Progress small note */}
+          {progress?.message && (
+            <div className="mb-2 text-xs text-gray-600">{progress.message}{progress.total ? ` • ${progress.total} items` : ""}</div>
+          )}
+
+          {/* Loading skeletons before first results */}
+          {isLoading && items.length === 0 && !summary && (
+            <div className="mb-4 space-y-2">
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/6" />
+              <Skeleton className="h-4 w-3/6" />
+            </div>
           )}
 
           {items.length > 0 && (
@@ -350,6 +399,20 @@ export default function SearchBox({
               ))}
             </div>
           )}
+
+          {/* Empty state after completion with no content */}
+          {!isLoading && !error && items.length === 0 && !summary && (
+            <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              No findings yet. Try refining your topic or enabling a provider for summarization.
+            </div>
+          )}
+
+          {/* Footer controls when finished */}
+          <div className="mt-3 flex items-center justify-end gap-2">
+            {!isLoading && (items.length > 0 || summary) && (
+              <button onClick={reset} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Clear</button>
+            )}
+          </div>
         </div>
       )}
     </div>
