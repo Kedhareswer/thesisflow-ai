@@ -17,9 +17,9 @@ export default function TaskSection({ title, options, selected, onToggle, single
     Array.isArray(selected) ? selected.includes(id) : selected === id
 
   return (
-    <section className="mx-auto w-full max-w-4xl px-4">
+    <section className="mx-auto w-full max-w-4xl px-4 text-center">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-600">{title}</h3>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {options.map((opt) => (
           <button
             key={opt.id}

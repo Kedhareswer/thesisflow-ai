@@ -54,22 +54,39 @@ function composeSuffix(use: string[], make: string[]) {
   return parts.length ? " " + parts.join(" ") + "." : "."
 }
 
+// Remove any trailing " using ..." and/or " and create ..." segments (plus the trailing period)
+function stripTrailingSuffix(text: string): string {
+  // Example matches:
+  //  " ... using Google Scholar." 
+  //  " ... and create a PDF report." 
+  //  " ... using Google Scholar and create a PDF report."
+  // Also tolerates accidental extra spaces and multiple dots at the end.
+  return text.replace(/\s+(using\s+[^.]+)?(\s+and create\s+[^.]+)?\s*\.*\s*$/i, "")
+}
+
 function extractSubjectFromPrompt(prompt: string): string {
-  // Find the last occurrence of common prepositions and take the trailing part until period
+  // Work on a version without any trailing generated suffix
+  const cleaned = stripTrailingSuffix(prompt)
+  // Find the last occurrence of common prepositions and take the trailing part
   const preps = [" on ", " for ", " from ", " about ", " related to "]
   let idx = -1
   let found = ""
   for (const p of preps) {
-    const i = prompt.toLowerCase().lastIndexOf(p)
+    const i = cleaned.toLowerCase().lastIndexOf(p)
     if (i > idx) {
       idx = i
       found = p
     }
   }
   if (idx >= 0) {
-    const after = prompt.slice(idx + found.length)
-    const stop = after.indexOf(".")
-    const subject = (stop >= 0 ? after.slice(0, stop) : after).trim()
+    const after = cleaned.slice(idx + found.length)
+    // Stop at the earliest of a period or any suffix introducer (" using ", " and create ")
+    const nextUsing = after.toLowerCase().indexOf(" using ")
+    const nextCreate = after.toLowerCase().indexOf(" and create ")
+    const nextDot = after.indexOf(".")
+    const stops = [nextUsing, nextCreate, nextDot].filter((n) => n >= 0)
+    const stopAt = stops.length ? Math.min(...stops) : -1
+    const subject = (stopAt >= 0 ? after.slice(0, stopAt) : after).trim()
     return subject || "__________"
   }
   return "__________"
@@ -81,11 +98,9 @@ function buildBase(want: string, subject: string): string {
 }
 
 function replaceSuffixKeepingBase(current: string, newSuffix: string): string {
-  // Remove any existing " using ..." or " and create ..." segments at the end
-  const withoutSuffix = current.replace(/\s+(using\s+.*)?(\s+and create\s+.*)?\.?\s*$/i, "")
-  // Ensure ends without trailing period before adding new suffix
-  const base = withoutSuffix.replace(/\.+\s*$/, "")
-  return base + newSuffix
+  // Remove any trailing generated suffix and trailing periods from current
+  const baseOnly = stripTrailingSuffix(current).replace(/\.+\s*$/, "")
+  return baseOnly + newSuffix
 }
 
 export default function SearchBox({
@@ -193,9 +208,9 @@ export default function SearchBox({
         />
 
         {/* bottom bar */}
-        <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">
+        <div className="mt-2 grid grid-cols-3 items-center gap-2 rounded-md border-t border-gray-100 px-2 py-2">
           {/* left: paperclip */}
-          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50" title="Attach files">
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50 justify-self-start" title="Attach files">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 11-8.49-8.49l9.19-9.19a4 4 0 115.66 5.66L9.88 17.94a2 2 0 11-2.83-2.83l8.49-8.49" />
             </svg>
@@ -204,7 +219,7 @@ export default function SearchBox({
           {/* center-left: Deep Search pill */}
           <button
             onClick={toggleDeep}
-            className={`ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors ${
+            className={`ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors justify-self-center ${
               deepOn ? "border-orange-500 bg-orange-50 text-orange-700" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
             }`}
             title="Deep Review"
@@ -216,7 +231,7 @@ export default function SearchBox({
           {/* right: submit */}
           <button
             onClick={onSubmit}
-            className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-500 hover:to-orange-700"
+            className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-500 hover:to-orange-700 justify-self-end"
           >
             Submit
           </button>

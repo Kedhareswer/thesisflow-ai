@@ -1,11 +1,9 @@
 "use client"
 
 import React from "react"
-import Header from "./Header"
 import SearchBox, { type SelectionState } from "./SearchBox"
 import TaskSection from "./TaskSection"
 import PopularTasks from "./PopularTasks"
-import Footer from "./Footer"
 
 const wantOptions = [
   { id: "search_papers", label: "Search research papers" },
@@ -72,17 +70,15 @@ export default function MainContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
-
       <main className="flex-1">
         {/* Hero */}
-        <section className="mx-auto max-w-4xl px-4 pt-10 pb-6">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-sm text-gray-700">
+        <section className="mx-auto max-w-3xl px-4 pt-10 pb-6 text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-sm text-gray-700 mx-auto">
             <span>✨</span>
             <span>Newly Launched</span>
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Everyday Research Tasks</h1>
-          <p className="mt-2 max-w-2xl text-gray-600">
+          <p className="mt-2 max-w-2xl mx-auto text-gray-600">
             Compose, search, and build outputs for your academic work with ThesisFlow-AI.
           </p>
         </section>
@@ -93,7 +89,7 @@ export default function MainContent() {
         </section>
 
         {/* Build your task */}
-        <div className="mx-auto w-full max-w-4xl px-4 pb-3 text-sm font-semibold uppercase tracking-wider text-gray-600">
+        <div className="mx-auto w-full max-w-3xl px-4 pb-3 text-center text-sm font-semibold uppercase tracking-wider text-gray-600">
           Build your task
         </div>
 
@@ -107,8 +103,6 @@ export default function MainContent() {
           <PopularTasks onPick={onPickPopular} />
         </div>
       </main>
-
-      <Footer />
     </div>
   )
 }

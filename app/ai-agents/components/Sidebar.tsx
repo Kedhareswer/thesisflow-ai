@@ -3,6 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus } from "lucide-react"
 
 type SidebarProps = {
   collapsed: boolean
@@ -10,15 +11,15 @@ type SidebarProps = {
 }
 
 const navItems = [
-  { label: "AI Agent", href: "/ai-agents", id: "ai-agent" },
-  { label: "AI Writer", href: "/writer", id: "ai-writer" },
-  { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf" },
-  { label: "Literature Review", href: "/literature-review", id: "lit-review" },
-  { label: "Find Topics", href: "/topics", id: "find-topics" },
-  { label: "Paraphraser", href: "/paraphraser", id: "paraphraser" },
-  { label: "Citation Generator", href: "/citations", id: "citations" },
-  { label: "Extract Data", href: "/extract", id: "extract" },
-  { label: "AI Detector", href: "/ai-detector", id: "ai-detector" },
+  { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
+  { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
+  { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare },
+  { label: "Literature Review", href: "/literature-review", id: "lit-review", icon: BookOpen },
+  { label: "Find Topics", href: "/topics", id: "find-topics", icon: Search },
+  { label: "Paraphraser", href: "/paraphraser", id: "paraphraser", icon: RefreshCcw },
+  { label: "Citation Generator", href: "/citations", id: "citations", icon: Quote },
+  { label: "Extract Data", href: "/extract", id: "extract", icon: Database },
+  { label: "AI Detector", href: "/ai-detector", id: "ai-detector", icon: ShieldCheck },
 ]
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
@@ -54,32 +55,42 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       <div className="px-3 pb-3">
-        <button className="w-full rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow hover:bg-orange-600">
-          + New Chat
-        </button>
+        {collapsed ? (
+          <button
+            aria-label="New Chat"
+            title="New Chat"
+            className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-white shadow hover:bg-orange-600"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        ) : (
+          <button className="w-full rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow hover:bg-orange-600">
+            + New Chat
+          </button>
+        )}
       </div>
 
       {/* Nav */}
       <nav className="px-1">
         {navItems.map((item) => {
           const active = pathname === item.href
+          const Icon = item.icon
           return (
-            <Link key={item.id} href={item.href} className="block">
+            <Link key={item.id} href={item.href} className="block" title={item.label} aria-label={item.label}>
               <div
-                className={`relative mx-2 my-0.5 flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors ${
-                  active
-                    ? "text-orange-600 bg-orange-50"
-                    : "text-gray-700 hover:bg-gray-50"
-                }`}
+                className={`relative mx-2 my-0.5 flex items-center rounded-md py-2 text-sm transition-colors ${
+                  active ? "text-orange-600 bg-orange-50" : "text-gray-700 hover:bg-gray-50"
+                } ${collapsed ? "justify-center" : "gap-3 px-2"}`}
               >
-                {/* Left rail for active */}
-                <span
-                  className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 rounded-sm ${
-                    active ? "w-1 bg-orange-500" : "w-0"
-                  }`}
-                />
-                {/* Simple dot icon */}
-                <span className={`h-2 w-2 rounded-full ${active ? "bg-orange-500" : "bg-gray-300"}`} />
+                {/* Left rail only when expanded */}
+                {!collapsed && (
+                  <span
+                    className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 rounded-sm ${active ? "w-1 bg-orange-500" : "w-0"}`}
+                  />
+                )}
+                {/* Icon */}
+                <Icon className={`h-4 w-4 ${active ? "text-orange-600" : "text-gray-500"}`} />
+                {/* Label */}
                 <span className={`${collapsed ? "hidden" : "block"}`}>{item.label}</span>
               </div>
             </Link>
@@ -87,19 +98,21 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* Bottom card */}
-      <div className="mt-4 px-3 pb-6">
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm text-yellow-800">
-            <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
-            <span className={`${collapsed ? "hidden" : "block"}`}>Tip: Save tasks to reuse later.</span>
-          </div>
-          <div className={`flex gap-2 ${collapsed ? "hidden" : "flex"}`}>
-            <Link href="/login" className="flex-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">Login</Link>
-            <Link href="/signup" className="flex-1 rounded-md bg-orange-500 px-2 py-1.5 text-center text-xs font-medium text-white hover:bg-orange-600">Sign up</Link>
+      {/* Bottom card - hide entirely when collapsed */}
+      {!collapsed && (
+        <div className="mt-4 px-3 pb-6">
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm text-yellow-800">
+              <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+              <span>Tip: Save tasks to reuse later.</span>
+            </div>
+            <div className="flex gap-2">
+              <Link href="/login" className="flex-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">Login</Link>
+              <Link href="/signup" className="flex-1 rounded-md bg-orange-500 px-2 py-1.5 text-center text-xs font-medium text-white hover:bg-orange-600">Sign up</Link>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </aside>
   )
 }
