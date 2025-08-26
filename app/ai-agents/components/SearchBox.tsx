@@ -1,6 +1,9 @@
 "use client"
 
 import React from "react"
+import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+import type { AIProvider } from "@/lib/ai-providers"
+import { useDeepSearch } from "@/hooks/use-deep-search"
 
 export type SelectionState = {
   want: string
@@ -116,6 +119,24 @@ export default function SearchBox({
 }) {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const [userEdited, setUserEdited] = React.useState(false)
+  const [provider, setProvider] = React.useState<AIProvider | undefined>(undefined)
+  const [model, setModel] = React.useState<string | undefined>(undefined)
+
+  // Deep Search hook
+  const {
+    items,
+    summary,
+    progress,
+    warnings,
+    notices,
+    infos,
+    isLoading,
+    error,
+    start,
+    stop,
+    reset,
+    isStreaming,
+  } = useDeepSearch()
 
   // Compute composed value
   const subject = React.useMemo(() => extractSubjectFromPrompt(value || buildBase(selection.want, "__________")), [value, selection.want])
@@ -155,11 +176,19 @@ export default function SearchBox({
     // Update trailing parts even when user edited
     const suffix = composeSuffix(nextUse, selection.make)
     setValue((prev) => replaceSuffixKeepingBase(prev || composed, suffix))
+    // Clear any running deep search if toggled off
+    if (deepOn) {
+      stop()
+    }
   }
 
   const onSubmit = () => {
-    // For now, just console log; wire to your flow as needed
-    // You can replace this with navigation or API call
+    if (deepOn) {
+      // Start Deep Search streaming
+      start({ query: value, provider, model, limit: 20 })
+      return
+    }
+    // Fallback: no deep search selected
     console.log("Submit query:", value)
   }
 
@@ -192,6 +221,13 @@ export default function SearchBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection.want])
 
+  // Cleanup deep search on unmount
+  React.useEffect(() => {
+    return () => {
+      stop()
+    }
+  }, [stop])
+
   return (
     <div className="relative mx-auto w-full max-w-3xl px-4">
       {/* Soft glow */}
@@ -209,12 +245,22 @@ export default function SearchBox({
 
         {/* bottom bar */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">
-          {/* left: paperclip */}
-          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50" title="Attach files">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 11-8.49-8.49l9.19-9.19a4 4 0 115.66 5.66L9.88 17.94a2 2 0 11-2.83-2.83l8.49-8.49" />
-            </svg>
-          </button>
+          {/* left: AI Provider selector (inline) */}
+          <div className="hidden sm:flex items-center gap-2">
+            <MinimalAIProviderSelector
+              selectedProvider={provider}
+              onProviderChange={(p) => {
+                setProvider(p)
+                // Reset model if provider changes
+                setModel(undefined)
+              }}
+              selectedModel={model}
+              onModelChange={setModel}
+              variant="inline"
+              showConfigLink={false}
+              className=""
+            />
+          </div>
 
           {/* center-left: Deep Search pill */}
           <button
@@ -237,6 +283,75 @@ export default function SearchBox({
           </button>
         </div>
       </div>
+
+      {/* Streaming results panel */}
+      {(deepOn && (isLoading || error || items.length > 0 || summary || warnings.length || notices.length)) && (
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-medium text-gray-700">ThesisFlow-AI Deep Search</div>
+            <div className="flex items-center gap-2">
+              {isStreaming && (
+                <span className="text-xs text-orange-700">Streaming…</span>
+              )}
+              {isLoading && (
+                <button onClick={stop} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Cancel</button>
+              )}
+              {!isLoading && (items.length > 0 || summary) && (
+                <button onClick={reset} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Clear</button>
+              )}
+            </div>
+          </div>
+
+          {progress?.message && (
+            <div className="mb-3 text-xs text-gray-600">{progress.message}{progress.total ? ` • ${progress.total} items` : ""}</div>
+          )}
+
+          {error && (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>
+          )}
+
+          {items.length > 0 && (
+            <div className="mb-4">
+              <div className="mb-1 text-sm font-semibold text-gray-800">Results</div>
+              <ul className="space-y-2">
+                {items.map((it, idx) => (
+                  <li key={`${it.url || it.title}-${idx}`} className="rounded-md border border-gray-100 p-2 hover:bg-gray-50">
+                    <a href={it.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-700 hover:underline">
+                      {it.title}
+                    </a>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                      <span className="rounded-full border border-gray-200 px-2 py-0.5">{it.source}</span>
+                      {it.kind && <span className="rounded-full border border-gray-200 px-2 py-0.5 capitalize">{it.kind}</span>}
+                    </div>
+                    {it.snippet && <p className="mt-1 line-clamp-2 text-xs text-gray-600">{it.snippet}</p>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {summary && (
+            <div className="rounded-md border border-orange-200 bg-orange-50 p-3">
+              <div className="mb-1 text-sm font-semibold text-orange-800">Summary</div>
+              <div className="prose prose-sm max-w-none text-orange-900" dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />
+            </div>
+          )}
+
+          {(warnings.length > 0 || notices.length > 0 || infos.length > 0) && (
+            <div className="mt-3 space-y-1">
+              {infos.map((m, i) => (
+                <div key={`i-${i}`} className="text-xs text-gray-500">ℹ️ {m}</div>
+              ))}
+              {notices.map((m, i) => (
+                <div key={`n-${i}`} className="text-xs text-blue-700">🔔 {m}</div>
+              ))}
+              {warnings.map((w, i) => (
+                <div key={`w-${i}`} className="text-xs text-yellow-700">⚠️ {w.source ? `[${w.source}] ` : ''}{w.error}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
