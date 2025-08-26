@@ -54,17 +54,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <div className="px-3 pb-3">
         {collapsed ? (
-          <button
-            aria-label="New Chat"
-            title="New Chat"
-            className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-white shadow hover:bg-orange-600"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          <Link href="/ai-agents/chat" title="New Chat" aria-label="New Chat">
+            <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-white shadow hover:bg-orange-600">
+              <Plus className="h-4 w-4" />
+            </div>
+          </Link>
         ) : (
-          <button className="w-full rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow hover:bg-orange-600">
-            + New Chat
-          </button>
+          <Link href="/ai-agents/chat" title="New Chat" aria-label="New Chat">
+            <div className="w-full rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow hover:bg-orange-600">
+              + New Chat
+            </div>
+          </Link>
         )}
       </div>
 
@@ -95,6 +95,36 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           )
         })}
       </nav>
+
+      {/* Recent Chats (only for chat route) */}
+      {pathname.startsWith("/ai-agents/chat") && (
+        <div className={`${collapsed ? "px-1" : "px-3"} mt-2`}
+        >
+          {!collapsed && (
+            <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Recent Chats
+            </div>
+          )}
+          <Link
+            href="/ai-agents/chat"
+            className="block"
+            title="Deep Learning Techniques"
+            aria-label="Deep Learning Techniques"
+          >
+            <div
+              className={`relative mx-2 my-0.5 flex items-center rounded-md py-2 text-sm bg-gray-100 text-gray-900 ${
+                collapsed ? "justify-center px-0" : "gap-2 px-2"
+              }`}
+            >
+              {!collapsed && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-sm bg-gray-400" />
+              )}
+              <span className={`h-2 w-2 rounded-full ${collapsed ? "bg-gray-400" : "bg-gray-300"}`} />
+              <span className={`${collapsed ? "hidden" : "block truncate"}`}>Deep Learning Techniques</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Bottom card - show only when not collapsed AND unauthenticated */}
       {!collapsed && !isLoading && !user && (
