@@ -22,6 +22,7 @@ const NotificationBell = lazy(() => import("@/app/collaborate/components/notific
 const navigation = [
   { name: "Explorer", href: "/explorer", icon: Search },
   { name: "Summarizer", href: "/summarizer", icon: FileText },
+  { name: "AI Agents", href: "/ai-agents", icon: Bot },
   { name: "Writer", href: "/writer", icon: PenLine },
   { name: "Planner", href: "/planner", icon: Calendar },
   { name: "Collaborate", href: "/collaborate", icon: Users },
