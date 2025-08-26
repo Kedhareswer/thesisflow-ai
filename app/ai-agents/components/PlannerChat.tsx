@@ -29,6 +29,14 @@ interface PlannerChatProps {
   onRetryStep?: (stepId: string) => void
   onCancelExecution?: () => void
   className?: string
+  // Deep search integration
+  deepSearchResults?: {
+    items: any[]
+    summary?: string
+    isLoading?: boolean
+    error?: string
+    progress?: any
+  }
 }
 
 export function PlannerChat({
@@ -39,7 +47,8 @@ export function PlannerChat({
   onSendMessage,
   onRetryStep,
   onCancelExecution,
-  className
+  className,
+  deepSearchResults
 }: PlannerChatProps) {
   const [sections, setSections] = React.useState<PlanSection[]>([])
   const [input, setInput] = React.useState('')
@@ -48,106 +57,162 @@ export function PlannerChat({
 
   // Process events into sections
   React.useEffect(() => {
-    if (!plan) return
+    if (!plan && !deepSearchResults) return
 
     const newSections: PlanSection[] = []
 
-    // Planning section
-    newSections.push({
-      id: 'planning',
-      title: '🧠 Task Analysis & Planning',
-      type: 'planning',
-      content: (
-        <div className="space-y-3">
-          <div className="text-sm text-gray-600">
-            <div><span className="font-medium">Description:</span> {plan.description}</div>
-          </div>
-          <div className="text-sm text-gray-700">
-            <p className="font-medium mb-2">Analyzing your request:</p>
-            <p>Breaking down your request into structured, actionable steps...</p>
-          </div>
-          
-          <div className="text-sm text-gray-700">
-            <p className="font-medium mb-2">Generated {plan.steps.length} steps:</p>
-            <ol className="space-y-1 ml-4 list-decimal">
-              {plan.steps.slice(0, 5).map(step => (
-                <li key={step.id} className="text-gray-600">
-                  {step.title}
-                </li>
-              ))}
-              {plan.steps.length > 5 && (
-                <li className="text-gray-500 italic">
-                  ... and {plan.steps.length - 5} more steps
-                </li>
-              )}
-            </ol>
-          </div>
-        </div>
-      ),
-      status: 'completed',
-      expanded: false,
-      timestamp: plan.createdAt
-    })
-
-    // Validation section
-    if (plan.validation) {
+    // Show deep search results as part of planning workflow
+    if (deepSearchResults && (deepSearchResults.items.length > 0 || deepSearchResults.summary || deepSearchResults.isLoading)) {
       newSections.push({
-        id: 'validation',
-        title: '✅ Plan Validation',
-        type: 'validation',
+        id: 'deep-search',
+        title: '🔍 Deep Search & Research',
+        type: 'execution',
         content: (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              {plan.validation.isValid ? (
-                <>
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">Plan is valid and ready to execute</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-5 w-5 text-yellow-600" />
-                  <span className="text-sm font-medium text-yellow-700">Plan requires refinement</span>
-                </>
-              )}
-            </div>
-
-            {plan.validation.issues.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Issues found:</p>
-                <ul className="space-y-1 ml-4">
-                  {plan.validation.issues.map((issue, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-red-600">
-                      <span>•</span>
-                      <span>{issue}</span>
-                    </li>
-                  ))}
-                </ul>
+            {deepSearchResults.isLoading && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Searching and analyzing sources...
               </div>
             )}
 
-            {plan.validation.suggestions.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Suggestions:</p>
-                <ul className="space-y-1 ml-4">
-                  {plan.validation.suggestions.map((suggestion, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-blue-600">
-                      <span>💡</span>
-                      <span>{suggestion}</span>
-                    </li>
+            {deepSearchResults.error && (
+              <div className="text-sm text-red-700 p-2 bg-red-50 rounded">
+                {deepSearchResults.error}
+              </div>
+            )}
+
+            {deepSearchResults.progress?.message && (
+              <div className="text-xs text-gray-600">
+                {deepSearchResults.progress.message}
+                {deepSearchResults.progress.total && ` • ${deepSearchResults.progress.total} items`}
+              </div>
+            )}
+
+            {deepSearchResults.items.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-800">Found {deepSearchResults.items.length} sources:</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {deepSearchResults.items.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="p-2 bg-gray-50 rounded text-sm">
+                      <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-blue-700 hover:underline">
+                        {item.title}
+                      </a>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                        <span className="bg-white px-2 py-0.5 rounded border">{item.source}</span>
+                        {item.kind && <span className="bg-white px-2 py-0.5 rounded border capitalize">{item.kind}</span>}
+                      </div>
+                      {item.snippet && <p className="mt-1 text-xs text-gray-600 line-clamp-2">{item.snippet}</p>}
+                    </div>
                   ))}
-                </ul>
+                  {deepSearchResults.items.length > 5 && (
+                    <p className="text-xs text-gray-500 text-center">
+                      ... and {deepSearchResults.items.length - 5} more sources
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {deepSearchResults.summary && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded">
+                <p className="text-sm font-medium text-green-800 mb-2">Research Summary:</p>
+                <div className="text-sm text-green-700 prose prose-sm max-w-none" 
+                     dangerouslySetInnerHTML={{ __html: deepSearchResults.summary.replace(/\n/g, '<br/>') }} />
               </div>
             )}
           </div>
         ),
-        status: plan.validation.isValid ? 'completed' : 'failed',
-        expanded: !plan.validation.isValid,
-        timestamp: plan.createdAt
+        status: deepSearchResults.isLoading ? 'in_progress' : 'completed',
+        expanded: true,
+        timestamp: new Date()
       })
     }
 
+    if (plan) {
+      // Planning section
+      newSections.push({
+        id: 'planning',
+        title: '🧠 Task Analysis & Planning',
+        type: 'planning',
+        content: (
+          <div className="space-y-3">
+            <div className="text-sm text-gray-600">
+              <div><span className="font-medium">Description:</span> {plan.description}</div>
+            </div>
+            <div className="text-sm text-gray-700">
+              <p className="font-medium mb-2">Analyzing your request:</p>
+              <p>Breaking down your request into structured, actionable steps...</p>
+            </div>
+            
+            <div className="text-sm text-gray-700">
+              <p className="font-medium mb-2">Generated {plan.steps.length} steps:</p>
+              <ol className="space-y-1 ml-4 list-decimal">
+                {plan.steps.slice(0, 5).map(step => (
+                  <li key={step.id} className="text-gray-600">
+                    {step.title}
+                  </li>
+                ))}
+                {plan.steps.length > 5 && (
+                  <li className="text-gray-500 italic">
+                    ... and {plan.steps.length - 5} more steps
+                  </li>
+                )}
+              </ol>
+            </div>
+          </div>
+        ),
+        status: isPlanning ? 'in_progress' : 'completed',
+        expanded: true,
+        timestamp: plan.createdAt
+      })
+
+      // Validation section (if plan has validation)
+      if (plan.validation) {
+        newSections.push({
+          id: 'validation',
+          title: '✅ Plan Validation',
+          type: 'validation',
+          content: (
+            <div className="space-y-2">
+              <div className="text-sm">
+                <span className={`font-medium ${plan.validation.isValid ? 'text-green-700' : 'text-red-700'}`}>
+                  Status: {plan.validation.isValid ? 'Valid' : 'Issues Found'}
+                </span>
+              </div>
+              
+              {plan.validation.issues && plan.validation.issues.length > 0 && (
+                <div className="text-sm text-red-700">
+                  <p className="font-medium mb-1">Issues:</p>
+                  <ul className="ml-4 space-y-1 list-disc">
+                    {plan.validation.issues.map((issue, i) => (
+                      <li key={i}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {plan.validation.suggestions && plan.validation.suggestions.length > 0 && (
+                <div className="text-sm text-blue-700">
+                  <p className="font-medium mb-1">Suggestions:</p>
+                  <ul className="ml-4 space-y-1 list-disc">
+                    {plan.validation.suggestions.map((suggestion, i) => (
+                      <li key={i}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ),
+          status: plan.validation.isValid ? 'completed' : 'failed',
+          expanded: !plan.validation.isValid,
+          timestamp: plan.createdAt
+        })
+      }
+    }
+
     setSections(newSections)
-  }, [plan])
+  }, [plan, isPlanning, deepSearchResults])
 
   // Process orchestrator events
   React.useEffect(() => {

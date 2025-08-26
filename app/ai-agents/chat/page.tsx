@@ -59,21 +59,16 @@ export default function ChatPage() {
   const [selectedProvider, setSelectedProvider] = React.useState<string>(providerParam || "")
   const [selectedModel, setSelectedModel] = React.useState<string>(modelParam || "")
   
-  // Simple generation state (when Deep Search is off)
-  const [simpleLoading, setSimpleLoading] = React.useState(false)
-  const [simpleError, setSimpleError] = React.useState<string | null>(null)
-  const [simpleContent, setSimpleContent] = React.useState<string | null>(null)
-  const [simpleProvider, setSimpleProvider] = React.useState<AIProvider | undefined>()
-  const [simpleModel, setSimpleModel] = React.useState<string | undefined>()
+  // Always use planning workflow - no separate simple mode
   
   // Planning and execution state
   const [isPlanning, setIsPlanning] = React.useState(false)
   const [isExecuting, setIsExecuting] = React.useState(false)
   const [currentPlan, setCurrentPlan] = React.useState<TaskPlan | undefined>()
   const [orchestratorEvents, setOrchestratorEvents] = React.useState<OrchestratorEvent[]>([])
-  const [showPlannerView, setShowPlannerView] = React.useState(false)
+  // Always show planning view
   
-  // Deep search hook
+  // Deep search hook - now integrated into planning workflow
   const {
     items,
     summary,
@@ -86,52 +81,14 @@ export default function ChatPage() {
     provider,
     model,
     start,
-    stop,
     reset,
     isStreaming,
+    stop,
   } = useDeepSearch()
 
-  const generateSimple = React.useCallback(async (prompt: string) => {
-    setSimpleLoading(true)
-    setSimpleError(null)
-    setSimpleContent(null)
-    setSimpleProvider(undefined)
-    setSimpleModel(undefined)
-    try {
-      let headers: Record<string, string> = { "Content-Type": "application/json" }
-      try {
-        const { supabase } = await import("@/integrations/supabase/client")
-        const sess = await supabase.auth.getSession()
-        const token = sess.data.session?.access_token
-        if (token) headers["Authorization"] = `Bearer ${token}`
-      } catch {}
-
-      const res = await fetch("/api/ai/generate", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ prompt, maxTokens: 1800, temperature: 0.7, provider: providerParam, model: modelParam }),
-      })
-      if (res.status === 401) {
-        setSimpleError("Please sign in to use AI chat.")
-        return
-      }
-      const data = await res.json()
-      if (!data.success) {
-        throw new Error(data.error || "Generation failed")
-      }
-      setSimpleContent(data.content || data.response || "")
-      setSimpleProvider((data.provider || providerParam) as AIProvider | undefined)
-      setSimpleModel((data.model || modelParam) as string | undefined)
-    } catch (e: any) {
-      setSimpleError(e?.message || "Something went wrong")
-    } finally {
-      setSimpleLoading(false)
-    }
-  }, [modelParam, providerParam])
-  
   const handlePlanAndExecute = async (want: string, use: string[], make: string[], subject: string, prompt: string) => {
-    setShowPlannerView(true)
     setIsPlanning(true)
+    setIsExecuting(false)
     setOrchestratorEvents([])
     setCurrentPlan(undefined)
 
@@ -238,25 +195,23 @@ export default function ChatPage() {
     if (!input.trim()) return
 
     // Get current SearchBox state
-    const searchBoxState = searchBoxRef.current?.getState?.()
-    const hasSelections = searchBoxState?.want || searchBoxState?.use?.length > 0 || searchBoxState?.make?.length > 0
+    const searchBoxState = (searchBoxRef.current as any)?.getState?.()
+    const hasSelections = searchBoxState?.want || (searchBoxState?.use?.length > 0) || (searchBoxState?.make?.length > 0)
 
-    // If there are want/use/make selections, use the planner
+    // Always use planning workflow - either with SearchBox selections or defaults
     if (hasSelections) {
       const want = searchBoxState?.want || ''
       const use = searchBoxState?.use || []
       const make = searchBoxState?.make || []
       const subject = extractSubjectFromPrompt(input)
       handlePlanAndExecute(want, use, make, subject, input)
-      return
-    }
-    
-    if (deepOn) {
-      try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: true }) } catch {}
-      start({ query: input, provider: providerParam, model: modelParam, limit: 20 })
     } else {
-      try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: false }) } catch {}
-      generateSimple(input)
+      // For queries without SearchBox selections, use default planning approach
+      const subject = extractSubjectFromPrompt(input)
+      const defaultWant = deepOn ? 'search_papers' : 'write_report'
+      const defaultUse = ['arxiv', 'pubmed']
+      const defaultMake = ['pdf_report']
+      handlePlanAndExecute(defaultWant, defaultUse, defaultMake, subject, input)
     }
   }
 
@@ -294,35 +249,34 @@ export default function ChatPage() {
     <div className="flex min-h-screen flex-col">
       {/* Top toolbar area */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        {/* Planner View */}
-        {showPlannerView ? (
-          <PlannerChat
-            plan={currentPlan}
-            events={orchestratorEvents}
-            isPlanning={isPlanning}
-            isExecuting={isExecuting}
-            onSendMessage={(msg) => {
-              // Handle additional messages during execution
-              console.log('Additional message during execution:', msg)
-            }}
-            onRetryStep={(stepId) => {
-              // Implement retry logic
-              console.log('Retry step:', stepId)
-            }}
-            onCancelExecution={() => {
-              setIsExecuting(false)
-              setShowPlannerView(false)
-            }}
-            className="flex-1"
-          />
-        ) : (
-          <div className={`flex-1 flex flex-col ${deepOn ? '' : 'overflow-y-auto'} px-4 py-6`}>
-            <h1 className="text-[15px] font-semibold text-gray-900">{topicTitle}</h1>
-            <div className="flex items-center gap-2">
-              <button className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Outputs</button>
-            </div>
-          </div>
-        )}
+        {/* Always show Planner View for consistent workflow */}
+        <PlannerChat
+          plan={currentPlan}
+          events={orchestratorEvents}
+          isPlanning={isPlanning}
+          isExecuting={isExecuting}
+          deepSearchResults={{
+            items,
+            summary,
+            isLoading,
+            error: error || undefined,
+            progress
+          }}
+          onSendMessage={(msg) => {
+            // Handle additional messages during execution
+            console.log('Additional message during execution:', msg)
+          }}
+          onRetryStep={(stepId) => {
+            // Implement retry logic
+            console.log('Retry step:', stepId)
+          }}
+          onCancelExecution={() => {
+            setIsExecuting(false)
+            setCurrentPlan(undefined)
+            setOrchestratorEvents([])
+          }}
+          className="flex-1"
+        />
       </div>
 
       {/* Main content area */}
@@ -365,180 +319,6 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Simple chat response panel (when Deep Search is off) */}
-          {!deepOn && (simpleLoading || simpleError || simpleContent) && (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <h2 className="text-[18px] font-semibold leading-6 text-gray-900">Response</h2>
-                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">chat</span>
-              </div>
-
-              {simpleLoading && (
-                <div className="mb-3 flex items-center gap-2 text-sm text-gray-700">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating…
-                </div>
-              )}
-
-              {simpleError && (
-                <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{simpleError}</div>
-              )}
-
-              {simpleContent && (
-                <div className="rounded-md border border-orange-200 bg-orange-50 p-3">
-                  <div className="mb-1 text-sm font-semibold text-orange-800">Answer</div>
-                  {(simpleProvider || simpleModel || providerParam || modelParam) && (
-                    <div className="mb-2 flex flex-wrap gap-2 text-xs text-orange-800">
-                      {(simpleProvider || providerParam) && (
-                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
-                          Provider: {simpleProvider || providerParam}
-                        </span>
-                      )}
-                      {(simpleModel || modelParam) && (
-                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
-                          Model: {simpleModel || modelParam}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="prose prose-sm max-w-none text-orange-900" dangerouslySetInnerHTML={{ __html: (simpleContent || '').replace(/\n/g, '<br/>') }} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Streaming results panel */}
-          {(deepOn && (isLoading || error || items.length > 0 || summary || warnings.length || notices.length)) && (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              {/* Header: Topic + Tag */}
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <h2 className="text-[18px] font-semibold leading-6 text-gray-900">{topicTitle}</h2>
-                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">{topicTag}</span>
-              </div>
-
-              {/* Executing Plan preamble while loading and before results */}
-              {isLoading && items.length === 0 && !summary && (
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Bot className="h-5 w-5 text-white" />
-                    <span className="font-medium">Executing Plan...</span>
-                  </div>
-                  <div className="mt-3 text-[15px] leading-relaxed text-gray-800">
-                    <p>I understand you're interested in deep review for <span className="font-semibold">Deep Learning</span>. To provide the most valuable and focused assistance, here are a few quick questions to narrow down your research focus:</p>
-                    <ol className="mt-3 list-decimal space-y-2 pl-5">
-                      <li><span className="font-semibold">What specific aspect</span> of this topic interests you most?</li>
-                      <li><span className="font-semibold">What's your primary goal</span> with this research (learn, build, evaluate, stay current)?</li>
-                      <li><span className="font-semibold">Which application domains</span> are most relevant to you?</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* Agent running card */}
-              {isLoading && (
-                <div className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Agent is running...
-                  </div>
-                  <div className="mt-2 rounded-xl border border-gray-200 bg-white/90 p-3 text-sm text-gray-600">
-                    You can step in with instructions while the task runs...
-                  </div>
-                  <div className="mt-2 flex items-center justify-end gap-2">
-                    {isStreaming && <span className="text-xs text-orange-700">Streaming…</span>}
-                    <button onClick={stop} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-100">Cancel</button>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
-              )}
-
-              {/* Progress small note */}
-              {progress?.message && (
-                <div className="mb-2 text-xs text-gray-600">{progress.message}{progress.total ? ` • ${progress.total} items` : ""}</div>
-              )}
-
-              {/* Loading skeletons before first results */}
-              {isLoading && items.length === 0 && !summary && (
-                <div className="mb-4 space-y-2">
-                  <div className="h-4 w-64 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-4 w-56 bg-gray-200 rounded animate-pulse" />
-                </div>
-              )}
-
-              {items.length > 0 && (
-                <div className="mb-4">
-                  <div className="mb-1 text-sm font-semibold text-gray-800">Results</div>
-                  <ul className="space-y-2">
-                    {items.map((it, idx) => (
-                      <li key={`${it.url || it.title}-${idx}`} className="rounded-md border border-gray-100 p-2 hover:bg-gray-50">
-                        <a href={it.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-700 hover:underline">
-                          {it.title}
-                        </a>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                          <span className="rounded-full border border-gray-200 px-2 py-0.5">{it.source}</span>
-                          {it.kind && <span className="rounded-full border border-gray-200 px-2 py-0.5 capitalize">{it.kind}</span>}
-                        </div>
-                        {it.snippet && <p className="mt-1 line-clamp-2 text-xs text-gray-600">{it.snippet}</p>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {summary && (
-                <div className="rounded-md border border-orange-200 bg-orange-50 p-3">
-                  <div className="mb-1 text-sm font-semibold text-orange-800">Summary</div>
-                  {(provider || model || providerParam || modelParam) && (
-                    <div className="mb-2 flex flex-wrap gap-2 text-xs text-orange-800">
-                      {(provider || providerParam) && (
-                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
-                          Provider: {provider || providerParam}
-                        </span>
-                      )}
-                      {(model || modelParam) && (
-                        <span className="rounded-full border border-orange-200 bg-white/60 px-2 py-0.5">
-                          Model: {model || modelParam}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="prose prose-sm max-w-none text-orange-900" dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />
-                </div>
-              )}
-
-              {(warnings.length > 0 || notices.length > 0 || infos.length > 0) && (
-                <div className="mt-3 space-y-1">
-                  {infos.map((m, i) => (
-                    <div key={`i-${i}`} className="text-xs text-gray-500">ℹ️ {m}</div>
-                  ))}
-                  {notices.map((m, i) => (
-                    <div key={`n-${i}`} className="text-xs text-blue-700">🔔 {m}</div>
-                  ))}
-                  {warnings.map((w, i) => (
-                    <div key={`w-${i}`} className="text-xs text-yellow-700">⚠️ {w.source ? `[${w.source}] ` : ''}{w.error}</div>
-                  ))}
-                </div>
-              )}
-
-              {/* Empty state after completion with no content */}
-              {!isLoading && !error && items.length === 0 && !summary && (
-                <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                  No findings yet. Try refining your topic or enabling a provider for summarization.
-                </div>
-              )}
-
-              {/* Footer controls when finished */}
-              <div className="mt-3 flex items-center justify-end gap-2">
-                {!isLoading && (items.length > 0 || summary) && (
-                  <button onClick={reset} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Clear</button>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </main>
 
