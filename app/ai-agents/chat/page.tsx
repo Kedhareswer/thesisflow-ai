@@ -1,13 +1,52 @@
 "use client"
 
 import React from "react"
-import { Bot, ChevronUp, Loader2, Plus, Paperclip, Image as ImageIcon, Smile } from "lucide-react"
+import { Bot, ChevronUp, Loader2, Paperclip, Image as ImageIcon, Smile } from "lucide-react"
 import { useDeepSearch } from "@/hooks/use-deep-search"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSearchParams } from "next/navigation"
+import type { AIProvider } from "@/lib/ai-providers"
+import { addRecentChat } from "@/lib/services/recent-chats"
+
+// Helpers to derive a friendly title/tag from the query (same logic style as SearchBox)
+function stripTrailingSuffix(text: string): string {
+  return text.replace(/\s+(using\s+[^.]+)?(\s+and create\s+[^.]+)?\s*\.*\s*$/i, "")
+}
+function extractSubjectFromPrompt(prompt: string): string {
+  const cleaned = stripTrailingSuffix(prompt || "")
+  const preps = [" on ", " for ", " from ", " about ", " related to "]
+  let idx = -1
+  let found = ""
+  for (const p of preps) {
+    const i = cleaned.toLowerCase().lastIndexOf(p)
+    if (i > idx) {
+      idx = i
+      found = p
+    }
+  }
+  if (idx >= 0) {
+    const after = cleaned.slice(idx + found.length)
+    const nextUsing = after.toLowerCase().indexOf(" using ")
+    const nextCreate = after.toLowerCase().indexOf(" and create ")
+    const nextDot = after.indexOf(".")
+    const stops = [nextUsing, nextCreate, nextDot].filter((n) => n >= 0)
+    const stopAt = stops.length ? Math.min(...stops) : -1
+    const subject = (stopAt >= 0 ? after.slice(0, stopAt) : after).trim()
+    return subject || "Topic"
+  }
+  return cleaned.trim() || "Topic"
+}
+function toTitleCase(input: string) {
+  return (input || "").replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+}
 
 export default function ChatPage() {
+  const searchParams = useSearchParams()
   const [deepOn, setDeepOn] = React.useState(true)
   const [input, setInput] = React.useState("")
+  const startedRef = React.useRef(false)
+  const providerParam = React.useMemo(() => (searchParams?.get("provider") || undefined) as AIProvider | undefined, [searchParams])
+  const modelParam = React.useMemo(() => searchParams?.get("model") || undefined, [searchParams])
   const {
     items,
     summary,
@@ -27,10 +66,12 @@ export default function ChatPage() {
     e?.preventDefault()
     if (!input.trim()) return
     if (deepOn) {
-      start({ query: input, limit: 20 })
+      try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: true }) } catch {}
+      start({ query: input, provider: providerParam, model: modelParam, limit: 20 })
     } else {
       // fallback: no deep search
       console.log("Submit query:", input)
+      try { addRecentChat({ query: input, provider: providerParam, model: modelParam, deep: false }) } catch {}
     }
   }
 
@@ -41,18 +82,37 @@ export default function ChatPage() {
     }
   }, [deepOn, stop])
 
+  // Read query from URL and optionally auto-start deep search
+  React.useEffect(() => {
+    if (!searchParams) return
+    const q = (searchParams.get("query") || "").trim()
+    const deep = searchParams.get("deep") === "1"
+    if (q) setInput((prev) => (prev?.trim() ? prev : q))
+    if (typeof deep === "boolean") setDeepOn(deep)
+    if (q && deep && !startedRef.current) {
+      startedRef.current = true
+      try { addRecentChat({ query: q, provider: providerParam, model: modelParam, deep: true }) } catch {}
+      start({ query: q, provider: providerParam, model: modelParam, limit: 20 })
+    }
+  }, [searchParams, start, providerParam, modelParam])
+
+  // Derive dynamic title/tag from current input or URL query
+  const topicBase = input?.trim() || searchParams?.get("query") || "Topic"
+  const subject = React.useMemo(() => extractSubjectFromPrompt(topicBase), [topicBase])
+  const topicTitle = React.useMemo(() => toTitleCase(subject), [subject])
+  const topicTag = React.useMemo(() => {
+    const words = (subject || "").split(/\s+/).filter(Boolean)
+    return words.slice(0, 2).join(" ").toLowerCase() || "topic"
+  }, [subject])
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top toolbar area */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
-          <h1 className="text-[15px] font-semibold text-gray-900">Deep Learning Techniques</h1>
+          <h1 className="text-[15px] font-semibold text-gray-900">{topicTitle}</h1>
           <div className="flex items-center gap-2">
-            <button className="hidden sm:inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-              <Plus className="h-4 w-4" /> New Chat
-            </button>
             <button className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Outputs</button>
-            <button className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-black">Pricing</button>
           </div>
         </div>
       </div>
@@ -62,7 +122,7 @@ export default function ChatPage() {
         <div className="mx-auto max-w-3xl pb-36 pt-5">
           {/* Topic pill, right aligned similar to screenshot */}
           <div className="mb-4 flex justify-end">
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">Deep learning</span>
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">{topicTag}</span>
           </div>
 
           {/* Assistant preamble card */}
@@ -102,8 +162,8 @@ export default function ChatPage() {
             <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
               {/* Header: Topic + Tag */}
               <div className="mb-3 flex items-start justify-between gap-3">
-                <h2 className="text-[18px] font-semibold leading-6 text-gray-900">Deep Learning Techniques</h2>
-                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">deep learning</span>
+                <h2 className="text-[18px] font-semibold leading-6 text-gray-900">{topicTitle}</h2>
+                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">{topicTag}</span>
               </div>
 
               {/* Executing Plan preamble while loading and before results */}
@@ -219,7 +279,7 @@ export default function ChatPage() {
       </main>
 
       {/* Sticky bottom chat composer */}
-      <form onSubmit={onSubmit} className="sticky bottom-0 z-10 w-full border-t border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      <form onSubmit={onSubmit} className="sticky bottom-0 z-10 w-full bg-transparent">
         <div className="mx-auto max-w-3xl px-4 py-3">
           {/* container */}
           <div className="relative rounded-2xl border border-gray-200 bg-white p-3 shadow-xl">
@@ -227,7 +287,7 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask anything or give follow up task..."
-              className="min-h-[88px] w-full resize-none rounded-md p-3 text-[15px] leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
+              className="min-h-[88px] w-full resize-none rounded-md p-3 text-[15px] leading-relaxed text-[#ee691a] caret-[#ee691a] outline-none placeholder:text-gray-400"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault()

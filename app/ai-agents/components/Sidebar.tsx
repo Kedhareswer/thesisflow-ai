@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { getRecentChats, clearRecentChats, type RecentChat } from "@/lib/services/recent-chats"
 
 type SidebarProps = {
   collapsed: boolean
@@ -26,6 +27,16 @@ const navItems = [
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading } = useSupabaseAuth()
+  const [recents, setRecents] = React.useState<RecentChat[]>([])
+
+  React.useEffect(() => {
+    // Load recent chats on mount and when path changes (simple refresh strategy)
+    try {
+      setRecents(getRecentChats(10))
+    } catch {
+      setRecents([])
+    }
+  }, [pathname])
 
   return (
     <aside
@@ -96,33 +107,55 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* Recent Chats (only for chat route) */}
-      {pathname.startsWith("/ai-agents/chat") && (
-        <div className={`${collapsed ? "px-1" : "px-3"} mt-2`}
-        >
+      {/* Recent Chats (show on AI Agents and Chat pages) */}
+      {pathname.startsWith("/ai-agents") && recents.length > 0 && (
+        <div className={`${collapsed ? "px-1" : "px-3"} mt-2`}>
           {!collapsed && (
-            <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Recent Chats
+            <div className="flex items-center justify-between px-1 pb-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Recent Chats</div>
+              <button
+                onClick={() => { try { clearRecentChats() } catch {}; setRecents([]) }}
+                className="text-[11px] text-gray-500 hover:text-gray-700"
+                title="Clear recent chats"
+                aria-label="Clear recent chats"
+              >Clear</button>
             </div>
           )}
-          <Link
-            href="/ai-agents/chat"
-            className="block"
-            title="Deep Learning Techniques"
-            aria-label="Deep Learning Techniques"
-          >
-            <div
-              className={`relative mx-2 my-0.5 flex items-center rounded-md py-2 text-sm bg-gray-100 text-gray-900 ${
-                collapsed ? "justify-center px-0" : "gap-2 px-2"
-              }`}
-            >
-              {!collapsed && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-sm bg-gray-400" />
-              )}
-              <span className={`h-2 w-2 rounded-full ${collapsed ? "bg-gray-400" : "bg-gray-300"}`} />
-              <span className={`${collapsed ? "hidden" : "block truncate"}`}>Deep Learning Techniques</span>
-            </div>
-          </Link>
+          {recents.map((c) => {
+            const params = new URLSearchParams()
+            params.set("query", c.query)
+            if (c.deep) params.set("deep", "1")
+            if (c.provider) params.set("provider", c.provider)
+            if (c.model) params.set("model", c.model)
+            const href = `/ai-agents/chat?${params.toString()}`
+            return (
+              <Link
+                key={c.id}
+                href={href}
+                className="block"
+                title={c.query}
+                aria-label={c.query}
+              >
+                <div
+                  className={`relative mx-2 my-0.5 rounded-md bg-gray-100 text-gray-900 ${
+                    collapsed ? "grid place-items-center px-0 py-2" : "px-2 py-2"
+                  }`}
+                >
+                  {collapsed ? (
+                    <span className="h-2 w-2 rounded-full bg-gray-400" />
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-gray-300" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">{c.query}</div>
+                        <div className="mt-0.5 text-[11px] text-gray-500">{new Date(c.ts).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
 

@@ -6,6 +6,8 @@ import type { AIProvider } from "@/lib/ai-providers"
 import { useDeepSearch } from "@/hooks/use-deep-search"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2, Bot } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { addRecentChat } from "@/lib/services/recent-chats"
 
 export type SelectionState = {
   want: string
@@ -46,14 +48,24 @@ const makeLabels: Record<string, string> = {
   interactive_app: "an Interactive app",
 }
 
+// Natural language join: [A] -> "A", [A,B] -> "A and B", [A,B,C] -> "A, B, and C"
+function listJoin(items: string[]) {
+  if (items.length <= 1) return items.join("")
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`
+}
+
 function composeSuffix(use: string[], make: string[]) {
+  const uniqueUse = Array.from(new Set(use || []))
+  const uniqueMake = Array.from(new Set(make || []))
   const parts: string[] = []
-  if (use.length) {
-    const useText = use.map((id) => useLabels[id] ?? id).join(", ")
+  if (uniqueUse.length) {
+    const useText = listJoin(uniqueUse.map((id) => useLabels[id] ?? id))
     parts.push(`using ${useText}`)
   }
-  if (make.length) {
-    const makeText = make.map((id) => makeLabels[id] ?? id).join(", ")
+  if (uniqueMake.length) {
+    const makeText = listJoin(uniqueMake.map((id) => makeLabels[id] ?? id))
+    // Keep leading "and" so it reads well after the base clause
     parts.push(`and create ${makeText}`)
   }
   return parts.length ? " " + parts.join(" ") + "." : "."
@@ -61,12 +73,19 @@ function composeSuffix(use: string[], make: string[]) {
 
 // Remove any trailing " using ..." and/or " and create ..." segments (plus the trailing period)
 function stripTrailingSuffix(text: string): string {
-  // Example matches:
-  //  " ... using Google Scholar." 
-  //  " ... and create a PDF report." 
+  // Robustly remove any trailing "using ..." and/or "and create ..." in any order, including duplicates.
+  // Examples handled:
+  //  " ... using Google Scholar."
+  //  " ... and create a PDF report."
   //  " ... using Google Scholar and create a PDF report."
-  // Also tolerates accidental extra spaces and multiple dots at the end.
-  return text.replace(/\s+(using\s+[^.]+)?(\s+and create\s+[^.]+)?\s*\.*\s*$/i, "")
+  //  " ... and create a PDF report using Google Scholar."
+  //  Duplicates like: " ... and create X using Y and create X."
+  const pattern = /\s*(?:using\s+[^.]+(?:\s+and create\s+[^.]+)?|and create\s+[^.]+(?:\s+using\s+[^.]+)?)\s*\.*\s*$/i
+  let out = text
+  while (pattern.test(out)) {
+    out = out.replace(pattern, "")
+  }
+  return out
 }
 
 function extractSubjectFromPrompt(prompt: string): string {
@@ -127,6 +146,7 @@ export default function SearchBox({
   const [userEdited, setUserEdited] = React.useState(false)
   const [provider, setProvider] = React.useState<AIProvider | undefined>(undefined)
   const [model, setModel] = React.useState<string | undefined>(undefined)
+  const router = useRouter()
 
   // Deep Search hook
   const {
@@ -159,6 +179,18 @@ export default function SearchBox({
     return words.slice(0, 2).join(" ").toLowerCase() || "topic"
   }, [subject])
 
+  // Deep Review toggle state (declared early to use below)
+  const deepOn = selection.use.includes("deep_review")
+
+  // Whether to show the streaming/results panel (avoid rendering numeric 0)
+  const showResultsPanel = React.useMemo(() => {
+    return (
+      deepOn && (
+        isLoading || !!error || items.length > 0 || !!summary || warnings.length > 0 || notices.length > 0 || infos.length > 0
+      )
+    )
+  }, [deepOn, isLoading, error, items.length, summary, warnings.length, notices.length, infos.length])
+
   // Sync rules
   React.useEffect(() => {
     if (!userEdited) {
@@ -179,7 +211,6 @@ export default function SearchBox({
   }
 
   // Deep Review pill sync
-  const deepOn = selection.use.includes("deep_review")
   const toggleDeep = () => {
     const nextUse = deepOn
       ? selection.use.filter((u) => u !== "deep_review")
@@ -196,13 +227,28 @@ export default function SearchBox({
   }
 
   const onSubmit = () => {
-    if (deepOn) {
-      // Start Deep Search streaming
-      start({ query: value, provider, model, limit: 20 })
+    const q = (value || "").trim()
+    if (!q) return
+    const builderMakes = (selection.make || []).filter((m) => ["website", "interactive_app", "data_visualisation", "ppt_presentation"].includes(m))
+    const baseParams = new URLSearchParams()
+    baseParams.set("query", q)
+    if (provider) baseParams.set("provider", provider)
+    if (model) baseParams.set("model", model)
+
+    // Save to recents
+    try { addRecentChat({ query: q, provider, model, deep: !!deepOn }) } catch {}
+
+    if (builderMakes.length > 0) {
+      baseParams.set("want", selection.want)
+      if (selection.use?.length) baseParams.set("use", selection.use.join(","))
+      baseParams.set("make", builderMakes.join(","))
+      router.push(`/ai-agents/builder?${baseParams.toString()}`)
       return
     }
-    // Fallback: no deep search selected
-    console.log("Submit query:", value)
+
+    // Fallback to chat/deep search flow
+    if (deepOn) baseParams.set("deep", "1")
+    router.push(`/ai-agents/chat?${baseParams.toString()}`)
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -253,7 +299,7 @@ export default function SearchBox({
           onChange={onTextChange}
           onKeyDown={onKeyDown}
           placeholder="Type your research task..."
-          className="min-h-[88px] w-full resize-none rounded-md p-3 text-[15px] leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
+          className="min-h-[88px] w-full resize-none rounded-md p-3 text-[15px] leading-relaxed text-[#ee691a] caret-[#ee691a] outline-none placeholder:text-gray-400"
         />
 
         {/* bottom bar */}
@@ -298,7 +344,7 @@ export default function SearchBox({
       </div>
 
       {/* Streaming results panel */}
-      {(deepOn && (isLoading || error || items.length > 0 || summary || warnings.length || notices.length)) && (
+      {showResultsPanel && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           {/* Header: Topic + Tag */}
           <div className="mb-3 flex items-start justify-between gap-3">
