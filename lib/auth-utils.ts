@@ -30,18 +30,6 @@ export async function getAuthUser(request: Request, source = "api") {
   let authToken = request.headers.get('Authorization')?.replace('Bearer ', '')
   console.log(`getAuthUser (${source}): Authorization header token:`, authToken ? "Present" : "Missing")
   
-  // If not in header, allow query parameter (useful for EventSource which cannot send headers)
-  if (!authToken) {
-    try {
-      const url = new URL(request.url)
-      const qpToken = url.searchParams.get('access_token') || url.searchParams.get('token')
-      if (qpToken) {
-        authToken = qpToken
-        console.log(`getAuthUser (${source}): Found auth token in query string`)
-      }
-    } catch {}
-  }
-
   // If not in header, try to get from cookies
   if (!authToken) {
     const cookieHeader = request.headers.get('cookie')

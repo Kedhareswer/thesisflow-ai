@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import { getRecentChats, clearRecentChats, type RecentChat } from "@/lib/services/recent-chats"
 
 type SidebarProps = {
   collapsed: boolean
@@ -27,16 +26,6 @@ const navItems = [
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading } = useSupabaseAuth()
-  const [recents, setRecents] = React.useState<RecentChat[]>([])
-
-  React.useEffect(() => {
-    // Load recent chats on mount and when path changes (simple refresh strategy)
-    try {
-      setRecents(getRecentChats(10))
-    } catch {
-      setRecents([])
-    }
-  }, [pathname])
 
   return (
     <aside
@@ -65,17 +54,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <div className="px-3 pb-3">
         {collapsed ? (
-          <Link href="/ai-agents/chat" title="New Chat" aria-label="New Chat">
-            <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-white shadow hover:bg-orange-600">
-              <Plus className="h-4 w-4" />
-            </div>
-          </Link>
+          <button
+            aria-label="New Chat"
+            title="New Chat"
+            className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-white shadow hover:bg-orange-600"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         ) : (
-          <Link href="/ai-agents/chat" title="New Chat" aria-label="New Chat">
-            <div className="w-full rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow hover:bg-orange-600">
-              + New Chat
-            </div>
-          </Link>
+          <button className="w-full rounded-md bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow hover:bg-orange-600">
+            + New Chat
+          </button>
         )}
       </div>
 
@@ -106,58 +95,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           )
         })}
       </nav>
-
-      {/* Recent Chats (show on AI Agents and Chat pages) */}
-      {pathname.startsWith("/ai-agents") && recents.length > 0 && (
-        <div className={`${collapsed ? "px-1" : "px-3"} mt-2`}>
-          {!collapsed && (
-            <div className="flex items-center justify-between px-1 pb-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Recent Chats</div>
-              <button
-                onClick={() => { try { clearRecentChats() } catch {}; setRecents([]) }}
-                className="text-[11px] text-gray-500 hover:text-gray-700"
-                title="Clear recent chats"
-                aria-label="Clear recent chats"
-              >Clear</button>
-            </div>
-          )}
-          {recents.map((c) => {
-            const params = new URLSearchParams()
-            params.set("query", c.query)
-            if (c.deep) params.set("deep", "1")
-            if (c.provider) params.set("provider", c.provider)
-            if (c.model) params.set("model", c.model)
-            const href = `/ai-agents/chat?${params.toString()}`
-            return (
-              <Link
-                key={c.id}
-                href={href}
-                className="block"
-                title={c.query}
-                aria-label={c.query}
-              >
-                <div
-                  className={`relative mx-2 my-0.5 rounded-md bg-gray-100 text-gray-900 ${
-                    collapsed ? "grid place-items-center px-0 py-2" : "px-2 py-2"
-                  }`}
-                >
-                  {collapsed ? (
-                    <span className="h-2 w-2 rounded-full bg-gray-400" />
-                  ) : (
-                    <div className="flex items-start gap-2">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-gray-300" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{c.query}</div>
-                        <div className="mt-0.5 text-[11px] text-gray-500">{new Date(c.ts).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      )}
 
       {/* Bottom card - show only when not collapsed AND unauthenticated */}
       {!collapsed && !isLoading && !user && (

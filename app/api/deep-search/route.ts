@@ -199,19 +199,17 @@ export async function GET(request: NextRequest) {
 
       send({ type: 'progress', message: 'Search complete, preparing summary', total: scored.length })
 
-      // Summarization: use selected provider/model if provided; otherwise use fallback across available keys
+      // Summarization via user's selected provider/model (no env fallback)
       let summarySent = false
-      try {
-        const top = scored.slice(0, Math.min(12, Math.max(5, Math.floor(limit / 2))))
-        const prompt = buildSummaryPrompt(q, top)
-
-        let result: any
-        if (provider) {
+      if (provider) {
+        try {
           // Validate provider exists in registry (optional safety)
           if (!AI_PROVIDERS[provider]) {
             send({ type: 'notice', message: `Unknown provider '${provider}', skipping summarization.` })
           } else {
-            result = await enhancedAIService.generateText({
+            const top = scored.slice(0, Math.min(12, Math.max(5, Math.floor(limit / 2))))
+            const prompt = buildSummaryPrompt(q, top)
+            const result = await enhancedAIService.generateText({
               prompt,
               provider,
               model,
@@ -219,31 +217,18 @@ export async function GET(request: NextRequest) {
               temperature: 0.3,
               userId: user.id,
             })
+            if (result.success && result.content) {
+              send({ type: 'summary', provider, model, content: result.content })
+              summarySent = true
+            } else {
+              send({ type: 'notice', message: result.error || 'Summarization failed. Configure API keys in Settings.' })
+            }
           }
-        } else {
-          // No provider specified: attempt fallback using user's valid API keys
-          result = await enhancedAIService.generateTextWithFallback({
-            prompt,
-            maxTokens: 900,
-            temperature: 0.3,
-            userId: user.id,
-          })
+        } catch (e) {
+          send({ type: 'notice', message: e instanceof Error ? e.message : String(e) })
         }
-
-        if (result && result.success && result.content) {
-          // Prefer actual provider/model used (may come from fallback)
-          const usedProvider = result.provider || provider || undefined
-          const usedModel = result.model || model || undefined
-          if (!provider && result.fallbackInfo?.finalProvider) {
-            send({ type: 'info', message: `Using ${result.fallbackInfo.finalProvider} for summarization.` })
-          }
-          send({ type: 'summary', provider: usedProvider, model: usedModel, content: result.content })
-          summarySent = true
-        } else if (result && !result.success) {
-          send({ type: 'notice', message: result.error || 'Summarization failed. Configure API keys in Settings.' })
-        }
-      } catch (e) {
-        send({ type: 'notice', message: e instanceof Error ? e.message : String(e) })
+      } else {
+        send({ type: 'notice', message: 'No provider selected; streaming raw results only.' })
       }
 
       send({ type: 'done', summary: summarySent, total: results.length })
