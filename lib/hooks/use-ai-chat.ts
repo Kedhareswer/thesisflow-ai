@@ -34,6 +34,25 @@ export function useAIChat() {
   const [isLoading, setIsLoading] = useState(false)
   const [progress, setProgress] = useState<DeepResearchProgress | null>(null)
 
+  // Persist sessions to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const serializable = sessions.map((s) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        updatedAt: s.updatedAt instanceof Date ? s.updatedAt.toISOString() : s.updatedAt,
+        messages: s.messages.map((m) => ({
+          ...m,
+          timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+        })),
+      }))
+      localStorage.setItem('ai-chat-sessions', JSON.stringify(serializable))
+    } catch (e) {
+      console.error('Failed to persist sessions:', e)
+    }
+  }, [sessions])
+
   // Helper function to generate tables from research results
   const generateTablesFromResults = (result: ResearchResult) => {
     const tables = []
@@ -167,7 +186,27 @@ export function useAIChat() {
       taskConfig
     }
 
-    setSessions(prev => [newSession, ...prev])
+    // Update state and synchronously persist to avoid race on navigation
+    setSessions(prev => {
+      const next = [newSession, ...prev]
+      if (typeof window !== 'undefined') {
+        try {
+          const serializable = next.map((s) => ({
+            ...s,
+            createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+            updatedAt: s.updatedAt instanceof Date ? s.updatedAt.toISOString() : s.updatedAt,
+            messages: s.messages.map((m) => ({
+              ...m,
+              timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+            })),
+          }))
+          localStorage.setItem('ai-chat-sessions', JSON.stringify(serializable))
+        } catch (e) {
+          console.error('Failed to persist new session:', e)
+        }
+      }
+      return next
+    })
     setCurrentSession(newSession)
     return sessionId
   }, [])
