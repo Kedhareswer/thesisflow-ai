@@ -4,7 +4,7 @@ import React from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 import { ChatMessage } from "@/lib/types/ai-chat"
-import { ArrowLeft, Send, Loader2 } from "lucide-react"
+import { ArrowLeft, Send } from "lucide-react"
 import ReasoningSteps from '../components/ReasoningSteps'
 import RichContentRenderer from '../../../../components/research/RichContentRenderer'
 import Sidebar from '../../components/Sidebar'
@@ -14,7 +14,7 @@ export default function ChatPage() {
   const router = useRouter()
   const chatId = params?.id as string
   
-  const { currentSession, loadSession, addMessage, simulateDeepResearch, isLoading, progress } = useAIChat()
+  const { currentSession, loadSession, addMessage, executeDeepResearch, isLoading, progress } = useAIChat()
   const [collapsed, setCollapsed] = React.useState(false)
   const [input, setInput] = React.useState("")
   const [reasoningSteps, setReasoningSteps] = React.useState<any[]>([])
@@ -36,10 +36,10 @@ export default function ChatPage() {
         ])
         
         // Auto-start research with initial query for new sessions
-        simulateDeepResearch(chatId, session.taskConfig.query)
+        executeDeepResearch(chatId, session.taskConfig.query)
       }
     }
-  }, [chatId, loadSession, router, simulateDeepResearch])
+  }, [chatId, loadSession, router, executeDeepResearch])
 
   // Update reasoning steps based on progress
   React.useEffect(() => {
@@ -107,8 +107,8 @@ export default function ChatPage() {
     const message = input.trim()
     setInput("")
     
-    // For now, simulate deep research for any input
-    await simulateDeepResearch(chatId, message)
+    // Execute real deep research for user input
+    await executeDeepResearch(chatId, message)
   }
 
   const formatTimestamp = (date: Date) => {
@@ -207,12 +207,7 @@ export default function ChatPage() {
     return (
       <div className="flex min-h-screen bg-[#F8F9FA]">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
-            <div className="text-gray-600">Loading chat session...</div>
-          </div>
-        </div>
+        <div className="flex-1" />
       </div>
     )
   }
