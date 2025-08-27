@@ -72,22 +72,11 @@ export default function AIAgentsPage() {
 
       {/* Right column */}
       <div className="flex min-h-screen flex-1 flex-col">
-        {/* Top header within page (below global nav) */}
-        <div className="sticky top-16 z-10 border-b border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="mx-auto flex h-14 max-w-6xl items-center justify-end px-4">
-            <a
-              href="/plan"
-              className="inline-flex items-center rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white shadow hover:bg-orange-600"
-            >
-              Pricing
-            </a>
-          </div>
-        </div>
 
         {/* Main content scrolls */}
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
           {/* Hero */}
-          <div className="mb-6">
+          <div className="mb-6 flex flex-col items-center text-center">
             <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">
               ✨ Newly Launched
             </span>

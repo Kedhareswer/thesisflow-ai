@@ -122,7 +122,7 @@ export default function SearchBox({
   const [provider, setProvider] = React.useState<AIProvider | undefined>(undefined)
   const [model, setModel] = React.useState<string | undefined>(undefined)
 
-  // Deep Search hook
+  // Deep Research hook
   const {
     items,
     summary,
@@ -191,7 +191,7 @@ export default function SearchBox({
 
   const onSubmit = () => {
     if (deepOn) {
-      // Start Deep Search streaming
+      // Start Deep Research streaming
       start({ query: value, provider, model, limit: 20 })
       return
     }
@@ -276,16 +276,16 @@ export default function SearchBox({
             />
           </div>
 
-          {/* center-left: Deep Search pill */}
+          {/* center-left: Deep Research pill */}
           <button
             onClick={toggleDeep}
             className={`ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors ${
               deepOn ? "border-orange-500 bg-orange-50 text-orange-700" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
             }`}
-            title="Deep Review"
+            title="Deep Research"
           >
             <span className={`h-2 w-2 rounded-full ${deepOn ? "bg-orange-500" : "bg-gray-300"}`} />
-            Deep Search
+            Deep Research
           </button>
 
           {/* right: submit */}
