@@ -2,11 +2,12 @@
 
 import React from "react"
 import { useParams, useRouter } from "next/navigation"
-import Sidebar from "../../components/Sidebar"
-import ReasoningSteps from "../components/ReasoningSteps"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 import { ChatMessage } from "@/lib/types/ai-chat"
 import { ArrowLeft, Send, Loader2 } from "lucide-react"
+import ReasoningSteps from '../components/ReasoningSteps'
+import RichContentRenderer from '../../../../components/research/RichContentRenderer'
+import Sidebar from '../../components/Sidebar'
 
 export default function ChatPage() {
   const params = useParams()
@@ -151,13 +152,44 @@ export default function ChatPage() {
         )
       
       case 'assistant':
+        const isComprehensiveReport = message.metadata?.taskType === 'deep-research' && 
+          message.metadata?.comprehensiveReport
+
         return (
           <div key={message.id} className="flex justify-start mb-4">
-            <div className="max-w-[85%] bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
-              <div className="prose prose-sm max-w-none">
-                <div className="text-sm text-gray-900 whitespace-pre-wrap">{message.content}</div>
-              </div>
-              {message.metadata?.sources && (
+            <div className="max-w-[95%] bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              {isComprehensiveReport ? (
+                <RichContentRenderer
+                  content={message.content}
+                  metadata={{
+                    totalPapers: message.metadata?.totalPapers,
+                    sources: message.metadata?.sources,
+                    keyFindings: message.metadata?.keyFindings,
+                    executiveSummary: message.metadata?.executiveSummary
+                  }}
+                  tables={message.metadata?.tables || []}
+                  charts={message.metadata?.charts || []}
+                  highlights={message.metadata?.highlights || []}
+                />
+              ) : (
+                <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700 prose-li:text-gray-700">
+                  <div 
+                    className="text-sm text-gray-900"
+                    dangerouslySetInnerHTML={{ 
+                      __html: message.content
+                        .replace(/^# (.*$)/gim, '<h1 class="text-lg font-bold text-gray-900 mb-3 mt-0">$1</h1>')
+                        .replace(/^## (.*$)/gim, '<h2 class="text-base font-semibold text-gray-800 mb-2 mt-4">$1</h2>')
+                        .replace(/^### (.*$)/gim, '<h3 class="text-sm font-medium text-gray-700 mb-2 mt-3">$1</h3>')
+                        .replace(/^\*\*(.*?)\*\*/gim, '<strong class="font-semibold text-gray-900">$1</strong>')
+                        .replace(/^\- (.*$)/gim, '<li class="ml-4 list-disc text-gray-700">$1</li>')
+                        .replace(/^(\d+)\. (.*$)/gim, '<li class="ml-4 list-decimal text-gray-700">$2</li>')
+                        .replace(/\n/g, '<br>')
+                    }}
+                  />
+                </div>
+              )}
+              
+              {message.metadata?.sources && !isComprehensiveReport && (
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   <div className="text-xs text-gray-500">
                     <span className="font-medium">Sources:</span> {message.metadata.sources.join(", ")}

@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock } from "lucide-react"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2 } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 
@@ -27,10 +27,16 @@ const navItems = [
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading } = useSupabaseAuth()
-  const { sessions } = useAIChat()
+  const { sessions, clearAllSessions } = useAIChat()
   
   // Get recent chats (max 5, most recent first)
   const recentChats = sessions.slice(0, 5)
+  
+  const handleClearHistory = () => {
+    if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+      clearAllSessions()
+    }
+  }
 
   return (
     <aside
@@ -110,9 +116,21 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div className="mt-4 px-1">
           {/* Section Header */}
           {!collapsed && (
-            <div className="mx-2 mb-2 flex items-center gap-2 px-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
-              <Clock className="h-3 w-3" />
-              Recent Chats
+            <div className="mx-2 mb-2 flex items-center justify-between px-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <div className="flex items-center gap-2">
+                <Clock className="h-3 w-3" />
+                Recent Chats
+              </div>
+              {recentChats.length > 0 && (
+                <button
+                  onClick={handleClearHistory}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors normal-case"
+                  title="Clear all chat history"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear
+                </button>
+              )}
             </div>
           )}
           

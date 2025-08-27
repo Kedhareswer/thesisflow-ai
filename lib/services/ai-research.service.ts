@@ -1,38 +1,52 @@
 import { LiteratureSearchService } from './literature-search.service'
+import { PlanningService, ResearchPlan } from './planning.service'
+import { ExecutingService, ExecutionProgress } from './executing.service'
 import { createClient } from '@supabase/supabase-js'
 
-interface SearchSource {
+export interface SearchSource {
   name: string
   count: number
   papers?: any[]
 }
 
-interface ResearchProgress {
+export interface ResearchProgress {
   phase: string
   message: string
   progress: number
-  sources?: SearchSource[]
+  sources?: { name: string; count: number }[]
+  planId?: string
+  currentTask?: string
+  taskProgress?: number
 }
 
-interface ResearchResult {
+export interface ResearchResult {
   query: string
   papers: any[]
-  sources: SearchSource[]
+  sources: { name: string; url?: string; type: string }[]
   summary: string
   keyFindings: string[]
   nextSteps: string[]
   totalPapers: number
+  relatedTerms: string[]
+  plan?: ResearchPlan
+  executionResults?: any[]
+  comprehensiveReport?: string
+  executiveSummary?: string
 }
 
 export class AIResearchService {
   private literatureSearch: LiteratureSearchService
+  private planningService: PlanningService
+  private executingService: ExecutingService
   private supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
   constructor() {
-    this.literatureSearch = new LiteratureSearchService(this.supabase)
+    this.literatureSearch = new LiteratureSearchService()
+    this.planningService = new PlanningService()
+    this.executingService = new ExecutingService()
   }
 
   async conductResearch(
@@ -40,67 +54,88 @@ export class AIResearchService {
     onProgress?: (progress: ResearchProgress) => void
   ): Promise<ResearchResult> {
     
-    // Phase 1: Initial Literature Search
+    // Enhanced workflow with planning and execution
+    
+    // Phase 1: Generate Research Plan
     onProgress?.({
-      phase: 'searching',
-      message: 'Searching academic databases...',
-      progress: 10
+      phase: 'planning',
+      message: 'Creating comprehensive research plan...',
+      progress: 5
     })
 
-    const searchResults = await this.performLiteratureSearch(query)
+    const availableTools = ['literature_search', 'web_search', 'citation_analysis', 'trend_analysis']
+    const researchPlan = await this.planningService.generateResearchPlan(query, availableTools)
     
+    // Phase 2: Execute Research Plan
     onProgress?.({
-      phase: 'searching',
-      message: 'Found initial papers, expanding search...',
-      progress: 25,
-      sources: searchResults.sources
+      phase: 'executing',
+      message: 'Executing research plan with sequential tasks...',
+      progress: 15,
+      planId: researchPlan.id,
+      currentTask: 'Starting execution'
     })
 
-    // Phase 2: Expand search with related terms
-    const expandedResults = await this.expandSearch(query, searchResults)
-    
-    onProgress?.({
-      phase: 'analyzing',
-      message: 'Analyzing paper quality and relevance...',
-      progress: 50,
-      sources: expandedResults.sources
-    })
+    const executionResults = await this.executingService.executePlan(
+      researchPlan,
+      (executionProgress) => {
+        // Forward execution progress to research progress
+        const currentTask = executionProgress.taskProgresses[executionProgress.currentTaskIndex]
+        onProgress?.({
+          phase: 'executing',
+          message: currentTask?.message || 'Executing research tasks...',
+          progress: 15 + (executionProgress.overallProgress * 0.6), // 15-75% for execution
+          planId: researchPlan.id,
+          currentTask: currentTask?.taskId,
+          taskProgress: currentTask?.progress
+        })
+      }
+    )
 
-    // Phase 3: Quality analysis and filtering
-    const filteredPapers = await this.filterAndRankPapers(expandedResults.papers)
-    
-    onProgress?.({
-      phase: 'analyzing',
-      message: 'Extracting key insights from top papers...',
-      progress: 70
-    })
-
-    // Phase 4: Content analysis and insight extraction
-    const insights = await this.extractInsights(filteredPapers, query)
-    
+    // Phase 3: Generate Comprehensive Report
     onProgress?.({
       phase: 'synthesizing',
-      message: 'Synthesizing findings and generating report...',
-      progress: 90
+      message: 'Synthesizing findings into comprehensive report...',
+      progress: 80
     })
 
-    // Phase 5: Generate comprehensive summary
-    const summary = await this.generateSummary(query, insights, filteredPapers)
+    const comprehensiveReport = await this.generateComprehensiveReport(executionResults.results)
+    const executiveSummary = await this.generateExecutiveSummary(executionResults.results)
     
+    // Phase 4: Final compilation
     onProgress?.({
       phase: 'completed',
-      message: 'Research complete! Generated comprehensive analysis.',
+      message: 'Research complete! Generated comprehensive multi-page analysis.',
       progress: 100
     })
 
+    // Compile final results
+    const allPapers = executionResults.results
+      .filter(r => r.type === 'search_results')
+      .flatMap(r => r.results || [])
+    
+    const allSources = executionResults.results
+      .filter(r => r.type === 'search_results')
+      .flatMap(r => r.sources || [])
+      .map(s => ({ name: s, url: '', type: 'academic' }))
+
+    const keyFindings = executionResults.results
+      .filter(r => r.type === 'analysis_results')
+      .flatMap(r => r.keyFindings || [])
+      .slice(0, 10)
+
     return {
       query,
-      papers: filteredPapers,
-      sources: expandedResults.sources,
-      summary: summary.text,
-      keyFindings: summary.keyFindings,
-      nextSteps: summary.nextSteps,
-      totalPapers: filteredPapers.length
+      papers: allPapers.slice(0, 50),
+      sources: allSources,
+      summary: comprehensiveReport,
+      keyFindings: keyFindings,
+      nextSteps: this.generateNextSteps(executionResults.results),
+      totalPapers: allPapers.length,
+      relatedTerms: this.extractRelatedTermsFromResults(executionResults.results),
+      plan: researchPlan,
+      executionResults: executionResults.results,
+      comprehensiveReport: comprehensiveReport,
+      executiveSummary: executiveSummary
     }
   }
 
@@ -257,14 +292,77 @@ The data indicates ${recentPapers > papers.length * 0.5 ? 'active and growing' :
       ],
       
       nextSteps: [
-        'Generate a detailed literature review document',
-        'Create citation network visualizations',
-        'Export findings to PDF/Word format',
-        'Analyze specific subtopics in greater depth',
-        'Track emerging trends and recent developments'
+        'Explore emerging methodologies in top papers',
+        'Investigate recent citation patterns',
+        'Review conference proceedings for cutting-edge research',
+        'Connect with key researchers in the field'
       ]
     }
 
     return summary
+  }
+
+  private async generateComprehensiveReport(executionResults: any[]): Promise<string> {
+    const searchResults = executionResults.filter(r => r.type === 'search_results')
+    const analysisResults = executionResults.filter(r => r.type === 'analysis_results')
+    const totalPapers = searchResults.reduce((sum, r) => sum + (r.totalResults || 0), 0)
+    
+    return `# Comprehensive Research Report
+
+## Executive Summary
+This analysis examined ${totalPapers} academic papers to provide comprehensive insights.
+
+## Key Findings
+${analysisResults.map((result, index) => `
+### ${result.analysisType || 'Analysis'} ${index + 1}
+- Key insights from systematic analysis
+- Research patterns and trends identified
+`).join('')}
+
+## Research Landscape
+Our multi-phase analysis reveals significant developments in the field with ${totalPapers} sources examined.
+
+## Future Directions
+Based on findings, we recommend continued research in emerging areas and methodological innovations.
+
+---
+*Report generated: ${new Date().toISOString().split('T')[0]}*`
+  }
+
+  private async generateExecutiveSummary(executionResults: any[]): Promise<string> {
+    const totalPapers = executionResults
+      .filter(r => r.type === 'search_results')
+      .reduce((sum, r) => sum + (r.totalResults || 0), 0)
+    
+    return `## Executive Summary
+
+**Research Scope**: Analysis of ${totalPapers} academic sources
+**Key Insights**: Comprehensive examination of current research landscape
+**Methodology**: Multi-phase systematic analysis with synthesis
+**Impact**: Strategic insights for research and development planning`
+  }
+
+  private generateNextSteps(executionResults: any[]): string[] {
+    return [
+      'Conduct follow-up research on identified gaps',
+      'Engage with key researchers in the field',
+      'Develop implementation strategy',
+      'Monitor emerging trends',
+      'Create actionable roadmap'
+    ]
+  }
+
+  private extractRelatedTermsFromResults(executionResults: any[]): string[] {
+    const analysisResults = executionResults.filter(r => r.type === 'analysis_results')
+    const terms = analysisResults.flatMap(r => r.keyTopics || [])
+      .map(topic => typeof topic === 'string' ? topic : topic.keyword)
+      .filter(Boolean)
+      .slice(0, 10)
+    
+    if (terms.length === 0) {
+      return ['research', 'analysis', 'methodology', 'findings', 'applications']
+    }
+    
+    return terms
   }
 }

@@ -10,6 +10,29 @@ export interface ChatMessage {
     progress?: number
     totalPapers?: number
     keyFindings?: string[]
+    comprehensiveReport?: string
+    executiveSummary?: string
+    tables?: Array<{
+      headers: string[]
+      rows: string[][]
+    }>
+    charts?: Array<{
+      type: 'bar' | 'line' | 'pie'
+      title: string
+      labels: string[]
+      datasets: Array<{
+        label: string
+        data: number[]
+        backgroundColor?: string | string[]
+        borderColor?: string
+        borderWidth?: number
+      }>
+    }>
+    highlights?: Array<{
+      type: 'info' | 'warning' | 'success' | 'error'
+      title: string
+      content: string
+    }>
   }
 }
 
