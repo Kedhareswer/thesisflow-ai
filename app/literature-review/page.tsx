@@ -37,12 +37,19 @@ export default function LiteratureReviewPage() {
 
   const handleSearch = () => {
     if (!query.trim()) return
-    console.log("Starting literature review search:", { query, quality: selectedQuality })
-    router.push("/literature-review/results")
+    const params = new URLSearchParams({
+      query: query.trim(),
+      quality: selectedQuality
+    })
+    router.push(`/literature-review/results?${params.toString()}`)
   }
 
   const handleSearchClick = (search: SearchResult) => {
-    router.push("/literature-review/results")
+    const params = new URLSearchParams({
+      query: search.query,
+      quality: search.qualityLevel
+    })
+    router.push(`/literature-review/results?${params.toString()}`)
   }
 
   const formatDate = (date: Date) => {

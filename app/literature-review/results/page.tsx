@@ -1,59 +1,38 @@
 "use client"
 
 import React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Sidebar from "../../ai-agents/components/Sidebar"
 import { ChevronDown, ChevronUp, Plus, ArrowLeft } from "lucide-react"
-
-interface Paper {
-  id: string
-  title: string
-  authors: string[]
-  journal: string
-  year: number
-  insights: string[]
-}
-
-const mockPapers: Paper[] = [
-  {
-    id: "1",
-    title: "Climate Change Impacts on Global Biodiversity Patterns: A Comprehensive Meta-Analysis",
-    authors: ["Smith, J.A.", "Johnson, A.B.", "Williams, C.D."],
-    journal: "Nature Climate Change",
-    year: 2024,
-    insights: ["Species displacement rates increased by 45% since 2000", "Habitat fragmentation accelerating in tropical regions", "Marine ecosystems showing critical adaptation responses"]
-  },
-  {
-    id: "2", 
-    title: "Ecosystem Response Mechanisms to Rapid Temperature Changes in Arctic Environments",
-    authors: ["Brown, M.K.", "Davis, K.L.", "Anderson, P.R."],
-    journal: "Science",
-    year: 2023,
-    insights: ["Coral reef bleaching events now annual rather than decadal", "Arctic ice loss exceeding IPCC projections", "Permafrost thaw releasing significant methane volumes"]
-  },
-  {
-    id: "3",
-    title: "Biodiversity Conservation Strategies in Climate-Altered Landscapes",
-    authors: ["Garcia, L.M.", "Thompson, R.S."],
-    journal: "Conservation Biology",
-    year: 2024,
-    insights: ["Protected area networks require 30% expansion", "Climate corridors essential for species migration", "Assisted migration programs showing promising results"]
-  },
-  {
-    id: "4",
-    title: "Tipping Points in Global Ecosystem Function Under Climate Stress",
-    authors: ["Chen, W.H.", "Kumar, S.", "Roberts, E.J."],
-    journal: "Proceedings of the National Academy of Sciences",
-    year: 2023,
-    insights: ["Amazon rainforest approaching critical threshold", "Boreal forests shifting to grasslands in northern regions", "Ocean acidification affecting food web stability"]
-  }
-]
+import { useLiteratureSearch } from "@/hooks/use-literature-search"
 
 export default function LiteratureReviewResults() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [collapsed, setCollapsed] = React.useState(false)
   const [stepsExpanded, setStepsExpanded] = React.useState(true)
   const [reportExpanded, setReportExpanded] = React.useState(false)
+
+  const query = searchParams.get("query") || ""
+  const quality = searchParams.get("quality") || "standard"
+
+  const { results, isLoading, error, searchTime, source, cached, search } = useLiteratureSearch()
+
+  React.useEffect(() => {
+    if (query) {
+      // Deep review/high-quality can map to larger limits
+      const limit = quality === "deep-review" ? 30 : quality === "high-quality" ? 20 : 10
+      search(query, limit)
+    }
+  }, [query, quality, search])
+
+  const journalsCount = React.useMemo(() => {
+    const map: Record<string, number> = {}
+    results.forEach(p => {
+      if (p.journal) map[p.journal] = (map[p.journal] || 0) + 1
+    })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [results])
 
   return (
     <div className="flex min-h-screen bg-[#F8F9FA]">
@@ -76,40 +55,35 @@ export default function LiteratureReviewResults() {
         </div>
 
         <div className="flex flex-1">
-          {/* Left Panel - Chat */}
+          {/* Left Panel - Activity / Status */}
           <div className="w-1/2 border-r border-gray-200 bg-white p-4 overflow-y-auto">
             <div className="space-y-4">
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-                <div className="text-sm font-medium text-blue-800 mb-1">🔍 Search Initiated</div>
-                <div className="text-sm text-blue-700">Starting literature review for: "overview of climate change impact on biodiversity"</div>
-                <div className="text-xs text-blue-600 mt-2">Mode: Deep Review • Sources: arXiv, PubMed, Google Scholar</div>
+                <div className="text-sm font-medium text-blue-800 mb-1">Search</div>
+                <div className="text-sm text-blue-700">Query: "{query}"</div>
+                <div className="text-xs text-blue-600 mt-2">Mode: {quality.replace('-', ' ')}</div>
               </div>
-              
-              <div className="rounded-lg bg-orange-50 border border-orange-200 p-4">
-                <div className="text-sm font-medium text-orange-800 mb-1">📊 Database Search</div>
-                <div className="text-sm text-orange-700">Scanning academic databases...</div>
-                <div className="text-xs text-orange-600 mt-2">• arXiv: 245 papers found</div>
-                <div className="text-xs text-orange-600">• PubMed: 312 papers found</div>
-                <div className="text-xs text-orange-600">• Google Scholar: 162 papers found</div>
-              </div>
-              
-              <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-                <div className="text-sm font-medium text-yellow-800 mb-1">🔬 Quality Assessment</div>
-                <div className="text-sm text-yellow-700">Filtering papers by relevance and quality metrics</div>
-                <div className="text-xs text-yellow-600 mt-2">719 → 245 papers after filtering</div>
-              </div>
-              
-              <div className="rounded-lg bg-purple-50 border border-purple-200 p-4">
-                <div className="text-sm font-medium text-purple-800 mb-1">🤖 AI Analysis</div>
-                <div className="text-sm text-purple-700">Extracting insights and synthesizing findings...</div>
-                <div className="text-xs text-purple-600 mt-2">Processing abstracts and key findings</div>
-              </div>
-              
-              <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-                <div className="text-sm font-medium text-green-800 mb-1">✅ Analysis Complete</div>
-                <div className="text-sm text-green-700">Generated comprehensive literature review with key insights</div>
-                <div className="text-xs text-green-600 mt-2">Ready for export • 4 main themes identified</div>
-              </div>
+
+              {isLoading && (
+                <div className="rounded-lg bg-orange-50 border border-orange-200 p-4">
+                  <div className="text-sm font-medium text-orange-800 mb-1">Fetching results…</div>
+                  <div className="text-sm text-orange-700">Contacting data sources (OpenAlex, arXiv, CrossRef)</div>
+                </div>
+              )}
+
+              {!isLoading && !error && (
+                <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                  <div className="text-sm font-medium text-green-800 mb-1">Completed</div>
+                  <div className="text-sm text-green-700">Found {results.length} papers in {searchTime}ms • Source: {source}{cached ? " (cached)" : ""}</div>
+                </div>
+              )}
+
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                  <div className="text-sm font-medium text-red-800 mb-1">Error</div>
+                  <div className="text-sm text-red-700">{error}</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -127,10 +101,10 @@ export default function LiteratureReviewResults() {
               {stepsExpanded && (
                 <div className="border-t border-gray-200 p-4">
                   <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-                    <li>Query formulation and database selection</li>
-                    <li>Paper collection and screening</li>
-                    <li>Quality assessment and filtering</li>
-                    <li>Data extraction and synthesis</li>
+                    <li>Formulate query and choose mode</li>
+                    <li>Parallel search across sources</li>
+                    <li>Deduplicate and rank results</li>
+                    <li>Review papers and extract insights</li>
                   </ol>
                 </div>
               )}
@@ -142,32 +116,18 @@ export default function LiteratureReviewResults() {
                 onClick={() => setReportExpanded(!reportExpanded)}
                 className="flex w-full items-center justify-between p-4 text-left"
               >
-                <span className="font-medium text-gray-900">Report</span>
+                <span className="font-medium text-gray-900">Summary</span>
                 {reportExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
               {reportExpanded && (
                 <div className="border-t border-gray-200 p-4">
                   <div className="prose prose-sm max-w-none text-gray-700">
-                    <h4 className="font-medium text-gray-900 mb-3">Executive Summary</h4>
-                    <p className="mb-4">
-                      Climate change significantly impacts global biodiversity through multiple interconnected pathways, 
-                      with species displacement rates increasing by 45% since 2000 and critical tipping points being 
-                      approached in key ecosystems.
-                    </p>
-                    
-                    <h5 className="font-medium text-gray-900 mb-2">Key Findings:</h5>
+                    <h4 className="font-medium text-gray-900 mb-3">Overview</h4>
+                    <p className="mb-4">{results.length} papers retrieved in {searchTime}ms. Top journals:</p>
                     <ul className="list-disc list-inside space-y-1 mb-4">
-                      <li>Marine ecosystems experiencing annual coral bleaching events</li>
-                      <li>Arctic ice loss exceeding IPCC projections by 15-25%</li>
-                      <li>Amazon rainforest approaching critical threshold for dieback</li>
-                      <li>Protected area networks require 30% expansion for climate adaptation</li>
-                    </ul>
-                    
-                    <h5 className="font-medium text-gray-900 mb-2">Recommendations:</h5>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Implement climate corridor strategies for species migration</li>
-                      <li>Expand assisted migration programs for vulnerable species</li>
-                      <li>Integrate climate projections into conservation planning</li>
+                      {journalsCount.map(([j, n]) => (
+                        <li key={j}>{j} — {n}</li>
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -190,25 +150,28 @@ export default function LiteratureReviewResults() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Papers</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Insights</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meta</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {mockPapers.map((paper) => (
+                    {results.map((paper) => (
                       <tr key={paper.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">{paper.title}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            <a href={paper.url} target="_blank" rel="noreferrer" className="hover:underline">{paper.title}</a>
+                          </div>
                           <div className="text-xs text-gray-500">{paper.authors.join(", ")} • {paper.journal} • {paper.year}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <ul className="text-sm text-gray-700 list-disc list-inside">
-                            {paper.insights.map((insight, idx) => (
-                              <li key={idx}>{insight}</li>
-                            ))}
-                          </ul>
+                          <div className="text-xs text-gray-600">Source: {paper.source}{paper.doi ? ` • DOI: ${paper.doi}` : ''} • Citations: {paper.citations}</div>
                         </td>
                       </tr>
                     ))}
+                    {!isLoading && results.length === 0 && !error && (
+                      <tr>
+                        <td className="px-4 py-6 text-sm text-gray-500" colSpan={2}>No results</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
