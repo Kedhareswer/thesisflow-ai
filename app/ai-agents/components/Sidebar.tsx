@@ -17,7 +17,7 @@ const navItems = [
   { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
   { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare },
   { label: "Literature Review", href: "/literature-review", id: "lit-review", icon: BookOpen },
-  { label: "Find Topics", href: "/ai-agents/topics", id: "find-topics", icon: Search },
+  { label: "Find Topics", href: "/topics", id: "find-topics", icon: Search },
   { label: "Paraphraser", href: "/paraphraser", id: "paraphraser", icon: RefreshCcw },
   { label: "Citation Generator", href: "/citations", id: "citations", icon: Quote },
   { label: "Extract Data", href: "/extract", id: "extract", icon: Database },
