@@ -3,6 +3,7 @@
 import React from "react"
 import { useParams, useRouter } from "next/navigation"
 import Sidebar from "../../components/Sidebar"
+import ReasoningSteps from "../components/ReasoningSteps"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 import { ChatMessage } from "@/lib/types/ai-chat"
 import { ArrowLeft, Send, Loader2 } from "lucide-react"
@@ -15,6 +16,7 @@ export default function ChatPage() {
   const { currentSession, loadSession, addMessage, simulateDeepResearch, isLoading, progress } = useAIChat()
   const [collapsed, setCollapsed] = React.useState(false)
   const [input, setInput] = React.useState("")
+  const [reasoningSteps, setReasoningSteps] = React.useState<any[]>([])
   
   React.useEffect(() => {
     if (chatId) {
@@ -22,9 +24,81 @@ export default function ChatPage() {
       if (!session) {
         // If session doesn't exist, redirect back to AI agents page
         router.push("/ai-agents")
+      } else if (session && session.messages.length === 0) {
+        // Initialize reasoning steps
+        setReasoningSteps([
+          { id: 'search', title: 'Database Search', description: 'Searching academic databases...', status: 'pending' },
+          { id: 'expand', title: 'Search Expansion', description: 'Finding related terms and expanding search...', status: 'pending' },
+          { id: 'analyze', title: 'Quality Analysis', description: 'Filtering and ranking papers by relevance...', status: 'pending' },
+          { id: 'extract', title: 'Insight Extraction', description: 'Analyzing abstracts and extracting key themes...', status: 'pending' },
+          { id: 'synthesize', title: 'Report Generation', description: 'Synthesizing findings into comprehensive summary...', status: 'pending' }
+        ])
+        
+        // Auto-start research with initial query for new sessions
+        simulateDeepResearch(chatId, session.taskConfig.query)
       }
     }
-  }, [chatId, loadSession, router])
+  }, [chatId, loadSession, router, simulateDeepResearch])
+
+  // Update reasoning steps based on progress
+  React.useEffect(() => {
+    if (progress && reasoningSteps.length > 0) {
+      setReasoningSteps(prev => prev.map(step => {
+        switch (progress.phase) {
+          case 'searching':
+            if (step.id === 'search') {
+              return { 
+                ...step, 
+                status: 'active',
+                description: progress.message,
+                sources: progress.sources,
+                progress: progress.progress,
+                duration: 'in progress...'
+              }
+            }
+            return step
+          case 'analyzing':
+            if (step.id === 'search') {
+              return { ...step, status: 'completed', duration: '2.3s' }
+            }
+            if (step.id === 'expand') {
+              return { ...step, status: 'completed', duration: '1.8s' }
+            }
+            if (step.id === 'analyze') {
+              return { 
+                ...step, 
+                status: 'active',
+                description: progress.message,
+                progress: progress.progress,
+                duration: 'in progress...'
+              }
+            }
+            return step
+          case 'synthesizing':
+            if (step.id === 'analyze') {
+              return { ...step, status: 'completed', duration: '3.1s' }
+            }
+            if (step.id === 'extract') {
+              return { ...step, status: 'completed', duration: '2.7s' }
+            }
+            if (step.id === 'synthesize') {
+              return { 
+                ...step, 
+                status: 'active',
+                description: progress.message,
+                progress: progress.progress,
+                duration: 'in progress...'
+              }
+            }
+            return step
+          case 'completed':
+            return step.status !== 'completed' ? { ...step, status: 'completed', duration: step.id === 'synthesize' ? '4.2s' : step.duration } : step
+          default:
+            return step
+        }
+      }))
+    }
+  }, [progress, reasoningSteps.length])
 
   const handleSendMessage = async () => {
     if (!input.trim() || !chatId || isLoading) return
@@ -112,12 +186,12 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FA]">
+    <div className="flex h-screen bg-[#F8F9FA] overflow-hidden">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       
-      <div className="flex min-h-screen flex-1 flex-col">
-        {/* Header */}
-        <div className="border-b border-gray-200 bg-white px-6 py-4">
+      <div className="flex h-screen flex-1 flex-col">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push("/ai-agents")}
@@ -136,40 +210,25 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Chat Messages */}
+        {/* Scrollable Chat Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto space-y-4">
             {currentSession.messages.map(renderMessage)}
             
-            {/* Loading indicator */}
-            {isLoading && progress && (
-              <div className="flex justify-center mb-4">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 text-center">
-                  <div className="flex items-center gap-2 text-sm text-yellow-800 font-medium">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {progress.message}
-                  </div>
-                  {progress.sources && (
-                    <div className="text-xs text-yellow-600 mt-1">
-                      {progress.sources.map(source => `${source.name}: ${source.count} papers`).join(" • ")}
-                    </div>
-                  )}
-                  <div className="mt-2">
-                    <div className="w-48 bg-yellow-200 rounded-full h-2">
-                      <div 
-                        className="bg-yellow-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${progress.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
+            {/* Reasoning Steps - shown during research */}
+            {isLoading && reasoningSteps.length > 0 && (
+              <div className="mb-6">
+                <ReasoningSteps 
+                  steps={reasoningSteps}
+                  isComplete={!isLoading}
+                />
               </div>
             )}
           </div>
         </div>
 
-        {/* Input Area */}
-        <div className="border-t border-gray-200 bg-white px-6 py-4">
+        {/* Sticky Input Area */}
+        <div className="sticky bottom-0 z-10 border-t border-gray-200/50 bg-white/80 backdrop-blur-md px-6 py-4 shadow-lg">
           <div className="max-w-4xl mx-auto">
             <div className="flex gap-4">
               <div className="flex-1">
