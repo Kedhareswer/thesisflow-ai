@@ -92,6 +92,8 @@ function extractSubjectFromPrompt(prompt: string): string {
 }
 
 function buildBase(want: string, subject: string): string {
+  // If no explicit WANT is selected, do not prefill any base text
+  if (!want) return ""
   const tmpl = wantTemplates[want] ?? wantTemplates.search_papers
   return tmpl.replace("__________", subject || "__________")
 }
@@ -113,7 +115,7 @@ export default function SearchBox({
   setValue,
 }: {
   selection: SelectionState
-  setSelection: (s: SelectionState) => void
+  setSelection: React.Dispatch<React.SetStateAction<SelectionState>>
   value: string
   setValue: React.Dispatch<React.SetStateAction<string>>
 }) {
@@ -143,6 +145,8 @@ export default function SearchBox({
   const composed = React.useMemo(() => {
     const base = buildBase(selection.want, subject)
     const suffix = composeSuffix(selection.use, selection.make)
+    // Avoid rendering a lone trailing period when no base/suffix parts are present
+    if (!base && suffix.trim() === ".") return ""
     return base + suffix
   }, [selection.want, selection.use, selection.make, subject])
 
@@ -205,6 +209,55 @@ export default function SearchBox({
       onSubmit()
     }
   }
+
+  // Infer selections from the user's freeform prompt when nothing is selected yet
+  React.useEffect(() => {
+    const text = (value || "").toLowerCase()
+    if (!text.trim()) return
+    setSelection((prev) => {
+      if (prev.want || (prev.use && prev.use.length) || (prev.make && prev.make.length)) return prev
+
+      let want = ""
+      if ((/(paper|papers)/.test(text) && /(search|get|find|help)/.test(text)) || /search\s+.*(paper|papers)/.test(text)) {
+        want = "search_papers"
+      } else if (/\bwrite\b|\breport\b/.test(text)) {
+        want = "write_report"
+      } else if (/(literature review|review literature)/.test(text)) {
+        want = "review_literature"
+      } else if (/(analyse|analyze).+data/.test(text)) {
+        want = "analyse_data"
+      } else if (/extract.+data/.test(text)) {
+        want = "extract_data"
+      } else if (/review.+writing|improve.+writing/.test(text)) {
+        want = "review_writing"
+      }
+
+      const useSet = new Set<string>()
+      if (text.includes("arxiv")) useSet.add("arxiv")
+      if (text.includes("pubmed")) useSet.add("pubmed")
+      if (text.includes("google scholar") || /\bscholar\b/.test(text)) useSet.add("google_scholar")
+      if (text.includes("deep research") || text.includes("deep review")) useSet.add("deep_review")
+      if (text.includes("grants.gov")) useSet.add("grants_gov")
+      if (text.includes("python")) useSet.add("python_library")
+
+      const makeSet = new Set<string>()
+      if (/\bwebsite\b|\bweb site\b/.test(text)) makeSet.add("website")
+      if (/latex/.test(text) && /(manuscript|paper)/.test(text)) makeSet.add("latex_manuscript")
+      if (/(visualization|visualisation|chart|graph)/.test(text)) makeSet.add("data_visualisation")
+      if (/(ppt|presentation)/.test(text)) makeSet.add("ppt_presentation")
+      if (/\bword\b/.test(text)) makeSet.add("word_document")
+      if (/\bpdf\b/.test(text) || /\breport\b/.test(text)) makeSet.add("pdf_report")
+
+      if (!want && useSet.size === 0 && makeSet.size === 0) return prev
+      return {
+        ...prev,
+        want: want || prev.want,
+        use: useSet.size ? Array.from(useSet) : prev.use,
+        make: makeSet.size ? Array.from(makeSet) : prev.make,
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
 
   // When USE/MAKE change while user edited, update only suffix
   React.useEffect(() => {

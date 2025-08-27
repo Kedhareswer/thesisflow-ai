@@ -50,7 +50,7 @@ function Chip({ active, onClick, children }: { active?: boolean; onClick?: () =>
 
 export default function AIAgentsPage() {
   const [collapsed, setCollapsed] = React.useState(false)
-  const [selection, setSelection] = React.useState<SelectionState>({ want: "search_papers", use: [], make: [] })
+  const [selection, setSelection] = React.useState<SelectionState>({ want: "", use: [], make: [] })
   const [value, setValue] = React.useState("")
 
   const toggleMulti = (group: "use" | "make", id: string) => {
@@ -135,9 +135,9 @@ export default function AIAgentsPage() {
             <div className="mb-3 text-sm font-semibold text-gray-800">Popular Tasks</div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {[
-                "Review literature on diffusion models using Deep Review and create a PDF report.",
+                "Review literature on diffusion models using Deep Research and create a PDF report.",
                 "Search research papers on LLM evaluation using arXiv and Google Scholar.",
-                "Find grants for climate adaptation and create a PPT presentation.",
+                "Extract data from PDF papers and create a Word document.",
                 "Analyse data on customer churn and create a Data visualisation.",
               ].map((t, i) => (
                 <div key={i} className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700 hover:bg-gray-50">
