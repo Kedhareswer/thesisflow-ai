@@ -18,10 +18,8 @@ const wantTemplates: Record<string, string> = {
   write_report: "Write a report on __________",
   review_literature: "Review literature on __________",
   analyse_data: "Analyse data on __________",
-  find_grants: "Find grants for __________",
   extract_data: "Extract data from __________",
   review_writing: "Review my writing about __________",
-  search_patents: "Search patents related to __________",
 }
 
 const useLabels: Record<string, string> = {
@@ -30,9 +28,7 @@ const useLabels: Record<string, string> = {
   pubmed: "PubMed",
   google_scholar: "Google Scholar",
   grants_gov: "Grants.gov",
-  clinical_trials: "ClinicalTrials",
   python_library: "Python library",
-  google_patents: "Google Patents",
 }
 
 const makeLabels: Record<string, string> = {
@@ -40,10 +36,8 @@ const makeLabels: Record<string, string> = {
   latex_manuscript: "a LaTeX manuscript",
   data_visualisation: "a Data visualisation",
   ppt_presentation: "a PPT presentation",
-  latex_poster: "a LaTeX poster",
   word_document: "a Word document",
   pdf_report: "a PDF report",
-  interactive_app: "an Interactive app",
 }
 
 function composeSuffix(use: string[], make: string[]) {
