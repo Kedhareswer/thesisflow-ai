@@ -8,6 +8,8 @@ export interface ChatMessage {
     citations?: string[]
     taskType?: string
     progress?: number
+    totalPapers?: number
+    keyFindings?: string[]
   }
 }
 

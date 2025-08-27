@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { ChatSession, ChatMessage, DeepResearchProgress } from "@/lib/types/ai-chat"
 import { v4 as uuidv4 } from "uuid"
+import { AIResearchService } from "@/lib/services/ai-research.service"
 
 export function useAIChat() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -83,6 +84,7 @@ export function useAIChat() {
 
   const simulateDeepResearch = useCallback(async (sessionId: string, query: string) => {
     setIsLoading(true)
+    const researchService = new AIResearchService()
     
     // Add initial user message
     addMessage(sessionId, {
@@ -90,82 +92,61 @@ export function useAIChat() {
       content: query
     })
 
-    // Simulate research phases
-    const phases: DeepResearchProgress[] = [
-      {
-        phase: 'searching',
-        message: 'Searching academic databases...',
-        progress: 20,
-        sources: [
-          { name: 'arXiv', count: 245 },
-          { name: 'PubMed', count: 312 },
-          { name: 'Google Scholar', count: 162 }
-        ]
-      },
-      {
-        phase: 'analyzing',
-        message: 'Analyzing paper quality and relevance...',
-        progress: 60
-      },
-      {
-        phase: 'synthesizing',
-        message: 'Synthesizing findings and generating insights...',
-        progress: 90
-      },
-      {
-        phase: 'completed',
-        message: 'Analysis complete! Generated comprehensive review.',
-        progress: 100
-      }
-    ]
+    try {
+      // Conduct real research with progress updates
+      const result = await researchService.conductResearch(query, (progress) => {
+        setProgress({
+          phase: progress.phase as any,
+          message: progress.message,
+          progress: progress.progress,
+          sources: progress.sources
+        })
+        
+        // Add system message for each phase
+        addMessage(sessionId, {
+          role: 'system',
+          content: progress.message,
+          metadata: {
+            progress: progress.progress,
+            sources: progress.sources?.map(s => s.name)
+          }
+        })
+      })
 
-    for (let i = 0; i < phases.length; i++) {
-      setProgress(phases[i])
-      
-      // Add system message for each phase
+      // Add comprehensive AI response with real research results
       addMessage(sessionId, {
-        role: 'system',
-        content: phases[i].message,
+        role: 'assistant',
+        content: result.summary,
         metadata: {
-          progress: phases[i].progress,
-          sources: phases[i].sources?.map(s => s.name)
+          sources: result.sources.map(s => s.name),
+          taskType: 'deep-research',
+          totalPapers: result.totalPapers,
+          keyFindings: result.keyFindings
         }
       })
 
-      // Wait between phases
-      await new Promise(resolve => setTimeout(resolve, 2000))
+    } catch (error) {
+      console.error('Research failed:', error)
+      
+      // Add error message
+      addMessage(sessionId, {
+        role: 'assistant',
+        content: `I encountered an issue while conducting the research: ${error instanceof Error ? error.message : 'Unknown error'}
+
+I'll try alternative approaches to get you the information you need. Would you like me to:
+
+1. **Try a simpler search** with different terms
+2. **Focus on specific databases** (arXiv, PubMed, etc.)
+3. **Break down your query** into smaller research questions
+4. **Use cached results** from previous similar searches
+
+Please let me know how you'd like to proceed, or rephrase your research question.`,
+        metadata: {
+          sources: [],
+          taskType: 'error-recovery'
+        }
+      })
     }
-
-    // Add final AI response
-    addMessage(sessionId, {
-      role: 'assistant',
-      content: `# Research Summary
-
-I've completed a comprehensive analysis of your query: "${query}"
-
-## Key Findings:
-- Found and analyzed 719 relevant papers across major databases
-- Identified 4 main research themes
-- Generated actionable insights and recommendations
-
-## Sources Analyzed:
-- **arXiv**: 245 papers
-- **PubMed**: 312 papers  
-- **Google Scholar**: 162 papers
-
-## Next Steps:
-Would you like me to:
-1. Generate a detailed report
-2. Create visualizations of the data
-3. Export findings to a specific format
-4. Explore a particular aspect in more depth
-
-The analysis is now ready for your review!`,
-      metadata: {
-        sources: ['arXiv', 'PubMed', 'Google Scholar'],
-        taskType: 'deep-research'
-      }
-    })
 
     setIsLoading(false)
     setProgress(null)
