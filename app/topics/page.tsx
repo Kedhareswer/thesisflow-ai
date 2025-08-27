@@ -1,122 +1,132 @@
 "use client"
 
-import React, { useState } from "react"
-import { Search, Link, Circle, Heart, TrendingUp, BarChart3 } from "lucide-react"
+import React, { useState } from 'react'
+import { Search, TestTube, Sun, Pill, Zap, TrendingUp } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+const suggestedTopics = [
+  {
+    id: 1,
+    text: "Benchmarks for evaluation of large language models",
+    icon: TestTube,
+    iconColor: "text-blue-600",
+    bgColor: "bg-blue-50 border-blue-200"
+  },
+  {
+    id: 2,
+    text: "Efficient materials for solar panels",
+    icon: Sun,
+    iconColor: "text-yellow-600",
+    bgColor: "bg-yellow-50 border-yellow-200"
+  },
+  {
+    id: 3,
+    text: "Effective interventions for treating depression",
+    icon: Pill,
+    iconColor: "text-pink-600",
+    bgColor: "bg-pink-50 border-pink-200"
+  },
+  {
+    id: 4,
+    text: "Renewable energy trends for the next decade",
+    icon: Zap,
+    iconColor: "text-green-600",
+    bgColor: "bg-green-50 border-green-200"
+  },
+  {
+    id: 5,
+    text: "Main causes of economic recessions",
+    icon: TrendingUp,
+    iconColor: "text-purple-600",
+    bgColor: "bg-purple-50 border-purple-200"
+  }
+]
 
 export default function FindTopicsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-
-  const topicSuggestions = [
-    {
-      id: 1,
-      text: "Benchmarks for evaluation of large language models",
-      icon: Link,
-      iconColor: "text-blue-500",
-      bgColor: "bg-blue-50",
-      hoverColor: "hover:bg-blue-100"
-    },
-    {
-      id: 2,
-      text: "Efficient materials for solar panels",
-      icon: Circle,
-      iconColor: "text-orange-500",
-      bgColor: "bg-orange-50",
-      hoverColor: "hover:bg-orange-100"
-    },
-    {
-      id: 3,
-      text: "Effective interventions for treating depression",
-      icon: Heart,
-      iconColor: "text-pink-500",
-      bgColor: "bg-pink-50",
-      hoverColor: "hover:bg-pink-100"
-    },
-    {
-      id: 4,
-      text: "Renewable energy trends for the next decade",
-      icon: TrendingUp,
-      iconColor: "text-green-500",
-      bgColor: "bg-green-50",
-      hoverColor: "hover:bg-green-100"
-    },
-    {
-      id: 5,
-      text: "Main causes of economic recessions",
-      icon: BarChart3,
-      iconColor: "text-purple-500",
-      bgColor: "bg-purple-50",
-      hoverColor: "hover:bg-purple-100"
-    }
-  ]
+  const [searchQuery, setSearchQuery] = useState('')
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle search functionality here
-    console.log("Searching for:", searchQuery)
+    if (searchQuery.trim()) {
+      // TODO: Implement actual search functionality
+      console.log('Searching for:', searchQuery)
+    }
   }
 
   const handleTopicClick = (topic: string) => {
     setSearchQuery(topic)
-    console.log("Selected topic:", topic)
+    // TODO: Trigger search with the selected topic
+    console.log('Selected topic:', topic)
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex-1 bg-white">
       {/* Main Content Container */}
-      <div className="max-w-4xl mx-auto px-6 py-16">
+      <div className="min-h-screen flex flex-col">
         {/* Header Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-semibold text-gray-900 mb-4">
-            Find Topics
-          </h1>
-          <p className="text-lg text-gray-600 font-normal">
-            Go deeper within research papers to extract insightful topics.
-          </p>
-        </div>
+        <div className="flex-1 flex flex-col items-center justify-start px-6 py-12">
+          {/* Title and Subtitle */}
+          <div className="max-w-2xl mx-auto text-center mb-12">
+            <h1 className="text-4xl font-semibold text-gray-900 mb-4">
+              Find Topics
+            </h1>
+            <p className="text-lg text-gray-600 font-normal">
+              Go deeper within research papers to extract insightful topics.
+            </p>
+          </div>
 
-        {/* Search Section */}
-        <div className="max-w-2xl mx-auto mb-16">
-          <form onSubmit={handleSearch} className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for topics across research papers..."
-              className="w-full px-6 py-4 text-base border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
-            />
-            <button
-              type="submit"
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-          </form>
-        </div>
-
-        {/* Suggestions Section */}
-        <div className="max-w-3xl mx-auto">
-          <p className="text-base text-gray-700 mb-6 font-medium">
-            Try asking or searching for:
-          </p>
-          
-          <div className="space-y-4">
-            {topicSuggestions.map((suggestion) => {
-              const IconComponent = suggestion.icon
-              return (
+          {/* Search Container */}
+          <div className="w-full max-w-2xl mx-auto mb-12">
+            <form onSubmit={handleSearch} className="relative">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for topics across research papers..."
+                  className="w-full px-4 py-4 pr-12 text-base text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm transition-all duration-200"
+                />
                 <button
-                  key={suggestion.id}
-                  onClick={() => handleTopicClick(suggestion.text)}
-                  className={`group w-full flex items-center gap-4 p-4 rounded-lg border border-gray-100 ${suggestion.bgColor} ${suggestion.hoverColor} transition-colors duration-200 text-left`}
+                  type="submit"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <div className={`flex-shrink-0 w-5 h-5 ${suggestion.iconColor}`}>
-                    <IconComponent className="w-5 h-5" />
-                  </div>
-                  <span className="text-base text-blue-600 hover:text-blue-700 font-medium group-hover:underline">
-                    {suggestion.text}
-                  </span>
+                  <Search className="h-5 w-5" />
                 </button>
-              )
-            })}
+              </div>
+            </form>
+          </div>
+
+          {/* Suggested Topics Section */}
+          <div className="w-full max-w-4xl mx-auto">
+            <div className="mb-8">
+              <p className="text-base text-gray-600 font-normal">
+                Try asking or searching for:
+              </p>
+            </div>
+
+            {/* Topics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {suggestedTopics.map((topic) => {
+                const IconComponent = topic.icon
+                return (
+                  <button
+                    key={topic.id}
+                    onClick={() => handleTopicClick(topic.text)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-200 hover:shadow-md hover:scale-[1.02] text-left group",
+                      topic.bgColor
+                    )}
+                  >
+                    <div className={cn("flex-shrink-0", topic.iconColor)}>
+                      <IconComponent className="h-5 w-5" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700 transition-colors">
+                      {topic.text}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
