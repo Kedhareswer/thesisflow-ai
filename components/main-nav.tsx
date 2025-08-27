@@ -20,10 +20,10 @@ import { useEffect, useState, lazy, Suspense } from "react"
 const NotificationBell = lazy(() => import("@/app/collaborate/components/notification-bell"))
 
 const navigation = [
+  { name: "AI Agents", href: "/ai-agents", icon: Bot },
   { name: "Explorer", href: "/explorer", icon: Search },
   { name: "Summarizer", href: "/summarizer", icon: FileText },
   { name: "Writer", href: "/writer", icon: PenLine },
-  { name: "AI Agents", href: "/ai-agents", icon: Bot },
   { name: "Planner", href: "/planner", icon: Calendar },
   { name: "Collaborate", href: "/collaborate", icon: Users },
 ]
@@ -107,39 +107,32 @@ export function MainNav() {
             <div className="inline-flex h-8 items-center justify-center rounded bg-black text-white text-xs font-bold px-2 whitespace-nowrap">
               Thesis
             </div>
-            <span className="text-lg font-semibold text-black">Flow AI</span>
+            <span className="text-lg font-semibold text-black">Flow-AI</span>
           </Link>
 
-          {/* Navigation */}
+          {/* Navigation (visible to all users) */}
           <nav className="hidden md:flex items-center space-x-1">
-            {user && !isLoading ? (
-              navigation.map((item) => {
-                const Icon = item.icon
-                const isActive = pathname === item.href
+            {navigation.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
 
-                return (
-                  <Link key={item.name} href={item.href}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-9 px-3 text-sm font-medium transition-colors",
-                        "hover:bg-gray-100 hover:text-black",
-                        isActive ? "bg-gray-100 text-black" : "text-gray-600",
-                      )}
-                    >
-                      <Icon className="mr-2 h-4 w-4" />
-                      {item.name}
-                    </Button>
-                  </Link>
-                )
-              })
-            ) : (
-              // Show limited navigation for unauthenticated users
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span>Sign in to access research tools</span>
-              </div>
-            )}
+              return (
+                <Link key={item.name} href={item.href}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-9 px-3 text-sm font-medium transition-colors",
+                      "hover:bg-gray-100 hover:text-black",
+                      isActive ? "bg-gray-100 text-black" : "text-gray-600",
+                    )}
+                  >
+                    <Icon className="mr-2 h-4 w-4" />
+                    {item.name}
+                  </Button>
+                </Link>
+              )
+            })}
           </nav>
 
           {/* Mobile Navigation */}
@@ -153,29 +146,29 @@ export function MainNav() {
               </SheetTrigger>
               <SheetContent side="left" className="pr-0">
                 <nav className="flex flex-col gap-2 p-4">
-                  {user && !isLoading ? (
-                    navigation.map((item) => {
-                      const Icon = item.icon
-                      const isActive = pathname === item.href
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          className={cn(
-                            "flex items-center rounded-md px-3 py-2 text-sm font-medium",
-                            isActive ? "bg-gray-100 text-black" : "text-gray-700 hover:bg-gray-100"
-                          )}
-                        >
-                          <Icon className="mr-2 h-4 w-4" />
-                          {item.name}
-                        </Link>
-                      )
-                    })
-                  ) : (
-                    <>
-                      <Link href="/login" className="px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100">Sign In</Link>
-                      <Link href="/signup" className="px-3 py-2 text-sm font-medium text-white bg-black rounded-md">Sign Up</Link>
-                    </>
+                  {navigation.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center rounded-md px-3 py-2 text-sm font-medium",
+                          isActive ? "bg-gray-100 text-black" : "text-gray-700 hover:bg-gray-100"
+                        )}
+                      >
+                        <Icon className="mr-2 h-4 w-4" />
+                        {item.name}
+                      </Link>
+                    )
+                  })}
+                  {/* Auth actions */}
+                  {!user && !isLoading && (
+                    <div className="mt-2 flex gap-2">
+                      <Link href="/login" className="flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100">Sign In</Link>
+                      <Link href="/signup" className="flex-1 rounded-md bg-black px-3 py-2 text-center text-sm font-medium text-white">Sign Up</Link>
+                    </div>
                   )}
                 </nav>
               </SheetContent>

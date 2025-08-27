@@ -5,7 +5,7 @@ import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal
 import type { AIProvider } from "@/lib/ai-providers"
 import { useDeepSearch } from "@/hooks/use-deep-search"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2, Bot } from "lucide-react"
+import { Loader2, Bot, Paperclip } from "lucide-react"
 
 export type SelectionState = {
   want: string
@@ -258,8 +258,15 @@ export default function SearchBox({
 
         {/* bottom bar */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">
-          {/* left: AI Provider selector (inline) */}
+          {/* left: paperclip + provider selector */}
           <div className="hidden sm:flex items-center gap-2">
+            <button
+              type="button"
+              title="Attach"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
             <MinimalAIProviderSelector
               selectedProvider={provider}
               onProviderChange={(p) => {

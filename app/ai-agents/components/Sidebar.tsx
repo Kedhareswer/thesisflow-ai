@@ -29,12 +29,16 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`sticky top-0 h-screen overflow-y-auto border-r border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 transition-all duration-300 ${
+      className={`sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 transition-all duration-300 ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
-      {/* Header */}
-      <div className="flex items-center px-3 py-3">
+      {/* Header row with brand + toggle */}
+      <div className="flex items-center gap-2 px-3 py-3">
+        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-orange-400 to-orange-600 text-[11px] font-bold text-white">
+          T
+        </div>
+        {!collapsed && <span className="text-sm font-semibold text-gray-900">ThesisFlow-AI</span>}
         <button
           aria-label="Toggle sidebar"
           onClick={onToggle}
