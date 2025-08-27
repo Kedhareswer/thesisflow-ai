@@ -113,11 +113,13 @@ export default function SearchBox({
   setSelection,
   value,
   setValue,
+  onSubmitQuery,
 }: {
   selection: SelectionState
   setSelection: React.Dispatch<React.SetStateAction<SelectionState>>
   value: string
   setValue: React.Dispatch<React.SetStateAction<string>>
+  onSubmitQuery?: (query: string) => void
 }) {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const [userEdited, setUserEdited] = React.useState(false)
@@ -193,20 +195,20 @@ export default function SearchBox({
     }
   }
 
-  const onSubmit = () => {
-    if (deepOn) {
-      // Start Deep Research streaming
-      start({ query: value, provider, model, limit: 20 })
-      return
+  const handleSubmit = () => {
+    if (!value.trim()) return
+    
+    if (onSubmitQuery) {
+      onSubmitQuery(value.trim())
+    } else {
+      console.log("Submit query:", value)
     }
-    // Fallback: no deep search selected
-    console.log("Submit query:", value)
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      onSubmit()
+      handleSubmit()
     }
   }
 
@@ -343,7 +345,7 @@ export default function SearchBox({
 
           {/* right: submit */}
           <button
-            onClick={onSubmit}
+            onClick={handleSubmit}
             className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-br from-orange-400 to-orange-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-500 hover:to-orange-700"
           >
             Submit

@@ -1,8 +1,10 @@
 "use client"
 
 import React from "react"
+import { useRouter } from "next/navigation"
 import Sidebar from "./components/Sidebar"
 import SearchBox, { type SelectionState } from "./components/SearchBox"
+import { useAIChat } from "@/lib/hooks/use-ai-chat"
 
 // Chips data
 const WANT_OPTIONS: { id: SelectionState["want"]; label: string }[] = [
@@ -49,9 +51,40 @@ function Chip({ active, onClick, children }: { active?: boolean; onClick?: () =>
 }
 
 export default function AIAgentsPage() {
+  const router = useRouter()
+  const { createSession } = useAIChat()
   const [collapsed, setCollapsed] = React.useState(false)
   const [selection, setSelection] = React.useState<SelectionState>({ want: "", use: [], make: [] })
   const [value, setValue] = React.useState("")
+
+  const handleCreateChat = (query: string) => {
+    if (!query.trim()) return
+    
+    const sessionId = createSession({
+      want: selection.want || "search_papers",
+      use: selection.use,
+      make: selection.make,
+      query: query.trim()
+    })
+    
+    router.push(`/ai-agents/chat/${sessionId}`)
+  }
+
+  const handlePopularTaskClick = (task: string) => {
+    // Extract task components and set selection
+    if (task.includes("Deep Research")) {
+      setSelection({ want: "review_literature", use: ["deep_review"], make: ["pdf_report"] })
+    } else if (task.includes("arXiv") && task.includes("Google Scholar")) {
+      setSelection({ want: "search_papers", use: ["arxiv", "google_scholar"], make: [] })
+    } else if (task.includes("PDF papers")) {
+      setSelection({ want: "extract_data", use: [], make: ["word_document"] })
+    } else if (task.includes("customer churn")) {
+      setSelection({ want: "analyse_data", use: [], make: ["data_visualisation"] })
+    }
+    
+    setValue(task)
+    handleCreateChat(task)
+  }
 
   const toggleMulti = (group: "use" | "make", id: string) => {
     setSelection((prev) => {
@@ -88,7 +121,13 @@ export default function AIAgentsPage() {
           </div>
 
           {/* Search card */}
-          <SearchBox selection={selection} setSelection={setSelection} value={value} setValue={setValue} />
+          <SearchBox 
+            selection={selection} 
+            setSelection={setSelection} 
+            value={value} 
+            setValue={setValue}
+            onSubmitQuery={handleCreateChat}
+          />
 
           {/* Builder sections */}
           <section className="mt-10">
@@ -140,7 +179,11 @@ export default function AIAgentsPage() {
                 "Extract data from PDF papers and create a Word document.",
                 "Analyse data on customer churn and create a Data visualisation.",
               ].map((t, i) => (
-                <div key={i} className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700 hover:bg-gray-50">
+                <div 
+                  key={i} 
+                  onClick={() => handlePopularTaskClick(t)}
+                  className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors hover:border-orange-300"
+                >
                   {t}
                 </div>
               ))}
