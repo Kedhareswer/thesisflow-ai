@@ -3,8 +3,9 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus } from "lucide-react"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { useAIChat } from "@/lib/hooks/use-ai-chat"
 
 type SidebarProps = {
   collapsed: boolean
@@ -26,6 +27,10 @@ const navItems = [
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading } = useSupabaseAuth()
+  const { sessions } = useAIChat()
+  
+  // Get recent chats (max 5, most recent first)
+  const recentChats = sessions.slice(0, 5)
 
   return (
     <aside
@@ -99,6 +104,62 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           )
         })}
       </nav>
+
+      {/* Recent Chats Section */}
+      {recentChats.length > 0 && (
+        <div className="mt-4 px-1">
+          {/* Section Header */}
+          {!collapsed && (
+            <div className="mx-2 mb-2 flex items-center gap-2 px-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <Clock className="h-3 w-3" />
+              Recent Chats
+            </div>
+          )}
+          
+          {/* Chat List */}
+          <div className="space-y-0.5">
+            {recentChats.map((chat) => {
+              const isCurrentChat = pathname.includes(`/ai-agents/chat/${chat.id}`)
+              const timeAgo = new Date().getTime() - chat.updatedAt.getTime() < 3600000 
+                ? `${Math.floor((new Date().getTime() - chat.updatedAt.getTime()) / 60000)}m ago`
+                : `${Math.floor((new Date().getTime() - chat.updatedAt.getTime()) / 3600000)}h ago`
+              
+              return (
+                <Link 
+                  key={chat.id} 
+                  href={`/ai-agents/chat/${chat.id}`} 
+                  className="block" 
+                  title={collapsed ? chat.title : `${chat.title} • ${timeAgo}`}
+                >
+                  <div
+                    className={`relative mx-2 flex items-center rounded-md py-2 text-sm transition-colors ${
+                      isCurrentChat ? "text-orange-600 bg-orange-50" : "text-gray-600 hover:bg-gray-50"
+                    } ${collapsed ? "justify-center" : "gap-3 px-2"}`}
+                  >
+                    {/* Left rail only when expanded */}
+                    {!collapsed && (
+                      <span
+                        className={`absolute left-0 top-1/2 -translate-y-1/2 h-4 rounded-sm ${isCurrentChat ? "w-1 bg-orange-500" : "w-0"}`}
+                      />
+                    )}
+                    
+                    {/* Chat Icon */}
+                    <MessageSquare className={`h-4 w-4 flex-shrink-0 ${isCurrentChat ? "text-orange-600" : "text-gray-400"}`} />
+                    
+                    {/* Chat Details */}
+                    {!collapsed && (
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{chat.title}</div>
+                        <div className="text-xs text-gray-400">{timeAgo}</div>
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Bottom card - show only when not collapsed AND unauthenticated */}
       {!collapsed && !isLoading && !user && (

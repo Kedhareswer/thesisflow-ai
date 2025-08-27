@@ -1,14 +1,44 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { ChatSession, ChatMessage, DeepResearchProgress } from "@/lib/types/ai-chat"
 import { v4 as uuidv4 } from "uuid"
 
 export function useAIChat() {
-  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    // Load sessions from localStorage on initialization
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('ai-chat-sessions')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          // Convert date strings back to Date objects
+          return parsed.map((session: any) => ({
+            ...session,
+            createdAt: new Date(session.createdAt),
+            updatedAt: new Date(session.updatedAt),
+            messages: session.messages.map((msg: any) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp)
+            }))
+          }))
+        } catch (e) {
+          console.error('Failed to parse stored sessions:', e)
+        }
+      }
+    }
+    return []
+  })
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [progress, setProgress] = useState<DeepResearchProgress | null>(null)
+
+  // Save sessions to localStorage whenever sessions change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ai-chat-sessions', JSON.stringify(sessions))
+    }
+  }, [sessions])
 
   const createSession = useCallback((taskConfig: ChatSession['taskConfig']) => {
     const sessionId = uuidv4()

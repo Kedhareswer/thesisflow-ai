@@ -18,9 +18,13 @@ export default function ChatPage() {
   
   React.useEffect(() => {
     if (chatId) {
-      loadSession(chatId)
+      const session = loadSession(chatId)
+      if (!session) {
+        // If session doesn't exist, redirect back to AI agents page
+        router.push("/ai-agents")
+      }
     }
-  }, [chatId, loadSession])
+  }, [chatId, loadSession, router])
 
   const handleSendMessage = async () => {
     if (!input.trim() || !chatId || isLoading) return
