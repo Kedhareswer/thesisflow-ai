@@ -13,7 +13,7 @@ type SidebarProps = {
 }
 
 // External destination for QuantumPDF ChatApp
-const QUANTUM_PDF_URL = (process.env.NEXT_PUBLIC_QUANTUM_PDF_URL as string) || "https://quantumpdf.app"
+const QUANTUM_PDF_URL = (process.env.NEXT_PUBLIC_QUANTUM_PDF_URL as string) || "https://quantumn-pdf-chatapp.netlify.app/"
 
 const navItems = [
   { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },

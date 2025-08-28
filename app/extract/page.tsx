@@ -1,13 +1,15 @@
 "use client"
 
 import React, { useState, useRef, useCallback } from 'react'
-import { 
-  Upload, 
-  FileText, 
-  Sparkles, 
-  Loader2, 
-  Check, 
-  X, 
+import Link from 'next/link'
+import Sidebar from '../ai-agents/components/Sidebar'
+import {
+  Upload,
+  FileText,
+  Sparkles,
+  Loader2,
+  Check,
+  X,
   Settings,
   File as FileIcon,
   MessageSquare,
@@ -19,12 +21,15 @@ import {
   Calendar,
   Hash,
   Mail,
-  Link,
+  Link as LinkIcon,
   ChevronDown,
   Copy,
   Download,
   AlertCircle,
-  BarChart3
+  BarChart3,
+  Search,
+  MoreHorizontal,
+  Mic
 } from 'lucide-react'
 
 interface ChatMessage {
@@ -340,129 +345,179 @@ export default function ExtractPage() {
 
   if (viewMode === 'chat') {
     return (
-      <div className="flex min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+      <div className="flex min-h-screen bg-[#F8F9FA]">
+        {/* Sidebar (same as AI Agents) */}
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
         <div className="flex min-h-screen flex-1 flex-col">
-          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
-            {/* Header */}
-            <div className="mb-6">
-              <div className="flex items-center gap-4 mb-4">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-4 text-sm text-gray-500">
+              <Link href="/" className="hover:text-gray-700">Home</Link>
+              <span className="mx-2">/</span>
+              <span className="text-gray-700">Extract Data</span>
+            </div>
+
+            {/* Tabs + Toolbar */}
+            <div className="mb-3 flex items-center gap-4">
+              <div className="flex items-center gap-6 border-b border-gray-200">
                 <button
-                  onClick={() => setViewMode('upload')}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                  onClick={() => setActiveTab('pdf')}
+                  className={`-mb-px px-1 pb-2 text-sm font-medium ${
+                    activeTab === 'pdf'
+                      ? 'border-b-2 border-orange-500 text-gray-900'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
                 >
-                  ← Back to Upload
+                  PDF file
                 </button>
-                <h1 className="text-2xl font-bold text-gray-900">Extract Data Assistant</h1>
-              </div>
-              
-              <div className="flex items-center gap-4 mb-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={highQuality}
-                    onChange={(e) => setHighQuality(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-sm text-gray-600">High-quality extraction</span>
-                </label>
-                
-                <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-                  <button
-                    onClick={() => setActiveTab('pdf')}
-                    className={`px-3 py-1.5 text-sm rounded ${
-                      activeTab === 'pdf' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    <Eye className="w-4 h-4 inline mr-1" />
-                    PDF View
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('summary')}
-                    className={`px-3 py-1.5 text-sm rounded ${
-                      activeTab === 'summary' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Summary View
-                  </button>
-                </div>
+                <button
+                  onClick={() => setActiveTab('summary')}
+                  className={`-mb-px px-1 pb-2 text-sm font-medium ${
+                    activeTab === 'summary'
+                      ? 'border-b-2 border-orange-500 text-gray-900'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Summary
+                </button>
               </div>
             </div>
 
-            {/* Chat Interface */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
-              {/* Left Panel - PDF/Summary View */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  {activeTab === 'pdf' ? 'Document View' : 'Summary'}
-                </h3>
-                
+            {/* Main content: Left (viewer) + Right (chat) */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              {/* Left column */}
+              <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white">
+                {/* Toolbar row */}
+                <div className="flex items-center gap-2 border-b border-gray-200 p-3">
+                  <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
+                    <Search className="h-4 w-4" />
+                  </button>
+                  <button className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    Explain math & table
+                  </button>
+                  <div className="relative ml-1 flex-1">
+                    <input
+                      placeholder="Search in PDF"
+                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-50">
+                    80%
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <button className="inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                  <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700">
+                    <Mic className="h-3.5 w-3.5" />
+                    Podcast
+                  </span>
+                </div>
+
+                {/* Viewer/Summary area */}
                 {activeTab === 'pdf' ? (
-                  <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
-                    <FileIcon className="w-12 h-12 mx-auto mb-2" />
-                    <p>PDF viewer would be displayed here</p>
-                    <p className="text-sm mt-1">
-                      Files: {selectedFiles.map(f => f.name).join(', ')}
-                    </p>
+                  <div className="h-[620px] overflow-auto bg-[#FAFAFA]">
+                    <div className="mx-auto max-w-3xl px-6 py-6">
+                      <div className="rounded-md border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="mb-4 text-center">
+                          <h2 className="text-xl font-semibold text-gray-800">
+                            Enhancement of Endoscopic Images & Videos using Advanced Deep Learning & Traditional Image Enhancement Techniques
+                          </h2>
+                          <p className="mt-2 text-xs text-gray-500">Files: {selectedFiles.map((f) => f.name).join(', ') || 'Sample.pdf'}</p>
+                        </div>
+                        <div className="h-96 rounded-md bg-orange-100/40 ring-1 ring-orange-200/70" />
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-gray-700 text-sm">
-                      Document summary and key findings will appear here after processing.
-                    </p>
+                  <div className="h-[620px] overflow-auto bg-white p-4">
+                    <div className="prose prose-sm max-w-none">
+                      <h3 className="mb-2 font-semibold text-gray-900">Summary</h3>
+                      <p className="text-[15px] leading-7 text-gray-700">
+                        Document summary and key findings will appear here after processing.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Right Panel - Chat */}
-              <div className="bg-white rounded-lg border border-gray-200 flex flex-col">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="font-semibold text-gray-900">Chat Assistant</h3>
-                  <p className="text-sm text-gray-600">Ask questions about your uploaded documents</p>
+              {/* Right column - Chat */}
+              <div className="flex min-h-[720px] flex-col rounded-lg border border-gray-200 bg-white">
+                <div className="flex items-center justify-between border-b border-gray-200 p-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-orange-600" />
+                    <h3 className="text-sm font-semibold text-gray-900">Chat</h3>
+                  </div>
+                  <div className="text-xs text-gray-500">en</div>
                 </div>
-                
+
+                {/* Suggestion chips */}
+                <div className="flex flex-wrap gap-2 p-3">
+                  {['Methods used','Limitations','Explain Abstract','Practical Implications','Paper Summary','Literature survey','Future works'].map((c) => (
+                    <button key={c} className="whitespace-nowrap rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">
+                      {c}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={messagesEndRef}>
+                <div className="flex-1 space-y-3 overflow-y-auto px-3 py-2" ref={messagesEndRef}>
                   {messages.map((message) => (
                     <div
                       key={message.id}
                       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-lg px-3 py-2 ${
-                          message.sender === 'user'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-100 text-gray-900'
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          message.sender === 'user' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        <p className="text-sm">{message.content}</p>
+                        {message.content}
                       </div>
                     </div>
                   ))}
                 </div>
-                
-                {/* Input */}
-                <div className="p-4 border-t border-gray-200">
-                  <div className="flex gap-2">
+
+                {/* Composer */}
+                <div className="border-t border-gray-200 p-3">
+                  {/* Guided prompt */}
+                  <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
+                    <span className="truncate">Generate summary of this paper, Results of the paper, Conc</span>
+                    <button className="text-gray-500 hover:text-gray-700">+13 more</button>
+                  </div>
+
+                  <div className="flex items-end gap-2">
                     <textarea
                       ref={chatInputRef}
                       value={currentMessage}
                       onChange={(e) => setCurrentMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="Ask about your documents..."
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                      placeholder="Ask any question..."
+                      className="min-h-[40px] flex-1 resize-none rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                       rows={1}
                     />
                     <button
                       onClick={sendMessage}
                       disabled={!currentMessage.trim()}
-                      className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex h-9 items-center justify-center rounded-md bg-orange-600 px-3 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
                     >
-                      <Send className="w-4 h-4" />
+                      <Send className="h-4 w-4" />
                     </button>
+                  </div>
+
+                  {/* High quality toggle */}
+                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                    <label className="inline-flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={highQuality}
+                        onChange={(e) => setHighQuality(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      High Quality
+                    </label>
+                    <span className="ml-auto text-lg">∑</span>
                   </div>
                 </div>
               </div>
@@ -474,127 +529,95 @@ export default function ExtractPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+    <div className="flex min-h-screen bg-[#F8F9FA]">
+      {/* Sidebar (same as AI Agents) */}
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <div className="flex min-h-screen flex-1 flex-col">
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+          {/* Breadcrumb */}
+          <div className="mb-6 text-sm text-gray-500">
+            <Link href="/" className="hover:text-gray-700">Home</Link>
+            <span className="mx-2">/</span>
+            <span className="text-gray-700">Extract Data</span>
+          </div>
+
           {/* Header */}
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
-              Extract Data
-            </h1>
-            <p className="mt-2 text-gray-600">
-              Get summary, conclusions and findings from multiple PDFs in a table
-            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Extract Data From Research Papers</h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-gray-600">Get summary, conclusions and findings from multiple PDFs in a table.</p>
           </div>
 
           {/* Upload Area */}
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-              <div className="text-center mb-6">
-                <Upload className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">Upload Your Files</h2>
-                <p className="text-gray-600">
-                  Drop your PDFs, Word docs, or other files here to get started
-                </p>
-              </div>
+          <div className="mx-auto max-w-3xl">
+            <div className="rounded-lg border border-gray-200 bg-white p-6">
+              {/* Drop Zone */}
+              {!isUploading && (
+                <div className="rounded-md border border-gray-200 p-4">
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`rounded-md border-2 border-dashed p-10 text-center ${
+                      isDragOver ? 'border-orange-300 bg-orange-50' : 'border-gray-300 bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf"
+                      onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
+                      className="hidden"
+                    />
+                    <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
+                      <FileText className="h-7 w-7 text-gray-500" />
+                    </div>
+                    <div className="text-sm text-gray-700">Drag and drop or click to browse files</div>
+                    <div className="mt-1 text-xs text-gray-400">Max. 100 MB per file</div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-5 inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload PDF
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Upload Progress */}
               {isUploading && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="mb-2">
+                  <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Uploading...</span>
                     <span className="text-sm text-gray-500">{uploadProgress}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                  
-                  {/* Skeleton Loading */}
-                  <div className="mt-4 space-y-3">
-                    <div className="animate-pulse flex space-x-4">
-                      <div className="rounded-full bg-gray-200 h-10 w-10"></div>
-                      <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      </div>
-                    </div>
-                    <div className="animate-pulse flex space-x-4">
-                      <div className="rounded-full bg-gray-200 h-10 w-10"></div>
-                      <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      </div>
-                    </div>
+                  <div className="h-2 w-full rounded-full bg-gray-200">
+                    <div className="h-2 rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                   </div>
                 </div>
               )}
 
               {/* File List */}
               {selectedFiles.length > 0 && !isUploading && (
-                <div className="mb-6">
-                  <h3 className="font-medium text-gray-900 mb-3">Selected Files</h3>
+                <div className="mt-6">
+                  <h3 className="mb-2 text-sm font-medium text-gray-900">Selected Files</h3>
                   <div className="space-y-2">
                     {selectedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div key={index} className="flex items-center justify-between rounded-md border border-gray-200 bg-white p-3">
                         <div className="flex items-center gap-3">
-                          <FileIcon className="w-5 h-5 text-gray-500" />
+                          <FileIcon className="h-5 w-5 text-gray-500" />
                           <div>
                             <p className="text-sm font-medium text-gray-900">{file.name}</p>
                             <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => removeFile(index)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="w-4 h-4" />
+                        <button onClick={() => removeFile(index)} className="text-gray-400 hover:text-gray-600">
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Drop Zone */}
-              {!isUploading && (
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    isDragOver
-                      ? 'border-green-400 bg-green-50'
-                      : 'border-gray-300 hover:border-green-400 hover:bg-green-50'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
-                    onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
-                    className="hidden"
-                  />
-                  
-                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">
-                    Drag and drop your files here
-                  </p>
-                  <p className="text-gray-500 mb-4">
-                    or click to browse from your computer
-                  </p>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Choose Files
-                  </button>
-                  <p className="text-xs text-gray-500 mt-4">
-                    Supports PDF, Word, Excel, PowerPoint, and text files
-                  </p>
                 </div>
               )}
             </div>

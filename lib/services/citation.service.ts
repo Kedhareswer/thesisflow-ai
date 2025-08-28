@@ -214,12 +214,12 @@ class CitationService {
           const foreName = a.querySelector('ForeName')?.textContent || '';
           return `${foreName} ${lastName}`.trim();
         }),
-        year: article.querySelector('PubDate Year')?.textContent,
-        journal: article.querySelector('Title')?.textContent,
-        volume: article.querySelector('Volume')?.textContent,
-        issue: article.querySelector('Issue')?.textContent,
-        pages: article.querySelector('MedlinePgn')?.textContent,
-        doi: article.querySelector('ArticleId[IdType="doi"]')?.textContent,
+        year: article.querySelector('PubDate Year')?.textContent ?? undefined,
+        journal: article.querySelector('Title')?.textContent ?? undefined,
+        volume: article.querySelector('Volume')?.textContent ?? undefined,
+        issue: article.querySelector('Issue')?.textContent ?? undefined,
+        pages: article.querySelector('MedlinePgn')?.textContent ?? undefined,
+        doi: article.querySelector('ArticleId[IdType="doi"]')?.textContent ?? undefined,
         url: url
       };
     } catch (error) {

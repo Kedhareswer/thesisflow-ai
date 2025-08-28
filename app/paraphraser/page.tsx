@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { ChevronDown, Share, FileText, RotateCcw } from "lucide-react"
+import { ChevronDown, Share, FileText, Globe } from "lucide-react"
 
 interface ParaphraseResult {
   paraphrased: string
@@ -20,9 +20,22 @@ export default function ParaphraserPage() {
   const [showMoreDropdown, setShowMoreDropdown] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [wordCount, setWordCount] = useState(0)
+  const [resultText, setResultText] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const tabs = ['Academic', 'Fluent', 'Formal', 'Creative']
   const moreOptions = ['Casual', 'Technical', 'Simple', 'Professional']
+
+  const TAB_TO_MODE: Record<string, 'academic' | 'casual' | 'formal' | 'creative' | 'technical' | 'simple'> = {
+    Academic: 'academic',
+    Fluent: 'casual',
+    Formal: 'formal',
+    Creative: 'creative',
+    Casual: 'casual',
+    Technical: 'technical',
+    Simple: 'simple',
+    Professional: 'formal',
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value
@@ -33,14 +46,30 @@ export default function ParaphraserPage() {
 
   const handleParaphrase = useCallback(async () => {
     if (!inputText.trim()) return
-    
     setIsLoading(true)
-    
-    // Simulate API call
-    setTimeout(() => {
+    setError(null)
+    setResultText('')
+    try {
+      const mode = TAB_TO_MODE[activeTab] || 'academic'
+      const res = await fetch('/api/paraphraser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: inputText,
+          mode,
+          preserveLength: lengthValue >= 3,
+          variations: variationValue,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Failed to paraphrase')
+      setResultText(data?.paraphrased || '')
+    } catch (e: any) {
+      setError(e?.message || 'Failed to paraphrase')
+    } finally {
       setIsLoading(false)
-    }, 2000)
-  }, [inputText])
+    }
+  }, [inputText, activeTab, lengthValue, variationValue])
 
   const trySampleText = () => {
     const sampleText = "The rapid advancement of artificial intelligence has transformed various industries and continues to shape the future of technology. Machine learning algorithms and neural networks have enabled computers to perform complex tasks that were once thought to be exclusively human capabilities."
@@ -83,18 +112,18 @@ export default function ParaphraserPage() {
           </div>
 
           {/* Content Container */}
-          <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg">
-            {/* Tabs */}
-            <div className="border-b border-gray-200">
-              <div className="flex">
+          <div className="mx-auto w-full max-w-5xl rounded-lg border border-gray-200 bg-white">
+            {/* Top row: Tabs + Controls (teal accent) */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 sm:px-6">
+              <div className="flex items-center">
                 {tabs.map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-4 sm:px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === tab
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ? 'border-[#199EBD] text-[#147C97]'
+                        : 'border-transparent text-gray-600 hover:text-gray-800'
                     }`}
                   >
                     {tab}
@@ -103,13 +132,13 @@ export default function ParaphraserPage() {
                 <div className="relative">
                   <button
                     onClick={() => setShowMoreDropdown(!showMoreDropdown)}
-                    className="flex items-center px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700"
+                    className="flex items-center px-4 sm:px-6 py-3 text-sm font-medium text-gray-600 hover:text-gray-800"
                   >
                     More
                     <ChevronDown className="ml-1 h-4 w-4" />
                   </button>
                   {showMoreDropdown && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                    <div className="absolute top-full left-0 mt-1 w-48 rounded-md border border-gray-200 bg-white shadow-lg z-10">
                       {moreOptions.map((option) => (
                         <button
                           key={option}
@@ -117,7 +146,7 @@ export default function ParaphraserPage() {
                             setActiveTab(option)
                             setShowMoreDropdown(false)
                           }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                         >
                           {option}
                         </button>
@@ -126,106 +155,103 @@ export default function ParaphraserPage() {
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Controls */}
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                {/* Left side - Sliders */}
-                <div className="flex items-center space-x-8">
-                  {/* Length Slider */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm text-gray-600 min-w-[50px]">Length:</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="w-6 h-6 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
-                        {lengthValue}
-                      </span>
-                      <input
-                        type="range"
-                        min="1"
-                        max="5"
-                        value={lengthValue}
-                        onChange={(e) => setLengthValue(Number(e.target.value))}
-                        className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                      />
-                      {[1, 2, 3, 4, 5].map((num) => (
-                        <span
-                          key={num}
-                          className={`w-2 h-2 rounded-full ${
-                            num <= lengthValue ? 'bg-blue-500' : 'bg-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Variation Slider */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm text-gray-600 min-w-[60px]">Variation:</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="w-6 h-6 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
-                        {variationValue}
-                      </span>
-                      <input
-                        type="range"
-                        min="1"
-                        max="5"
-                        value={variationValue}
-                        onChange={(e) => setVariationValue(Number(e.target.value))}
-                        className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                      />
-                      {[1, 2, 3, 4, 5].map((num) => (
-                        <span
-                          key={num}
-                          className={`w-2 h-2 rounded-full ${
-                            num <= variationValue ? 'bg-blue-500' : 'bg-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
+              <div className="hidden md:flex items-center gap-8">
+                {/* Length Slider */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600">Length:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      value={lengthValue}
+                      onChange={(e) => setLengthValue(Number(e.target.value))}
+                      className="w-28 cursor-pointer accent-[#199EBD]"
+                    />
+                    {[1,2,3,4,5].map((i) => (
+                      <span key={i} className={`h-1.5 w-1.5 rounded-full ${i <= lengthValue ? 'bg-[#199EBD]' : 'bg-gray-300'}`} />
+                    ))}
                   </div>
                 </div>
-
-                {/* Right side - Locale */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">🌐 Locale</span>
+                {/* Variation Slider */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600">Variation:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      value={variationValue}
+                      onChange={(e) => setVariationValue(Number(e.target.value))}
+                      className="w-28 cursor-pointer accent-[#199EBD]"
+                    />
+                    {[1,2,3,4,5].map((i) => (
+                      <span key={i} className={`h-1.5 w-1.5 rounded-full ${i <= variationValue ? 'bg-[#199EBD]' : 'bg-gray-300'}`} />
+                    ))}
+                  </div>
+                </div>
+                {/* Locale */}
+                <button className="flex items-center gap-2 text-sm text-gray-600">
+                  <Globe className="h-4 w-4 text-gray-500" />
+                  <span>Locale</span>
                   <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Two-pane content */}
+            <div className="grid grid-cols-1 md:grid-cols-2">
+              {/* Left: input */}
+              <div className="p-4 sm:p-6">
+                <div className="relative">
+                  <textarea
+                    value={inputText}
+                    onChange={handleInputChange}
+                    placeholder="Write here or try a sample text"
+                    className="h-[380px] w-full resize-none p-4 text-gray-800 placeholder-gray-400 focus:outline-none"
+                  />
+                  {!inputText && (
+                    <button
+                      onClick={trySampleText}
+                      className="absolute top-14 left-6 inline-flex items-center gap-2 text-sm text-[#199EBD] hover:underline"
+                    >
+                      <FileText className="h-4 w-4" />
+                      try a sample text
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: results */}
+              <div className="border-t border-gray-200 p-4 sm:p-6 md:border-t-0 md:border-l">
+                <div className="h-[380px] w-full overflow-auto">
+                  {isLoading ? (
+                    <div className="flex h-full items-center justify-center text-sm text-gray-500">Processing…</div>
+                  ) : error ? (
+                    <div className="text-sm text-red-600">{error}</div>
+                  ) : resultText ? (
+                    <div className="whitespace-pre-wrap text-gray-800">{resultText}</div>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-gray-400">Paraphrased text will appear here</div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Text Input Area */}
-            <div className="p-6">
-              <div className="relative">
-                <textarea
-                  value={inputText}
-                  onChange={handleInputChange}
-                  placeholder="Write here or try a sample text"
-                  className="w-full h-64 p-4 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-700 placeholder-gray-400"
-                />
-                {!inputText && (
-                  <button
-                    onClick={trySampleText}
-                    className="absolute top-16 left-8 text-blue-500 hover:text-blue-600 text-sm underline"
-                  >
-                    📄 try a sample text
-                  </button>
-                )}
-              </div>
-
-              {/* Bottom Bar */}
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-gray-500">
-                  {wordCount}/500 words
-                </div>
+            {/* Bottom bar */}
+            <div className="flex items-center justify-between border-t border-gray-200 px-4 sm:px-6 py-4">
+              <div className="text-sm text-gray-500">{wordCount}/500 words</div>
+              <div className="flex-1 flex justify-center">
                 <button
                   onClick={handleParaphrase}
                   disabled={!inputText.trim() || isLoading}
-                  className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="rounded-md bg-orange-500 px-6 py-2 font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isLoading ? 'Processing...' : 'Paraphrase'}
+                  {isLoading ? 'Processing…' : 'Paraphrase'}
                 </button>
               </div>
+              <div className="w-[80px]" />
             </div>
           </div>
         </div>

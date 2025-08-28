@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { FileText, Upload, Loader2, ChevronDown } from "lucide-react"
+import { Upload, Loader2, Info } from "lucide-react"
 
 interface AIDetectionResult {
   is_ai: boolean
@@ -30,8 +30,15 @@ export default function AIDetectorPage() {
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'input' | 'upload'>('input')
   const [textType, setTextType] = useState<'scientific' | 'non-scientific'>('scientific')
-  const [showDropdown, setShowDropdown] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const wordLimit = 1500
+  const examples = [
+    { label: 'Chat GPT', text: 'We investigated the impact of climate variability on maize yields using a multi-year dataset and controlled field trials. Results indicate significant correlations between seasonal precipitation anomalies and yield outcomes.' },
+    { label: 'Quillbot', text: 'This study explores how fluctuations in climate influence agricultural productivity by examining temporal precipitation patterns and their association with harvest metrics.' },
+    { label: 'Jasper', text: 'Our research assesses the role of atmospheric dynamics in shaping crop performance, applying regression models to quantify the sensitivity of yields to drought indices.' },
+    { label: 'AI + Human text', text: 'Initial pilot experiments suggested mixed effects; however, our expanded analysis reveals that resilience strategies such as mulching and cultivar selection mitigate adverse conditions.' },
+    { label: 'Abstract by AI', text: 'This paper proposes a framework for evaluating climate-yield interactions, demonstrating that context-aware agronomic interventions substantially reduce variance in outcomes.' }
+  ]
 
   const handleAnalyze = async () => {
     if (!inputText.trim()) {
@@ -42,6 +49,11 @@ export default function AIDetectorPage() {
     const wordCount = inputText.split(/\s+/).filter(w => w.length > 0).length
     if (wordCount < 10) {
       setError('Text too short. Please provide at least 10 words for analysis.')
+      return
+    }
+
+    if (wordCount > wordLimit) {
+      setError(`Please limit your input to ${wordLimit} words.`)
       return
     }
 
@@ -79,146 +91,166 @@ export default function AIDetectorPage() {
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 px-8 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Academic AI Detector</h1>
+          <div className="max-w-6xl mx-auto text-center">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Academic AI Detector</h1>
+            <p className="mt-2 text-sm sm:text-base text-gray-500">Catch GPT-4, ChatGPT, Jasper, and any AI in scholarly content.</p>
+          </div>
         </header>
 
         {/* Main Content */}
         <main className="flex-1 px-8 py-8">
-          <div className="max-w-4xl mx-auto">
-            {/* Tab Navigation */}
-            <div className="flex mb-8">
-              <button
-                onClick={() => setActiveTab('input')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'input'
-                    ? 'border-blue-500 text-blue-600 bg-blue-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
+          <div className="max-w-6xl mx-auto">
+            {/* Tabs */}
+            <div className="mb-5 border-b border-gray-200">
+              <nav className="flex gap-6">
+                <button
+                  onClick={() => setActiveTab('input')}
+                  className={`-mb-px pb-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'input'
+                      ? 'border-sky-500 text-sky-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
                   Input Text
-                </div>
-              </button>
-              <button
-                onClick={() => setActiveTab('upload')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'upload'
-                    ? 'border-blue-500 text-blue-600 bg-blue-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  Upload File
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={() => setActiveTab('upload')}
+                  className={`-mb-px pb-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'upload'
+                      ? 'border-sky-500 text-sky-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Upload PDF
+                </button>
+              </nav>
             </div>
 
             {/* Content Area */}
             {activeTab === 'input' && (
-              <div className="space-y-6">
-                {/* Type Selector */}
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                    Type of Text:
-                  </label>
-                  <div className="relative">
+              <div className="space-y-4">
+                {/* Examples Row */}
+                <div className="flex items-center flex-wrap gap-2">
+                  <span className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-700 text-sm font-medium">Examples</span>
+                  {examples.map((ex) => (
                     <button
-                      onClick={() => setShowDropdown(!showDropdown)}
-                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      key={ex.label}
+                      onClick={() => setInputText(ex.text)}
+                      className="px-3 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 text-sm hover:bg-gray-50"
                     >
-                      {textType === 'scientific' ? 'Scientific' : 'Non-Scientific'}
-                      <ChevronDown className="w-4 h-4" />
+                      {ex.label}
                     </button>
-                    
-                    {showDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  ))}
+                </div>
+
+                {/* Two Column Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left: Textarea Card */}
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <textarea
+                      ref={textareaRef}
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      placeholder="Start writing here or paste some scientific text and click analyse"
+                      className="w-full min-h-[360px] p-4 outline-none resize-none text-sm"
+                    />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t px-4 py-3 bg-white">
+                      <div className="flex items-center gap-3">
                         <button
-                          onClick={() => {
-                            setTextType('scientific')
-                            setShowDropdown(false)
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 first:rounded-t-lg"
+                          onClick={() => setInputText('')}
+                          className="px-3 py-1.5 rounded-md border border-orange-200 bg-orange-50 text-orange-600 text-sm"
                         >
+                          New Input
+                        </button>
+                        <span className="text-sm text-gray-500">{Math.min(wordCount, wordLimit)}/{wordLimit} words</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="radio"
+                            className="accent-sky-600"
+                            checked={textType === 'scientific'}
+                            onChange={() => setTextType('scientific')}
+                          />
                           Scientific
-                        </button>
-                        <button
-                          onClick={() => {
-                            setTextType('non-scientific')
-                            setShowDropdown(false)
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 last:rounded-b-lg"
-                        >
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="radio"
+                            className="accent-sky-600"
+                            checked={textType === 'non-scientific'}
+                            onChange={() => setTextType('non-scientific')}
+                          />
                           Non-Scientific
-                        </button>
+                        </label>
+                      </div>
+                      <button
+                        onClick={handleAnalyze}
+                        disabled={wordCount < 10 || isAnalyzing || wordCount > wordLimit}
+                        className="px-6 py-2.5 bg-orange-500 text-white text-sm font-medium rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isAnalyzing ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Analysing...
+                          </div>
+                        ) : (
+                          'Analyse'
+                        )}
+                      </button>
+                    </div>
+                    {error && (
+                      <div className="mx-4 mb-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                        {error}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Report Card */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-8 min-h-[360px] flex items-center justify-center text-gray-500 text-center">
+                    {result ? (
+                      <div className="w-full">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Detection Results</h3>
+                        <div className={`p-4 rounded-lg ${result.is_ai ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
+                          <div className="text-base font-medium">
+                            {result.is_ai ? 'AI-Generated Content Detected' : 'Human-Written Content'}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            Confidence: {result.confidence}% | AI Probability: {result.ai_probability}% | Human Probability: {result.human_probability}%
+                          </div>
+                          <div className="text-xs text-gray-500 mt-2">Model: {result.model_used} • Reliability: {result.reliability_score}%</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Info className="w-10 h-10 text-gray-400" />
+                        <p>Once you analyse any text/doc, your report will show up here.</p>
                       </div>
                     )}
                   </div>
                 </div>
-
-                {/* Text Input */}
-                <div className="space-y-4">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Enter text to analyze for AI-generated content..."
-                    className="w-full h-80 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
-                  />
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
-                      {wordCount} words
-                    </div>
-                    <button
-                      onClick={handleAnalyze}
-                      disabled={wordCount < 10 || isAnalyzing}
-                      className="px-8 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isAnalyzing ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Detecting AI...
-                        </div>
-                      ) : (
-                        'Detect AI'
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Error Display */}
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="text-sm text-red-600">{error}</div>
-                  </div>
-                )}
-
-                {/* Results Display */}
-                {result && (
-                  <div className="mt-8 p-6 bg-white border border-gray-200 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Detection Results</h3>
-                    <div className={`p-4 rounded-lg ${result.is_ai ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
-                      <div className="text-lg font-medium">
-                        {result.is_ai ? 'AI-Generated Content Detected' : 'Human-Written Content'}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Confidence: {result.confidence}% | 
-                        AI Probability: {result.ai_probability}% | 
-                        Human Probability: {result.human_probability}%
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
             {activeTab === 'upload' && (
-              <div className="text-center py-12">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Upload File</h3>
-                <p className="text-gray-500">Drag and drop a file or click to browse</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left: Upload area */}
+                <div className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col items-center justify-center text-center">
+                  <Upload className="w-12 h-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Upload PDF</h3>
+                  <p className="text-gray-500 mb-4">Drag and drop a PDF or click to browse</p>
+                  <label className="inline-block">
+                    <span className="px-4 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 cursor-pointer">Choose File</span>
+                    <input type="file" accept="application/pdf" className="hidden" />
+                  </label>
+                </div>
+                {/* Right: Report placeholder */}
+                <div className="bg-white border border-gray-200 rounded-lg p-8 min-h-[360px] flex items-center justify-center text-gray-500 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Info className="w-10 h-10 text-gray-400" />
+                    <p>Once you analyse any text/doc, your report will show up here.</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
