@@ -136,16 +136,6 @@ export default function ChatPage() {
           <div key={message.id} className="flex justify-center mb-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-center">
               <div className="text-sm text-blue-800 font-medium">{message.content}</div>
-              {message.metadata?.progress && (
-                <div className="mt-2">
-                  <div className="w-32 bg-blue-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${message.metadata.progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
               <div className="text-xs text-blue-600 mt-1">{formatTimestamp(message.timestamp)}</div>
             </div>
           </div>
@@ -225,7 +215,6 @@ export default function ChatPage() {
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="text-sm">Back to Tasks</span>
             </button>
             <div className="h-4 w-px bg-gray-300" />
             <div>
@@ -255,15 +244,15 @@ export default function ChatPage() {
         </div>
 
         {/* Sticky Input Area */}
-        <div className="sticky bottom-0 z-10 border-t border-gray-200/50 bg-white/80 backdrop-blur-md px-6 py-4 shadow-lg">
+        <div className="sticky bottom-0 z-10 px-6 py-4">
           <div className="max-w-4xl mx-auto">
-            <div className="flex gap-4">
+            <div className="flex gap-4 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200/50 p-4 shadow-lg">
               <div className="flex-1">
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask a follow-up question or request additional analysis..."
-                  className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  className="w-full resize-none bg-transparent border-none px-0 py-0 text-sm placeholder:text-gray-500 focus:outline-none"
                   rows={3}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
