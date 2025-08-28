@@ -134,6 +134,8 @@ export default function SearchBox({
   const [userEdited, setUserEdited] = React.useState(false)
   const [provider, setProvider] = React.useState<AIProvider | undefined>(undefined)
   const [model, setModel] = React.useState<string | undefined>(undefined)
+  const [placeholderIndex, setPlaceholderIndex] = React.useState(0)
+  const [isFocused, setIsFocused] = React.useState(false)
 
   // Deep Research hook
   const {
@@ -221,13 +223,6 @@ export default function SearchBox({
     }
   }
 
-  const applyPlaceholder = (prompt: string) => {
-    setValue(prompt)
-    setUserEdited(true)
-    // focus textarea for immediate editing
-    textareaRef.current?.focus()
-  }
-
   // Infer selections from the user's freeform prompt when nothing is selected yet
   React.useEffect(() => {
     const text = (value || "").toLowerCase()
@@ -306,6 +301,17 @@ export default function SearchBox({
     }
   }, [stop])
 
+  // Rotate placeholder prompts when input is empty and not focused
+  React.useEffect(() => {
+    if (isFocused || (value && value.trim().length > 0)) return
+    const id = window.setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDER_PROMPTS.length)
+    }, 3000)
+    return () => window.clearInterval(id)
+  }, [isFocused, value])
+
+  const currentPlaceholder = PLACEHOLDER_PROMPTS[placeholderIndex] || ""
+
   return (
     <div className="relative mx-auto w-full max-w-3xl px-4">
       {/* Soft glow */}
@@ -317,26 +323,11 @@ export default function SearchBox({
           value={value}
           onChange={onTextChange}
           onKeyDown={onKeyDown}
-          placeholder="Type your research task..."
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder={currentPlaceholder}
           className="min-h-[88px] w-full resize-none rounded-md p-3 text-[15px] leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
         />
-
-        {/* Placeholder prompt chips (shown only when input is empty) */}
-        {(!value || value.trim().length === 0) && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {PLACEHOLDER_PROMPTS.map((p, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => applyPlaceholder(p)}
-                className="text-xs whitespace-nowrap rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-gray-700 hover:bg-gray-100"
-                title={p}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* bottom bar */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">

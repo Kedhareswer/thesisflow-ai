@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb } from "lucide-react"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb, ArrowUpRight, Calendar, Users } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 
@@ -12,13 +12,18 @@ type SidebarProps = {
   onToggle: () => void
 }
 
+// External destination for QuantumPDF ChatApp
+const QUANTUM_PDF_URL = (process.env.NEXT_PUBLIC_QUANTUM_PDF_URL as string) || "https://quantumpdf.app"
+
 const navItems = [
   { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
   { label: "Research Suggestions", href: "/ai-assistant", id: "research-suggestions", icon: Lightbulb },
   { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
-  { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare },
+  { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare, external: true, externalHref: QUANTUM_PDF_URL },
   { label: "Literature Review", href: "/literature-review", id: "lit-review", icon: BookOpen },
   { label: "Find Topics", href: "/topics", id: "find-topics", icon: Search },
+  { label: "Planner", href: "/planner", id: "planner", icon: Calendar },
+  { label: "Collaborate", href: "/collaborate", id: "collaborate", icon: Users },
   { label: "Paraphraser", href: "/paraphraser", id: "paraphraser", icon: RefreshCcw },
   { label: "Citation Generator", href: "/citations", id: "citations", icon: Quote },
   { label: "Extract Data", href: "/extract", id: "extract", icon: Database },
@@ -89,24 +94,51 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {navItems.map((item) => {
           const active = pathname === item.href
           const Icon = item.icon
+          const content = (
+            <div
+              className={`relative mx-2 my-0.5 flex items-center rounded-md py-2 text-sm transition-colors ${
+                active ? "text-orange-600 bg-orange-50" : "text-gray-700 hover:bg-gray-50"
+              } ${collapsed ? "justify-center" : "gap-3 px-2"}`}
+            >
+              {/* Left rail only when expanded */}
+              {!collapsed && (
+                <span
+                  className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 rounded-sm ${active ? "w-1 bg-orange-500" : "w-0"}`}
+                />
+              )}
+              {/* Icon */}
+              <Icon className={`h-4 w-4 ${active ? "text-orange-600" : "text-gray-500"}`} />
+              {/* Label + external arrow for Chat with PDF */}
+              {!collapsed && (
+                <span className="flex items-center gap-1">
+                  {item.label}
+                  {item.id === "chat-pdf" && (
+                    <ArrowUpRight className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                  )}
+                </span>
+              )}
+            </div>
+          )
+
+          if ((item as any).external && (item as any).externalHref && item.id === "chat-pdf") {
+            return (
+              <a
+                key={item.id}
+                href={(item as any).externalHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+                title={`${item.label} – opens in new tab`}
+                aria-label={`${item.label} (external)`}
+              >
+                {content}
+              </a>
+            )
+          }
+
           return (
             <Link key={item.id} href={item.href} className="block" title={item.label} aria-label={item.label}>
-              <div
-                className={`relative mx-2 my-0.5 flex items-center rounded-md py-2 text-sm transition-colors ${
-                  active ? "text-orange-600 bg-orange-50" : "text-gray-700 hover:bg-gray-50"
-                } ${collapsed ? "justify-center" : "gap-3 px-2"}`}
-              >
-                {/* Left rail only when expanded */}
-                {!collapsed && (
-                  <span
-                    className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 rounded-sm ${active ? "w-1 bg-orange-500" : "w-0"}`}
-                  />
-                )}
-                {/* Icon */}
-                <Icon className={`h-4 w-4 ${active ? "text-orange-600" : "text-gray-500"}`} />
-                {/* Label */}
-                <span className={`${collapsed ? "hidden" : "block"}`}>{item.label}</span>
-              </div>
+              {content}
             </Link>
           )
         })}
