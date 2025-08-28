@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { ChevronDown, MoreHorizontal } from "lucide-react"
 
@@ -30,10 +30,22 @@ const mockSearches: SearchResult[] = [
 
 export default function LiteratureReviewPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [collapsed, setCollapsed] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [selectedQuality, setSelectedQuality] = React.useState<QualityLevel>("deep-review")
   const [searches] = React.useState<SearchResult[]>(mockSearches)
+
+  // Prefill from URL params without auto-starting
+  React.useEffect(() => {
+    const pf = searchParams.get("prefill") || searchParams.get("q") || searchParams.get("query")
+    const ql = searchParams.get("quality") as QualityLevel | null
+    if (pf) setQuery(pf)
+    if (ql && (ql === "standard" || ql === "high-quality" || ql === "deep-review")) {
+      setSelectedQuality(ql)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const handleSearch = () => {
     if (!query.trim()) return

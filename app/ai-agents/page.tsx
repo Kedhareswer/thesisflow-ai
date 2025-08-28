@@ -34,6 +34,58 @@ const MAKE_OPTIONS: { id: string; label: string }[] = [
   { id: "pdf_report", label: "a PDF report" },
 ]
 
+// -------- Helpers to detect and refine paper-search prompts ---------
+function ai_stripTrailingSuffix(text: string): string {
+  return text.replace(/\s+(using\s+[^.]+)?(\s+and create\s+[^.]+)?\s*\.*\s*$/i, "")
+}
+
+function ai_extractSubjectFromPrompt(prompt: string): string {
+  const cleaned = ai_stripTrailingSuffix(prompt)
+  const preps = [" on ", " for ", " from ", " about ", " related to "]
+  let idx = -1
+  let found = ""
+  for (const p of preps) {
+    const i = cleaned.toLowerCase().lastIndexOf(p)
+    if (i > idx) {
+      idx = i
+      found = p
+    }
+  }
+  if (idx >= 0) {
+    const after = cleaned.slice(idx + found.length)
+    const nextUsing = after.toLowerCase().indexOf(" using ")
+    const nextCreate = after.toLowerCase().indexOf(" and create ")
+    const nextDot = after.indexOf(".")
+    const stops = [nextUsing, nextCreate, nextDot].filter((n) => n >= 0)
+    const stopAt = stops.length ? Math.min(...stops) : -1
+    const subject = (stopAt >= 0 ? after.slice(0, stopAt) : after).trim()
+    return subject || "__________"
+  }
+  return "__________"
+}
+
+function ai_buildRefinedQuery(want: SelectionState["want"], subject: string): string {
+  const s = subject && subject !== "__________" ? subject : "__________"
+  if (want === "review_literature") return `Review literature on ${s}.`
+  return `Search research papers on ${s}.`
+}
+
+function ai_inferQuality(sel: SelectionState): "standard" | "high-quality" | "deep-review" {
+  if (sel.use?.includes("deep_review")) return "deep-review"
+  if (sel.use?.some((u) => ["arxiv", "pubmed", "google_scholar"].includes(u))) return "high-quality"
+  return "standard"
+}
+
+function ai_isPaperSearchIntent(q: string, sel: SelectionState): boolean {
+  const t = q.toLowerCase()
+  if (sel.want === "search_papers" || sel.want === "review_literature") return true
+  if (sel.use?.some((u) => ["arxiv", "pubmed", "google_scholar", "deep_review"].includes(u))) return true
+  const mentionsPapers = /(paper|papers|study|studies|article|articles)/i.test(t)
+  const mentionsSearch = /(search|find|look up|get|discover)/i.test(t)
+  const mentionsLitReview = /(literature review|review literature)/i.test(t)
+  return (mentionsSearch && mentionsPapers) || mentionsLitReview
+}
+
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
     <button
@@ -57,33 +109,47 @@ export default function AIAgentsPage() {
   const [selection, setSelection] = React.useState<SelectionState>({ want: "", use: [], make: [] })
   const [value, setValue] = React.useState("")
 
-  const handleCreateChat = (query: string) => {
+  const handleCreateChat = (query: string, selOverride?: SelectionState) => {
     if (!query.trim()) return
-    
+    const q = query.trim()
+    const sel = selOverride ?? selection
+
+    // If the user's intent is to search papers / do literature review, redirect to Literature Review
+    if (ai_isPaperSearchIntent(q, sel)) {
+      const subject = ai_extractSubjectFromPrompt(q)
+      const refined = ai_buildRefinedQuery(sel.want, subject)
+      const quality = ai_inferQuality(sel)
+      const params = new URLSearchParams({ prefill: refined, quality })
+      router.push(`/literature-review?${params.toString()}`)
+      return
+    }
+
+    // Otherwise, create a normal AI Agent chat session
     const sessionId = createSession({
-      want: selection.want || "search_papers",
-      use: selection.use,
-      make: selection.make,
-      query: query.trim()
+      want: sel.want || "search_papers",
+      use: sel.use,
+      make: sel.make,
+      query: q,
     })
-    
     router.push(`/ai-agents/chat/${sessionId}`)
   }
 
   const handlePopularTaskClick = (task: string) => {
     // Extract task components and set selection
+    let nextSel: SelectionState = { want: "", use: [], make: [] }
     if (task.includes("Deep Research")) {
-      setSelection({ want: "review_literature", use: ["deep_review"], make: ["pdf_report"] })
+      nextSel = { want: "review_literature", use: ["deep_review"], make: ["pdf_report"] }
     } else if (task.includes("arXiv") && task.includes("Google Scholar")) {
-      setSelection({ want: "search_papers", use: ["arxiv", "google_scholar"], make: [] })
+      nextSel = { want: "search_papers", use: ["arxiv", "google_scholar"], make: [] }
     } else if (task.includes("PDF papers")) {
-      setSelection({ want: "extract_data", use: [], make: ["word_document"] })
+      nextSel = { want: "extract_data", use: [], make: ["word_document"] }
     } else if (task.includes("customer churn")) {
-      setSelection({ want: "analyse_data", use: [], make: ["data_visualisation"] })
+      nextSel = { want: "analyse_data", use: [], make: ["data_visualisation"] }
     }
-    
+
+    setSelection(nextSel)
     setValue(task)
-    handleCreateChat(task)
+    handleCreateChat(task, nextSel)
   }
 
   const toggleMulti = (group: "use" | "make", id: string) => {

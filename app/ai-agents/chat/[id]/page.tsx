@@ -132,14 +132,8 @@ export default function ChatPage() {
         )
       
       case 'system':
-        return (
-          <div key={message.id} className="flex justify-center mb-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-center">
-              <div className="text-sm text-blue-800 font-medium">{message.content}</div>
-              <div className="text-xs text-blue-600 mt-1">{formatTimestamp(message.timestamp)}</div>
-            </div>
-          </div>
-        )
+        // Skip rendering system messages - they're handled by ReasoningSteps component
+        return null
       
       case 'assistant':
         const isComprehensiveReport = message.metadata?.taskType === 'deep-research' && 

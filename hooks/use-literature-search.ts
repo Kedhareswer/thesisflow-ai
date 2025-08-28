@@ -73,6 +73,7 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
   const [currentQuery, setCurrentQuery] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLimitRef = useRef<number>(defaultLimit);
 
   const search = useCallback(async (
     query: string,
@@ -99,9 +100,11 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     }));
 
     try {
+      // Remember the last requested limit for consistent retries
+      lastLimitRef.current = Math.min(limit, 50);
       const params = new URLSearchParams({
         query: query.trim(),
-        limit: Math.min(limit, 50).toString()
+        limit: lastLimitRef.current.toString()
       });
 
       if (userId) {
@@ -117,8 +120,37 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({} as any));
+
+        // Build a helpful message
+        const errorMessage = (errorData && (errorData.error || errorData.message))
+          || (response.status === 429 ? 'Rate limit exceeded. Please try again later.' : `HTTP ${response.status}: ${response.statusText}`);
+
+        // Extract rate limit info from payload or headers (best-effort)
+        let rateLimitInfo = errorData?.rateLimitInfo || null;
+        if (!rateLimitInfo) {
+          const limit = Number(response.headers.get('X-RateLimit-Limit') || '')
+          const remaining = Number(response.headers.get('X-RateLimit-Remaining') || '')
+          const reset = response.headers.get('X-RateLimit-Reset') || ''
+          if (!Number.isNaN(limit) && !Number.isNaN(remaining)) {
+            rateLimitInfo = {
+              limit,
+              remaining,
+              resetTime: reset || new Date(Date.now() + 60_000).toISOString()
+            }
+          }
+        }
+
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: errorMessage,
+          results: [],
+          rateLimitInfo
+        }));
+
+        if (onError) onError(errorMessage);
+        return null;
       }
 
       const result: SearchResult = await response.json();
@@ -206,7 +238,7 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
 
   const retry = useCallback(() => {
     if (currentQuery) {
-      search(currentQuery, defaultLimit);
+      search(currentQuery, lastLimitRef.current || defaultLimit);
     }
   }, [currentQuery, defaultLimit, search]);
 

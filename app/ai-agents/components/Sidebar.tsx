@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2 } from "lucide-react"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 
@@ -14,6 +14,7 @@ type SidebarProps = {
 
 const navItems = [
   { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
+  { label: "Research Suggestions", href: "/ai-assistant", id: "research-suggestions", icon: Lightbulb },
   { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
   { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare },
   { label: "Literature Review", href: "/literature-review", id: "lit-review", icon: BookOpen },
