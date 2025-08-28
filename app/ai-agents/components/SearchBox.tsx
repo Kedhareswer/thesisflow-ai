@@ -40,6 +40,15 @@ const makeLabels: Record<string, string> = {
   pdf_report: "a PDF report",
 }
 
+// Placeholder prompts to quickly get users started
+const PLACEHOLDER_PROMPTS: string[] = [
+  "Review literature on diffusion models using Deep Research.",
+  "Search research papers on LLM evaluation using arXiv and Google Scholar.",
+  "Extract data from PDF papers and create a Word document.",
+  "Analyse data on customer churn and create a Data visualisation.",
+  "Write a report on AI safety benchmarks and create a PDF report.",
+]
+
 function composeSuffix(use: string[], make: string[]) {
   const parts: string[] = []
   if (use.length) {
@@ -212,6 +221,13 @@ export default function SearchBox({
     }
   }
 
+  const applyPlaceholder = (prompt: string) => {
+    setValue(prompt)
+    setUserEdited(true)
+    // focus textarea for immediate editing
+    textareaRef.current?.focus()
+  }
+
   // Infer selections from the user's freeform prompt when nothing is selected yet
   React.useEffect(() => {
     const text = (value || "").toLowerCase()
@@ -304,6 +320,23 @@ export default function SearchBox({
           placeholder="Type your research task..."
           className="min-h-[88px] w-full resize-none rounded-md p-3 text-[15px] leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
         />
+
+        {/* Placeholder prompt chips (shown only when input is empty) */}
+        {(!value || value.trim().length === 0) && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {PLACEHOLDER_PROMPTS.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => applyPlaceholder(p)}
+                className="text-xs whitespace-nowrap rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-gray-700 hover:bg-gray-100"
+                title={p}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* bottom bar */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">

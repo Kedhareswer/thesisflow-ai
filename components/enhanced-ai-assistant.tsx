@@ -12,9 +12,16 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Brain, Loader2, Copy, Download, ContrastIcon as Compare, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { enhancedAIService, type AIResponse as EnhancedAIResponse } from "@/lib/enhanced-ai-service"
+import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import type { AIProvider } from "@/lib/ai-providers"
 import AIProviderSelector from "./ai-provider-selector"
+
+// Minimal response shape for comparison UI (kept for potential future use)
+type MinimalAIResponse = {
+  content: string
+  model?: string
+  usage?: { tokens?: number }
+}
 
 // Types for the enhanced AI assistant
 interface ResearchContext {
@@ -71,7 +78,7 @@ export default function EnhancedAIAssistant() {
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([])
 
   // Comparison Results
-  const [comparisonResults, setComparisonResults] = useState<Partial<Record<AIProvider, EnhancedAIResponse>>>({})
+  const [comparisonResults, setComparisonResults] = useState<Partial<Record<AIProvider, MinimalAIResponse>>>({})
 
   const generateResearchSuggestions = async () => {
     if (!researchContext.topic || !researchContext.description) {
@@ -88,7 +95,7 @@ export default function EnhancedAIAssistant() {
       if (compareMode) {
         const prompt = `Generate research suggestions for: ${researchContext.topic}\nDescription: ${researchContext.description}`
         // Simple comparison using multiple calls
-        const results: Partial<Record<AIProvider, EnhancedAIResponse>> = {}
+        const results: Partial<Record<AIProvider, MinimalAIResponse>> = {}
         for (const provider of availableProviders) {
           try {
             const response = await enhancedAIService.chatCompletion([{ role: "user", content: prompt }], {
@@ -225,7 +232,7 @@ export default function EnhancedAIAssistant() {
         onProviderChange={setSelectedProvider}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
-        showComparison={true}
+        showComparison={false}
       />
 
       {/* Global Settings */}
@@ -416,8 +423,8 @@ export default function EnhancedAIAssistant() {
             </Card>
           )}
 
-          {/* Comparison Results */}
-          {Object.keys(comparisonResults).length > 0 && (
+          {/* Comparison Results (removed from UI) */}
+          {false && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
