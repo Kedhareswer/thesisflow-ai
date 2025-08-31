@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Calendar, CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon, Activity } from "lucide-react"
+import Sidebar from "../ai-agents/components/Sidebar"
 import { ProjectCalendar } from "./components/project-calendar"
 import { GanttChart } from "./components/gantt-chart"
 import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
@@ -57,6 +58,8 @@ export default function PlannerPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d')
+   // Global navigation sidebar collapse state
+   const [collapsed, setCollapsed] = useState(false)
   const { user } = useSupabaseAuth()
 
   const userId = user?.id || ""
@@ -544,7 +547,10 @@ export default function PlannerPage() {
   if (error) return <div className="flex justify-center items-center h-96 text-red-500">{error}</div>
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="flex min-h-screen bg-[#F8F9FA]">
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v=>!v)} />
+      <div className="flex-1 bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Upgrade Banner for Free Users */}
       <div className="mb-6">
         <ProjectLimitBanner currentUsage={projects.length} />
@@ -1305,6 +1311,8 @@ export default function PlannerPage() {
           </div>
         </Card>
       ))}
+        </div>
+      </div>
     </div>
   )
 }
