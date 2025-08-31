@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown } from "lucide-react"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown, Home } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ const QUANTUM_PDF_URL = (process.env.NEXT_PUBLIC_QUANTUM_PDF_URL as string) || "
 const NotificationBell = React.lazy(() => import("@/app/collaborate/components/notification-bell"))
 
 const navItems = [
+  { label: "Thesis Flow", href: "/", id: "home", icon: Home },
   { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
   { label: "Research Suggestions", href: "/ai-assistant", id: "research-suggestions", icon: Lightbulb },
   { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
@@ -85,7 +86,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto border-r border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 transition-all duration-300 ${
+      className={`sticky top-0 h-screen overflow-y-auto border-r border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 transition-all duration-300 ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
