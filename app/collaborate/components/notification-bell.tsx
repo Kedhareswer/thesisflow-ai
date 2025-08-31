@@ -244,8 +244,11 @@ export default function NotificationBell() {
       })
 
       // Update local state
-      setNotifications(prev => 
-        prev.map(notif => ({ ...notif, read: true }))
+      setNotifications(prev =>
+        prev.map(n => ({
+          ...n,
+          read: true,
+        }))
       )
       setUnreadCount(0)
       
@@ -450,89 +453,82 @@ export default function NotificationBell() {
           <DropdownMenuLabel className="flex items-center justify-between">
             <span>Notifications</span>
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={markAllAsRead}
+                className="text-xs h-6 px-2"
+              >
+                Mark all read
+              </Button>
               <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-6 w-6">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
-                    <DialogTitle>Notification Preferences</DialogTitle>
-                    <DialogDescription>
-                      Choose which notifications you'd like to receive
-                    </DialogDescription>
+                    <DialogTitle className="text-lg font-semibold">Notification Preferences</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Team Notifications</h4>
+                  
+                  <div className="py-2">
+                    <div className="flex items-center justify-between py-2 px-1">
+                      <span className="text-sm font-medium">Email Notifications</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={preferences.email_notifications}
+                          onChange={(e) => updatePreferences({ email_notifications: e.target.checked })}
+                        />
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="mt-4 space-y-2">
+                      <h4 className="text-sm font-medium text-gray-500 px-1">NOTIFICATIONS</h4>
+                      
                       {[
                         { key: 'team_invitations', label: 'Team invitations' },
                         { key: 'member_added', label: 'New team members' },
                         { key: 'role_changes', label: 'Role changes' },
-                      ].map((item) => (
-                        <div key={item.key} className="flex items-center justify-between">
-                          <span className="text-sm">{item.label}</span>
-                          <input
-                            type="checkbox"
-                            checked={preferences[item.key as keyof NotificationPreferences]}
-                            onChange={(e) => updatePreferences({ [item.key]: e.target.checked })}
-                            disabled={isUpdatingPreferences}
-                            className="rounded"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">Chat Notifications</h4>
-                      {[
                         { key: 'new_messages', label: 'New messages' },
                         { key: 'message_mentions', label: 'When mentioned' },
+                        { key: 'document_shared', label: 'Document shared with me' },
                       ].map((item) => (
-                        <div key={item.key} className="flex items-center justify-between">
+                        <div key={item.key} className="flex items-center justify-between py-2 px-1 hover:bg-gray-50 rounded">
                           <span className="text-sm">{item.label}</span>
-                          <input
-                            type="checkbox"
-                            checked={preferences[item.key as keyof NotificationPreferences]}
-                            onChange={(e) => updatePreferences({ [item.key]: e.target.checked })}
-                            disabled={isUpdatingPreferences}
-                            className="rounded"
-                          />
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="sr-only peer"
+                              checked={preferences[item.key as keyof NotificationPreferences]}
+                              onChange={(e) => updatePreferences({ [item.key]: e.target.checked })}
+                              disabled={isUpdatingPreferences}
+                            />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                          </label>
                         </div>
                       ))}
                     </div>
                     
-                    <Separator />
-                    
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-sm">File Notifications</h4>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Document sharing</span>
-                        <input
-                          type="checkbox"
-                          checked={preferences.document_shared}
-                          onChange={(e) => updatePreferences({ document_shared: e.target.checked })}
+                    <div className="flex items-center justify-between py-2 px-1 mt-2">
+                      <span className="text-sm font-medium">Push Notifications</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer"
+                          checked={preferences.push_notifications}
+                          onChange={(e) => updatePreferences({ push_notifications: e.target.checked })}
                           disabled={isUpdatingPreferences}
-                          className="rounded"
                         />
-                      </div>
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                      </label>
                     </div>
                   </div>
                 </DialogContent>
               </Dialog>
-              {unreadCount > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={markAllAsRead}
-                  className="text-xs h-6 px-2"
-                >
-                  Mark all read
-                </Button>
-              )}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -566,9 +562,17 @@ export default function NotificationBell() {
                   return (
                     <div key={notification.id} className="p-3">
                       <TeamInvitation
-                        invitation={invitation}
-                        onAccept={(invitationId) => handleInvitationResponse(invitationId, 'accept')}
-                        onDecline={(invitationId) => handleInvitationResponse(invitationId, 'reject')}
+                        invitation={{
+                          id: notification.id,
+                          team_name: invitation.team.name,
+                          role: invitation.role,
+                          status: 'pending',
+                          created_at: invitation.created_at,
+                          inviter_name: invitation.inviter.full_name,
+                          inviter_avatar: invitation.inviter.avatar_url,
+                        }}
+                        onAccept={(invitationId: string) => handleInvitationResponse(invitationId, 'accept')}
+                        onReject={(invitationId: string) => handleInvitationResponse(invitationId, 'reject')}
                         className="w-full"
                       />
                     </div>
