@@ -8,7 +8,7 @@ interface DropdownMenuProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  side?: 'top' | 'bottom'
+  side?: 'top' | 'bottom' | 'left' | 'right'
   align?: 'start' | 'center' | 'end'
   className?: string
   alignOffset?: number
@@ -139,15 +139,26 @@ export function DropdownMenu({
         <div
           className={cn(
             "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
-            side === 'top' ? 'bottom-full mb-2' : 'mt-2',
-            align === 'end' && 'right-0',
-            align === 'center' && 'left-1/2 -translate-x-1/2',
+            // Side placement classes (base positioning, offset handled via style)
+            side === 'top' && 'bottom-full',
+            side === 'bottom' && 'top-full',
+            side === 'right' && 'left-full',
+            side === 'left' && 'right-full',
+            // Center alignment transforms
+            align === 'center' && (side === 'left' || side === 'right' ? 'top-1/2 -translate-y-1/2' : 'left-1/2 -translate-x-1/2'),
             className
           )}
           style={{
-            ...(side === 'top' ? { bottom: `calc(100% + ${sideOffset}px)` } : { top: `calc(100% + ${sideOffset}px)` }),
-            ...(align === 'end' ? { right: `${alignOffset}px` } : {}),
-            ...(align === 'start' ? { left: `${alignOffset}px` } : {})
+            // Offset away from trigger depending on side
+            ...(side === 'top' ? { bottom: `calc(100% + ${sideOffset}px)` } : {}),
+            ...(side === 'bottom' ? { top: `calc(100% + ${sideOffset}px)` } : {}),
+            ...(side === 'right' ? { left: `calc(100% + ${sideOffset}px)` } : {}),
+            ...(side === 'left' ? { right: `calc(100% + ${sideOffset}px)` } : {}),
+            // Align along the perpendicular axis
+            ...((side === 'left' || side === 'right')
+              ? (align === 'end' ? { bottom: `${alignOffset}px` } : (align === 'start' ? { top: `${alignOffset}px` } : {}))
+              : (align === 'end' ? { right: `${alignOffset}px` } : (align === 'start' ? { left: `${alignOffset}px` } : {}))
+            )
           } as React.CSSProperties}
         >
           {childrenWithCloseHandler}

@@ -445,10 +445,11 @@ export default function NotificationBell() {
             )}
           </Button>
         }
-        className="w-80 right-0"
-        side="top"
+        className="w-80"
+        side="right"
         align="end"
         sideOffset={8}
+        alignOffset={0}
         openOnHover
         hoverOpenDelay={75}
         hoverCloseDelay={150}
