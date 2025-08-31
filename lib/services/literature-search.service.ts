@@ -101,6 +101,7 @@ export class LiteratureSearchService {
       scholar:     { capacity: 1, refillMs: 1000, refillAmount: 1, concurrency: 1 },
       shodhganga:  { capacity: 1, refillMs: 1000, refillAmount: 1, concurrency: 1 },
       jstor:       { capacity: 1, refillMs: 1000, refillAmount: 1, concurrency: 1 },
+      serpapi:     { capacity: 5, refillMs: 500, refillAmount: 1, concurrency: 2 },
     };
     Object.entries(defaults).forEach(([k, v]) => {
       this.rateConfigs.set(k, v);
@@ -453,6 +454,9 @@ export class LiteratureSearchService {
     tasks.push(withCatch('scholar', () => this.searchGoogleScholarLite(query, limit)));
     tasks.push(withCatch('shodhganga', () => this.searchShodhganga(query, limit)));
     tasks.push(withCatch('jstor', () => this.searchJSTORLite(query, limit)));
+    if (process.env.SERPAPI_KEY) {
+      tasks.push(withCatch('serpapi', () => this.searchSerpGoogleScholar(query, limit)));
+    }
 
     await Promise.allSettled(tasks);
 
@@ -523,6 +527,9 @@ export class LiteratureSearchService {
     addTask('scholar', () => this.searchGoogleScholarLite(query, Math.min(50, Math.max(10, limit))));
     addTask('shodhganga', () => this.searchShodhganga(query, Math.min(50, Math.max(10, limit))));
     addTask('jstor', () => this.searchJSTORLite(query, Math.min(50, Math.max(10, limit))));
+    if (process.env.SERPAPI_KEY) {
+      addTask('serpapi', () => this.searchSerpGoogleScholar(query, Math.min(50, Math.max(10, limit))));
+    }
 
     // Wait until either all tasks finish or the max window elapses
     const allDone = Promise.allSettled(tasks);
@@ -1259,6 +1266,48 @@ export class LiteratureSearchService {
   /**
    * JSTOR basic search (HTML). Often gated; return [] if blocked.
    */
+  private async searchSerpGoogleScholar(query: string, limit: number): Promise<Paper[]> {
+    const apiKey = process.env.SERPAPI_KEY;
+    if (!apiKey) return [];
+    try {
+      const url = new URL('https://serpapi.com/search.json');
+      url.searchParams.set('engine', 'google_scholar');
+      url.searchParams.set('q', query);
+      url.searchParams.set('num', Math.min(20, limit).toString());
+      url.searchParams.set('api_key', apiKey);
+
+      const resp = await this.fetchWithPolicies('serpapi', url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
+      if (!resp.ok) throw new Error(`SerpAPI error: ${resp.status}`);
+
+      const data = await resp.json();
+      const results = data?.organic_results || [];
+      return results.slice(0, limit).map((r: any) => {
+        const title = r?.title || 'No title';
+        const authors = (r?.publication_info?.summary || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        const yearMatch = r?.publication_info?.summary?.match(/\b(19|20)\d{2}\b/);
+        const year = yearMatch ? yearMatch[0] : '';
+        const doi = r?.inline_links?.doi || undefined;
+        return {
+          id: r.result_id || r.link || title,
+          title,
+          authors,
+          abstract: r?.snippet || '',
+          year,
+          journal: r?.publication_info?.container_title || 'Google Scholar',
+          url: r?.link,
+          citations: r?.inline_links?.cited_by?.total || 0,
+          source: 'serpapi',
+          doi
+        } as Paper;
+      });
+    } catch (error) {
+      console.warn('SerpAPI Google Scholar search failed:', error);
+      return [];
+    }
+  }
+
   private async searchJSTORLite(query: string, limit: number): Promise<Paper[]> {
     try {
       const { cleaned } = this.parseQueryOperators(query);
