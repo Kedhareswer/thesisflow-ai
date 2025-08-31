@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 
 interface DropdownMenuProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -18,6 +19,8 @@ interface DropdownMenuProps extends React.HTMLAttributes<HTMLDivElement> {
   // Optional delays (ms) for hover open/close
   hoverOpenDelay?: number
   hoverCloseDelay?: number
+  // Render content in a portal to avoid clipping
+  usePortal?: boolean
 }
 
 export function DropdownMenu({
@@ -33,12 +36,17 @@ export function DropdownMenu({
   openOnHover = false,
   hoverOpenDelay = 0,
   hoverCloseDelay = 100,
+  usePortal = true,
   ...props
 }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
+  const triggerRef = React.useRef<HTMLDivElement>(null)
+  const contentRef = React.useRef<HTMLDivElement>(null)
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [mounted, setMounted] = React.useState(false)
+  const [portalPos, setPortalPos] = React.useState<{ top: number; left: number; transform?: string }>({ top: 0, left: 0 })
 
   const handleOpenChange = (newOpen: boolean) => {
     setIsOpen(newOpen)
@@ -46,8 +54,15 @@ export function DropdownMenu({
   }
 
   React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const clickedInsideMenu = menuRef.current?.contains(target)
+      const clickedInsideContent = contentRef.current?.contains(target)
+      if (!clickedInsideMenu && !clickedInsideContent) {
         handleOpenChange(false)
       }
     }
@@ -120,6 +135,106 @@ export function DropdownMenu({
     }
   }, [])
 
+  // Compute portal position based on trigger rect
+  const computePosition = React.useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const scrollX = window.pageXOffset
+    const scrollY = window.pageYOffset
+
+    let top = 0
+    let left = 0
+    let transform: string | undefined
+
+    if (side === 'right') {
+      left = rect.right + scrollX + sideOffset
+      if (align === 'start') {
+        top = rect.top + scrollY + alignOffset
+      } else if (align === 'center') {
+        top = rect.top + scrollY + rect.height / 2
+        transform = 'translateY(-50%)'
+      } else { // end
+        top = rect.bottom + scrollY - alignOffset
+        transform = 'translateY(-100%)'
+      }
+    } else if (side === 'left') {
+      left = rect.left + scrollX - sideOffset
+      if (align === 'start') {
+        top = rect.top + scrollY + alignOffset
+      } else if (align === 'center') {
+        top = rect.top + scrollY + rect.height / 2
+        transform = 'translate(-100%, -50%)'
+      } else {
+        top = rect.bottom + scrollY - alignOffset
+        transform = 'translate(-100%, -100%)'
+      }
+      // Shift fully to the left of trigger
+      if (!transform) transform = 'translateX(-100%)'
+    } else if (side === 'top') {
+      top = rect.top + scrollY - sideOffset
+      if (align === 'center') {
+        left = rect.left + scrollX + rect.width / 2
+        transform = 'translate(-50%, -100%)'
+      } else if (align === 'end') {
+        left = rect.right + scrollX - alignOffset
+        transform = 'translateX(-100%) translateY(-100%)'
+      } else { // start
+        left = rect.left + scrollX + alignOffset
+        transform = 'translateY(-100%)'
+      }
+    } else { // bottom
+      top = rect.bottom + scrollY + sideOffset
+      if (align === 'center') {
+        left = rect.left + scrollX + rect.width / 2
+        transform = 'translateX(-50%)'
+      } else if (align === 'end') {
+        left = rect.right + scrollX - alignOffset
+        transform = 'translateX(-100%)'
+      } else { // start
+        left = rect.left + scrollX + alignOffset
+      }
+    }
+
+    // Basic viewport clamping (best-effort when not using size measurements)
+    const margin = 8
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+
+    // If we have content size, clamp more precisely
+    const width = contentRef.current?.offsetWidth ?? 0
+    const height = contentRef.current?.offsetHeight ?? 0
+
+    let clampedLeft = left
+    let clampedTop = top
+
+    if (!transform?.includes('translateX(')) {
+      clampedLeft = Math.min(Math.max(left, margin), vw - (width || 0) - margin)
+    }
+    if (!transform?.includes('translateY(')) {
+      clampedTop = Math.min(Math.max(top, margin), vh - (height || 0) - margin)
+    }
+
+    setPortalPos({ top: clampedTop, left: clampedLeft, transform })
+  }, [align, alignOffset, side, sideOffset])
+
+  React.useLayoutEffect(() => {
+    if (!isOpen || !usePortal) return
+    computePosition()
+    // Recompute after first paint when sizes are known
+    requestAnimationFrame(() => computePosition())
+  }, [isOpen, usePortal, computePosition])
+
+  React.useEffect(() => {
+    if (!isOpen || !usePortal) return
+    const handler = () => computePosition()
+    window.addEventListener('resize', handler)
+    window.addEventListener('scroll', handler, true)
+    return () => {
+      window.removeEventListener('resize', handler)
+      window.removeEventListener('scroll', handler, true)
+    }
+  }, [isOpen, usePortal, computePosition])
+
   return (
     <div
       className="relative"
@@ -129,6 +244,7 @@ export function DropdownMenu({
       {...props}
     >
       <div
+        ref={triggerRef}
         onClick={() => handleOpenChange(!isOpen)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
@@ -136,33 +252,58 @@ export function DropdownMenu({
         {trigger}
       </div>
       {isOpen && (
-        <div
-          className={cn(
-            "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
-            // Side placement classes (base positioning, offset handled via style)
-            side === 'top' && 'bottom-full',
-            side === 'bottom' && 'top-full',
-            side === 'right' && 'left-full',
-            side === 'left' && 'right-full',
-            // Center alignment transforms
-            align === 'center' && (side === 'left' || side === 'right' ? 'top-1/2 -translate-y-1/2' : 'left-1/2 -translate-x-1/2'),
-            className
-          )}
-          style={{
-            // Offset away from trigger depending on side
-            ...(side === 'top' ? { bottom: `calc(100% + ${sideOffset}px)` } : {}),
-            ...(side === 'bottom' ? { top: `calc(100% + ${sideOffset}px)` } : {}),
-            ...(side === 'right' ? { left: `calc(100% + ${sideOffset}px)` } : {}),
-            ...(side === 'left' ? { right: `calc(100% + ${sideOffset}px)` } : {}),
-            // Align along the perpendicular axis
-            ...((side === 'left' || side === 'right')
-              ? (align === 'end' ? { bottom: `${alignOffset}px` } : (align === 'start' ? { top: `${alignOffset}px` } : {}))
-              : (align === 'end' ? { right: `${alignOffset}px` } : (align === 'start' ? { left: `${alignOffset}px` } : {}))
+        usePortal && mounted
+          ? createPortal(
+              <div
+                ref={contentRef}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                className={cn(
+                  "fixed z-[100] min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+                  className
+                )}
+                style={{
+                  top: portalPos.top,
+                  left: portalPos.left,
+                  transform: portalPos.transform,
+                } as React.CSSProperties}
+              >
+                {childrenWithCloseHandler}
+              </div>,
+              document.body
             )
-          } as React.CSSProperties}
-        >
-          {childrenWithCloseHandler}
-        </div>
+          : (
+              <div
+                ref={contentRef}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                className={cn(
+                  "absolute z-[100] min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+                  // Side placement classes (base positioning, offset handled via style)
+                  side === 'top' && 'bottom-full',
+                  side === 'bottom' && 'top-full',
+                  side === 'right' && 'left-full',
+                  side === 'left' && 'right-full',
+                  // Center alignment transforms
+                  align === 'center' && (side === 'left' || side === 'right' ? 'top-1/2 -translate-y-1/2' : 'left-1/2 -translate-x-1/2'),
+                  className
+                )}
+                style={{
+                  // Offset away from trigger depending on side
+                  ...(side === 'top' ? { bottom: `calc(100% + ${sideOffset}px)` } : {}),
+                  ...(side === 'bottom' ? { top: `calc(100% + ${sideOffset}px)` } : {}),
+                  ...(side === 'right' ? { left: `calc(100% + ${sideOffset}px)` } : {}),
+                  ...(side === 'left' ? { right: `calc(100% + ${sideOffset}px)` } : {}),
+                  // Align along the perpendicular axis
+                  ...((side === 'left' || side === 'right')
+                    ? (align === 'end' ? { bottom: `${alignOffset}px` } : (align === 'start' ? { top: `${alignOffset}px` } : {}))
+                    : (align === 'end' ? { right: `${alignOffset}px` } : (align === 'start' ? { left: `${alignOffset}px` } : {}))
+                  )
+                } as React.CSSProperties}
+              >
+                {childrenWithCloseHandler}
+              </div>
+            )
       )}
     </div>
   )
