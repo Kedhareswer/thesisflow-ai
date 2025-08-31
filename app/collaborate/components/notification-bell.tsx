@@ -553,6 +553,8 @@ export default function NotificationBell() {
                       name: notification.data.team_name,
                       description: notification.data.team_description
                     },
+                    team_name: notification.data.team_name,
+                    status: 'pending',
                     inviter: {
                       id: notification.data.inviter_id || '',
                       full_name: notification.data.inviter_name,
@@ -567,8 +569,8 @@ export default function NotificationBell() {
                     <div key={notification.id} className="p-3">
                       <TeamInvitation
                         invitation={invitation}
-                        onAccept={(invitationId) => handleInvitationResponse(invitationId, 'accept')}
-                        onDecline={(invitationId) => handleInvitationResponse(invitationId, 'reject')}
+                        onAccept={(invitationId: string) => handleInvitationResponse(invitationId, 'accept')}
+                        onReject={(invitationId: string) => handleInvitationResponse(invitationId, 'reject')}
                         className="w-full"
                       />
                     </div>
