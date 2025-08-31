@@ -12,12 +12,12 @@ import { TopicExplorer } from "./components/TopicExplorer"
 import { IdeaGenerator } from "./components/IdeaGenerator"
 import { ResearchAssistant } from "./components/ResearchAssistant"
 import { RouteGuard } from "@/components/route-guard"
-import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
+import Sidebar from "@/app/ai-agents/components/Sidebar"
 import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { ResearchSessionManager } from "@/components/research-session-manager"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-const containerStyle = "container mx-auto px-4 py-8 max-w-6xl"
+const containerStyle = "mx-auto w-full max-w-6xl flex-1 px-4 py-8"
 const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
 const sectionDescriptionStyle = "text-gray-600"
 
@@ -75,70 +75,77 @@ export default function ResearchExplorer() {
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
     <RouteGuard requireAuth={true}>
       <ResearchSessionProvider>
         <ErrorBoundary>
-          <div className="min-h-screen bg-white text-gray-900">
-            <div className={containerStyle}>
-              <header className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Research Explorer</h1>
-                <p className={sectionDescriptionStyle}>
-                  AI-powered tools to discover research papers, generate ideas, and explore topics.
-                </p>
-              </header>
+          <div className="flex min-h-screen bg-[#F8F9FA]">
+            {/* Sidebar (sticky, collapsible) */}
+            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
 
-              <Tabs defaultValue="search" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-5 bg-gray-100 rounded-md">
-                  <TabsTrigger value="search" className="data-[state=active]:bg-gray-200">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Search
-                  </TabsTrigger>
-                  <TabsTrigger value="explore" className="data-[state=active]:bg-gray-200">
-                    <Brain className="h-4 w-4 mr-2" />
-                    Explore
-                  </TabsTrigger>
-                  <TabsTrigger value="ideas" className="data-[state=active]:bg-gray-200">
-                    <Lightbulb className="h-4 w-4 mr-2" />
-                    Ideas
-                  </TabsTrigger>
-                  <TabsTrigger value="assistant" className="data-[state=active]:bg-gray-200">
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Assistant
-                  </TabsTrigger>
-                  <TabsTrigger value="session" className="data-[state=active]:bg-gray-200">
-                    <Database className="h-4 w-4 mr-2" />
-                    Session
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="search">
-                  <EnhancedLiteratureSearch />
-                </TabsContent>
-                <TabsContent value="explore">
-                  <TopicExplorer selectedProvider={selectedProvider} selectedModel={selectedModel} />
-                </TabsContent>
-                <TabsContent value="ideas">
-                  <IdeaGenerator />
-                </TabsContent>
-                <TabsContent value="assistant">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <MessageCircle className="h-5 w-5" />
-                      <h2 className="text-xl font-semibold">Research Assistant</h2>
+            {/* Right column */}
+            <div className="flex min-h-screen flex-1 flex-col">
+              <main className={containerStyle}>
+                <header className="mb-8">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Research Explorer</h1>
+                  <p className={sectionDescriptionStyle}>
+                    AI-powered tools to discover research papers, generate ideas, and explore topics.
+                  </p>
+                </header>
+
+                <Tabs defaultValue="search" className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-5 bg-gray-100 rounded-md">
+                    <TabsTrigger value="search" className="data-[state=active]:bg-gray-200">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Search
+                    </TabsTrigger>
+                    <TabsTrigger value="explore" className="data-[state=active]:bg-gray-200">
+                      <Brain className="h-4 w-4 mr-2" />
+                      Explore
+                    </TabsTrigger>
+                    <TabsTrigger value="ideas" className="data-[state=active]:bg-gray-200">
+                      <Lightbulb className="h-4 w-4 mr-2" />
+                      Ideas
+                    </TabsTrigger>
+                    <TabsTrigger value="assistant" className="data-[state=active]:bg-gray-200">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Assistant
+                    </TabsTrigger>
+                    <TabsTrigger value="session" className="data-[state=active]:bg-gray-200">
+                      <Database className="h-4 w-4 mr-2" />
+                      Session
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="search">
+                    <EnhancedLiteratureSearch />
+                  </TabsContent>
+                  <TabsContent value="explore">
+                    <TopicExplorer selectedProvider={selectedProvider} selectedModel={selectedModel} />
+                  </TabsContent>
+                  <TabsContent value="ideas">
+                    <IdeaGenerator />
+                  </TabsContent>
+                  <TabsContent value="assistant">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="h-5 w-5" />
+                        <h2 className="text-xl font-semibold">Research Assistant</h2>
+                      </div>
+                      <p className="text-sm text-gray-600">Get AI-powered assistance for your research questions.</p>
+                      <ResearchAssistant 
+                        personalities={personalities}
+                        selectedPersonality={selectedPersonality}
+                        onPersonalityChange={setSelectedPersonality}
+                      />
                     </div>
-                    <p className="text-sm text-gray-600">Get AI-powered assistance for your research questions.</p>
-                    <ResearchAssistant 
-                      personalities={personalities}
-                      selectedPersonality={selectedPersonality}
-                      onPersonalityChange={setSelectedPersonality}
-                    />
-                  </div>
-                </TabsContent>
-                <TabsContent value="session">
-                  <ResearchSessionManager />
-                </TabsContent>
-              </Tabs>
+                  </TabsContent>
+                  <TabsContent value="session">
+                    <ResearchSessionManager />
+                  </TabsContent>
+                </Tabs>
+              </main>
             </div>
           </div>
         </ErrorBoundary>
