@@ -65,11 +65,13 @@ export async function GET(request: NextRequest) {
       hasMore: (notifications?.length || 0) === limit
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Notifications GET error:", error)
+    const msg = typeof error?.message === 'string' ? error.message : ''
+    const status = msg.includes('Authentication required') ? 401 : 500
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: status === 401 ? 'Authentication required' : 'Internal server error' },
+      { status }
     )
   }
 }
@@ -79,6 +81,17 @@ export async function PUT(request: NextRequest) {
     const user = await requireAuth(request, "collaborate-notifications")
     
     const { notificationId, markAsRead, markAllAsRead } = await request.json()
+
+    // Basic input validation
+    if (!markAllAsRead && !notificationId) {
+      return NextResponse.json(
+        { error: "Either notificationId or markAllAsRead is required" },
+        { status: 400 }
+      )
+    }
+
+    // Simple UUID v4-ish check (relaxed)
+    const isValidUuid = (v: string) => /^[0-9a-fA-F-]{36}$/.test(v)
 
     const supabaseAdmin = createSupabaseAdmin()
     if (!supabaseAdmin) {
@@ -110,6 +123,12 @@ export async function PUT(request: NextRequest) {
       })
 
     } else if (notificationId) {
+      if (!isValidUuid(notificationId)) {
+        return NextResponse.json(
+          { error: "Invalid notificationId" },
+          { status: 400 }
+        )
+      }
       // Mark specific notification as read/unread
       const { data: notification, error: fetchError } = await supabaseAdmin
         .from('notifications')
@@ -131,16 +150,24 @@ export async function PUT(request: NextRequest) {
         )
       }
 
-      const { error: updateError } = await supabaseAdmin
+      const { data: updated, error: updateError } = await supabaseAdmin
         .from('notifications')
         .update({ is_read: markAsRead === true })
         .eq('id', notificationId)
+        .eq('user_id', user.id)
+        .select('id')
 
       if (updateError) {
         console.error('Error updating notification:', updateError)
         return NextResponse.json(
-          { error: "Failed to update notification" },
+          { error: `Failed to update notification: ${updateError.message || 'Unknown error'}` },
           { status: 500 }
+        )
+      }
+      if (!updated || updated.length === 0) {
+        return NextResponse.json(
+          { error: "Notification not found or not owned by user" },
+          { status: 404 }
         )
       }
 
@@ -156,11 +183,13 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Notifications PUT error:", error)
+    const msg = typeof error?.message === 'string' ? error.message : ''
+    const status = msg.includes('Authentication required') ? 401 : 500
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: status === 401 ? 'Authentication required' : 'Internal server error' },
+      { status }
     )
   }
 }
@@ -249,11 +278,13 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Notifications DELETE error:", error)
+    const msg = typeof error?.message === 'string' ? error.message : ''
+    const status = msg.includes('Authentication required') ? 401 : 500
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: status === 401 ? 'Authentication required' : 'Internal server error' },
+      { status }
     )
   }
 }
