@@ -36,11 +36,13 @@ export async function GET(request: NextRequest) {
       const defaultPreferences = {
         user_id: user.id,
         team_invitations: true,
+        member_added: true,
         new_messages: true,
-        system_updates: true,
-        email_notifications: false, // Off by default for future use
-        push_notifications: true,   // On by default for future use
-        marketing_emails: false     // Off by default
+        message_mentions: true,
+        document_shared: true,
+        role_changes: true,
+        email_notifications: false, // Future use
+        push_notifications: true    // Future use
       }
 
       const { data: newPreferences, error: createError } = await supabaseAdmin
@@ -88,11 +90,13 @@ export async function PUT(request: NextRequest) {
     // Validate that only boolean values are provided for valid fields
     const validFields = [
       'team_invitations',
+      'member_added',
       'new_messages',
-      'system_updates',
+      'message_mentions',
+      'document_shared',
+      'role_changes',
       'email_notifications',
-      'push_notifications',
-      'marketing_emails'
+      'push_notifications'
     ]
 
     const updateData: any = {
@@ -220,9 +224,12 @@ export async function POST(request: NextRequest) {
     
     const updateData = {
       team_invitations: allEnabled,
+      member_added: allEnabled,
       new_messages: allEnabled,
-      system_updates: allEnabled,
-      // Don't change email/push/marketing notifications with bulk actions
+      message_mentions: allEnabled,
+      document_shared: allEnabled,
+      role_changes: allEnabled,
+      // Don't change email/push notifications with bulk actions
       updated_at: new Date().toISOString()
     }
 

@@ -3,9 +3,11 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb, ArrowUpRight, Calendar, Users } from "lucide-react"
+import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useAIChat } from "@/lib/hooks/use-ai-chat"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 
 type SidebarProps = {
   collapsed: boolean
@@ -14,6 +16,9 @@ type SidebarProps = {
 
 // External destination for QuantumPDF ChatApp
 const QUANTUM_PDF_URL = (process.env.NEXT_PUBLIC_QUANTUM_PDF_URL as string) || "https://quantumn-pdf-chatapp.netlify.app/"
+
+// Lazy load the notification bell to avoid heavy initial render
+const NotificationBell = React.lazy(() => import("@/app/collaborate/components/notification-bell"))
 
 const navItems = [
   { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
@@ -32,7 +37,7 @@ const navItems = [
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
-  const { user, isLoading } = useSupabaseAuth()
+  const { user, isLoading, signOut } = useSupabaseAuth()
   const { sessions, clearAllSessions } = useAIChat()
   
   // Get recent chats (max 5, most recent first)
@@ -42,6 +47,40 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
       clearAllSessions()
     }
+  }
+
+  // Simple avatar used in profile dropdown
+  const SimpleAvatar = ({ size = "sm" }: { size?: "sm" | "md" }) => {
+    const getInitials = () => {
+      if (user?.user_metadata?.display_name) {
+        return user.user_metadata.display_name[0].toUpperCase()
+      }
+      if (user?.email) {
+        return user.email[0].toUpperCase()
+      }
+      return "U"
+    }
+
+    const sizeClass = size === "sm" ? "h-8 w-8 text-sm" : "h-10 w-10 text-base"
+
+    const avatarUrl = user?.user_metadata?.avatar_url
+    if (avatarUrl) {
+      return (
+        <img
+          src={`${avatarUrl}?v=${Date.now()}`}
+          alt="Profile"
+          className={`${sizeClass} rounded-full object-cover`}
+        />
+      )
+    }
+
+    return (
+      <div
+        className={`${sizeClass} bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold rounded-full flex items-center justify-center`}
+      >
+        {getInitials()}
+      </div>
+    )
   }
 
   return (
@@ -224,6 +263,62 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <Link href="/login" className="flex-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">Login</Link>
               <Link href="/signup" className="flex-1 rounded-md bg-orange-500 px-2 py-1.5 text-center text-xs font-medium text-white hover:bg-orange-600">Sign up</Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Authenticated footer: Notification bell + Profile menu */}
+      {user && !isLoading && (
+        <div className="sticky bottom-0 mt-3 border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 px-2 py-3">
+          <div className={collapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between gap-2"}>
+            <React.Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
+              <NotificationBell />
+            </React.Suspense>
+
+            <DropdownMenu
+              trigger={
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-gray-100">
+                  <SimpleAvatar size="sm" />
+                </Button>
+              }
+              className="w-56 right-0"
+            >
+              <div className="flex items-center justify-start gap-3 p-3 border-b">
+                <SimpleAvatar size="md" />
+                <div className="flex flex-col space-y-1 leading-none">
+                  <p className="font-medium text-sm">
+                    {user.user_metadata?.full_name || user.user_metadata?.display_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : "User")}
+                  </p>
+                  <p className="w-[180px] truncate text-xs text-gray-600">{user.email}</p>
+                </div>
+              </div>
+              <DropdownMenuItem>
+                <Link href="/profile" className="flex items-center w-full">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Link href="/settings" className="flex items-center w-full">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Link href="/plan" className="flex items-center w-full">
+                  <Crown className="mr-2 h-4 w-4" />
+                  Plan
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="cursor-pointer text-red-600 focus:text-red-600"
+                onClick={() => signOut()}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenu>
           </div>
         </div>
       )}

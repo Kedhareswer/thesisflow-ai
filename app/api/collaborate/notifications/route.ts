@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by read status
     if (unreadOnly) {
-      query = query.eq('read', false)
+      query = query.eq('is_read', false)
     }
 
     // Filter by type
@@ -54,11 +54,13 @@ export async function GET(request: NextRequest) {
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .eq('read', false)
+      .eq('is_read', false)
+
+    const normalized = (notifications || []).map((n: any) => ({ ...n, read: n.is_read }))
 
     return NextResponse.json({
       success: true,
-      notifications: notifications || [],
+      notifications: normalized,
       unreadCount: unreadCount || 0,
       hasMore: (notifications?.length || 0) === limit
     })
@@ -90,9 +92,9 @@ export async function PUT(request: NextRequest) {
       // Mark all notifications as read
       const { error: updateError } = await supabaseAdmin
         .from('notifications')
-        .update({ read: true })
+        .update({ is_read: true })
         .eq('user_id', user.id)
-        .eq('read', false)
+        .eq('is_read', false)
 
       if (updateError) {
         console.error('Error marking all notifications as read:', updateError)
@@ -131,7 +133,7 @@ export async function PUT(request: NextRequest) {
 
       const { error: updateError } = await supabaseAdmin
         .from('notifications')
-        .update({ read: markAsRead === true })
+        .update({ is_read: markAsRead === true })
         .eq('id', notificationId)
 
       if (updateError) {
@@ -185,7 +187,7 @@ export async function DELETE(request: NextRequest) {
         .from('notifications')
         .delete()
         .eq('user_id', user.id)
-        .eq('read', true)
+        .eq('is_read', true)
 
       if (deleteError) {
         console.error('Error deleting all notifications:', deleteError)
