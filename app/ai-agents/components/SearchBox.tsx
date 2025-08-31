@@ -5,7 +5,7 @@ import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal
 import type { AIProvider } from "@/lib/ai-providers"
 import { useDeepSearch } from "@/hooks/use-deep-search"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2, Bot, Paperclip } from "lucide-react"
+import { Loader2, Bot } from "lucide-react"
 
 export type SelectionState = {
   want: string
@@ -59,7 +59,8 @@ function composeSuffix(use: string[], make: string[]) {
     const makeText = make.map((id) => makeLabels[id] ?? id).join(", ")
     parts.push(`and create ${makeText}`)
   }
-  return parts.length ? " " + parts.join(" ") + "." : "."
+  // Only add a period if there's actual content
+  return parts.length ? ` ${parts.join(" ")}.` : ""
 }
 
 // Remove any trailing " using ..." and/or " and create ..." segments (plus the trailing period)
@@ -136,6 +137,7 @@ export default function SearchBox({
   const [model, setModel] = React.useState<string | undefined>(undefined)
   const [placeholderIndex, setPlaceholderIndex] = React.useState(0)
   const [isFocused, setIsFocused] = React.useState(false)
+  const [deepResearchOn, setDeepResearchOn] = React.useState(false)
 
   // Deep Research hook
   const {
@@ -189,20 +191,18 @@ export default function SearchBox({
     if (next !== composed) setUserEdited(true)
   }
 
-  // Deep Review pill sync
-  const deepOn = selection.use.includes("deep_review")
+  // Deep Research toggle (independent from Deep Review)
+  const deepOn = deepResearchOn
   const toggleDeep = () => {
-    const nextUse = deepOn
-      ? selection.use.filter((u) => u !== "deep_review")
-      : Array.from(new Set([...(selection.use || []), "deep_review"]))
-    const nextSel = { ...selection, use: nextUse }
-    setSelection(nextSel)
-    // Update trailing parts even when user edited
-    const suffix = composeSuffix(nextUse, selection.make)
-    setValue((prev) => replaceSuffixKeepingBase(prev || composed, suffix))
-    // Clear any running deep search if toggled off
-    if (deepOn) {
+    const next = !deepResearchOn
+    setDeepResearchOn(next)
+    if (!next) {
+      // Stop any running deep research stream
       stop()
+    } else {
+      // Start deep research with the current input
+      const q = (value || composed || "").trim()
+      start({ query: q, provider, model })
     }
   }
 
@@ -249,7 +249,7 @@ export default function SearchBox({
       if (text.includes("arxiv")) useSet.add("arxiv")
       if (text.includes("pubmed")) useSet.add("pubmed")
       if (text.includes("google scholar") || /\bscholar\b/.test(text)) useSet.add("google_scholar")
-      if (text.includes("deep research") || text.includes("deep review")) useSet.add("deep_review")
+      if (text.includes("deep review")) useSet.add("deep_review")
       if (text.includes("grants.gov")) useSet.add("grants_gov")
       if (text.includes("python")) useSet.add("python_library")
 
@@ -331,15 +331,8 @@ export default function SearchBox({
 
         {/* bottom bar */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded-md border-t border-gray-100 px-2 py-2">
-          {/* left: paperclip + provider selector */}
+          {/* left: provider selector */}
           <div className="hidden sm:flex items-center gap-2">
-            <button
-              type="button"
-              title="Attach"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
             <MinimalAIProviderSelector
               selectedProvider={provider}
               onProviderChange={(p) => {
@@ -378,7 +371,7 @@ export default function SearchBox({
       </div>
 
       {/* Streaming results panel */}
-      {(deepOn && (isLoading || error || items.length > 0 || summary || warnings.length || notices.length)) && (
+      {(deepOn && (isLoading || !!error || items.length > 0 || !!summary || warnings.length > 0 || notices.length > 0)) && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           {/* Header: Topic + Tag */}
           <div className="mb-3 flex items-start justify-between gap-3">
@@ -394,7 +387,7 @@ export default function SearchBox({
                 <span className="font-medium">Executing Plan...</span>
               </div>
               <div className="mt-3 text-[15px] leading-relaxed text-gray-800">
-                <p>I understand you're interested in deep review for <span className="font-semibold">{topicTitle}</span>. To provide the most valuable and focused assistance, here are a few quick questions to narrow down your research focus:</p>
+                <p>I understand you're interested in deep research for <span className="font-semibold">{topicTitle}</span>. To provide the most valuable and focused assistance, here are a few quick questions to narrow down your research focus:</p>
                 <ol className="mt-3 list-decimal space-y-2 pl-5">
                   <li><span className="font-semibold">What specific aspect</span> of this topic interests you most?</li>
                   <li><span className="font-semibold">What's your primary goal</span> with this research (learn, build, evaluate, stay current)?</li>

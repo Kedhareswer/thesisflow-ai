@@ -138,7 +138,8 @@ export default function AIAgentsPage() {
     // Extract task components and set selection
     let nextSel: SelectionState = { want: "", use: [], make: [] }
     if (task.includes("Deep Research")) {
-      nextSel = { want: "review_literature", use: ["deep_review"], make: ["pdf_report"] }
+      // Deep Research is distinct from Deep Review; do not auto-toggle deep_review here
+      nextSel = { want: "review_literature", use: [], make: ["pdf_report"] }
     } else if (task.includes("arXiv") && task.includes("Google Scholar")) {
       nextSel = { want: "search_papers", use: ["arxiv", "google_scholar"], make: [] }
     } else if (task.includes("PDF papers")) {

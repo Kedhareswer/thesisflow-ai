@@ -41,10 +41,13 @@ export function LiteratureSearch({
     searchWithDebounce,
     clearResults,
     retry,
-    isRateLimited
+    isRateLimited,
+    aggregateWindowMs
   } = useLiteratureSearch({
     defaultLimit: maxResults,
     debounceMs: 800,
+    aggregateWindowMs: 120000, // 2 minutes
+    ignoreWhileAggregating: true,
     onSuccess: (result) => {
       console.log(`Literature search completed in ${result.searchTime}ms from ${result.source}`);
     },
@@ -88,6 +91,8 @@ export function LiteratureSearch({
       arxiv: { label: 'arXiv', color: 'bg-green-100 text-green-800' },
       crossref: { label: 'CrossRef', color: 'bg-purple-100 text-purple-800' },
       combined: { label: 'Multiple', color: 'bg-orange-100 text-orange-800' },
+      aggregate: { label: 'Multiple Sources', color: 'bg-orange-100 text-orange-800' },
+      'openalex-fast': { label: 'OpenAlex Fast', color: 'bg-blue-100 text-blue-800' },
       'openalex-fallback': { label: 'OpenAlex', color: 'bg-blue-100 text-blue-800' },
       'arxiv-fallback': { label: 'arXiv', color: 'bg-green-100 text-green-800' }
     };
@@ -163,6 +168,14 @@ export function LiteratureSearch({
               )}
             </Button>
           </div>
+
+          {/* Aggregation hint */}
+          {isLoading && aggregateWindowMs > 0 && (
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Aggregating results from multiple sources (up to {Math.round(aggregateWindowMs / 60000)} min)...
+            </div>
+          )}
 
           {/* Search Stats */}
           {(results.length > 0 || searchTime > 0) && (

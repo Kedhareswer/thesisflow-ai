@@ -47,6 +47,8 @@ export interface UseLiteratureSearchOptions {
   defaultLimit?: number;
   autoSearch?: boolean;
   debounceMs?: number;
+  aggregateWindowMs?: number; // e.g., 120000 for 2 minutes
+  ignoreWhileAggregating?: boolean; // prevent firing new requests while one aggregate search runs
   onSuccess?: (result: SearchResult) => void;
   onError?: (error: string) => void;
 }
@@ -56,6 +58,8 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     defaultLimit = 10,
     autoSearch = false,
     debounceMs = 500,
+    aggregateWindowMs = 0,
+    ignoreWhileAggregating = true,
     onSuccess,
     onError
   } = options;
@@ -74,6 +78,9 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastLimitRef = useRef<number>(defaultLimit);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const aggregatingRef = useRef<boolean>(false);
+  const aggregationDeadlineRef = useRef<number | null>(null);
 
   const search = useCallback(async (
     query: string,
@@ -88,6 +95,11 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+    // Cancel any scheduled retries
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
 
     // Create new abort controller
@@ -109,6 +121,14 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
 
       if (userId) {
         params.append('userId', userId);
+      }
+      if (aggregateWindowMs && aggregateWindowMs > 0) {
+        params.append('aggregateWindowMs', String(aggregateWindowMs));
+        aggregatingRef.current = true;
+        aggregationDeadlineRef.current = Date.now() + aggregateWindowMs;
+      } else {
+        aggregatingRef.current = false;
+        aggregationDeadlineRef.current = null;
       }
 
       const response = await fetch(`/api/literature-search?${params}`, {
@@ -149,6 +169,25 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
           rateLimitInfo
         }));
 
+        // Reset aggregation flags on failure
+        aggregatingRef.current = false;
+        aggregationDeadlineRef.current = null;
+
+        // Limited auto-retry/backoff only if 429 and reset is within 2 minutes window
+        const status = response.status;
+        if (status === 429 && rateLimitInfo?.resetTime) {
+          const resetAt = new Date(rateLimitInfo.resetTime).getTime();
+          const now = Date.now();
+          const waitMs = Math.max(1000, Math.min(30000, resetAt - now));
+          const withinTwoMin = resetAt - now <= 120000;
+          if (withinTwoMin && waitMs > 0) {
+            retryTimeoutRef.current = setTimeout(() => {
+              // Only retry if not aborted by a new search in the meantime
+              search(query, lastLimitRef.current || defaultLimit, userId);
+            }, waitMs);
+          }
+        }
+
         if (onError) onError(errorMessage);
         return null;
       }
@@ -165,6 +204,10 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         rateLimitInfo: result.rateLimitInfo || null
       });
 
+      // Reset aggregation flags on success
+      aggregatingRef.current = false;
+      aggregationDeadlineRef.current = null;
+
       setCurrentQuery(query);
 
       if (onSuccess) {
@@ -176,6 +219,8 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         // Request was cancelled, don't update state
+        aggregatingRef.current = false;
+        aggregationDeadlineRef.current = null;
         return null;
       }
 
@@ -194,7 +239,7 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
 
       return null;
     }
-  }, [defaultLimit, onSuccess, onError]);
+  }, [defaultLimit, onSuccess, onError, aggregateWindowMs]);
 
   const searchWithDebounce = useCallback((
     query: string,
@@ -208,9 +253,13 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
 
     // Set new timeout
     debounceTimeoutRef.current = setTimeout(() => {
+      // Optionally ignore while aggregating to avoid spamming server
+      if (ignoreWhileAggregating && aggregatingRef.current) {
+        return;
+      }
       search(query, limit, userId);
     }, debounceMs);
-  }, [search, debounceMs, defaultLimit]);
+  }, [search, debounceMs, defaultLimit, ignoreWhileAggregating]);
 
   const clearResults = useCallback(() => {
     // Cancel any pending requests
@@ -221,6 +270,10 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     // Clear debounce timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
 
     setState({
@@ -234,6 +287,8 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     });
 
     setCurrentQuery('');
+    aggregatingRef.current = false;
+    aggregationDeadlineRef.current = null;
   }, []);
 
   const retry = useCallback(() => {
@@ -250,6 +305,10 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
   }, []);
 
   return {
@@ -260,6 +319,7 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     retry,
     cleanup,
     currentQuery,
-    isRateLimited: state.rateLimitInfo?.remaining === 0
+    isRateLimited: state.rateLimitInfo?.remaining === 0,
+    aggregateWindowMs
   };
 }

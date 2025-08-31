@@ -270,6 +270,83 @@ export class LiteratureSearchService {
   }
 
   /**
+   * Aggregate results from many sources with a maximum time window.
+   * Returns as soon as all sources finish, or at most after maxDurationMs.
+   */
+  async aggregatePapers(
+    query: string,
+    limit: number,
+    maxDurationMs: number = 120000
+  ): Promise<SearchResult> {
+    const startTime = Date.now();
+    const seen = new Set<string>();
+    const collected: Paper[] = [];
+
+    const addUnique = (arr: Paper[]) => {
+      for (const p of arr) {
+        if (!p?.title) continue;
+        const key = p.title.toLowerCase().trim();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        collected.push(p);
+      }
+    };
+
+    // Prepare source tasks (best-effort; individual timeouts still apply)
+    const tasks: Promise<void>[] = [];
+    const addTask = (name: string, fn: () => Promise<Paper[]>) => {
+      tasks.push(
+        (async () => {
+          try {
+            const res = await Promise.race([fn(), this.timeoutPromise(this.REQUEST_TIMEOUT)]);
+            if (Array.isArray(res)) addUnique(res);
+          } catch (e) {
+            // Swallow and continue; aggregation is best-effort
+          }
+        })()
+      );
+    };
+
+    // Core sources
+    addTask('openalex', () => this.searchOpenAlex(query, Math.min(50, Math.max(10, limit))));
+    addTask('arxiv', () => this.searchArxiv(query, Math.min(50, Math.max(10, limit))));
+    addTask('crossref', () => this.searchCrossRef(query, Math.min(50, Math.max(20, limit))));
+    addTask('openaire', () => this.searchOpenAIRE(query, Math.min(50, Math.max(10, limit))));
+    addTask('doaj', () => this.searchDOAJ(query, Math.min(50, Math.max(10, limit))));
+    addTask('pubmed', () => this.searchPubMed(query, Math.min(50, Math.max(10, limit))));
+    // Optional sources
+    if (process.env.CORE_API_KEY) {
+      addTask('core', () => this.searchCORE(query, Math.min(50, Math.max(10, limit))));
+    }
+    // Keyless extras (HTML)
+    addTask('scholar', () => this.searchGoogleScholarLite(query, Math.min(50, Math.max(10, limit))));
+    addTask('shodhganga', () => this.searchShodhganga(query, Math.min(50, Math.max(10, limit))));
+    addTask('jstor', () => this.searchJSTORLite(query, Math.min(50, Math.max(10, limit))));
+
+    // Wait until either all tasks finish or the max window elapses
+    const allDone = Promise.allSettled(tasks);
+    const windowElapsed = new Promise<void>((resolve) => setTimeout(resolve, Math.max(1000, maxDurationMs)));
+    await Promise.race([allDone, windowElapsed]);
+
+    // Sort by citations then year and trim to limit
+    const papers = collected
+      .sort((a, b) => {
+        const citationDiff = (b.citations || 0) - (a.citations || 0);
+        if (citationDiff !== 0) return citationDiff;
+        return parseInt(b.year || '0') - parseInt(a.year || '0');
+      })
+      .slice(0, limit);
+
+    return {
+      success: true,
+      papers,
+      source: 'aggregate',
+      count: collected.length,
+      searchTime: Date.now() - startTime
+    };
+  }
+
+  /**
    * Search OpenAIRE API (minimal). If API shape changes, safely returns [].
    */
   private async searchOpenAIRE(query: string, limit: number): Promise<Paper[]> {

@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query');
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
+    const aggregateWindowMsRaw = searchParams.get('aggregateWindowMs');
+    const aggregateWindowMs = aggregateWindowMsRaw ? Math.max(0, parseInt(aggregateWindowMsRaw)) : 0;
     const userId = searchParams.get('userId'); // Optional for authenticated requests
     const mode = (searchParams.get('mode') || '').toLowerCase(); // forward | backward
     const seed = searchParams.get('seed') || '';
@@ -84,7 +86,11 @@ export async function GET(request: NextRequest) {
         searchTime: Date.now() - startTime
       };
     } else {
-      result = await literatureSearch.searchPapers(query!.trim(), limit);
+      if (aggregateWindowMs && aggregateWindowMs > 0) {
+        result = await literatureSearch.aggregatePapers(query!.trim(), limit, aggregateWindowMs);
+      } else {
+        result = await literatureSearch.searchPapers(query!.trim(), limit);
+      }
     }
 
     // Track usage
@@ -128,7 +134,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, limit = 10, userId, mode: rawMode, seed = '' } = body;
+    const { query, limit = 10, userId, mode: rawMode, seed = '', aggregateWindowMs: bodyAggregateWindowMs } = body;
+    const aggregateWindowMs = bodyAggregateWindowMs ? Math.max(0, parseInt(String(bodyAggregateWindowMs))) : 0;
     const mode: string = (rawMode || '').toLowerCase();
     const isCitationMode = mode === 'forward' || mode === 'backward';
 
@@ -179,7 +186,11 @@ export async function POST(request: NextRequest) {
         searchTime: 0
       };
     } else {
-      result = await literatureSearch.searchPapers(query.trim(), Math.min(limit, 50));
+      if (aggregateWindowMs && aggregateWindowMs > 0) {
+        result = await literatureSearch.aggregatePapers(query.trim(), Math.min(limit, 50), aggregateWindowMs);
+      } else {
+        result = await literatureSearch.searchPapers(query.trim(), Math.min(limit, 50));
+      }
     }
 
     // Track usage

@@ -23,7 +23,7 @@ const NotificationBell = React.lazy(() => import("@/app/collaborate/components/n
 const navItems = [
   { label: "Thesis Flow", href: "/", id: "home", icon: Home },
   { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
-  { label: "Research Suggestions", href: "/ai-assistant", id: "research-suggestions", icon: Lightbulb },
+  { label: "Explorer", href: "/explorer", id: "explorer", icon: Lightbulb },
   { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
   { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare, external: true, externalHref: QUANTUM_PDF_URL },
   { label: "Literature Review", href: "/literature-review", id: "lit-review", icon: BookOpen },
