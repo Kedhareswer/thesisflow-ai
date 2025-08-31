@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Sidebar from "../../ai-agents/components/Sidebar"
 import { ChevronDown, ChevronUp, Plus, ArrowLeft } from "lucide-react"
 import { useLiteratureSearch } from "@/hooks/use-literature-search"
+import { supabase } from "@/integrations/supabase/client"
 
 // Helpers to derive a topic/title from the user's query
 function stripTrailingSuffix(text: string): string {
@@ -47,11 +48,19 @@ export default function LiteratureReviewResults() {
   const [collapsed, setCollapsed] = React.useState(false)
   const [stepsExpanded, setStepsExpanded] = React.useState(true)
   const [reportExpanded, setReportExpanded] = React.useState(false)
+  const [userId, setUserId] = React.useState<string | undefined>(undefined)
 
   const query = searchParams.get("query") || ""
   const quality = searchParams.get("quality") || "standard"
+  const sessionIdParam = searchParams.get("sessionId") || undefined
 
-  const { results, isLoading, error, searchTime, source, cached, search, retry, rateLimitInfo, isRateLimited } = useLiteratureSearch()
+  const { results, isLoading, error, searchTime, source, cached, search, retry, rateLimitInfo, isRateLimited } = useLiteratureSearch({
+    debounceMs: 1200,
+    autoPreloadSession: true,
+    userIdForSession: userId,
+    sessionId: sessionIdParam,
+    includeInPreload: 'results'
+  })
 
   // Avoid duplicate requests in React Strict Mode remounts
   const hasSearchedRef = React.useRef(false)
@@ -91,6 +100,17 @@ export default function LiteratureReviewResults() {
     const limit = quality === "deep-review" ? 30 : quality === "high-quality" ? 20 : 10
     search(query, limit)
   }, [query, quality, search])
+
+  // Load authenticated userId for session authorization (client-side)
+  React.useEffect(() => {
+    let mounted = true
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return
+      const id = data?.user?.id
+      setUserId(id || undefined)
+    }).catch(() => setUserId(undefined))
+    return () => { mounted = false }
+  }, [])
 
   // If rate limited, queue an automatic retry after reset time
   React.useEffect(() => {
@@ -209,17 +229,6 @@ export default function LiteratureReviewResults() {
                 <div className="mt-3">
                   <button onClick={retry} className="rounded-md border border-red-200 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-100">
                     Retry
-                  </button>
-                </div>
-              </div>
-            )}
-            {error && (queuedRetry || /rate limit/i.test(error)) && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
-                <div className="text-sm font-medium">Rate limited — retrying{retryInSec !== null ? ` in ${retryInSec}s` : ''}…</div>
-                <div className="mt-2 text-xs">We’ll auto-retry as soon as the limit resets.</div>
-                <div className="mt-3">
-                  <button onClick={() => { setQueuedRetry(false); setRetryInSec(null); retry(); }} className="rounded-md border border-amber-200 bg-white px-3 py-1 text-sm text-amber-900 hover:bg-amber-100">
-                    Retry now
                   </button>
                 </div>
               </div>

@@ -46,14 +46,215 @@ interface ArxivEntry {
   author: Array<{ name: { _: string } }> | { name: { _: string } };
 }
 
+// Rate limiting and concurrency control types
+interface RateConfig {
+  capacity: number;      // max burst tokens
+  refillMs: number;      // interval to refill tokens
+  refillAmount: number;  // tokens added per interval
+  concurrency: number;   // max concurrent requests
+}
+
+interface TokenBucket {
+  capacity: number;
+  tokens: number;
+  refillMs: number;
+  refillAmount: number;
+  lastRefill: number; // epoch ms
+}
+
+interface Semaphore {
+  max: number;
+  current: number;
+  queue: Array<() => void>;
+}
+
 export class LiteratureSearchService {
   private cache = new Map<string, { data: SearchResult; timestamp: number }>();
   private inflight = new Map<string, Promise<SearchResult>>();
   private readonly CACHE_DURATION = 3600000; // 1 hour
   private readonly REQUEST_TIMEOUT = 6000; // 6 seconds per API call
   private readonly MAX_CONCURRENT_REQUESTS = 3;
+  // Per-source policies
+  private rateConfigs = new Map<string, RateConfig>();
+  private buckets = new Map<string, TokenBucket>();
+  private semaphores = new Map<string, Semaphore>();
+  // Opt-in debug logs for policies
+  private debugPolicies = process.env.LIT_SEARCH_DEBUG === '1';
+  private debugLog(...args: any[]): void {
+    if (this.debugPolicies) console.debug('[lit-pol]', ...args);
+  }
 
-  constructor(private supabaseClient?: any) {}
+  constructor(private supabaseClient?: any) {
+    this.initRatePolicies();
+  }
+
+  // Initialize defaults for known sources (conservative, adjustable later)
+  private initRatePolicies() {
+    const defaults: Record<string, RateConfig> = {
+      openalex:    { capacity: 8, refillMs: 250, refillAmount: 1, concurrency: 2 },
+      arxiv:       { capacity: 4, refillMs: 500, refillAmount: 1, concurrency: 2 },
+      crossref:    { capacity: 4, refillMs: 500, refillAmount: 1, concurrency: 2 },
+      openaire:    { capacity: 4, refillMs: 500, refillAmount: 1, concurrency: 2 },
+      doaj:        { capacity: 4, refillMs: 500, refillAmount: 1, concurrency: 2 },
+      pubmed:      { capacity: 4, refillMs: 500, refillAmount: 1, concurrency: 2 },
+      core:        { capacity: 2, refillMs: 1000, refillAmount: 1, concurrency: 1 },
+      scholar:     { capacity: 1, refillMs: 1000, refillAmount: 1, concurrency: 1 },
+      shodhganga:  { capacity: 1, refillMs: 1000, refillAmount: 1, concurrency: 1 },
+      jstor:       { capacity: 1, refillMs: 1000, refillAmount: 1, concurrency: 1 },
+    };
+    Object.entries(defaults).forEach(([k, v]) => {
+      this.rateConfigs.set(k, v);
+      this.buckets.set(k, {
+        capacity: v.capacity,
+        tokens: v.capacity,
+        refillMs: v.refillMs,
+        refillAmount: v.refillAmount,
+        lastRefill: Date.now(),
+      });
+      this.semaphores.set(k, { max: v.concurrency, current: 0, queue: [] });
+    });
+  }
+
+  // Simple semaphore acquire/release
+  private async acquireSemaphore(source: string): Promise<() => void> {
+    const sem = this.semaphores.get(source);
+    if (!sem) return () => {};
+    if (sem.current < sem.max) {
+      sem.current++;
+      this.debugLog('semaphore acquire', { source, current: sem.current, max: sem.max });
+      return () => {
+        sem.current--;
+        this.debugLog('semaphore release', { source, current: sem.current, max: sem.max });
+        const next = sem.queue.shift();
+        if (next) next();
+      };
+    }
+    this.debugLog('semaphore wait', { source, current: sem.current, max: sem.max });
+    await new Promise<void>(resolve => sem.queue.push(resolve));
+    sem.current++;
+    this.debugLog('semaphore acquire', { source, current: sem.current, max: sem.max });
+    return () => {
+      sem.current--;
+      this.debugLog('semaphore release', { source, current: sem.current, max: sem.max });
+      const next = sem.queue.shift();
+      if (next) next();
+    };
+  }
+
+  private refillBucket(b: TokenBucket): void {
+    const now = Date.now();
+    if (now <= b.lastRefill) return;
+    const elapsed = now - b.lastRefill;
+    if (elapsed >= b.refillMs) {
+      const intervals = Math.floor(elapsed / b.refillMs);
+      b.tokens = Math.min(b.capacity, b.tokens + intervals * b.refillAmount);
+      b.lastRefill += intervals * b.refillMs;
+    }
+  }
+
+  private async takeToken(source: string): Promise<void> {
+    const b = this.buckets.get(source);
+    if (!b) return; // no bucket -> unlimited
+    for (;;) {
+      this.refillBucket(b);
+      if (b.tokens > 0) {
+        b.tokens -= 1;
+        this.debugLog('token take', { source, tokens: b.tokens, capacity: b.capacity });
+        return;
+      }
+      const wait = Math.max(15, b.refillMs - (Date.now() - b.lastRefill));
+      this.debugLog('token wait', { source, waitMs: wait, tokens: b.tokens, capacity: b.capacity });
+      await this.sleep(wait);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
+
+  // Unified fetch with per-source rate limiting, concurrency caps, and jittered backoff
+  private async fetchWithPolicies(
+    source: string,
+    input: string | URL | Request,
+    init: RequestInit = {},
+    opts: { timeoutMs?: number; retries?: number } = {}
+  ): Promise<Response> {
+    const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : this.REQUEST_TIMEOUT;
+    const maxRetries = typeof opts.retries === 'number' ? opts.retries : 2;
+    let attempt = 0;
+    let backoff = 300; // ms
+
+    while (true) {
+      attempt++;
+      const release = await this.acquireSemaphore(source);
+      await this.takeToken(source);
+      const b = this.buckets.get(source);
+      const sem = this.semaphores.get(source);
+      this.debugLog('attempt begin', {
+        source,
+        attempt,
+        timeoutMs,
+        maxRetries,
+        tokens: b ? `${b.tokens}/${b.capacity}` : 'na',
+        concurrency: sem ? `${sem.current}/${sem.max}` : 'na'
+      });
+      const ac = new AbortController();
+      const userSignal = init.signal as AbortSignal | undefined;
+      let timer: any;
+      const onAbort = () => ac.abort();
+      try {
+        if (userSignal) {
+          if (userSignal.aborted) throw new Error('Aborted');
+          userSignal.addEventListener('abort', onAbort, { once: true });
+        }
+        timer = setTimeout(() => ac.abort(), Math.max(100, timeoutMs));
+        const resp = await fetch(input as any, { ...init, signal: ac.signal });
+
+        // Release immediately after receiving response
+        release();
+        clearTimeout(timer);
+        if (userSignal) userSignal.removeEventListener('abort', onAbort);
+
+        if (resp.status === 429) {
+          if (attempt > maxRetries) return resp;
+          const retryAfterRaw = resp.headers.get('Retry-After');
+          const resetRaw = resp.headers.get('X-RateLimit-Reset');
+          let waitMs = 0;
+          if (retryAfterRaw) {
+            const sec = Number(retryAfterRaw);
+            waitMs = isNaN(sec) ? Math.max(0, new Date(retryAfterRaw).getTime() - Date.now()) : sec * 1000;
+          } else if (resetRaw) {
+            const reset = Number(resetRaw);
+            waitMs = reset > 10000000000 ? Math.max(0, reset - Date.now()) : Math.max(0, reset * 1000 - Date.now());
+          } else {
+            waitMs = backoff;
+          }
+          const jitter = Math.floor(Math.random() * 250);
+          this.debugLog('http 429 backoff', { source, attempt, waitMs, jitter });
+          await this.sleep(Math.min(60000, waitMs + jitter));
+          backoff = Math.min(4000, backoff * 2);
+          continue;
+        }
+        if (resp.status >= 500 && resp.status < 600) {
+          if (attempt > maxRetries) return resp;
+          const jitter = Math.floor(Math.random() * 250);
+          this.debugLog('http 5xx backoff', { source, attempt, backoff, jitter, status: resp.status });
+          await this.sleep(backoff + jitter);
+          backoff = Math.min(4000, backoff * 2);
+          continue;
+        }
+        this.debugLog('attempt success', { source, attempt, status: resp.status });
+        return resp;
+      } catch (err) {
+        clearTimeout(timer);
+        if (userSignal) userSignal.removeEventListener('abort', onAbort);
+        release();
+        if (attempt > maxRetries) throw err;
+        const jitter = Math.floor(Math.random() * 250);
+        this.debugLog('network error backoff', { source, attempt, backoff, jitter, error: String(err) });
+        await this.sleep(backoff + jitter);
+        backoff = Math.min(4000, backoff * 2);
+      }
+    }
+  }
 
   /**
    * Fast parallel literature search with caching and fallbacks
@@ -356,10 +557,9 @@ export class LiteratureSearchService {
       url.searchParams.set('size', Math.min(50, Math.max(10, limit)).toString());
       url.searchParams.set('format', 'json');
 
-      const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('openaire', url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!response.ok) throw new Error(`OpenAIRE API error: ${response.status}`);
 
       const data = await response.json().catch(() => null);
@@ -402,10 +602,9 @@ export class LiteratureSearchService {
       const url = new URL('https://doaj.org/api/v2/search/articles/' + encodeURIComponent(query));
       url.searchParams.set('pageSize', Math.min(50, Math.max(10, limit)).toString());
 
-      const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('doaj', url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!response.ok) throw new Error(`DOAJ API error: ${response.status}`);
 
       const data = await response.json();
@@ -448,10 +647,9 @@ export class LiteratureSearchService {
       url.searchParams.set('per-page', limit.toString());
       url.searchParams.set('mailto', 'research@example.com'); // Replace with actual email
 
-      const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('openalex', url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
 
       if (!response.ok) throw new Error(`OpenAlex API error: ${response.status}`);
 
@@ -485,9 +683,7 @@ export class LiteratureSearchService {
       url.searchParams.set('start', '0');
       url.searchParams.set('max_results', limit.toString());
 
-      const response = await fetch(url.toString(), {
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('arxiv', url.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
 
       if (!response.ok) throw new Error(`ArXiv API error: ${response.status}`);
 
@@ -509,10 +705,9 @@ export class LiteratureSearchService {
       url.searchParams.set('query', query);
       url.searchParams.set('rows', limit.toString());
 
-      const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'AI-Research-Assistant/1.0 (mailto:research@example.com)' },
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('crossref', url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0 (mailto:research@example.com)' }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
 
       if (!response.ok) throw new Error(`CrossRef API error: ${response.status}`);
 
@@ -781,7 +976,7 @@ export class LiteratureSearchService {
         url.searchParams.set('filter', `doi:${encodeURIComponent(doi)}`);
         url.searchParams.set('per-page', '1');
         url.searchParams.set('mailto', 'research@example.com');
-        const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+        const resp = await this.fetchWithPolicies('openalex', url.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
         const data = await resp.json().catch(() => null);
         const id = data?.results?.[0]?.id as string | undefined;
         const idMatch = id?.match(/openalex\.org\/(W\d+)/i)?.[1];
@@ -793,7 +988,7 @@ export class LiteratureSearchService {
       url.searchParams.set('search', s);
       url.searchParams.set('per-page', '1');
       url.searchParams.set('mailto', 'research@example.com');
-      const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      const resp = await this.fetchWithPolicies('openalex', url.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       const data = await resp.json().catch(() => null);
       const id = data?.results?.[0]?.id as string | undefined;
       const idMatch = id?.match(/openalex\.org\/(W\d+)/i)?.[1];
@@ -814,10 +1009,9 @@ export class LiteratureSearchService {
       url.searchParams.set('filter', `cites:${workId}`);
       url.searchParams.set('per-page', Math.min(50, Math.max(10, limit)).toString());
       url.searchParams.set('mailto', 'research@example.com');
-      const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' },
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('openalex', url.toString(), {
+        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!response.ok) throw new Error(`OpenAlex citations (forward) error: ${response.status}`);
       const data = await response.json();
       return (data?.results || []).map((work: OpenAlexWork) => ({
@@ -848,7 +1042,7 @@ export class LiteratureSearchService {
       // Fetch the seed work to get referenced_works list
       const workUrl = new URL(`https://api.openalex.org/works/${workId}`);
       workUrl.searchParams.set('mailto', 'research@example.com');
-      const workResp = await fetch(workUrl.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      const workResp = await this.fetchWithPolicies('openalex', workUrl.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!workResp.ok) throw new Error(`OpenAlex work fetch error: ${workResp.status}`);
       const workJson: any = await workResp.json().catch(() => null);
       const refs: string[] = Array.isArray(workJson?.referenced_works) ? workJson.referenced_works : [];
@@ -862,7 +1056,7 @@ export class LiteratureSearchService {
       url.searchParams.set('filter', `ids:${ids}`);
       url.searchParams.set('per-page', Math.min(50, Math.max(10, limit)).toString());
       url.searchParams.set('mailto', 'research@example.com');
-      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      const response = await this.fetchWithPolicies('openalex', url.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!response.ok) throw new Error(`OpenAlex citations (backward) error: ${response.status}`);
       const data = await response.json();
       return (data?.results || []).map((w: OpenAlexWork) => ({
@@ -893,10 +1087,9 @@ export class LiteratureSearchService {
       const url = new URL('https://api.core.ac.uk/v3/search/works');
       url.searchParams.set('q', query);
       url.searchParams.set('limit', Math.min(50, Math.max(10, limit)).toString());
-      const response = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(this.REQUEST_TIMEOUT)
-      });
+      const response = await this.fetchWithPolicies('core', url.toString(), {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!response.ok) throw new Error(`CORE API error: ${response.status}`);
       const data = await response.json();
       const results = Array.isArray(data?.results) ? data.results : [];
@@ -939,7 +1132,7 @@ export class LiteratureSearchService {
       esearch.searchParams.set('term', query);
       esearch.searchParams.set('retmode', 'json');
       esearch.searchParams.set('retmax', Math.min(50, Math.max(10, limit)).toString());
-      const esResp = await fetch(esearch.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      const esResp = await this.fetchWithPolicies('pubmed', esearch.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!esResp.ok) throw new Error(`PubMed ESearch error: ${esResp.status}`);
       const esJson: any = await esResp.json().catch(() => null);
       const ids: string[] = esJson?.esearchresult?.idlist || [];
@@ -949,7 +1142,7 @@ export class LiteratureSearchService {
       esum.searchParams.set('db', 'pubmed');
       esum.searchParams.set('id', ids.slice(0, Math.min(limit, 50)).join(','));
       esum.searchParams.set('retmode', 'json');
-      const sumResp = await fetch(esum.toString(), { signal: AbortSignal.timeout(this.REQUEST_TIMEOUT) });
+      const sumResp = await this.fetchWithPolicies('pubmed', esum.toString(), {}, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
       if (!sumResp.ok) throw new Error(`PubMed ESummary error: ${sumResp.status}`);
       const sumJson: any = await sumResp.json().catch(() => null);
       const result: Paper[] = [];
@@ -995,10 +1188,9 @@ export class LiteratureSearchService {
       const url = new URL('https://scholar.google.com/scholar');
       url.searchParams.set('q', q);
       url.searchParams.set('hl', 'en');
-      const resp = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' },
-        signal: AbortSignal.timeout(Math.min(this.REQUEST_TIMEOUT, 4000))
-      });
+      const resp = await this.fetchWithPolicies('scholar', url.toString(), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' }
+      }, { timeoutMs: Math.min(this.REQUEST_TIMEOUT, 4000), retries: 1 });
       if (!resp.ok) throw new Error(String(resp.status));
       const html = await resp.text();
       const results: Paper[] = [];
@@ -1034,10 +1226,9 @@ export class LiteratureSearchService {
       const { cleaned } = this.parseQueryOperators(query);
       const url = new URL('https://shodhganga.inflibnet.ac.in/simple-search');
       url.searchParams.set('query', cleaned);
-      const resp = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' },
-        signal: AbortSignal.timeout(Math.min(this.REQUEST_TIMEOUT, 5000))
-      });
+      const resp = await this.fetchWithPolicies('shodhganga', url.toString(), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' }
+      }, { timeoutMs: Math.min(this.REQUEST_TIMEOUT, 5000), retries: 1 });
       if (!resp.ok) throw new Error(String(resp.status));
       const html = await resp.text();
       const results: Paper[] = [];
@@ -1073,10 +1264,9 @@ export class LiteratureSearchService {
       const { cleaned } = this.parseQueryOperators(query);
       const url = new URL('https://www.jstor.org/action/doBasicSearch');
       url.searchParams.set('Query', cleaned);
-      const resp = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' },
-        signal: AbortSignal.timeout(Math.min(this.REQUEST_TIMEOUT, 4000))
-      });
+      const resp = await this.fetchWithPolicies('jstor', url.toString(), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AI-Research-Assistant/1.0)' }
+      }, { timeoutMs: Math.min(this.REQUEST_TIMEOUT, 4000), retries: 1 });
       if (!resp.ok) throw new Error(String(resp.status));
       const html = await resp.text();
       const results: Paper[] = [];

@@ -49,10 +49,52 @@ export async function GET(request: NextRequest) {
 
     // Get client IP for rate limiting
     const clientIP = getClientIP(request);
+
+    // Cache-first: serve DB cache before applying rate limits for standard searches
+    if (!isCitationMode && (!aggregateWindowMs || aggregateWindowMs <= 0)) {
+      const cacheKey = `${query!.trim().toLowerCase()}_${limit}`;
+      try {
+        const { data } = await supabase
+          .from('literature_cache')
+          .select('result, expires_at')
+          .eq('query_key', cacheKey)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+
+        if (data?.result) {
+          const cached: any = JSON.parse(data.result);
+          const rateLimitResult = await checkRateLimit(userId, clientIP);
+          const response = {
+            ...cached,
+            cached: true,
+            rateLimitInfo: {
+              limit: 100,
+              remaining: Math.max(0, 100 - rateLimitResult.current_count),
+              resetTime: rateLimitResult.reset_time
+            },
+            processingTime: Date.now() - startTime
+          };
+
+          return NextResponse.json(response, {
+            status: 200,
+            headers: {
+              'X-RateLimit-Limit': '100',
+              'X-RateLimit-Remaining': Math.max(0, 100 - rateLimitResult.current_count).toString(),
+              'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString(),
+              'Cache-Control': 'public, max-age=3600'
+            }
+          });
+        }
+      } catch (e) {
+        // If cache lookup fails, continue to normal flow
+        console.warn('Cache lookup failed, proceeding without cache:', e);
+      }
+    }
     
-    // Check rate limits (100 requests per hour per user/IP)
+    // Check rate limits (100 requests per hour per user/IP) after cache-first
     const rateLimitResult = await checkRateLimit(userId, clientIP);
     if (!rateLimitResult.allowed) {
+      const retryAfterSec = Math.max(1, Math.ceil((new Date(rateLimitResult.reset_time).getTime() - Date.now()) / 1000));
       return NextResponse.json({
         success: false,
         error: 'Rate limit exceeded. Please try again later.',
@@ -67,7 +109,8 @@ export async function GET(request: NextRequest) {
         headers: {
           'X-RateLimit-Limit': '100',
           'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString()
+          'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString(),
+          'Retry-After': retryAfterSec.toString()
         }
       });
     }
@@ -156,10 +199,49 @@ export async function POST(request: NextRequest) {
     }
 
     const clientIP = getClientIP(request);
-    
+    const normalizedLimit = Math.min(limit, 50);
+
+    // Cache-first for standard searches in POST as well
+    if (!isCitationMode && (!aggregateWindowMs || aggregateWindowMs <= 0)) {
+      const cacheKey = `${String(query).trim().toLowerCase()}_${normalizedLimit}`;
+      try {
+        const { data } = await supabase
+          .from('literature_cache')
+          .select('result, expires_at')
+          .eq('query_key', cacheKey)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+
+        if (data?.result) {
+          const cached: any = JSON.parse(data.result);
+          const rateLimitResult = await checkRateLimit(userId, clientIP);
+          return NextResponse.json({
+            ...cached,
+            cached: true,
+            rateLimitInfo: {
+              limit: 100,
+              remaining: Math.max(0, 100 - rateLimitResult.current_count),
+              resetTime: rateLimitResult.reset_time
+            }
+          }, {
+            status: 200,
+            headers: {
+              'X-RateLimit-Limit': '100',
+              'X-RateLimit-Remaining': Math.max(0, 100 - rateLimitResult.current_count).toString(),
+              'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString(),
+              'Cache-Control': 'public, max-age=3600'
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Cache lookup (POST) failed, proceeding without cache:', e);
+      }
+    }
+
     // Check rate limits
     const rateLimitResult = await checkRateLimit(userId, clientIP);
     if (!rateLimitResult.allowed) {
+      const retryAfterSec = Math.max(1, Math.ceil((new Date(rateLimitResult.reset_time).getTime() - Date.now()) / 1000));
       return NextResponse.json({
         success: false,
         error: 'Rate limit exceeded',
@@ -169,7 +251,15 @@ export async function POST(request: NextRequest) {
           remaining: 0,
           resetTime: rateLimitResult.reset_time
         }
-      }, { status: 429 });
+      }, { 
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': '100',
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': new Date(rateLimitResult.reset_time).getTime().toString(),
+          'Retry-After': retryAfterSec.toString()
+        }
+      });
     }
 
     // Perform search

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 export interface Paper {
   id: string;
@@ -49,8 +49,15 @@ export interface UseLiteratureSearchOptions {
   debounceMs?: number;
   aggregateWindowMs?: number; // e.g., 120000 for 2 minutes
   ignoreWhileAggregating?: boolean; // prevent firing new requests while one aggregate search runs
+  useSSE?: boolean; // prefer SSE progressive streaming when not aggregating
+  sessionId?: string; // external session identifier (optional)
+  sseFallbackToFetchMs?: number; // if no SSE progress within this time, fallback to fetch
   onSuccess?: (result: SearchResult) => void;
   onError?: (error: string) => void;
+  // Optional: preload an existing session on mount
+  autoPreloadSession?: boolean;
+  userIdForSession?: string; // used for session API auth checks
+  includeInPreload?: 'all' | 'events' | 'results' | 'session';
 }
 
 export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
@@ -60,9 +67,18 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     debounceMs = 500,
     aggregateWindowMs = 0,
     ignoreWhileAggregating = true,
+    useSSE = true,
+    sessionId,
+    sseFallbackToFetchMs = 1500,
     onSuccess,
-    onError
+    onError,
+    autoPreloadSession = false,
+    userIdForSession,
+    includeInPreload = 'results'
   } = options;
+
+  // Per-query cooldown (to avoid rapid repeat hits of the same normalized query)
+  const PER_QUERY_COOLDOWN_MS = 60000; // 60s
 
   const [state, setState] = useState<UseLiteratureSearchState>({
     results: [],
@@ -81,17 +97,42 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const aggregatingRef = useRef<boolean>(false);
   const aggregationDeadlineRef = useRef<number | null>(null);
+  const lastQueryFetchRef = useRef<Record<string, number>>({});
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const sseFallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const receivedAnyPaperRef = useRef<boolean>(false);
+  const seenKeysRef = useRef<Set<string>>(new Set());
+  const sessionIdRef = useRef<string>(
+    sessionId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  );
 
-  const search = useCallback(async (
+  // Keep a ref of the latest results to seed dedupe before streaming
+  const resultsRef = useRef<Paper[]>([]);
+  useEffect(() => {
+    resultsRef.current = state.results;
+  }, [state.results]);
+
+  // Small helper: build a stable dedupe key for a paper across sources
+  const paperKey = (p: Partial<Paper>): string => {
+    const doi = (p.doi || '').trim().toLowerCase();
+    if (doi) return `doi:${doi}`;
+    const id = (p.id || '').trim().toLowerCase();
+    if (id) return `id:${id}`;
+    const url = (p.url || '').trim().toLowerCase();
+    if (url) return `url:${url}`;
+    const title = (p.title || '').trim().toLowerCase();
+    if (title) return `title:${title}`;
+    return `hash:${JSON.stringify(p).toLowerCase()}`;
+  };
+
+  // Internal: perform classic fetch flow (existing implementation)
+  const doFetchSearch = useCallback(async (
     query: string,
-    limit: number = defaultLimit,
+    limit: number,
     userId?: string
   ): Promise<SearchResult | null> => {
-    if (!query || query.trim().length < 3) {
-      setState(prev => ({ ...prev, error: 'Query must be at least 3 characters long' }));
-      return null;
-    }
-
     // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -101,8 +142,12 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
     }
+    // Close any SSE
+    if (eventSourceRef.current) {
+      try { eventSourceRef.current.close(); } catch {}
+      eventSourceRef.current = null;
+    }
 
-    // Create new abort controller
     abortControllerRef.current = new AbortController();
 
     setState(prev => ({
@@ -130,6 +175,12 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         aggregatingRef.current = false;
         aggregationDeadlineRef.current = null;
       }
+
+      // Record last-attempt timestamp for cooldown
+      try {
+        const key = `${query.trim().toLowerCase()}_${lastLimitRef.current}`;
+        lastQueryFetchRef.current[key] = Date.now();
+      } catch {}
 
       const response = await fetch(`/api/literature-search?${params}`, {
         method: 'GET',
@@ -173,13 +224,24 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         aggregatingRef.current = false;
         aggregationDeadlineRef.current = null;
 
-        // Limited auto-retry/backoff only if 429 and reset is within 2 minutes window
+        // Limited auto-retry aligned to server-provided reset with small jitter
         const status = response.status;
         if (status === 429 && rateLimitInfo?.resetTime) {
           const resetAt = new Date(rateLimitInfo.resetTime).getTime();
           const now = Date.now();
-          const waitMs = Math.max(1000, Math.min(30000, resetAt - now));
-          const withinTwoMin = resetAt - now <= 120000;
+          let waitMs = resetAt - now;
+          // Prefer standard Retry-After header if present
+          const retryAfterHeader = response.headers.get('Retry-After');
+          if (retryAfterHeader) {
+            const sec = Number(retryAfterHeader);
+            if (!Number.isNaN(sec)) {
+              waitMs = Math.max(waitMs, sec * 1000);
+            }
+          }
+          // Add jitter (500–1500ms) to avoid herding
+          const jitter = Math.floor(Math.random() * 1000) + 500;
+          waitMs = Math.max(0, waitMs + jitter);
+          const withinTwoMin = waitMs <= 120000;
           if (withinTwoMin && waitMs > 0) {
             retryTimeoutRef.current = setTimeout(() => {
               // Only retry if not aborted by a new search in the meantime
@@ -215,7 +277,6 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       }
 
       return result;
-
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         // Request was cancelled, don't update state
@@ -225,27 +286,165 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       }
 
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      
       setState(prev => ({
         ...prev,
         isLoading: false,
         error: errorMessage,
         results: []
       }));
-
-      if (onError) {
-        onError(errorMessage);
-      }
-
+      if (onError) onError(errorMessage);
       return null;
     }
-  }, [defaultLimit, onSuccess, onError, aggregateWindowMs]);
+  }, [aggregateWindowMs, defaultLimit, onError, onSuccess]);
+
+  const search = useCallback(async (
+    query: string,
+    limit: number = defaultLimit,
+    userId?: string
+  ): Promise<SearchResult | null> => {
+    if (!query || query.trim().length < 3) {
+      setState(prev => ({ ...prev, error: 'Query must be at least 3 characters long' }));
+      return null;
+    }
+    // If SSE is enabled and not using aggregate window, try streaming first
+    if (useSSE && (!aggregateWindowMs || aggregateWindowMs <= 0)) {
+      // Cancel any existing fetch and SSE
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      if (eventSourceRef.current) {
+        try { eventSourceRef.current.close(); } catch {}
+        eventSourceRef.current = null;
+      }
+
+      // Prepare state for streaming
+      setState(prev => ({ ...prev, isLoading: true, error: null, cached: false, source: 'stream' }));
+      lastLimitRef.current = Math.min(limit, 50);
+      receivedAnyPaperRef.current = false;
+      // Seed dedupe set from any preloaded results
+      try {
+        const seeded = new Set<string>();
+        for (const p of resultsRef.current) {
+          seeded.add(paperKey(p));
+        }
+        seenKeysRef.current = seeded;
+      } catch {
+        seenKeysRef.current.clear();
+      }
+
+      // Build URL
+      const params = new URLSearchParams({
+        query: query.trim(),
+        limit: String(lastLimitRef.current),
+      });
+      if (userId) params.append('userId', userId);
+      if (sessionIdRef.current) params.append('sessionId', sessionIdRef.current);
+
+      const es = new EventSource(`/api/literature-search/stream?${params.toString()}`);
+      eventSourceRef.current = es;
+
+      // Fallback timer: if no progress quickly, close and fallback to fetch
+      if (sseFallbackTimerRef.current) clearTimeout(sseFallbackTimerRef.current);
+      sseFallbackTimerRef.current = setTimeout(() => {
+        if (!receivedAnyPaperRef.current) {
+          try { es.close(); } catch {}
+          eventSourceRef.current = null;
+          doFetchSearch(query, limit, userId);
+        }
+      }, sseFallbackToFetchMs);
+
+      es.addEventListener('init', (ev: MessageEvent) => {
+        try {
+          const data = JSON.parse(ev.data || '{}');
+          if (data?.rateLimit) {
+            setState(prev => ({
+              ...prev,
+              rateLimitInfo: {
+                limit: data.rateLimit.limit ?? 100,
+                remaining: data.rateLimit.remaining ?? 0,
+                resetTime: data.rateLimit.resetTime ?? new Date(Date.now() + 3600000).toISOString()
+              }
+            }));
+          }
+        } catch {}
+      });
+
+      es.addEventListener('paper', (ev: MessageEvent) => {
+        receivedAnyPaperRef.current = true;
+        const p: Paper = (() => { try { return JSON.parse(ev.data); } catch { return ev.data as any; } })();
+        const key = paperKey(p);
+        if (seenKeysRef.current.has(key)) return;
+        seenKeysRef.current.add(key);
+
+        setState(prev => {
+          if (prev.results.length >= lastLimitRef.current) return prev;
+          const next = [...prev.results, p];
+          return { ...prev, results: next };
+        });
+      });
+
+      es.addEventListener('error', (ev: MessageEvent) => {
+        // Per-source error, keep streaming others
+        // Optionally, could log or surface lightweight info
+      });
+
+      es.onmessage = () => { /* default messages ignored */ };
+
+      es.onerror = () => {
+        // Network or server error; fallback to fetch if nothing received
+        try { es.close(); } catch {}
+        eventSourceRef.current = null;
+        if (!receivedAnyPaperRef.current) {
+          doFetchSearch(query, limit, userId);
+        } else {
+          // We have partial results; finalize state as best-effort
+          setState(prev => ({ ...prev, isLoading: false }));
+        }
+      };
+
+      es.addEventListener('done', (ev: MessageEvent) => {
+        if (sseFallbackTimerRef.current) {
+          clearTimeout(sseFallbackTimerRef.current);
+          sseFallbackTimerRef.current = null;
+        }
+        const payload = (() => { try { return JSON.parse(ev.data); } catch { return {}; } })() as any;
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: null,
+          searchTime: typeof payload?.processingTime === 'number' ? payload.processingTime : prev.searchTime,
+          source: payload?.mode === 'search' ? 'stream' : (prev.source || 'stream'),
+        }));
+        setCurrentQuery(query);
+        try { es.close(); } catch {}
+        eventSourceRef.current = null;
+      });
+
+      return null; // streaming path doesn't return a final result synchronously
+    }
+
+    // Otherwise, fall back to standard fetch path (includes aggregate window)
+    return doFetchSearch(query, limit, userId);
+  }, [useSSE, aggregateWindowMs, doFetchSearch, defaultLimit]);
 
   const searchWithDebounce = useCallback((
     query: string,
     limit: number = defaultLimit,
     userId?: string
   ) => {
+    // Cooldown check to reduce duplicate identical queries
+    try {
+      const key = `${query.trim().toLowerCase()}_${limit}`;
+      const last = lastQueryFetchRef.current[key];
+      if (last && Date.now() - last < PER_QUERY_COOLDOWN_MS) {
+        return;
+      }
+    } catch {}
+
     // Clear existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -266,6 +465,10 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    if (eventSourceRef.current) {
+      try { eventSourceRef.current.close(); } catch {}
+      eventSourceRef.current = null;
+    }
 
     // Clear debounce timeout
     if (debounceTimeoutRef.current) {
@@ -274,6 +477,10 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
+    }
+    if (sseFallbackTimerRef.current) {
+      clearTimeout(sseFallbackTimerRef.current);
+      sseFallbackTimerRef.current = null;
     }
 
     setState({
@@ -291,11 +498,73 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     aggregationDeadlineRef.current = null;
   }, []);
 
+  // Preload session results on mount if requested
+  const loadSession = useCallback(async (
+    sessionIdArg?: string,
+    userIdArg?: string,
+    include: 'all' | 'events' | 'results' | 'session' = includeInPreload
+  ) => {
+    const sid = sessionIdArg || sessionIdRef.current;
+    if (!sid) return { success: false } as any;
+    try {
+      const qs = new URLSearchParams();
+      if (userIdArg || userIdForSession) qs.set('userId', (userIdArg || userIdForSession) as string);
+      if (include) qs.set('include', include);
+      const res = await fetch(`/api/literature-search/session/${encodeURIComponent(sid)}?${qs.toString()}`);
+      if (!res.ok) return { success: false } as any;
+      const payload = await res.json();
+
+      const loadedResults: Paper[] = (payload?.results || []).map((r: any) => r.paper as Paper);
+      // Seed dedupe set from loaded results
+      try {
+        const seeded = new Set<string>();
+        for (const p of loadedResults) seeded.add(paperKey(p));
+        seenKeysRef.current = seeded;
+      } catch {}
+
+      setState(prev => ({
+        ...prev,
+        results: loadedResults,
+        isLoading: false,
+        error: null,
+        cached: false,
+        source: 'session',
+        searchTime: prev.searchTime,
+      }));
+
+      // Update sessionId if different and set current query for UX
+      sessionIdRef.current = sid;
+      try {
+        if (payload?.session?.query) setCurrentQuery(payload.session.query);
+      } catch {}
+
+      return payload;
+    } catch {
+      return { success: false } as any;
+    }
+  }, [includeInPreload, userIdForSession]);
+
+  useEffect(() => {
+    if (autoPreloadSession && sessionIdRef.current) {
+      // Fire and forget
+      loadSession(sessionIdRef.current, userIdForSession, includeInPreload);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const retry = useCallback(() => {
+    // If rate-limited and reset time hasn't passed, do nothing
+    const info = state.rateLimitInfo;
+    if (info) {
+      const resetAt = new Date(info.resetTime).getTime();
+      if (Date.now() < resetAt) {
+        return;
+      }
+    }
     if (currentQuery) {
       search(currentQuery, lastLimitRef.current || defaultLimit);
     }
-  }, [currentQuery, defaultLimit, search]);
+  }, [state.rateLimitInfo, currentQuery, defaultLimit, search]);
 
   // Cleanup on unmount
   const cleanup = useCallback(() => {
@@ -309,7 +578,20 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
     }
+    if (eventSourceRef.current) {
+      try { eventSourceRef.current.close(); } catch {}
+      eventSourceRef.current = null;
+    }
+    if (sseFallbackTimerRef.current) {
+      clearTimeout(sseFallbackTimerRef.current);
+      sseFallbackTimerRef.current = null;
+    }
   }, []);
+
+  // Auto cleanup on component unmount
+  useEffect(() => {
+    return () => cleanup();
+  }, [cleanup]);
 
   return {
     ...state,
@@ -320,6 +602,8 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     cleanup,
     currentQuery,
     isRateLimited: state.rateLimitInfo?.remaining === 0,
-    aggregateWindowMs
+    aggregateWindowMs,
+    loadSession,
+    sessionId: sessionIdRef.current
   };
 }

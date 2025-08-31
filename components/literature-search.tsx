@@ -16,6 +16,7 @@ interface LiteratureSearchProps {
   onPaperSelect?: (paper: Paper) => void;
   defaultQuery?: string;
   maxResults?: number;
+  sessionId?: string;
 }
 
 export function LiteratureSearch({
@@ -23,7 +24,8 @@ export function LiteratureSearch({
   className = '',
   onPaperSelect,
   defaultQuery = '',
-  maxResults = 10
+  maxResults = 10,
+  sessionId
 }: LiteratureSearchProps) {
   const [query, setQuery] = useState(defaultQuery);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
@@ -45,9 +47,12 @@ export function LiteratureSearch({
     aggregateWindowMs
   } = useLiteratureSearch({
     defaultLimit: maxResults,
-    debounceMs: 800,
+    debounceMs: 1200,
     aggregateWindowMs: 120000, // 2 minutes
     ignoreWhileAggregating: true,
+    sessionId,
+    autoPreloadSession: true,
+    userIdForSession: userId,
     onSuccess: (result) => {
       console.log(`Literature search completed in ${result.searchTime}ms from ${result.source}`);
     },
@@ -221,7 +226,7 @@ export function LiteratureSearch({
         <Alert variant="destructive">
           <AlertDescription className="flex items-center justify-between">
             <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={retry}>
+            <Button variant="outline" size="sm" onClick={retry} disabled={isRateLimited}>
               Retry
             </Button>
           </AlertDescription>
@@ -340,7 +345,7 @@ export function LiteratureSearch({
             <p className="text-gray-600 mb-4">
               Try adjusting your search terms or using different keywords.
             </p>
-            <Button variant="outline" onClick={retry}>
+            <Button variant="outline" onClick={retry} disabled={isRateLimited}>
               Try Again
             </Button>
           </CardContent>
