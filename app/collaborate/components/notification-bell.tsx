@@ -446,6 +446,12 @@ export default function NotificationBell() {
           </Button>
         }
         className="w-80 right-0"
+        side="top"
+        align="end"
+        sideOffset={8}
+        openOnHover
+        hoverOpenDelay={75}
+        hoverCloseDelay={150}
       >
           <DropdownMenuLabel className="flex items-center justify-between">
             <span>Notifications</span>
@@ -553,8 +559,6 @@ export default function NotificationBell() {
                       name: notification.data.team_name,
                       description: notification.data.team_description
                     },
-                    team_name: notification.data.team_name,
-                    status: 'pending',
                     inviter: {
                       id: notification.data.inviter_id || '',
                       full_name: notification.data.inviter_name,
@@ -569,8 +573,8 @@ export default function NotificationBell() {
                     <div key={notification.id} className="p-3">
                       <TeamInvitation
                         invitation={invitation}
-                        onAccept={(invitationId: string) => handleInvitationResponse(invitationId, 'accept')}
-                        onReject={(invitationId: string) => handleInvitationResponse(invitationId, 'reject')}
+                        onAccept={(invitationId) => handleInvitationResponse(invitationId, 'accept')}
+                        onDecline={(invitationId) => handleInvitationResponse(invitationId, 'reject')}
                         className="w-full"
                       />
                     </div>
@@ -581,7 +585,7 @@ export default function NotificationBell() {
                 return (
                   <DropdownMenuItem
                     key={notification.id}
-                    className={`p-0 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
+                    className={`group p-0 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="w-full p-3 flex items-start gap-3">

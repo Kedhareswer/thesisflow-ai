@@ -13,6 +13,11 @@ interface DropdownMenuProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string
   alignOffset?: number
   sideOffset?: number
+  // Optional: open the menu on hover instead of click
+  openOnHover?: boolean
+  // Optional delays (ms) for hover open/close
+  hoverOpenDelay?: number
+  hoverCloseDelay?: number
 }
 
 export function DropdownMenu({
@@ -25,10 +30,15 @@ export function DropdownMenu({
   align = 'start',
   alignOffset = 0,
   sideOffset = 4,
+  openOnHover = false,
+  hoverOpenDelay = 0,
+  hoverCloseDelay = 100,
   ...props
 }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
+  const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleOpenChange = (newOpen: boolean) => {
     setIsOpen(newOpen)
@@ -70,9 +80,61 @@ export function DropdownMenu({
     return child
   })
 
+  // Hover handlers (optional)
+  const clearTimers = () => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current)
+      openTimerRef.current = null
+    }
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
+  const handleMouseEnter = () => {
+    if (!openOnHover) return
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+    openTimerRef.current = setTimeout(() => {
+      handleOpenChange(true)
+    }, Math.max(0, hoverOpenDelay))
+  }
+
+  const handleMouseLeave = () => {
+    if (!openOnHover) return
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current)
+      openTimerRef.current = null
+    }
+    closeTimerRef.current = setTimeout(() => {
+      handleOpenChange(false)
+    }, Math.max(0, hoverCloseDelay))
+  }
+
+  React.useEffect(() => {
+    return () => {
+      clearTimers()
+    }
+  }, [])
+
   return (
-    <div className="relative" ref={menuRef} {...props}>
-      <div onClick={() => handleOpenChange(!isOpen)}>{trigger}</div>
+    <div
+      className="relative"
+      ref={menuRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      {...props}
+    >
+      <div
+        onClick={() => handleOpenChange(!isOpen)}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+      >
+        {trigger}
+      </div>
       {isOpen && (
         <div
           className={cn(
