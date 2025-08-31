@@ -282,6 +282,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 </Button>
               }
               className="w-56 right-0"
+              side="top"
+              align="end"
+              sideOffset={8}
             >
               <div className="flex items-center justify-start gap-3 p-3 border-b">
                 <SimpleAvatar size="md" />

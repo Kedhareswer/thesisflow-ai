@@ -8,6 +8,11 @@ interface DropdownMenuProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  side?: 'top' | 'bottom'
+  align?: 'start' | 'center' | 'end'
+  className?: string
+  alignOffset?: number
+  sideOffset?: number
 }
 
 export function DropdownMenu({
@@ -16,6 +21,10 @@ export function DropdownMenu({
   open,
   onOpenChange,
   className,
+  side = 'bottom',
+  align = 'start',
+  alignOffset = 0,
+  sideOffset = 4,
   ...props
 }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false)
@@ -68,8 +77,16 @@ export function DropdownMenu({
         <div
           className={cn(
             "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+            side === 'top' ? 'bottom-full mb-2' : 'mt-2',
+            align === 'end' && 'right-0',
+            align === 'center' && 'left-1/2 -translate-x-1/2',
             className
           )}
+          style={{
+            ...(side === 'top' ? { bottom: `calc(100% + ${sideOffset}px)` } : { top: `calc(100% + ${sideOffset}px)` }),
+            ...(align === 'end' ? { right: `${alignOffset}px` } : {}),
+            ...(align === 'start' ? { left: `${alignOffset}px` } : {})
+          } as React.CSSProperties}
         >
           {childrenWithCloseHandler}
         </div>
