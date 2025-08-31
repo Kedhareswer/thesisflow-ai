@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { BookOpen, Brain, Lightbulb, MessageCircle, Database, Smile, Briefcase, Zap, AlertTriangle, Sparkles } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,6 +67,7 @@ const personalities = [
 
 export default function ResearchExplorer() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
 
   // State for research chatbot
   const [chatTopic, setChatTopic] = useState("")
@@ -76,6 +78,17 @@ export default function ResearchExplorer() {
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
   const [selectedPersonality, setSelectedPersonality] = useState(personalities[0])
   const [collapsed, setCollapsed] = useState(false)
+  const [initialQuery, setInitialQuery] = useState<string>("")
+  const [activeTab, setActiveTab] = useState("search")
+
+  // Handle query parameter from AI Agent redirects
+  useEffect(() => {
+    const query = searchParams?.get('query')
+    if (query) {
+      setInitialQuery(query)
+      setActiveTab("search") // Ensure we're on the search tab
+    }
+  }, [searchParams])
 
   return (
     <RouteGuard requireAuth={true}>
@@ -95,7 +108,7 @@ export default function ResearchExplorer() {
                   </p>
                 </header>
 
-                <Tabs defaultValue="search" className="space-y-6">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   <TabsList className="grid w-full grid-cols-5 bg-gray-100 rounded-md">
                     <TabsTrigger value="search" className="data-[state=active]:bg-gray-200">
                       <BookOpen className="h-4 w-4 mr-2" />
@@ -119,7 +132,7 @@ export default function ResearchExplorer() {
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="search">
-                    <EnhancedLiteratureSearch />
+                    <EnhancedLiteratureSearch initialQuery={initialQuery} />
                   </TabsContent>
                   <TabsContent value="explore">
                     <TopicExplorer selectedProvider={selectedProvider} selectedModel={selectedModel} />

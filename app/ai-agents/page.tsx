@@ -114,13 +114,12 @@ export default function AIAgentsPage() {
     const q = query.trim()
     const sel = selOverride ?? selection
 
-    // If the user's intent is to search papers / do literature review, redirect to Literature Review
+    // If the user's intent is to search papers / do literature review, redirect to Explorer
     if (ai_isPaperSearchIntent(q, sel)) {
       const subject = ai_extractSubjectFromPrompt(q)
-      const refined = ai_buildRefinedQuery(sel.want, subject)
-      const quality = ai_inferQuality(sel)
-      const params = new URLSearchParams({ prefill: refined, quality })
-      router.push(`/literature-review?${params.toString()}`)
+      const searchQuery = subject && subject !== "__________" ? subject : q
+      const params = new URLSearchParams({ query: searchQuery })
+      router.push(`/explorer?${params.toString()}`)
       return
     }
 

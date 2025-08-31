@@ -29,9 +29,10 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface EnhancedLiteratureSearchProps {
   className?: string
+  initialQuery?: string
 }
 
-export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearchProps) {
+export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLiteratureSearchProps) {
   const { toast } = useToast()
   const { papers: sessionPapers, selectedPapers: sessionSelectedPapers, selectPaper, addPapers } = useResearchPapers()
   const { hasContext, contextSummary } = useResearchContext()
@@ -302,6 +303,7 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
             className="w-full"
             showButton={true}
             buttonText="Search Literature"
+            initialValue={initialQuery}
           />
 
           <div className="flex gap-2 flex-wrap">
@@ -477,113 +479,150 @@ export function EnhancedLiteratureSearch({ className }: EnhancedLiteratureSearch
       )}
 
       {papers.length > 0 && (
-        <div className="space-y-4">
-          {papers.map((paper: ResearchPaper) => (
-            <Card key={paper.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={selectedPapers.has(paper.id)}
-                    onCheckedChange={(checked) => handlePaperSelect(paper.id, checked as boolean)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1">
-                    <CardTitle className="text-lg leading-tight mb-2">
-                      {paper.title}
-                    </CardTitle>
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                      {paper.authors && paper.authors.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          <span>
-                            {paper.authors.slice(0, 3).join(", ")}
-                            {paper.authors.length > 3 ? " et al." : ""}
-                          </span>
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="w-12 p-4 text-left">
+                      <Checkbox
+                        checked={selectedPapers.size === papers.length && papers.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </th>
+                    <th className="p-4 text-left font-medium text-gray-900">Paper Name & Date</th>
+                    <th className="p-4 text-left font-medium text-gray-900">Metadata</th>
+                    <th className="p-4 text-left font-medium text-gray-900">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {papers.map((paper: ResearchPaper) => (
+                    <tr key={paper.id} className="border-b hover:bg-gray-50 transition-colors">
+                      {/* Select Column */}
+                      <td className="p-4">
+                        <Checkbox
+                          checked={selectedPapers.has(paper.id)}
+                          onCheckedChange={(checked) => handlePaperSelect(paper.id, checked as boolean)}
+                        />
+                      </td>
+                      
+                      {/* Paper Name & Date Column */}
+                      <td className="p-4">
+                        <div className="space-y-2">
+                          <h3 className="font-medium text-gray-900 leading-tight line-clamp-2">
+                            {paper.title}
+                          </h3>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            {paper.authors && paper.authors.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                <span>
+                                  {paper.authors.slice(0, 2).join(", ")}
+                                  {paper.authors.length > 2 ? " et al." : ""}
+                                </span>
+                              </div>
+                            )}
+                            {paper.year && (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>{paper.year}</span>
+                              </div>
+                            )}
+                          </div>
+                          {paper.tldr && (
+                            <div className="bg-blue-50 p-2 rounded text-xs">
+                              <span className="font-medium text-blue-800">TL;DR:</span>
+                              <span className="text-blue-700 ml-1">{paper.tldr}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {paper.year && (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{paper.year}</span>
+                      </td>
+                      
+                      {/* Metadata Column */}
+                      <td className="p-4">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-1">
+                            {paper.venue_type && (
+                              <Badge variant="secondary" className="text-xs">
+                                {paper.venue_type}
+                              </Badge>
+                            )}
+                            {paper.open_access?.is_oa && (
+                              <Badge variant="outline" className="text-xs text-green-600">
+                                Open Access
+                              </Badge>
+                            )}
+                            {paper.source && (
+                              <Badge variant="outline" className="text-xs">
+                                {paper.source}
+                              </Badge>
+                            )}
+                            {paper.id?.includes('mock-') && (
+                              <Badge variant="outline" className="text-xs text-orange-600">
+                                Demo Data
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div className="text-sm text-gray-600 space-y-1">
+                            {paper.cited_by_count !== undefined && (
+                              <div className="flex items-center gap-1">
+                                <Quote className="h-3 w-3" />
+                                <span>{paper.cited_by_count} citations</span>
+                              </div>
+                            )}
+                            {paper.journal && (
+                              <div className="text-xs text-gray-500">
+                                {paper.journal}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {paper.abstract && (
+                            <p className="text-xs text-gray-600 line-clamp-2 mt-1">
+                              {paper.abstract}
+                            </p>
+                          )}
                         </div>
-                      )}
-                      {paper.cited_by_count !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <Quote className="h-3 w-3" />
-                          <span>{paper.cited_by_count} citations</span>
+                      </td>
+                      
+                      {/* Actions Column */}
+                      <td className="p-4">
+                        <div className="flex gap-2 flex-wrap">
+                          {paper.url && (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={paper.url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                View Paper
+                              </a>
+                            </Button>
+                          )}
+                          {paper.pdf_url && paper.pdf_url !== paper.url && (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer">
+                                <FileText className="h-3 w-3 mr-1" />
+                                PDF
+                              </a>
+                            </Button>
+                          )}
+                          {paper.doi && (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noopener noreferrer">
+                                <Eye className="h-3 w-3 mr-1" />
+                                DOI
+                              </a>
+                            </Button>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {paper.venue_type && (
-                        <Badge variant="secondary" className="text-xs">
-                          {paper.venue_type}
-                        </Badge>
-                      )}
-                      {paper.open_access?.is_oa && (
-                        <Badge variant="outline" className="text-xs text-green-600">
-                          Open Access
-                        </Badge>
-                      )}
-                      {paper.source && (
-                        <Badge variant="outline" className="text-xs">
-                          {paper.source}
-                        </Badge>
-                      )}
-                      {paper.id?.includes('mock-') && (
-                        <Badge variant="outline" className="text-xs text-orange-600">
-                          Demo Data
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="pt-0">
-                {paper.tldr && (
-                  <div className="bg-blue-50 p-3 rounded-md mb-3">
-                    <p className="text-sm text-blue-800 font-medium">TL;DR:</p>
-                    <p className="text-sm text-blue-700">{paper.tldr}</p>
-                  </div>
-                )}
-                
-                {paper.abstract && (
-                  <p className="text-sm text-gray-700 mb-4 line-clamp-3">
-                    {paper.abstract}
-                  </p>
-                )}
-                
-                <div className="flex gap-2 flex-wrap">
-                  {paper.url && (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={paper.url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        View Paper
-                      </a>
-                    </Button>
-                  )}
-                  {paper.pdf_url && paper.pdf_url !== paper.url && (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-3 w-3 mr-1" />
-                        PDF
-                      </a>
-                    </Button>
-                  )}
-                  {paper.doi && (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noopener noreferrer">
-                        <Eye className="h-3 w-3 mr-1" />
-                        DOI
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {paperSearch.error && (

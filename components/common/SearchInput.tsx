@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Search, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ interface SearchInputProps {
   autoFocus?: boolean
   buttonText?: string
   showButton?: boolean
+  initialValue?: string
 }
 
 export function SearchInput({
@@ -24,8 +25,16 @@ export function SearchInput({
   autoFocus = false,
   buttonText = "Search",
   showButton = false,
+  initialValue = "",
 }: SearchInputProps) {
-  const [query, setQuery] = useState("")
+  const [query, setQuery] = useState(initialValue)
+
+  // Update query when initialValue changes (for external updates)
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setQuery(initialValue)
+    }
+  }, [initialValue])
 
   const handleSearch = useCallback(() => {
     if (query.trim()) {
