@@ -74,7 +74,8 @@ export function ResearchAssistant({
     }))
   )
   const [isTyping, setIsTyping] = useState(false)
-  const [contextCollapsed, setContextCollapsed] = useState(false)
+  // Show research context card collapsed by default; user can expand
+  const [contextCollapsed, setContextCollapsed] = useState(true)
   
   // AI Provider state
   const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])

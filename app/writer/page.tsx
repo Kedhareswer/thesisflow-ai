@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Sidebar from "../ai-agents/components/Sidebar"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { ChangeEvent } from "react"
@@ -67,6 +68,8 @@ export default function WriterPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // collapse state for global navigation sidebar
+  const [collapsed, setCollapsed] = useState(false)
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false)
   const [isCitationManagerOpen, setIsCitationManagerOpen] = useState(false)
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
@@ -665,7 +668,12 @@ export default function WriterPage() {
   
   return (
     <TooltipProvider>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex min-h-screen bg-[#F8F9FA]">
+        {/* Global Navigation Sidebar */}
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v=>!v)} />
+
+        {/* Writer workspace (keeps existing Doc sidebar + editor) */}
+        <div className="flex flex-1 h-screen overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col">
           <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
@@ -1016,6 +1024,7 @@ export default function WriterPage() {
             </div>
           </ScrollArea>
         </main>
+      </div>
       </div>
     {/* Hidden file input for Import */}
     <input

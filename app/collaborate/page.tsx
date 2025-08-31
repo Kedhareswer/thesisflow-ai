@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import Sidebar from "../ai-agents/components/Sidebar"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -150,6 +151,8 @@ export default function CollaboratePage() {
     isPublic: false,
   })
   const [isInvitationsDialogOpen, setIsInvitationsDialogOpen] = useState(false)
+  // global navigation sidebar collapse state
+  const [collapsed, setCollapsed] = useState(false)
 
   const { toast } = useToast()
   const { socket } = useSocket()
@@ -808,7 +811,12 @@ export default function CollaboratePage() {
 
   return (
     <RouteGuard requireAuth={true}>
-      <div className="min-h-screen bg-background">
+      <div className="flex min-h-screen bg-[#F8F9FA]">
+          {/* Global Navigation Sidebar */}
+          <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v=>!v)} />
+
+          {/* Collaborate workspace */}
+          <div className="flex-1 bg-background">
         {/* Modern Header */}
         {/* Removed duplicate header here */}
         <div className="container mx-auto px-6 py-8 max-w-7xl">
@@ -1696,6 +1704,7 @@ export default function CollaboratePage() {
             </Card>
           </div>
         )}
+      </div>
       </div>
     </RouteGuard>
   )

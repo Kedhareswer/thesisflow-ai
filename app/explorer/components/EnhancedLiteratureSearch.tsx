@@ -41,9 +41,9 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
   const [showFilters, setShowFilters] = useState(false)
   const [selectedPapers, setSelectedPapers] = useState<Set<string>>(new Set(sessionSelectedPapers.map(p => p.id)))
   const [filters, setFilters] = useState<SearchFilters>({
-    publication_year_min: 2010,
+    publication_year_min: 2020,
     publication_year_max: new Date().getFullYear(),
-    sort_by: 'relevance',
+    sort_by: 'publication_date',
     sort_order: 'desc'
   })
   const [lastSearchQuery, setLastSearchQuery] = useState<string>('')
@@ -530,12 +530,6 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
                               </div>
                             )}
                           </div>
-                          {paper.tldr && (
-                            <div className="bg-blue-50 p-2 rounded text-xs">
-                              <span className="font-medium text-blue-800">TL;DR:</span>
-                              <span className="text-blue-700 ml-1">{paper.tldr}</span>
-                            </div>
-                          )}
                         </div>
                       </td>
                       
@@ -578,6 +572,13 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
                               </div>
                             )}
                           </div>
+                          
+                          {paper.tldr && (
+                            <div className="bg-blue-50 p-2 rounded text-xs">
+                              <span className="font-medium text-blue-800">TL;DR:</span>
+                              <span className="text-blue-700 ml-1">{paper.tldr}</span>
+                            </div>
+                          )}
                           
                           {paper.abstract && (
                             <p className="text-xs text-gray-600 line-clamp-2 mt-1">
