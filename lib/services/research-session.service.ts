@@ -319,6 +319,13 @@ class ResearchSessionService {
     this.updateSession({ chatHistory: [] })
   }
 
+  /**
+   * Replace the entire chat history. Useful for reverting to a previous point.
+   */
+  setChatHistory(chatHistory: ResearchSessionData['chatHistory']): void {
+    this.updateSession({ chatHistory })
+  }
+
   // Context Building
   buildResearchContext(): string {
     const context: string[] = []

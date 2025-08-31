@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap, RotateCcw } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -15,6 +15,7 @@ import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResearchSession } from "@/components/research-session-provider"
+import MarkdownRenderer from "@/components/common/MarkdownRenderer"
 import { Badge } from "@/components/ui/badge"
 
 interface Message {
@@ -52,6 +53,7 @@ export function ResearchAssistant({
     buildResearchContext, 
     addChatMessage, 
     clearChatHistory,
+    setChatHistory,
     hasContext, 
     contextSummary 
   } = useResearchSession()
@@ -306,6 +308,32 @@ ASSISTANT:`
     })
   }
 
+  // Revert to the state before a given user message
+  const handleRevertToMessage = (messageId: string) => {
+    const idx = messages.findIndex(m => m.id === messageId && m.role === 'user')
+    if (idx === -1) return
+    const target = messages[idx]
+    const trimmed = messages.slice(0, idx)
+
+    setIsTyping(false)
+    setIsSending(false)
+    setMessages(trimmed)
+    setValue(target.content)
+    // Persist trimmed history to session
+    const newHistory = trimmed.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp.toISOString()
+    }))
+    setChatHistory(newHistory)
+    adjustHeight()
+    textareaRef.current?.focus()
+    toast({
+      title: "Reverted",
+      description: "Chat reverted to before that prompt. You can edit and resend.",
+    })
+  }
+
 
   return (
     <div className="flex flex-col h-[75vh] md:h-[80vh] lg:h-[85vh] bg-white rounded-lg border">
@@ -363,7 +391,11 @@ ASSISTANT:`
                         : "bg-muted"
                     )}
                   >
-                    <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
+                    {message.role === "assistant" ? (
+                      <MarkdownRenderer content={message.content} />
+                    ) : (
+                      <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
+                    )}
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-xs opacity-70">
                       {message.timestamp.toLocaleTimeString()}
@@ -376,6 +408,18 @@ ASSISTANT:`
                         onClick={() => copyToClipboard(message.content)}
                       >
                         <Copy className="w-3 h-3" />
+                      </Button>
+                    )}
+                    {message.role === "user" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={() => handleRevertToMessage(message.id)}
+                        aria-label="Revert to this prompt"
+                        title="Revert to this prompt"
+                      >
+                        <RotateCcw className="w-3 h-3" />
                       </Button>
                     )}
                   </div>

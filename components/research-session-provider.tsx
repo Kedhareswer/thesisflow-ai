@@ -38,6 +38,7 @@ interface ResearchSessionContextType {
   // Chat management
   addChatMessage: (role: 'user' | 'assistant', content: string, contextUsed?: string[]) => void
   clearChatHistory: () => void
+  setChatHistory: (chatHistory: ResearchSessionData['chatHistory']) => void
   
   // Context building
   buildResearchContext: () => string
@@ -110,6 +111,7 @@ export function ResearchSessionProvider({ children }: ResearchSessionProviderPro
     getSelectedIdeas: researchSessionService.getSelectedIdeas.bind(researchSessionService),
     addChatMessage: researchSessionService.addChatMessage.bind(researchSessionService),
     clearChatHistory: researchSessionService.clearChatHistory.bind(researchSessionService),
+    setChatHistory: researchSessionService.setChatHistory.bind(researchSessionService),
     buildResearchContext: researchSessionService.buildResearchContext.bind(researchSessionService),
   }), [])
 
