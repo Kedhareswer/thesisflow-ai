@@ -4,6 +4,8 @@ import React from "react"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import type { AIProvider } from "@/lib/ai-providers"
 import { useDeepSearch } from "@/hooks/use-deep-search"
+import { useLiteratureSearch } from "@/hooks/use-literature-search"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2, Bot } from "lucide-react"
 
@@ -138,8 +140,19 @@ export default function SearchBox({
   const [placeholderIndex, setPlaceholderIndex] = React.useState(0)
   const [isFocused, setIsFocused] = React.useState(false)
   const [deepResearchOn, setDeepResearchOn] = React.useState(false)
+  
+  // Deep Research state management
+  const [deepResearchState, setDeepResearchState] = React.useState({
+    isLoading: false,
+    progress: null as any,
+    results: null as any,
+    error: null as string | null,
+    iterations: [] as any[],
+    currentIteration: 0,
+    isStreaming: false
+  })
 
-  // Deep Research hook
+  // Legacy Deep Search hook (for fallback)
   const {
     items,
     summary,
@@ -147,12 +160,12 @@ export default function SearchBox({
     warnings,
     notices,
     infos,
-    isLoading,
-    error,
+    isLoading: legacyLoading,
+    error: legacyError,
     start,
     stop,
     reset,
-    isStreaming,
+    isStreaming: legacyStreaming,
   } = useDeepSearch()
 
   // Compute composed value
@@ -199,20 +212,169 @@ export default function SearchBox({
     if (!next) {
       // Stop any running deep research stream
       stop()
+      setDeepResearchState({
+        isLoading: false,
+        progress: null,
+        results: null,
+        error: null,
+        iterations: [],
+        currentIteration: 0,
+        isStreaming: false
+      })
     } else {
-      // Start deep research with the current input
-      const q = (value || composed || "").trim()
-      start({ query: q, provider, model })
+      // Do NOT auto-start; wait for explicit user Submit
+      // Clear previous results to give a clean slate
+      reset()
+      setDeepResearchState({
+        isLoading: false,
+        progress: null,
+        results: null,
+        error: null,
+        iterations: [],
+        currentIteration: 0,
+        isStreaming: false
+      })
     }
   }
 
+  const { session } = useSupabaseAuth()
+
   const handleSubmit = () => {
-    if (!value.trim()) return
-    
+    const q = (value || composed || "").trim()
+    if (!q) return
+
+    // If Deep Research is enabled, call the plan-and-execute API with deep research flag
+    if (deepOn) {
+      // Set loading state
+      setDeepResearchState(prev => ({
+        ...prev,
+        isLoading: true,
+        isStreaming: true,
+        error: null,
+        results: null,
+        iterations: [],
+        currentIteration: 0
+      }))
+
+      // Use the new Deep Researcher system via plan-and-execute API
+      const requestBody = {
+        userQuery: q,
+        selectedTools: selection.use || [],
+        useDeepResearch: true,
+        maxIterations: 4
+      }
+
+      // Add timeout handling
+      const timeoutId = setTimeout(() => {
+        setDeepResearchState(prev => ({
+          ...prev,
+          isLoading: false,
+          isStreaming: false,
+          error: 'Request timeout - Deep Research is taking longer than expected. Please try again.'
+        }))
+      }, 300000) // 5 minute timeout
+
+      // Use fetch with streaming response and authentication
+      fetch('/api/plan-and-execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify(requestBody)
+      }).then(async (response) => {
+        clearTimeout(timeoutId)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+          throw new Error('No response body reader available')
+        }
+
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (line.trim() === '') continue
+              
+              if (line.startsWith('data: ')) {
+                try {
+                  const jsonStr = line.slice(6).trim()
+                  if (jsonStr === '{}') continue // Skip heartbeat
+                  
+                  const data = JSON.parse(jsonStr)
+                  console.log('Deep Research Progress:', data)
+                  
+                  if (data.type === 'deep_research_complete') {
+                    console.log('Deep Research Complete:', data.result)
+                    setDeepResearchState(prev => ({
+                      ...prev,
+                      isLoading: false,
+                      isStreaming: false,
+                      results: data.result
+                    }))
+                  } else if (data.type === 'deep_progress') {
+                    console.log('Deep Research Progress:', data)
+                    setDeepResearchState(prev => ({
+                      ...prev,
+                      progress: data,
+                      currentIteration: data.iteration || prev.currentIteration + 1,
+                      iterations: [...prev.iterations, data]
+                    }))
+                  } else if (data.type && (data.type.includes('evidence') || data.type.includes('conflict') || data.type.includes('gap') || data.type.includes('critical') || data.type.includes('critique') || data.type.includes('iteration') || data.type.includes('synthesis'))) {
+                    // Handle all deep research progress types
+                    console.log('Deep Research Phase:', data)
+                    setDeepResearchState(prev => ({
+                      ...prev,
+                      progress: data,
+                      currentIteration: data.iteration || prev.currentIteration,
+                      iterations: prev.iterations.some(iter => iter.type === data.type && iter.iteration === data.iteration) 
+                        ? prev.iterations 
+                        : [...prev.iterations, data]
+                    }))
+                  }
+                } catch (err) {
+                  console.error('Error parsing SSE data:', err, 'Line:', line)
+                }
+              } else if (line.startsWith('event: ')) {
+                // Handle event types if needed
+                console.log('SSE Event:', line.slice(7))
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
+      }).catch((error) => {
+        clearTimeout(timeoutId)
+        console.error('Deep Research Error:', error)
+        setDeepResearchState(prev => ({
+          ...prev,
+          isLoading: false,
+          isStreaming: false,
+          error: error.message || 'Failed to complete Deep Research. Please try again.'
+        }))
+      })
+
+      return
+    }
+
+    // Otherwise, fall back to parent handler (e.g., Explorer or Chat)
     if (onSubmitQuery) {
-      onSubmitQuery(value.trim())
+      onSubmitQuery(q)
     } else {
-      console.log("Submit query:", value)
+      console.log("Submit query:", q)
     }
   }
 
@@ -371,7 +533,7 @@ export default function SearchBox({
       </div>
 
       {/* Streaming results panel */}
-      {(deepOn && (isLoading || !!error || items.length > 0 || !!summary || warnings.length > 0 || notices.length > 0)) && (
+      {(deepOn && (deepResearchState.isLoading || !!deepResearchState.error || !!deepResearchState.results || deepResearchState.iterations.length > 0)) && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           {/* Header: Topic + Tag */}
           <div className="mb-3 flex items-start justify-between gap-3">
@@ -380,7 +542,7 @@ export default function SearchBox({
           </div>
 
           {/* Executing Plan preamble while loading and before results */}
-          {isLoading && items.length === 0 && !summary && (
+          {deepResearchState.isLoading && deepResearchState.iterations.length === 0 && !deepResearchState.results && (
             <div className="mb-4">
               <div className="flex items-center gap-2 text-sm text-gray-700">
                 <Bot className="h-4 w-4 text-gray-600" />
@@ -398,7 +560,7 @@ export default function SearchBox({
           )}
 
           {/* Agent running card */}
-          {isLoading && (
+          {deepResearchState.isLoading && (
             <div className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-3">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -408,23 +570,23 @@ export default function SearchBox({
                 You can step in with instructions while the task runs...
               </div>
               <div className="mt-2 flex items-center justify-end gap-2">
-                {isStreaming && <span className="text-xs text-orange-700">Streaming…</span>}
-                <button onClick={stop} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-100">Cancel</button>
+                {deepResearchState.isStreaming && <span className="text-xs text-orange-700">Streaming…</span>}
+                <button onClick={() => setDeepResearchState(prev => ({...prev, isLoading: false, isStreaming: false}))} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-100">Cancel</button>
               </div>
             </div>
           )}
 
-          {error && (
-            <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          {deepResearchState.error && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{deepResearchState.error}</div>
           )}
 
           {/* Progress small note */}
-          {progress?.message && (
-            <div className="mb-2 text-xs text-gray-600">{progress.message}{progress.total ? ` • ${progress.total} items` : ""}</div>
+          {deepResearchState.progress?.message && (
+            <div className="mb-2 text-xs text-gray-600">{deepResearchState.progress.message}</div>
           )}
 
           {/* Loading skeletons before first results */}
-          {isLoading && items.length === 0 && !summary && (
+          {deepResearchState.isLoading && deepResearchState.iterations.length === 0 && !deepResearchState.results && (
             <div className="mb-4 space-y-2">
               <Skeleton className="h-4 w-5/6" />
               <Skeleton className="h-4 w-4/6" />
@@ -432,49 +594,56 @@ export default function SearchBox({
             </div>
           )}
 
-          {items.length > 0 && (
+          {/* Deep Research Iterations */}
+          {deepResearchState.iterations.length > 0 && (
             <div className="mb-4">
-              <div className="mb-1 text-sm font-semibold text-gray-800">Results</div>
-              <ul className="space-y-2">
-                {items.map((it, idx) => (
-                  <li key={`${it.url || it.title}-${idx}`} className="rounded-md border border-gray-100 p-2 hover:bg-gray-50">
-                    <a href={it.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-700 hover:underline">
-                      {it.title}
-                    </a>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                      <span className="rounded-full border border-gray-200 px-2 py-0.5">{it.source}</span>
-                      {it.kind && <span className="rounded-full border border-gray-200 px-2 py-0.5 capitalize">{it.kind}</span>}
-                    </div>
-                    {it.snippet && <p className="mt-1 line-clamp-2 text-xs text-gray-600">{it.snippet}</p>}
-                  </li>
+              <div className="mb-1 text-sm font-semibold text-gray-800">Research Progress</div>
+              <div className="space-y-3">
+                {deepResearchState.iterations.map((iteration, idx) => (
+                  <div key={idx} className="rounded-md border border-gray-100 p-3 hover:bg-gray-50">
+                    <div className="text-sm font-medium text-gray-700">Iteration {idx + 1}</div>
+                    <div className="mt-1 text-xs text-gray-600">{iteration.message || 'Processing...'}</div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
 
-          {summary && (
+          {deepResearchState.results && (
             <div className="rounded-md border border-orange-200 bg-orange-50 p-3">
-              <div className="mb-1 text-sm font-semibold text-orange-800">Summary</div>
-              <div className="prose prose-sm max-w-none text-orange-900" dangerouslySetInnerHTML={{ __html: summary.replace(/\n/g, '<br/>') }} />
+              <div className="mb-1 text-sm font-semibold text-orange-800">Deep Research Results</div>
+              <div className="prose prose-sm max-w-none text-orange-900">
+                {deepResearchState.results.executiveSummary && (
+                  <div className="mb-3">
+                    <h4 className="font-semibold">Executive Summary</h4>
+                    <p>{deepResearchState.results.executiveSummary}</p>
+                  </div>
+                )}
+                {deepResearchState.results.keyFindings && deepResearchState.results.keyFindings.length > 0 && (
+                  <div className="mb-3">
+                    <h4 className="font-semibold">Key Findings</h4>
+                    <ul className="list-disc pl-5">
+                      {deepResearchState.results.keyFindings.map((finding: string, idx: number) => (
+                        <li key={idx}>{finding}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {(warnings.length > 0 || notices.length > 0 || infos.length > 0) && (
+          {/* Research metadata */}
+          {deepResearchState.results?.metaAnalysis && (
             <div className="mt-3 space-y-1">
-              {infos.map((m, i) => (
-                <div key={`i-${i}`} className="text-xs text-gray-500">ℹ️ {m}</div>
-              ))}
-              {notices.map((m, i) => (
-                <div key={`n-${i}`} className="text-xs text-blue-700">🔔 {m}</div>
-              ))}
-              {warnings.map((w, i) => (
-                <div key={`w-${i}`} className="text-xs text-yellow-700">⚠️ {w.source ? `[${w.source}] ` : ''}{w.error}</div>
-              ))}
+              <div className="text-xs text-gray-500">📊 Quality Score: {deepResearchState.results.metaAnalysis.qualityScore}/10</div>
+              <div className="text-xs text-gray-500">🔍 Sources Analyzed: {deepResearchState.results.metaAnalysis.sourcesAnalyzed}</div>
+              <div className="text-xs text-gray-500">⚖️ Conflicts Detected: {deepResearchState.results.metaAnalysis.conflictsDetected}</div>
             </div>
           )}
 
           {/* Empty state after completion with no content */}
-          {!isLoading && !error && items.length === 0 && !summary && (
+          {!deepResearchState.isLoading && !deepResearchState.error && deepResearchState.iterations.length === 0 && !deepResearchState.results && (
             <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
               No findings yet. Try refining your topic or enabling a provider for summarization.
             </div>
@@ -482,8 +651,8 @@ export default function SearchBox({
 
           {/* Footer controls when finished */}
           <div className="mt-3 flex items-center justify-end gap-2">
-            {!isLoading && (items.length > 0 || summary) && (
-              <button onClick={reset} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Clear</button>
+            {!deepResearchState.isLoading && (deepResearchState.iterations.length > 0 || deepResearchState.results) && (
+              <button onClick={() => setDeepResearchState({isLoading: false, progress: null, results: null, error: null, iterations: [], currentIteration: 0, isStreaming: false})} className="text-xs rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50">Clear</button>
             )}
           </div>
         </div>

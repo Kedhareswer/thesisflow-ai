@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth-utils'
 import { ErrorHandler } from '@/lib/utils/error-handler'
 import { PlanningService } from '@/lib/services/planning.service'
 import { ExecutingService, ExecutionProgress } from '@/lib/services/executing.service'
+import { DeepResearcherService, DeepResearchResult } from '@/lib/services/deep-researcher.service'
 
 // Supabase client (service role) for rate limiting and optional usage tracking
 const supabase = createClient(
@@ -20,7 +21,7 @@ interface RateLimitResult {
 export async function POST(request: NextRequest) {
   try {
     // 1) Parse JSON body
-    const { userQuery, selectedTools = [] } = await request.json()
+    const { userQuery, selectedTools = [], useDeepResearch = false, maxIterations = 4 } = await request.json()
 
     // 2) Require auth (reject unauthenticated)
     const user = await requireAuth(request, 'plan-and-execute')
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
 
     const planningService = new PlanningService()
     const executingService = new ExecutingService()
+    const deepResearcherService = new DeepResearcherService()
 
     const stream = new ReadableStream<Uint8Array>({
       start(c) {
@@ -94,6 +96,8 @@ export async function POST(request: NextRequest) {
         const initPayload = {
           type: 'init',
           userId,
+          useDeepResearch,
+          maxIterations: useDeepResearch ? maxIterations : 0,
           rateLimit: {
             limit: 100,
             remaining: Math.max(0, 100 - rateLimit.current_count),
@@ -119,42 +123,74 @@ export async function POST(request: NextRequest) {
         }
         request.signal.addEventListener('abort', abort)
 
-        // Plan + Execute
+        // Choose research approach
         const run = async () => {
           try {
-            // Generate plan
-            const plan = await planningService.generateResearchPlan(String(userQuery), selectedTools as string[])
+            if (useDeepResearch) {
+              // Deep Research Approach
+              const onDeepProgress = (progress: any) => {
+                if (closed) return
+                const progressData = {
+                  type: 'deep_progress',
+                  ...progress
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(progressData)}\n\n`))
+              }
 
-            controller.enqueue(encoder.encode(`event: plan\n`))
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(plan)}\n\n`))
+              const deepResult = await deepResearcherService.conductDeepResearch(
+                String(userQuery),
+                '', // initialContext
+                maxIterations,
+                userId,
+                onDeepProgress
+              )
 
-            // Execute plan with streaming progress
-            let lastOverall = -1
-            const onProgress = (progress: ExecutionProgress) => {
-              if (closed) return
-              // Optional: reduce noise by only emitting when overall changes or at task boundary
-              const shouldEmit = progress.overallProgress !== lastOverall || progress.isComplete
-              if (!shouldEmit) return
-              lastOverall = progress.overallProgress
+              // Send deep research result
+              const deepResultPayload = {
+                type: 'deep_research_complete',
+                result: deepResult,
+                processingTime: Date.now() - startTime,
+                totalIterations: deepResult.research_iterations.length,
+                totalSources: deepResult.meta_analysis.total_sources,
+                qualityScore: deepResult.meta_analysis.research_quality_score
+              }
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(deepResultPayload)}\n\n`))
 
-              controller.enqueue(encoder.encode(`event: progress\n`))
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(progress)}\n\n`))
+            } else {
+              // Traditional Plan + Execute Approach
+              const plan = await planningService.generateResearchPlan(String(userQuery), selectedTools as string[])
+
+              controller.enqueue(encoder.encode(`event: plan\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(plan)}\n\n`))
+
+              // Execute plan with streaming progress
+              let lastOverall = -1
+              const onProgress = (progress: ExecutionProgress) => {
+                if (closed) return
+                // Optional: reduce noise by only emitting when overall changes or at task boundary
+                const shouldEmit = progress.overallProgress !== lastOverall || progress.isComplete
+                if (!shouldEmit) return
+                lastOverall = progress.overallProgress
+
+                controller.enqueue(encoder.encode(`event: progress\n`))
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(progress)}\n\n`))
+              }
+
+              const finalProgress = await executingService.executePlan(plan, onProgress)
+
+              // Done event
+              const donePayload = {
+                type: 'done',
+                planId: finalProgress.planId,
+                totalTasks: finalProgress.totalTasks,
+                processingTime: Date.now() - startTime,
+                resultsCount: finalProgress.results?.length || 0,
+                overallProgress: finalProgress.overallProgress,
+                isComplete: finalProgress.isComplete,
+              }
+              controller.enqueue(encoder.encode(`event: done\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`))
             }
-
-            const finalProgress = await executingService.executePlan(plan, onProgress)
-
-            // Done event
-            const donePayload = {
-              type: 'done',
-              planId: finalProgress.planId,
-              totalTasks: finalProgress.totalTasks,
-              processingTime: Date.now() - startTime,
-              resultsCount: finalProgress.results?.length || 0,
-              overallProgress: finalProgress.overallProgress,
-              isComplete: finalProgress.isComplete,
-            }
-            controller.enqueue(encoder.encode(`event: done\n`))
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`))
 
             try { controller.close() } catch {}
             closed = true
