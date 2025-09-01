@@ -95,8 +95,44 @@ export async function POST(request: NextRequest) {
         processedResult = extractedContent;
     }
 
-    // Note: Database storage disabled until auth is properly configured
-    // const extractionRecord = null;
+    // Attempt to persist the extraction summary/result to Supabase (best-effort)
+    let extractionId: string | null = null;
+    try {
+      // Build a short summary if available
+      const summaryText = typeof (processedResult as any)?.summary === 'string'
+        ? (processedResult as any).summary as string
+        : (typeof (processedResult as any)?.text === 'string' ? ((processedResult as any).text as string).slice(0, 600) : null);
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('extractions' as any)
+        .insert({
+          user_id: null,
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          summary: summaryText,
+          result_json: {
+            result: processedResult,
+            metadata: {
+              fileSize: file.size,
+              fileType: file.type,
+              extractedAt: new Date().toISOString(),
+              wordCount: (extractedContent as any)?.metadata?.wordCount,
+              pageCount: (extractedContent as any)?.metadata?.pageCount || (extractedContent as any)?.metadata?.slideCount,
+              tableCount: extractedContent.tables?.length || 0,
+              ocrEnabled
+            }
+          }
+        })
+        .select('id')
+        .single();
+
+      if (!insertError && inserted?.id) {
+        extractionId = inserted.id as string;
+      }
+    } catch (dbErr) {
+      console.warn('Skipping DB persistence for extraction (non-fatal):', dbErr);
+    }
 
     // Return formatted result based on output format
     const response = {
@@ -114,7 +150,8 @@ export async function POST(request: NextRequest) {
         pageCount: extractedContent.metadata?.pageCount || extractedContent.metadata?.slideCount,
         tableCount: extractedContent.tables?.length || 0,
         ocrEnabled
-      }
+      },
+      extractionId
     };
 
     return NextResponse.json(response);

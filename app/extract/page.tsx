@@ -13,6 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
 import Sidebar from '@/app/ai-agents/components/Sidebar'
 import { Search, Sparkles, ChevronDown, MoreHorizontal, Send } from 'lucide-react'
+import type { RecentExtraction } from '@/lib/services/extractions-store'
+import { fetchRecentExtractions, fetchExtractionWithChats, saveChatMessage } from '@/lib/services/extractions-store'
 
 interface ChatMessage {
   id: string
@@ -106,6 +108,8 @@ export default function ExtractPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [showTables, setShowTables] = useState(true)
   const [showEntities, setShowEntities] = useState(true)
+  const [recentExtractions, setRecentExtractions] = useState<RecentExtraction[]>([])
+  const [activeExtractionId, setActiveExtractionId] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -281,6 +285,7 @@ export default function ExtractPage() {
             extractionId: data.extractionId
           }
         })
+        setActiveExtractionId(data.extractionId || null)
         setExtractionProgress(100)
         setExtractionPhase('Extraction completed')
         
@@ -288,6 +293,9 @@ export default function ExtractPage() {
           title: "Extraction Complete",
           description: `Successfully extracted data from ${file.name}`
         })
+
+        // refresh recent list
+        loadRecent()
       } else {
         throw new Error(data.error || 'Unknown error occurred')
       }
@@ -305,6 +313,30 @@ export default function ExtractPage() {
       setIsExtracting(false)
     }
   }, [extractionType, outputFormat, ocrEnabled, toast])
+
+  // Open a previous extraction with chats
+  const openExtraction = useCallback(async (id: string) => {
+    try {
+      const rec = await fetchExtractionWithChats(id)
+      if (!rec) return
+      setActiveExtractionId(id)
+      setExtractedData({
+        ...(rec.result_json?.result || {}),
+        fileName: rec.file_name,
+        metadata: rec.result_json?.metadata || {}
+      })
+      setMessages((rec.chats || []).map((c) => ({
+        id: c.id,
+        content: c.content,
+        sender: c.role,
+        timestamp: new Date(c.created_at)
+      })))
+      setViewMode('chat')
+      setActiveTab('summary')
+    } catch (e) {
+      // ignore
+    }
+  }, [])
 
   // Explain math & table handler
   const handleExplainMathTables = useCallback(async () => {
@@ -400,22 +432,24 @@ export default function ExtractPage() {
           setIsUploading(false)
           setTimeout(() => {
             setViewMode('chat')
-            // Add initial assistant message
-            setMessages([{
-              id: '1',
-              content: 'Hello! I\'ve processed your files. What would you like to extract or analyze?',
-              sender: 'assistant',
-              timestamp: new Date()
-            }])
-            // Kick off extraction for the first file
-            const firstFile = (files && files[0]) || selectedFiles[0]
-            if (firstFile) {
-              performExtraction(firstFile)
-            }
-          }, 500)
+            setActiveTab('summary')
+          // Add initial assistant message
+          setMessages([{
+            id: '1',
+            content: 'Hello! I\'ve processed your files. What would you like to extract or analyze?',
+            sender: 'assistant',
+            timestamp: new Date()
+          }])
+          // Kick off extraction for the first file
+          const firstFile = (files && files[0]) || selectedFiles[0]
+          if (firstFile) {
+            performExtraction(firstFile)
+          }
+        }, 500)
           return 100
         }
-        return prev + 10
+        // Increment progress smoothly until completion
+        return Math.min(prev + 10, 100)
       })
     }, 200)
   }
@@ -486,6 +520,9 @@ export default function ExtractPage() {
     setCurrentMessage('')
     setIsTyping(true)
 
+    // persist user message if we have an active extraction id
+    try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'user', messageText) } } catch {}
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -502,6 +539,7 @@ export default function ExtractPage() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiResponse])
+      try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'assistant', replyText) } } catch {}
     } catch (e) {
       const aiResponse: ChatMessage = {
         id: (Date.now() + 2).toString(),
@@ -510,10 +548,11 @@ export default function ExtractPage() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiResponse])
+      try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'assistant', aiResponse.content) } } catch {}
     } finally {
       setIsTyping(false)
     }
-  }, [currentMessage])
+  }, [currentMessage, activeExtractionId])
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -615,6 +654,18 @@ export default function ExtractPage() {
   useEffect(() => {
     fetchSupportedExtensions()
   }, [])
+
+  // Load recent extractions (best-effort, works when Supabase is configured)
+  const loadRecent = useCallback(async () => {
+    try {
+      const items = await fetchRecentExtractions(8)
+      setRecentExtractions(items)
+    } catch (e) {
+      // ignore if DB not configured
+    }
+  }, [])
+
+  useEffect(() => { loadRecent() }, [loadRecent])
 
   useEffect(() => {
     // Auto-scroll chat to bottom on new messages
@@ -755,7 +806,15 @@ export default function ExtractPage() {
                   <div className="h-[620px] overflow-auto bg-white p-4">
                     <div className="prose prose-sm max-w-none">
                       <h3 className="mb-2 font-semibold text-gray-900">Summary</h3>
-                      {extractedData ? (
+                      {isExtracting && (
+                        <div className="space-y-3">
+                          <Skeleton className="h-6 w-40" />
+                          {Array.from({ length: 10 }).map((_, i) => (
+                            <Skeleton key={i} className={`h-4 ${i % 3 === 0 ? 'w-5/6' : i % 3 === 1 ? 'w-3/4' : 'w-full'}`} />
+                          ))}
+                        </div>
+                      )}
+                      {!isExtracting && extractedData ? (
                         <div>
                           {extractedData.summary && (
                             <p className="text-[15px] leading-7 text-gray-700">{extractedData.summary}</p>
@@ -876,9 +935,9 @@ export default function ExtractPage() {
                             </div>
                           )}
                         </div>
-                      ) : (
+                      ) : (!isExtracting && (
                         <p className="text-[15px] leading-7 text-gray-700">Document summary and key findings will appear here after processing.</p>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1059,6 +1118,43 @@ export default function ExtractPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Recent Files */}
+              {(!isUploading) && (
+                <div className="mt-8">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-900">Recent Files</h3>
+                    <button onClick={loadRecent} className="text-xs text-gray-500 hover:text-gray-700">Refresh</button>
+                  </div>
+                  {recentExtractions.length === 0 ? (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">No recent files yet.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {recentExtractions.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => openExtraction(r.id)}
+                          className="rounded-md border border-gray-200 bg-white p-3 text-left hover:bg-gray-50"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2">
+                              <FileText className="mt-0.5 h-4 w-4 text-gray-500" />
+                              <div>
+                                <div className="truncate text-sm font-medium text-gray-900" title={r.file_name}>{r.file_name}</div>
+                                <div className="text-xs text-gray-500">{(r.file_type || 'file')} • {formatFileSize(r.file_size)}</div>
+                              </div>
+                            </div>
+                            <div className="text-[11px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</div>
+                          </div>
+                          {r.summary && (
+                            <p className="mt-2 line-clamp-3 text-xs text-gray-700">{r.summary}</p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
