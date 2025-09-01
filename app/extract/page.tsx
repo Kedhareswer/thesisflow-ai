@@ -1,36 +1,20 @@
 "use client"
 
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
-import Sidebar from '../ai-agents/components/Sidebar'
-import {
-  Upload,
-  FileText,
-  Sparkles,
-  Loader2,
-  Check,
-  X,
-  Settings,
-  File as FileIcon,
-  MessageSquare,
-  Send,
-  Bot,
-  User,
-  Eye,
-  FileImage,
-  Calendar,
-  Hash,
-  Mail,
-  Link as LinkIcon,
-  ChevronDown,
-  Copy,
-  Download,
-  AlertCircle,
-  BarChart3,
-  Search,
-  MoreHorizontal,
-  Mic
-} from 'lucide-react'
+import Sidebar from '@/app/ai-agents/components/Sidebar'
+import { Search, Sparkles, ChevronDown, MoreHorizontal, Mic, Send } from 'lucide-react'
 
 interface ChatMessage {
   id: string
@@ -59,7 +43,7 @@ interface ExtractedData {
   statistics: {
     totalWords: number
     readingTime: number
-    confidence: number
+    confidence?: number
   }
   tables: {
     id: string
@@ -80,14 +64,14 @@ type ViewMode = 'upload' | 'chat'
 
 const extractionTypes: ExtractionTypeOption[] = [
   { value: 'summary', label: 'Summary', description: 'Extract key points and overview', icon: FileText },
-  { value: 'tables', label: 'Tables', description: 'Extract structured data tables', icon: BarChart3 },
-  { value: 'entities', label: 'Entities', description: 'Extract people, places, organizations', icon: Hash },
+  { value: 'tables', label: 'Tables', description: 'Extract structured data tables', icon: Table },
+  { value: 'entities', label: 'Entities', description: 'Extract people, places, organizations', icon: Users },
   { value: 'structured', label: 'Structured', description: 'Extract all data in structured format', icon: Settings }
 ]
 
 const outputFormats: OutputFormatOption[] = [
   { value: 'json', label: 'JSON', description: 'JavaScript Object Notation', icon: FileText },
-  { value: 'csv', label: 'CSV', description: 'Comma-separated values', icon: BarChart3 },
+  { value: 'csv', label: 'CSV', description: 'Comma-separated values', icon: Download },
   { value: 'markdown', label: 'Markdown', description: 'Formatted text with markup', icon: FileText },
   { value: 'text', label: 'Plain Text', description: 'Simple text format', icon: FileText }
 ]
@@ -109,14 +93,20 @@ export default function ExtractPage() {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('json')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const [showFormatDropdown, setShowFormatDropdown] = useState(false)
-  const [inputText, setInputText] = useState('')
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
+  const [extractedData, setExtractedData] = useState<any>(null)
+  const [extractionProgress, setExtractionProgress] = useState(0)
+  const [extractionPhase, setExtractionPhase] = useState('')
+  const [extractionError, setExtractionError] = useState<string | null>(null)
+  const [supportedExtensions, setSupportedExtensions] = useState<string[]>([])
+  const [ocrEnabled, setOcrEnabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inputText, setInputText] = useState('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const { toast } = useToast()
 
   const handleFileSelect = useCallback((files: FileList) => {
     const fileArray = Array.from(files)
@@ -126,31 +116,64 @@ export default function ExtractPage() {
     }
   }, [])
 
-  const simulateUpload = () => {
-    setIsUploading(true)
-    setUploadProgress(0)
+  const performExtraction = useCallback(async (file: File) => {
+    setIsExtracting(true)
+    setExtractionProgress(0)
+    setExtractionPhase('Starting extraction...')
+    setExtractionError(null)
     
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsUploading(false)
-          setTimeout(() => {
-            setViewMode('chat')
-            // Add initial assistant message
-            setMessages([{
-              id: '1',
-              content: 'Hello! I\'ve processed your files. What would you like to extract or analyze?',
-              sender: 'assistant',
-              timestamp: new Date()
-            }])
-          }, 500)
-          return 100
-        }
-        return prev + 10
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('extractionType', extractionType)
+      formData.append('outputFormat', outputFormat)
+      formData.append('ocrEnabled', ocrEnabled.toString())
+      
+      const response = await fetch('/api/extract', {
+        method: 'POST',
+        body: formData
       })
-    }, 200)
-  }
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Extraction failed')
+      }
+      
+      if (data.success) {
+        setExtractedData({
+          ...data.result,
+          fileName: file.name,
+          metadata: {
+            ...data.metadata,
+            extractedAt: new Date().toLocaleString(),
+            extractionId: data.extractionId
+          }
+        })
+        setExtractionProgress(100)
+        setExtractionPhase('Extraction completed')
+        
+        toast({
+          title: "Extraction Complete",
+          description: `Successfully extracted data from ${file.name}`
+        })
+      } else {
+        throw new Error(data.error || 'Unknown error occurred')
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setExtractionError(errorMessage)
+      setExtractionPhase('Extraction failed')
+      
+      toast({
+        title: "Extraction Failed",
+        description: errorMessage,
+        variant: "destructive"
+      })
+    } finally {
+      setIsExtracting(false)
+    }
+  }, [extractionType, outputFormat, ocrEnabled, toast])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -180,6 +203,32 @@ export default function ExtractPage() {
     if (files) {
       handleFileSelect(files)
     }
+  }
+
+  const simulateUpload = () => {
+    setIsUploading(true)
+    setUploadProgress(0)
+    
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval)
+          setIsUploading(false)
+          setTimeout(() => {
+            setViewMode('chat')
+            // Add initial assistant message
+            setMessages([{
+              id: '1',
+              content: 'Hello! I\'ve processed your files. What would you like to extract or analyze?',
+              sender: 'assistant',
+              timestamp: new Date()
+            }])
+          }, 500)
+          return 100
+        }
+        return prev + 10
+      })
+    }, 200)
   }
 
   const handleExtract = async () => {
@@ -268,13 +317,13 @@ export default function ExtractPage() {
 
   const getEntityIcon = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'person': return User
+      case 'person': return Users
       case 'organization': return Settings
-      case 'location': return Hash
-      case 'date': return Calendar
-      case 'email': return Mail
-      case 'url': return Link
-      default: return Hash
+      case 'location': return Eye
+      case 'date': return Maximize
+      case 'email': return MessageSquare
+      case 'url': return Download
+      default: return Settings
     }
   }
 
@@ -304,21 +353,21 @@ export default function ExtractPage() {
         // Simple CSV conversion
         content = 'Type,Content\n'
         content += `Summary,"${extractedData.summary}"\n`
-        extractedData.keyPoints.forEach(point => {
+        extractedData.keyPoints.forEach((point: string) => {
           content += `Key Point,"${point}"\n`
         })
         filename = 'extracted-data.csv'
         break
       case 'markdown':
         content = `# Extracted Data\n\n## Summary\n${extractedData.summary}\n\n## Key Points\n`
-        extractedData.keyPoints.forEach(point => {
+        extractedData.keyPoints.forEach((point: string) => {
           content += `- ${point}\n`
         })
         filename = 'extracted-data.md'
         break
       case 'text':
         content = `EXTRACTED DATA\n\nSummary:\n${extractedData.summary}\n\nKey Points:\n`
-        extractedData.keyPoints.forEach(point => {
+        extractedData.keyPoints.forEach((point: string) => {
           content += `• ${point}\n`
         })
         filename = 'extracted-data.txt'
@@ -343,6 +392,22 @@ export default function ExtractPage() {
     }
   }
 
+  const fetchSupportedExtensions = async () => {
+    try {
+      const response = await fetch('/api/extract')
+      const data = await response.json()
+      if (data.success && data.supportedExtensions) {
+        setSupportedExtensions(data.supportedExtensions)
+      }
+    } catch (error) {
+      console.error('Failed to fetch supported extensions:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchSupportedExtensions()
+  }, [])
+
   if (viewMode === 'chat') {
     return (
       <div className="flex min-h-screen bg-[#F8F9FA]">
@@ -358,28 +423,16 @@ export default function ExtractPage() {
             </div>
 
             {/* Tabs + Toolbar */}
-            <div className="mb-3 flex items-center gap-4">
-              <div className="flex items-center gap-6 border-b border-gray-200">
-                <button
-                  onClick={() => setActiveTab('pdf')}
-                  className={`-mb-px px-1 pb-2 text-sm font-medium ${
-                    activeTab === 'pdf'
-                      ? 'border-b-2 border-orange-500 text-gray-900'
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  PDF file
-                </button>
-                <button
-                  onClick={() => setActiveTab('summary')}
-                  className={`-mb-px px-1 pb-2 text-sm font-medium ${
-                    activeTab === 'summary'
-                      ? 'border-b-2 border-orange-500 text-gray-900'
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  Summary
-                </button>
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="ocr-mode"
+                  checked={ocrEnabled}
+                  onCheckedChange={setOcrEnabled}
+                />
+                <Label htmlFor="ocr-mode" className="text-sm">
+                  Enable OCR (for images and scanned documents)
+                </Label>
               </div>
             </div>
 
@@ -606,7 +659,7 @@ export default function ExtractPage() {
                     {selectedFiles.map((file, index) => (
                       <div key={index} className="flex items-center justify-between rounded-md border border-gray-200 bg-white p-3">
                         <div className="flex items-center gap-3">
-                          <FileIcon className="h-5 w-5 text-gray-500" />
+                          <FileText className="h-5 w-5 text-gray-500" />
                           <div>
                             <p className="text-sm font-medium text-gray-900">{file.name}</p>
                             <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
