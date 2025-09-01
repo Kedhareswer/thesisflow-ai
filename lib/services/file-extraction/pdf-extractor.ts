@@ -3,7 +3,8 @@
  */
 
 import { BaseExtractor, ExtractedContent, ExtractionOptions } from './base-extractor';
-import pdf from 'pdf-parse';
+// Import internal implementation to avoid debug code in root index which tries to load a test PDF during bundling
+import pdf from 'pdf-parse/lib/pdf-parse';
 
 export class PDFExtractor extends BaseExtractor {
   constructor(options: ExtractionOptions = {}) {

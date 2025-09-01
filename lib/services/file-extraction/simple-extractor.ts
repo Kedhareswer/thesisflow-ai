@@ -48,9 +48,10 @@ export class SimpleExtractor {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       
-      // Dynamic import to avoid build issues
-      const pdfParse = await import('pdf-parse');
-      const data = await pdfParse.default(buffer);
+      // Dynamic import of internal implementation to avoid root index debug code
+      const pdfModule = await import('pdf-parse/lib/pdf-parse');
+      const pdf = (pdfModule as any).default ?? (pdfModule as any);
+      const data = await pdf(buffer);
       
       return {
         text: this.cleanText(data.text),
