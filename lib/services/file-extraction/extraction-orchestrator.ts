@@ -247,9 +247,11 @@ export class ExtractionOrchestrator {
    * Create a new instance of extractor with specific options
    */
   private createExtractorInstance(baseExtractor: BaseExtractor, options: ExtractionOptions): BaseExtractor {
-    const extractor = Object.create(Object.getPrototypeOf(baseExtractor));
-    extractor.constructor.call(extractor, options);
-    return extractor;
+    // Use proper ES6 class instantiation to avoid
+    // "Class constructor ... cannot be invoked without 'new'"
+    const ExtractorClass = (baseExtractor as any).constructor as new (options?: ExtractionOptions) => BaseExtractor;
+    const instance = new ExtractorClass(options);
+    return instance;
   }
 
   /**

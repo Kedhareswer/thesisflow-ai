@@ -13,7 +13,7 @@ import {
   Search,
   MessageSquare,
 } from "lucide-react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup, cubicBezier, type Variants } from "framer-motion";
 
 // Type definitions
 interface ThinkingStep {
@@ -123,7 +123,7 @@ export function AgentPlan({ isVisible, onComplete, className }: AgentPlanProps) 
   }, [isVisible, onComplete]);
 
   // Animation variants
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { 
       opacity: 0, 
       y: prefersReducedMotion ? 0 : 20,
@@ -135,7 +135,7 @@ export function AgentPlan({ isVisible, onComplete, className }: AgentPlanProps) 
       scale: 1,
       transition: {
         duration: 0.3,
-        ease: [0.2, 0.65, 0.3, 0.9]
+        ease: cubicBezier(0.2, 0.65, 0.3, 0.9)
       }
     },
     exit: {
@@ -146,7 +146,7 @@ export function AgentPlan({ isVisible, onComplete, className }: AgentPlanProps) 
     }
   };
 
-  const stepVariants = {
+  const stepVariants: Variants = {
     hidden: { 
       opacity: 0, 
       x: prefersReducedMotion ? 0 : -10 
@@ -154,12 +154,9 @@ export function AgentPlan({ isVisible, onComplete, className }: AgentPlanProps) 
     visible: { 
       opacity: 1, 
       x: 0,
-      transition: {
-        type: prefersReducedMotion ? "tween" : "spring",
-        stiffness: 500,
-        damping: 30,
-        duration: prefersReducedMotion ? 0.2 : undefined
-      }
+      transition: prefersReducedMotion 
+        ? { type: 'tween' as const, duration: 0.2 } 
+        : { type: 'spring' as const, stiffness: 500, damping: 30 }
     },
     exit: {
       opacity: 0,
@@ -168,14 +165,14 @@ export function AgentPlan({ isVisible, onComplete, className }: AgentPlanProps) 
     }
   };
 
-  const statusIconVariants = {
+  const statusIconVariants: Variants = {
     initial: { scale: 1, rotate: 0 },
     animate: { 
       scale: prefersReducedMotion ? 1 : [1, 1.1, 1],
       rotate: prefersReducedMotion ? 0 : [0, 5, 0],
       transition: {
         duration: 0.3,
-        ease: [0.34, 1.56, 0.64, 1]
+        ease: cubicBezier(0.34, 1.56, 0.64, 1)
       }
     }
   };

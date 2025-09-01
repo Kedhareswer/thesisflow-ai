@@ -10,10 +10,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
+) {
   const start = Date.now();
   try {
-    const sessionId = params.sessionId;
+    const { sessionId } = await params;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const include = (searchParams.get('include') || 'all').toLowerCase(); // 'all' | 'events' | 'results' | 'session'

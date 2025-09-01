@@ -103,11 +103,49 @@ export default function ExtractPage() {
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [showTables, setShowTables] = useState(true)
+  const [showEntities, setShowEntities] = useState(true)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
+
+  // Helpers: export extracted tables
+  const downloadBlob = useCallback((blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, [])
+
+  const exportTablesAsCSV = useCallback((tables: Array<{ headers: string[]; rows: string[][] }>) => {
+    if (!tables || tables.length === 0) return
+    const lines: string[] = []
+    tables.forEach((t, idx) => {
+      if (idx > 0) lines.push('')
+      if (t.headers && t.headers.length) {
+        lines.push(t.headers.map(h => '"' + String(h).replace(/"/g, '""') + '"').join(','))
+      }
+      if (t.rows) {
+        t.rows.forEach(row => {
+          lines.push(row.map(cell => '"' + String(cell ?? '').replace(/"/g, '""') + '"').join(','))
+        })
+      }
+    })
+    const csv = lines.join('\n')
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), 'extracted_tables.csv')
+  }, [downloadBlob])
+
+  const exportTablesAsJSON = useCallback((tables: Array<{ headers: string[]; rows: string[][] }>) => {
+    if (!tables || tables.length === 0) return
+    const json = JSON.stringify(tables, null, 2)
+    downloadBlob(new Blob([json], { type: 'application/json' }), 'extracted_tables.json')
+  }, [downloadBlob])
 
   const handleFileSelect = useCallback((files: FileList) => {
     const fileArray = Array.from(files)
@@ -592,47 +630,83 @@ export default function ExtractPage() {
                           )}
                           {Array.isArray(extractedData.tables) && extractedData.tables.length > 0 && (
                             <div className="mt-6">
-                              <h4 className="mb-2 font-semibold">Extracted Tables ({extractedData.tables.length})</h4>
-                              <div className="space-y-4">
-                                {extractedData.tables.map((t: any, ti: number) => (
-                                  <div key={t.id || ti} className="overflow-x-auto rounded-md border">
-                                    <table className="min-w-full border-collapse text-sm">
-                                      <thead className="bg-gray-50">
-                                        <tr>
-                                          {(t.headers || []).map((h: string, hi: number) => (
-                                            <th key={hi} className="border-b px-3 py-2 text-left font-medium text-gray-700">{h}</th>
-                                          ))}
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {(t.rows || []).map((row: string[], ri: number) => (
-                                          <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                            {row.map((cell: string, ci: number) => (
-                                              <td key={ci} className="border-b px-3 py-2 text-gray-800">{cell}</td>
+                              <div className="mb-2 flex items-center justify-between">
+                                <h4 className="font-semibold">Extracted Tables ({extractedData.tables.length})</h4>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => exportTablesAsCSV(extractedData.tables)}
+                                    className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Export CSV
+                                  </button>
+                                  <button
+                                    onClick={() => exportTablesAsJSON(extractedData.tables)}
+                                    className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Export JSON
+                                  </button>
+                                  <button
+                                    onClick={() => setShowTables(s => !s)}
+                                    className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                                    aria-expanded={showTables}
+                                  >
+                                    {showTables ? 'Hide' : 'Show'}
+                                  </button>
+                                </div>
+                              </div>
+                              {showTables && (
+                                <div className="space-y-4">
+                                  {extractedData.tables.map((t: any, ti: number) => (
+                                    <div key={t.id || ti} className="overflow-x-auto rounded-md border">
+                                      <table className="min-w-full border-collapse text-sm">
+                                        <thead className="bg-gray-50">
+                                          <tr>
+                                            {(t.headers || []).map((h: string, hi: number) => (
+                                              <th key={hi} className="border-b px-3 py-2 text-left font-medium text-gray-700">{h}</th>
                                             ))}
                                           </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                ))}
-                              </div>
+                                        </thead>
+                                        <tbody>
+                                          {(t.rows || []).map((row: string[], ri: number) => (
+                                            <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                              {row.map((cell: string, ci: number) => (
+                                                <td key={ci} className="border-b px-3 py-2 text-gray-800">{cell}</td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                           {Array.isArray(extractedData.entities) && extractedData.entities.length > 0 && (
                             <div className="mt-6">
-                              <h4 className="mb-2 font-semibold">Entities</h4>
-                              <div className="flex flex-wrap gap-2">
-                                {extractedData.entities.map((e: any, ei: number) => (
-                                  <span key={ei} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700">
-                                    <span className="font-medium">{e.type}</span>
-                                    <span className="text-gray-500">{e.value}</span>
-                                    {'count' in e && (
-                                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700">{e.count}</span>
-                                    )}
-                                  </span>
-                                ))}
+                              <div className="mb-2 flex items-center justify-between">
+                                <h4 className="font-semibold">Entities</h4>
+                                <button
+                                  onClick={() => setShowEntities(s => !s)}
+                                  className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                                  aria-expanded={showEntities}
+                                >
+                                  {showEntities ? 'Hide' : 'Show'}
+                                </button>
                               </div>
+                              {showEntities && (
+                                <div className="flex flex-wrap gap-2">
+                                  {extractedData.entities.map((e: any, ei: number) => (
+                                    <span key={ei} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700">
+                                      <span className="font-medium">{e.type}</span>
+                                      <span className="text-gray-500">{e.value}</span>
+                                      {'count' in e && (
+                                        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700">{e.count}</span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
