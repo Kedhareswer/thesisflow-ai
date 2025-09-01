@@ -2,16 +2,14 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
+import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
 import Sidebar from '@/app/ai-agents/components/Sidebar'
 import { Search, Sparkles, ChevronDown, MoreHorizontal, Send } from 'lucide-react'
@@ -105,6 +103,7 @@ export default function ExtractPage() {
   const [previewType, setPreviewType] = useState<'none' | 'pdf' | 'image' | 'text' | 'csv' | 'unsupported'>('none')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewText, setPreviewText] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [showTables, setShowTables] = useState(true)
   const [showEntities, setShowEntities] = useState(true)
 
@@ -163,6 +162,10 @@ export default function ExtractPage() {
     const accepted = picked.filter(f => f.size <= MAX_BYTES)
     setSelectedFiles(accepted)
     const generateServerPreview = async (file: File) => {
+      setPreviewLoading(true)
+      setPreviewType('none')
+      setPreviewUrl(null)
+      setPreviewText(null)
       try {
         const fd = new FormData()
         fd.append('file', file)
@@ -183,6 +186,8 @@ export default function ExtractPage() {
         setPreviewType('unsupported')
         setPreviewUrl(null)
         setPreviewText(null)
+      } finally {
+        setPreviewLoading(false)
       }
     }
 
@@ -705,16 +710,26 @@ export default function ExtractPage() {
                 {activeTab === 'pdf' ? (
                   <div className="h-[620px] overflow-auto bg-[#FAFAFA]">
                     <div className="mx-auto max-w-4xl px-4 py-4">
-                      {previewType === 'pdf' && previewUrl && (
+                      {previewLoading && (
+                        <div className="h-[580px] w-full overflow-hidden rounded-md border bg-white p-4">
+                          <div className="space-y-3">
+                            <Skeleton className="h-5 w-1/3" />
+                            {Array.from({ length: 14 }).map((_, i) => (
+                              <Skeleton key={i} className={`h-4 ${i % 3 === 0 ? 'w-5/6' : i % 3 === 1 ? 'w-3/4' : 'w-full'}`} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!previewLoading && previewType === 'pdf' && previewUrl && (
                         <iframe src={`${previewUrl}#toolbar=0`} className="h-[580px] w-full rounded-md border" title="PDF Preview" />
                       )}
-                      {previewType === 'image' && previewUrl && (
+                      {!previewLoading && previewType === 'image' && previewUrl && (
                         <img src={previewUrl} alt="Image preview" className="max-h-[580px] w-auto rounded-md border" />
                       )}
-                      {previewType === 'text' && typeof previewText === 'string' && (
+                      {!previewLoading && previewType === 'text' && typeof previewText === 'string' && (
                         <pre className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-sm text-gray-800 whitespace-pre-wrap">{previewText}</pre>
                       )}
-                      {previewType === 'csv' && typeof previewText === 'string' && (
+                      {!previewLoading && previewType === 'csv' && typeof previewText === 'string' && (
                         <div className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-sm">
                           <table className="min-w-full border-collapse text-sm">
                             <tbody>
@@ -729,7 +744,7 @@ export default function ExtractPage() {
                           </table>
                         </div>
                       )}
-                      {(previewType === 'none' || previewType === 'unsupported') && (
+                      {!previewLoading && (previewType === 'none' || previewType === 'unsupported') && (
                         <div className="rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
                           No preview available. Upload a supported file to preview it here.
                         </div>

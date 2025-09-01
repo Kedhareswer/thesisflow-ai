@@ -3,6 +3,7 @@ import { FileProcessor } from "@/lib/file-processors"
 import { FileProcessorWithOCR } from "@/lib/file-processors-with-ocr"
 import { ErrorHandler } from '@/lib/utils/error-handler'
 import mammoth from 'mammoth'
+import { PptxExtractor } from '@/lib/services/file-extraction/pptx-extractor'
 
 // Server-side PDF processing to avoid recursion
 const processPDFServerSide = async (file: File) => {
@@ -19,6 +20,22 @@ const processPDFServerSide = async (file: File) => {
     }
   } catch (error) {
     throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the PDF is not password protected and contains readable text.`)
+  }
+}
+
+// Server-side PowerPoint processing (PPTX)
+const processPptxServerSide = async (file: File) => {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const extractor = new PptxExtractor({ extractText: true, extractTables: false, extractMetadata: true })
+    const result = await extractor.extract(Buffer.from(arrayBuffer), file.name)
+    const content = result.text || ''
+    return {
+      content,
+      wordCount: content.trim().split(/\s+/).filter((w: string) => w.length > 0).length
+    }
+  } catch (error) {
+    throw new Error(`Failed to process PowerPoint presentation: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
@@ -129,6 +146,18 @@ export async function POST(request: Request) {
           case 'application/msword':
           case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
             result = await processWordServerSide(file)
+            break
+          
+          case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+            result = await processPptxServerSide(file)
+            break
+          
+          case 'application/vnd.ms-powerpoint':
+            // Legacy .ppt not fully supported for text extraction; provide a helpful message so preview shows
+            result = {
+              content: '[Preview for .ppt (legacy) is limited. Please convert to .pptx for a richer preview.]',
+              wordCount: 12
+            }
             break
           
           default:
