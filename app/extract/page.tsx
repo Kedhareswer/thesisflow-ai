@@ -102,6 +102,7 @@ export default function ExtractPage() {
   const [ocrEnabled, setOcrEnabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -112,7 +113,15 @@ export default function ExtractPage() {
     const fileArray = Array.from(files)
     setSelectedFiles(fileArray)
     if (fileArray.length > 0) {
-      simulateUpload()
+      // Create preview URL for first PDF file
+      const first = fileArray[0]
+      if (first && first.type === 'application/pdf') {
+        const url = URL.createObjectURL(first)
+        setPdfUrl(url)
+      } else {
+        setPdfUrl(null)
+      }
+      simulateUpload(fileArray)
     }
   }, [])
 
@@ -205,7 +214,7 @@ export default function ExtractPage() {
     }
   }
 
-  const simulateUpload = () => {
+  const simulateUpload = (files?: File[]) => {
     setIsUploading(true)
     setUploadProgress(0)
     
@@ -223,6 +232,11 @@ export default function ExtractPage() {
               sender: 'assistant',
               timestamp: new Date()
             }])
+            // Kick off extraction for the first file
+            const firstFile = (files && files[0]) || selectedFiles[0]
+            if (firstFile) {
+              performExtraction(firstFile)
+            }
           }, 500)
           return 100
         }
@@ -282,29 +296,48 @@ export default function ExtractPage() {
     }
   }
 
-  const sendMessage = useCallback(() => {
-    if (!currentMessage.trim()) return
-    
+  const sendMessage = useCallback(async (text?: string) => {
+    const messageText = (text ?? currentMessage).trim()
+    if (!messageText) return
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      content: currentMessage,
+      content: messageText,
       sender: 'user',
       timestamp: new Date()
     }
-    
+
     setMessages(prev => [...prev, userMessage])
     setCurrentMessage('')
-    
-    // Simulate AI response
-    setTimeout(() => {
+    setIsTyping(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText })
+      })
+      const data = await res.json()
+      const replyText = res.ok ? (data.response as string) : (data.error || 'Failed to get response')
+
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: 'I understand you want to extract information about "' + currentMessage + '". Let me analyze the uploaded files and provide you with the relevant data.',
+        content: replyText,
         sender: 'assistant',
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiResponse])
-    }, 1000)
+    } catch (e) {
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 2).toString(),
+        content: 'Error contacting chat service. Please try again.',
+        sender: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiResponse])
+    } finally {
+      setIsTyping(false)
+    }
   }, [currentMessage])
 
   const formatFileSize = (bytes: number): string => {
@@ -408,6 +441,18 @@ export default function ExtractPage() {
     fetchSupportedExtensions()
   }, [])
 
+  useEffect(() => {
+    // Auto-scroll chat to bottom on new messages
+    messagesEndRef.current?.scrollTo({ top: messagesEndRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages])
+
+  // Cleanup generated PDF object URL when file changes/unmounts
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+    }
+  }, [pdfUrl])
+
   if (viewMode === 'chat') {
     return (
       <div className="flex min-h-screen bg-[#F8F9FA]">
@@ -442,6 +487,17 @@ export default function ExtractPage() {
               <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white">
                 {/* Toolbar row */}
                 <div className="flex items-center gap-2 border-b border-gray-200 p-3">
+                  {/* Tabs toggle */}
+                  <div className="inline-flex items-center rounded-md border border-gray-200 bg-white text-xs">
+                    <button
+                      onClick={() => setActiveTab('pdf')}
+                      className={`px-3 py-1.5 ${activeTab === 'pdf' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >File View</button>
+                    <button
+                      onClick={() => setActiveTab('summary')}
+                      className={`px-3 py-1.5 border-l border-gray-200 ${activeTab === 'summary' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >Summary</button>
+                  </div>
                   <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
                     <Search className="h-4 w-4" />
                   </button>
@@ -468,28 +524,121 @@ export default function ExtractPage() {
                   </span>
                 </div>
 
+                {extractionError && (
+                  <div className="mx-3 my-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <AlertCircle className="mt-0.5 h-4 w-4" />
+                    <div>
+                      <div className="font-medium">Extraction failed</div>
+                      <div className="text-red-700">{extractionError}</div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Viewer/Summary area */}
                 {activeTab === 'pdf' ? (
                   <div className="h-[620px] overflow-auto bg-[#FAFAFA]">
-                    <div className="mx-auto max-w-3xl px-6 py-6">
-                      <div className="rounded-md border border-gray-200 bg-white p-6 shadow-sm">
-                        <div className="mb-4 text-center">
-                          <h2 className="text-xl font-semibold text-gray-800">
-                            Enhancement of Endoscopic Images & Videos using Advanced Deep Learning & Traditional Image Enhancement Techniques
-                          </h2>
-                          <p className="mt-2 text-xs text-gray-500">Files: {selectedFiles.map((f) => f.name).join(', ') || 'Sample.pdf'}</p>
+                    <div className="mx-auto max-w-4xl px-4 py-4">
+                      {pdfUrl ? (
+                        <iframe src={`${pdfUrl}#toolbar=0`} className="h-[580px] w-full rounded-md border" title="PDF Preview" />
+                      ) : (
+                        <div className="rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                          Upload a PDF to preview it here.
                         </div>
-                        <div className="h-96 rounded-md bg-orange-100/40 ring-1 ring-orange-200/70" />
-                      </div>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div className="h-[620px] overflow-auto bg-white p-4">
                     <div className="prose prose-sm max-w-none">
                       <h3 className="mb-2 font-semibold text-gray-900">Summary</h3>
-                      <p className="text-[15px] leading-7 text-gray-700">
-                        Document summary and key findings will appear here after processing.
-                      </p>
+                      {extractedData ? (
+                        <div>
+                          {extractedData.summary && (
+                            <p className="text-[15px] leading-7 text-gray-700">{extractedData.summary}</p>
+                          )}
+                          {Array.isArray(extractedData.keyPoints) && extractedData.keyPoints.length > 0 && (
+                            <div className="mt-4">
+                              <h4 className="mb-1 font-semibold">Key Points</h4>
+                              <ul className="list-disc pl-5 text-gray-700">
+                                {extractedData.keyPoints.map((p: string, idx: number) => (
+                                  <li key={idx}>{p}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {extractedData.statistics && (
+                            <div className="mt-4 text-sm text-gray-600">
+                              <div>Total Words: {extractedData.statistics.totalWords}</div>
+                              {'readingTime' in extractedData.statistics && (
+                                <div>Reading Time: {extractedData.statistics.readingTime} min</div>
+                              )}
+                            </div>
+                          )}
+                          {extractedData.metadata && (
+                            <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-600">
+                              {'wordCount' in extractedData.metadata && (
+                                <div>Word Count: {extractedData.metadata.wordCount}</div>
+                              )}
+                              {'pageCount' in extractedData.metadata && (
+                                <div>Pages/Slides: {extractedData.metadata.pageCount}</div>
+                              )}
+                              {'fileType' in extractedData.metadata && (
+                                <div>File Type: {extractedData.metadata.fileType}</div>
+                              )}
+                              {'fileSize' in extractedData.metadata && (
+                                <div>File Size: {Math.round((extractedData.metadata.fileSize / 1024 / 1024) * 100) / 100} MB</div>
+                              )}
+                            </div>
+                          )}
+                          {Array.isArray(extractedData.tables) && extractedData.tables.length > 0 && (
+                            <div className="mt-6">
+                              <h4 className="mb-2 font-semibold">Extracted Tables ({extractedData.tables.length})</h4>
+                              <div className="space-y-4">
+                                {extractedData.tables.map((t: any, ti: number) => (
+                                  <div key={t.id || ti} className="overflow-x-auto rounded-md border">
+                                    <table className="min-w-full border-collapse text-sm">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          {(t.headers || []).map((h: string, hi: number) => (
+                                            <th key={hi} className="border-b px-3 py-2 text-left font-medium text-gray-700">{h}</th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {(t.rows || []).map((row: string[], ri: number) => (
+                                          <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                            {row.map((cell: string, ci: number) => (
+                                              <td key={ci} className="border-b px-3 py-2 text-gray-800">{cell}</td>
+                                            ))}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {Array.isArray(extractedData.entities) && extractedData.entities.length > 0 && (
+                            <div className="mt-6">
+                              <h4 className="mb-2 font-semibold">Entities</h4>
+                              <div className="flex flex-wrap gap-2">
+                                {extractedData.entities.map((e: any, ei: number) => (
+                                  <span key={ei} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700">
+                                    <span className="font-medium">{e.type}</span>
+                                    <span className="text-gray-500">{e.value}</span>
+                                    {'count' in e && (
+                                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700">{e.count}</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[15px] leading-7 text-gray-700">Document summary and key findings will appear here after processing.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -508,7 +657,11 @@ export default function ExtractPage() {
                 {/* Suggestion chips */}
                 <div className="flex flex-wrap gap-2 p-3">
                   {['Methods used','Limitations','Explain Abstract','Practical Implications','Paper Summary','Literature survey','Future works'].map((c) => (
-                    <button key={c} className="whitespace-nowrap rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">
+                    <button
+                      key={c}
+                      onClick={() => sendMessage(c)}
+                      className="whitespace-nowrap rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                    >
                       {c}
                     </button>
                   ))}
@@ -530,6 +683,13 @@ export default function ExtractPage() {
                       </div>
                     </div>
                   ))}
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className={`max-w-[80%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-900`}>
+                        Assistant is typing...
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Composer */}
@@ -551,7 +711,7 @@ export default function ExtractPage() {
                       rows={1}
                     />
                     <button
-                      onClick={sendMessage}
+                      onClick={() => sendMessage()}
                       disabled={!currentMessage.trim()}
                       className="inline-flex h-9 items-center justify-center rounded-md bg-orange-600 px-3 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
                     >
@@ -618,7 +778,7 @@ export default function ExtractPage() {
                       ref={fileInputRef}
                       type="file"
                       multiple
-                      accept=".pdf"
+                      accept={supportedExtensions.length ? supportedExtensions.map(ext => `.${ext}`).join(',') : '.pdf'}
                       onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
                       className="hidden"
                     />
