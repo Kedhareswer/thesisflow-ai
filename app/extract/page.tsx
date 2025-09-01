@@ -115,6 +115,13 @@ export default function ExtractPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
+  // Search & Zoom state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentMatch, setCurrentMatch] = useState(0)
+  const matchRefs = useRef<HTMLElement[]>([])
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [zoom, setZoom] = useState<number>(100)
+  const [showZoomMenu, setShowZoomMenu] = useState(false)
 
   // Helpers: export extracted tables
   const downloadBlob = useCallback((blob: Blob, filename: string) => {
@@ -585,6 +592,68 @@ export default function ExtractPage() {
     }
   }
 
+  // --- Search helpers ---
+  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  const countOccurrences = (text: string, query: string) => {
+    if (!text || !query) return 0
+    const re = new RegExp(escapeRegExp(query), 'gi')
+    return (text.match(re) || []).length
+  }
+
+  const handleSearchChange = (v: string) => {
+    setSearchQuery(v)
+    setCurrentMatch(0)
+    matchRefs.current = []
+  }
+
+  const goToNextMatch = (total: number) => {
+    if (total > 0) setCurrentMatch((prev: number) => (prev + 1) % total)
+  }
+
+  const goToPrevMatch = (total: number) => {
+    if (total > 0) setCurrentMatch((prev: number) => (prev - 1 + total) % total)
+  }
+
+  const renderHighlightedText = (text: string, query: string) => {
+    if (!query) return [text]
+    matchRefs.current = []
+    const out: React.ReactNode[] = []
+    const lower = text.toLowerCase()
+    const q = query.toLowerCase()
+    let i = 0
+    if (!q.length) return [text]
+    // Build nodes with <mark> elements and collect refs
+    while (true) {
+      const idx = lower.indexOf(q, i)
+      if (idx === -1) break
+      out.push(text.slice(i, idx))
+      const seg = text.slice(idx, idx + q.length)
+      out.push(
+        <mark
+          key={`m-${idx}-${out.length}`}
+          ref={(el) => { if (el) matchRefs.current.push(el) }}
+          className="bg-yellow-200 px-0.5"
+        >
+          {seg}
+        </mark>
+      )
+      i = idx + q.length
+    }
+    out.push(text.slice(i))
+    return out
+  }
+
+  // Highlight current match and scroll into view when navigating
+  useEffect(() => {
+    matchRefs.current.forEach((el) => el.classList.remove('ring-2', 'ring-orange-400'))
+    const el = matchRefs.current[currentMatch]
+    if (el) {
+      el.classList.add('ring-2', 'ring-orange-400')
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [currentMatch, searchQuery, previewText, previewType])
+
   const downloadExtractedData = () => {
     if (!extractedData) return
     
@@ -724,23 +793,66 @@ export default function ExtractPage() {
                       className={`px-3 py-1.5 border-l border-gray-200 ${activeTab === 'summary' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
                     >Summary</button>
                   </div>
-                  <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
-                    <Search className="h-4 w-4" />
-                  </button>
+                  {/* Search in file */}
                   <button onClick={handleExplainMathTables} className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                     <Sparkles className="h-4 w-4 text-purple-600" />
                     Explain math & table
                   </button>
                   <div className="relative ml-1 flex-1">
-                    <input
-                      placeholder="Search in file"
-                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={searchInputRef}
+                        value={searchQuery}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        placeholder="Search in file"
+                        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                      {(previewType === 'text' || previewType === 'csv') && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                          <button
+                            onClick={() => goToPrevMatch(countOccurrences(previewText || '', searchQuery))}
+                            className="rounded border border-gray-200 bg-white px-2 py-1 hover:bg-gray-50"
+                            title="Previous"
+                          >
+                            Prev
+                          </button>
+                          <span className="min-w-[70px] text-center">
+                            {searchQuery ? `${Math.min(currentMatch + 1, Math.max(1, countOccurrences(previewText || '', searchQuery)))} / ${countOccurrences(previewText || '', searchQuery)}` : ''}
+                          </span>
+                          <button
+                            onClick={() => goToNextMatch(countOccurrences(previewText || '', searchQuery))}
+                            className="rounded border border-gray-200 bg-white px-2 py-1 hover:bg-gray-50"
+                            title="Next"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-50">
-                    80%
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
+                  {/* Zoom control */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowZoomMenu((s) => !s)}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
+                    >
+                      {zoom}%
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    {showZoomMenu && (
+                      <div className="absolute right-0 top-full z-10 mt-1 w-24 overflow-hidden rounded-md border border-gray-200 bg-white shadow">
+                        {[50, 80, 100, 125, 150].map((z) => (
+                          <button
+                            key={z}
+                            onClick={() => { setZoom(z); setShowZoomMenu(false) }}
+                            className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${zoom === z ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                          >
+                            {z}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button className="inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50">
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
@@ -772,23 +884,67 @@ export default function ExtractPage() {
                         </div>
                       )}
                       {!previewLoading && previewType === 'pdf' && previewUrl && (
-                        <iframe src={`${previewUrl}#toolbar=0`} className="h-[580px] w-full rounded-md border" title="PDF Preview" />
+                        <iframe
+                          src={`${previewUrl}#toolbar=0&zoom=${zoom}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`}
+                          className="h-[580px] w-full rounded-md border"
+                          title="PDF Preview"
+                        />
                       )}
                       {!previewLoading && previewType === 'image' && previewUrl && (
-                        <img src={previewUrl} alt="Image preview" className="max-h-[580px] w-auto rounded-md border" />
+                        <div className="h-[580px] w-full overflow-auto rounded-md border bg-white p-2">
+                          <img
+                            src={previewUrl}
+                            alt="Image preview"
+                            className="rounded"
+                            style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top left' }}
+                          />
+                        </div>
                       )}
                       {!previewLoading && previewType === 'text' && typeof previewText === 'string' && (
-                        <pre className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-sm text-gray-800 whitespace-pre-wrap">{previewText}</pre>
+                        <pre
+                          className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-gray-800 whitespace-pre-wrap"
+                          style={{ fontSize: `${zoom}%` }}
+                        >
+                          {renderHighlightedText(previewText, searchQuery)}
+                        </pre>
                       )}
                       {!previewLoading && previewType === 'csv' && typeof previewText === 'string' && (
-                        <div className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-sm">
+                        <div className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4" style={{ fontSize: `${zoom}%` }}>
                           <table className="min-w-full border-collapse text-sm">
                             <tbody>
                               {previewText.split('\n').slice(0, 100).map((line, i) => (
                                 <tr key={i}>
-                                  {line.split(',').map((cell, j) => (
-                                    <td key={j} className="border px-2 py-1">{cell}</td>
-                                  ))}
+                                  {line.split(',').map((cell, j) => {
+                                    if (!searchQuery) return (
+                                      <td key={j} className="border px-2 py-1">{cell}</td>
+                                    )
+                                    // highlight matches in cell
+                                    const parts: React.ReactNode[] = []
+                                    const lower = cell.toLowerCase()
+                                    const q = searchQuery.toLowerCase()
+                                    let k = 0
+                                    let pos = 0
+                                    while (true) {
+                                      const idx = lower.indexOf(q, pos)
+                                      if (idx === -1) break
+                                      parts.push(cell.slice(pos, idx))
+                                      const seg = cell.slice(idx, idx + q.length)
+                                      parts.push(
+                                        <mark
+                                          key={`c-${i}-${j}-${k++}`}
+                                          ref={(el) => { if (el) matchRefs.current.push(el) }}
+                                          className="bg-yellow-200 px-0.5"
+                                        >
+                                          {seg}
+                                        </mark>
+                                      )
+                                      pos = idx + q.length
+                                    }
+                                    parts.push(cell.slice(pos))
+                                    return (
+                                      <td key={j} className="border px-2 py-1">{parts}</td>
+                                    )
+                                  })}
                                 </tr>
                               ))}
                             </tbody>
