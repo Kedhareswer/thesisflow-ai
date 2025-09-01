@@ -27,6 +27,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    // Enforce 10MB size limit to avoid platform-level 413 errors
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      return NextResponse.json(
+        { success: false, error: 'File too large. Maximum allowed size is 10MB.' },
+        { status: 413 }
+      );
+    }
+
     // Check if file type is supported
     if (!orchestrator.isSupported(file.name)) {
       return NextResponse.json({ 
@@ -35,8 +44,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    let buffer: Buffer;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    } catch (e) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to read uploaded file.' },
+        { status: 400 }
+      );
+    }
 
     // Configure extraction options
     const extractionOptions = {

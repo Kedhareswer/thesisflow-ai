@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 import Sidebar from '@/app/ai-agents/components/Sidebar'
-import { Search, Sparkles, ChevronDown, MoreHorizontal, Mic, Send } from 'lucide-react'
+import { Search, Sparkles, ChevronDown, MoreHorizontal, Send } from 'lucide-react'
 
 interface ChatMessage {
   id: string
@@ -87,7 +87,6 @@ export default function ExtractPage() {
   const [currentMessage, setCurrentMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [activeTab, setActiveTab] = useState<TabMode>('summary')
-  const [highQuality, setHighQuality] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [extractionType, setExtractionType] = useState<ExtractionType>('summary')
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('json')
@@ -102,7 +101,10 @@ export default function ExtractPage() {
   const [ocrEnabled, setOcrEnabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  // File preview state
+  const [previewType, setPreviewType] = useState<'none' | 'pdf' | 'image' | 'text' | 'csv' | 'unsupported'>('none')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewText, setPreviewText] = useState<string | null>(null)
   const [showTables, setShowTables] = useState(true)
   const [showEntities, setShowEntities] = useState(true)
 
@@ -148,20 +150,83 @@ export default function ExtractPage() {
   }, [downloadBlob])
 
   const handleFileSelect = useCallback((files: FileList) => {
-    const fileArray = Array.from(files)
-    setSelectedFiles(fileArray)
-    if (fileArray.length > 0) {
-      // Create preview URL for first PDF file
-      const first = fileArray[0]
-      if (first && first.type === 'application/pdf') {
-        const url = URL.createObjectURL(first)
-        setPdfUrl(url)
-      } else {
-        setPdfUrl(null)
-      }
-      simulateUpload(fileArray)
+    const MAX_BYTES = 10 * 1024 * 1024 // 10MB
+    const picked = Array.from(files)
+    const tooLarge = picked.filter(f => f.size > MAX_BYTES)
+    if (tooLarge.length) {
+      toast({
+        title: 'File too large',
+        description: `${tooLarge.map(f => f.name).join(', ')} exceed(s) 10MB. Please upload smaller files.`,
+        variant: 'destructive'
+      })
     }
-  }, [])
+    const accepted = picked.filter(f => f.size <= MAX_BYTES)
+    setSelectedFiles(accepted)
+    const generateServerPreview = async (file: File) => {
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('enableOCR', 'false')
+        const res = await fetch('/api/extract-file', { method: 'POST', body: fd })
+        const ct = res.headers.get('content-type') || ''
+        const data = ct.includes('application/json') ? await res.json() : { text: '' }
+        if (res.ok && data.text) {
+          setPreviewType('text')
+          setPreviewUrl(null)
+          setPreviewText(String(data.text))
+        } else {
+          setPreviewType('unsupported')
+          setPreviewUrl(null)
+          setPreviewText(null)
+        }
+      } catch {
+        setPreviewType('unsupported')
+        setPreviewUrl(null)
+        setPreviewText(null)
+      }
+    }
+
+    if (accepted.length > 0) {
+      const first = accepted[0]
+      // Set preview based on type
+      if (first.type === 'application/pdf') {
+        const url = URL.createObjectURL(first)
+        setPreviewType('pdf')
+        setPreviewUrl(url)
+        setPreviewText(null)
+      } else if (first.type.startsWith('image/')) {
+        const url = URL.createObjectURL(first)
+        setPreviewType('image')
+        setPreviewUrl(url)
+        setPreviewText(null)
+      } else if (first.type === 'text/plain') {
+        first.text().then(t => {
+          setPreviewType('text')
+          setPreviewUrl(null)
+          setPreviewText(t)
+        })
+      } else if (first.type === 'text/csv' || first.name.toLowerCase().endsWith('.csv')) {
+        first.text().then(t => {
+          setPreviewType('csv')
+          setPreviewUrl(null)
+          setPreviewText(t)
+        })
+      } else if (
+        first.type === 'application/msword' ||
+        first.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        first.type === 'application/vnd.ms-powerpoint' ||
+        first.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      ) {
+        // Use server-side lightweight extraction for preview text
+        generateServerPreview(first)
+      } else {
+        setPreviewType('unsupported')
+        setPreviewUrl(null)
+        setPreviewText(null)
+      }
+      simulateUpload(accepted)
+    }
+  }, [toast])
 
   const performExtraction = useCallback(async (file: File) => {
     setIsExtracting(true)
@@ -180,11 +245,25 @@ export default function ExtractPage() {
         method: 'POST',
         body: formData
       })
-      
-      const data = await response.json()
+      // Robust parse: handle non-JSON (e.g., platform 413 HTML/plain responses)
+      const contentType = response.headers.get('content-type') || ''
+      let data: any = null
+      if (contentType.includes('application/json')) {
+        data = await response.json()
+      } else {
+        const text = await response.text()
+        if (!response.ok) {
+          if (response.status === 413 || /request entity too large/i.test(text)) {
+            throw new Error('Upload too large (HTTP 413). Please use files up to 10MB or compress images before uploading.')
+          }
+          throw new Error(text || 'Extraction failed')
+        }
+        // Unexpected but OK case
+        data = { success: true, result: { text } }
+      }
       
       if (!response.ok) {
-        throw new Error(data.error || 'Extraction failed')
+        throw new Error(data?.error || 'Extraction failed')
       }
       
       if (data.success) {
@@ -221,6 +300,59 @@ export default function ExtractPage() {
       setIsExtracting(false)
     }
   }, [extractionType, outputFormat, ocrEnabled, toast])
+
+  // Explain math & table handler
+  const handleExplainMathTables = useCallback(async () => {
+    const firstFile = selectedFiles[0]
+    if (!firstFile) return
+    // Temporarily request tables to ensure we have structured data
+    const formData = new FormData()
+    formData.append('file', firstFile)
+    formData.append('extractionType', 'tables')
+    formData.append('outputFormat', 'json')
+    formData.append('ocrEnabled', ocrEnabled.toString())
+
+    try {
+      const response = await fetch('/api/extract', { method: 'POST', body: formData })
+      const contentType = response.headers.get('content-type') || ''
+      const data = contentType.includes('application/json') ? await response.json() : { success: false }
+      if (!response.ok || !data.success) throw new Error(data.error || 'Failed to analyze tables')
+
+      const tables = data.result?.tables || []
+      const text = data.result?.text || ''
+
+      // Basic heuristic explanation
+      const lines: string[] = []
+      if (tables.length) {
+        lines.push(`Found ${tables.length} table(s).`)
+        tables.slice(0, 3).forEach((t: any, i: number) => {
+          const cols = (t.headers || []).length
+          const rows = (t.rows || []).length
+          lines.push(`Table ${i + 1}: ${cols} column(s), ${rows} row(s). Headers: ${(t.headers || []).join(', ')}`)
+        })
+      } else {
+        lines.push('No explicit tables detected.')
+      }
+      if (text) {
+        const mathHits = (text.match(/([0-9]+\.?[0-9]*\s*%|p\s*[<=>]\s*0\.[0-9]+|±\s*[0-9]+\.?[0-9]*|×\s*10\^\s*[-+]?[0-9]+)/gi) || []).slice(0, 10)
+        if (mathHits.length) {
+          lines.push(`Detected math/statistics mentions: ${mathHits.join(', ')}`)
+        }
+      }
+
+      const explanation = lines.join('\n')
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 3).toString(),
+        content: explanation,
+        sender: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiResponse])
+      setActiveTab('summary')
+    } catch (e) {
+      toast({ title: 'Explain failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' })
+    }
+  }, [selectedFiles, ocrEnabled, toast])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -487,9 +619,9 @@ export default function ExtractPage() {
   // Cleanup generated PDF object URL when file changes/unmounts
   useEffect(() => {
     return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
-  }, [pdfUrl])
+  }, [previewUrl])
 
   if (viewMode === 'chat') {
     return (
@@ -539,13 +671,13 @@ export default function ExtractPage() {
                   <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
                     <Search className="h-4 w-4" />
                   </button>
-                  <button className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                  <button onClick={handleExplainMathTables} className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                     <Sparkles className="h-4 w-4 text-purple-600" />
                     Explain math & table
                   </button>
                   <div className="relative ml-1 flex-1">
                     <input
-                      placeholder="Search in PDF"
+                      placeholder="Search in file"
                       className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
@@ -556,10 +688,7 @@ export default function ExtractPage() {
                   <button className="inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50">
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
-                  <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700">
-                    <Mic className="h-3.5 w-3.5" />
-                    Podcast
-                  </span>
+                  {/* Podcast feature removed */}
                 </div>
 
                 {extractionError && (
@@ -576,11 +705,33 @@ export default function ExtractPage() {
                 {activeTab === 'pdf' ? (
                   <div className="h-[620px] overflow-auto bg-[#FAFAFA]">
                     <div className="mx-auto max-w-4xl px-4 py-4">
-                      {pdfUrl ? (
-                        <iframe src={`${pdfUrl}#toolbar=0`} className="h-[580px] w-full rounded-md border" title="PDF Preview" />
-                      ) : (
+                      {previewType === 'pdf' && previewUrl && (
+                        <iframe src={`${previewUrl}#toolbar=0`} className="h-[580px] w-full rounded-md border" title="PDF Preview" />
+                      )}
+                      {previewType === 'image' && previewUrl && (
+                        <img src={previewUrl} alt="Image preview" className="max-h-[580px] w-auto rounded-md border" />
+                      )}
+                      {previewType === 'text' && typeof previewText === 'string' && (
+                        <pre className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-sm text-gray-800 whitespace-pre-wrap">{previewText}</pre>
+                      )}
+                      {previewType === 'csv' && typeof previewText === 'string' && (
+                        <div className="h-[580px] w-full overflow-auto rounded-md border bg-white p-4 text-sm">
+                          <table className="min-w-full border-collapse text-sm">
+                            <tbody>
+                              {previewText.split('\n').slice(0, 100).map((line, i) => (
+                                <tr key={i}>
+                                  {line.split(',').map((cell, j) => (
+                                    <td key={j} className="border px-2 py-1">{cell}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      {(previewType === 'none' || previewType === 'unsupported') && (
                         <div className="rounded-md border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                          Upload a PDF to preview it here.
+                          No preview available. Upload a supported file to preview it here.
                         </div>
                       )}
                     </div>
@@ -793,19 +944,7 @@ export default function ExtractPage() {
                     </button>
                   </div>
 
-                  {/* High quality toggle */}
-                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-                    <label className="inline-flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={highQuality}
-                        onChange={(e) => setHighQuality(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                      />
-                      High Quality
-                    </label>
-                    <span className="ml-auto text-lg">∑</span>
-                  </div>
+                  {/* High Quality and sigma UI removed */}
                 </div>
               </div>
             </div>
@@ -860,13 +999,13 @@ export default function ExtractPage() {
                       <FileText className="h-7 w-7 text-gray-500" />
                     </div>
                     <div className="text-sm text-gray-700">Drag and drop or click to browse files</div>
-                    <div className="mt-1 text-xs text-gray-400">Max. 100 MB per file</div>
+                    <div className="mt-1 text-xs text-gray-400">Max. 10 MB per file</div>
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="mt-5 inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
                     >
                       <Upload className="h-4 w-4" />
-                      Upload PDF
+                      Upload files
                     </button>
                   </div>
                 </div>
