@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload"
+import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
 
 interface UserProfile {
   display_name: string
@@ -399,6 +400,7 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8 max-w-4xl">
+      <BackBreadcrumb className="mb-2" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Profile</h1>

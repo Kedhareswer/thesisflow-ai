@@ -14,6 +14,7 @@ import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 import { AIProviderStatus } from "@/components/ai-provider-status"
 import { ApiKeyManager } from "@/components/api-key-manager"
+import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
 
 interface UserSettings {
   email_notifications: boolean
@@ -297,6 +298,7 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
+        <BackBreadcrumb className="mb-2" />
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage your account settings and preferences</p>
       </div>

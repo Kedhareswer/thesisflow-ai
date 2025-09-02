@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { RouteGuard } from "@/components/route-guard"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { loadStripe } from "@stripe/stripe-js"
+import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
@@ -268,9 +269,12 @@ Thank you!`)
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Your Plan</h1>
-            <p className="text-gray-600">Manage your subscription and usage</p>
+          <div className="mb-8">
+            <BackBreadcrumb className="mb-2" />
+            <div className="text-center">
+              <h1 className="text-3xl font-bold mb-2">Your Plan</h1>
+              <p className="text-gray-600">Manage your subscription and usage</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
