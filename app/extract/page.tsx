@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -364,59 +365,7 @@ export default function ExtractPage() {
     }
   }, [])
 
-  // Explain math & table handler
-  const handleExplainMathTables = useCallback(async () => {
-    const firstFile = selectedFiles[0]
-    if (!firstFile) return
-    // Temporarily request tables to ensure we have structured data
-    const formData = new FormData()
-    formData.append('file', firstFile)
-    formData.append('extractionType', 'tables')
-    formData.append('outputFormat', 'json')
-    formData.append('ocrEnabled', ocrEnabled.toString())
-
-    try {
-      const response = await fetch('/api/extract', { method: 'POST', body: formData })
-      const contentType = response.headers.get('content-type') || ''
-      const data = contentType.includes('application/json') ? await response.json() : { success: false }
-      if (!response.ok || !data.success) throw new Error(data.error || 'Failed to analyze tables')
-
-      const tables = data.result?.tables || []
-      const text = data.result?.text || ''
-
-      // Basic heuristic explanation
-      const lines: string[] = []
-      if (tables.length) {
-        lines.push(`Found ${tables.length} table(s).`)
-        tables.slice(0, 3).forEach((t: any, i: number) => {
-          const cols = (t.headers || []).length
-          const rows = (t.rows || []).length
-          lines.push(`Table ${i + 1}: ${cols} column(s), ${rows} row(s). Headers: ${(t.headers || []).join(', ')}`)
-        })
-      } else {
-        lines.push('No explicit tables detected.')
-      }
-      if (text) {
-        const mathHits = (text.match(/([0-9]+\.?[0-9]*\s*%|p\s*[<=>]\s*0\.[0-9]+|±\s*[0-9]+\.?[0-9]*|×\s*10\^\s*[-+]?[0-9]+)/gi) || []).slice(0, 10)
-        if (mathHits.length) {
-          lines.push(`Detected math/statistics mentions: ${mathHits.join(', ')}`)
-        }
-      }
-
-      const explanation = lines.join('\n')
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 3).toString(),
-        content: explanation,
-        sender: 'assistant',
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiResponse])
-      setActiveTab('summary')
-    } catch (e) {
-      toast({ title: 'Explain failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' })
-    }
-  }, [selectedFiles, ocrEnabled, toast])
-
+  // Drag handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(true)
@@ -426,6 +375,81 @@ export default function ExtractPage() {
     e.preventDefault()
     setIsDragOver(false)
   }, [])
+
+  const sendMessage = useCallback(async (text?: string) => {
+    const messageText = (text ?? currentMessage).trim()
+    if (!messageText) return
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      content: messageText,
+      sender: 'user',
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setCurrentMessage('')
+    setIsTyping(true)
+
+    // persist user message if we have an active extraction id
+    try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'user', messageText) } } catch {}
+
+    try {
+      // Build lightweight context from current extraction/preview
+      const parts: string[] = []
+      if (extractedData?.summary) parts.push(`Summary:\n${extractedData.summary}`)
+      if (Array.isArray(extractedData?.keyPoints) && extractedData.keyPoints.length) {
+        parts.push(`Key Points:\n- ${extractedData.keyPoints.join('\n- ')}`)
+      }
+      if (extractedData?.tables?.length) {
+        const firstTable = extractedData.tables[0]
+        try {
+          const headers = Array.isArray(firstTable.headers) ? firstTable.headers.join(', ') : ''
+          parts.push(`Table 1 Headers: ${headers}`)
+        } catch {}
+      }
+      const textCtx = (previewText || '').slice(0, 8000) // cap context to ~8k chars
+      if (textCtx) parts.push(`Document Text (truncated):\n${textCtx}`)
+      const context = parts.join('\n\n')
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText, context })
+      })
+      const data = await res.json()
+      const replyText = res.ok ? (data.response as string) : (data.error || 'Failed to get response')
+
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: replyText,
+        sender: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiResponse])
+      try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'assistant', replyText) } } catch {}
+    } catch (e) {
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 2).toString(),
+        content: 'Error contacting chat service. Please try again.',
+        sender: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiResponse])
+      try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'assistant', aiResponse.content) } } catch {}
+    } finally {
+      setIsTyping(false)
+    }
+  }, [currentMessage, activeExtractionId, extractedData, previewText])
+
+  // Explain math & table handler: ask chat with document context
+  const handleExplainMathTables = useCallback(async () => {
+    try {
+      await sendMessage('Explain the math and tables in the current document. Summarize key equations, statistics, metrics, and the main takeaways from any tables.')
+    } catch (e) {
+      toast({ title: 'Explain failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' })
+    }
+  }, [sendMessage, toast])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -530,55 +554,6 @@ export default function ExtractPage() {
       setIsExtracting(false)
     }
   }
-
-  const sendMessage = useCallback(async (text?: string) => {
-    const messageText = (text ?? currentMessage).trim()
-    if (!messageText) return
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      content: messageText,
-      sender: 'user',
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setCurrentMessage('')
-    setIsTyping(true)
-
-    // persist user message if we have an active extraction id
-    try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'user', messageText) } } catch {}
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messageText })
-      })
-      const data = await res.json()
-      const replyText = res.ok ? (data.response as string) : (data.error || 'Failed to get response')
-
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: replyText,
-        sender: 'assistant',
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiResponse])
-      try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'assistant', replyText) } } catch {}
-    } catch (e) {
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 2).toString(),
-        content: 'Error contacting chat service. Please try again.',
-        sender: 'assistant',
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiResponse])
-      try { if (activeExtractionId) { await saveChatMessage(activeExtractionId, 'assistant', aiResponse.content) } } catch {}
-    } finally {
-      setIsTyping(false)
-    }
-  }, [currentMessage, activeExtractionId])
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -1166,7 +1141,13 @@ export default function ExtractPage() {
                           message.sender === 'user' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        {message.content}
+                        {message.sender === 'assistant' ? (
+                          <div className="prose prose-sm prose-gray max-w-none">
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          message.content
+                        )}
                       </div>
                     </div>
                   ))}

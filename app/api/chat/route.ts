@@ -4,7 +4,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 
 export async function POST(request: NextRequest) {
   try {
-    const { message } = await request.json()
+    const { message, context } = await request.json()
 
     if (!process.env.GOOGLE_API_KEY) {
       throw new Error('Gemini API key is not configured')
@@ -20,9 +20,14 @@ export async function POST(request: NextRequest) {
 6. If asked about documents or literature, provide analytical insights and summaries
 7. When the query is unclear, ask for clarification while maintaining a helpful tone
 
+You are provided optional Document Context extracted from the user's uploaded file. Use it to answer the question. If the context doesn't contain enough information, say so briefly and ask for a clarifying follow-up.
+
+Document Context (may be truncated):
+${context || '(no document context provided)'}
+
 Current user query: ${message}
 
-Please provide a helpful, relevant, and well-structured response.`
+Please provide a helpful, relevant, and well-structured response in Markdown with short sections, bullet lists, and, when applicable, cite snippets from the context.`
 
     const response = await fetch(`${GEMINI_API_URL}?key=${process.env.GOOGLE_API_KEY}`, {
       method: 'POST',
