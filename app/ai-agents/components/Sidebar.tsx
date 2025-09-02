@@ -16,8 +16,8 @@ type SidebarProps = {
 // External destination for QuantumPDF ChatApp
 const QUANTUM_PDF_URL = (process.env.NEXT_PUBLIC_QUANTUM_PDF_URL as string) || "https://quantumn-pdf-chatapp.netlify.app/"
 
-// Lazy load the notifications menu to avoid heavy initial render
-const NotificationsMenu = React.lazy(() => import("@/components/ui/notifications-menu"))
+// Lazy load the notifications modal to avoid heavy initial render
+const NotificationsModal = React.lazy(() => import("@/components/ui/notifications-modal"))
 
 const navItems = [
   { label: "Thesis Flow", href: "/", id: "home", icon: Home },
@@ -196,7 +196,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div className="border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 px-2 py-3">
           <div className={collapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between gap-2"}>
             <React.Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
-              <NotificationsMenu />
+              <NotificationsModal />
             </React.Suspense>
 
             <DropdownMenu
