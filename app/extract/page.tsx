@@ -122,6 +122,25 @@ export default function ExtractPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [zoom, setZoom] = useState<number>(100)
   const [showZoomMenu, setShowZoomMenu] = useState(false)
+  // Suggestions modal state
+  const [showSuggestionsModal, setShowSuggestionsModal] = useState(false)
+  const [suggestionsTab, setSuggestionsTab] = useState<'general' | 'mine'>('general')
+  const generalSuggestions = [
+    'Generate summary of this paper',
+    'Results of the paper',
+    'Conclusions from the paper',
+    'Explain Abstract of this paper',
+    'What are the contributions of this paper',
+    'Find Related Papers',
+    'Explain the practical implications of this paper',
+    'Summarise introduction of this paper',
+    'Literature survey of this paper',
+    'Explain methodology used',
+    'Key findings of the paper',
+    'Limitations and future work',
+    'Create a layman summary for non-experts'
+  ]
+  const myQuestions: string[] = []
 
   // Helpers: export extracted tables
   const downloadBlob = useCallback((blob: Blob, filename: string) => {
@@ -741,6 +760,14 @@ export default function ExtractPage() {
     messagesEndRef.current?.scrollTo({ top: messagesEndRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
+  // Close suggestions modal with ESC
+  useEffect(() => {
+    if (!showSuggestionsModal) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSuggestionsModal(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showSuggestionsModal])
+
   // Cleanup generated PDF object URL when file changes/unmounts
   useEffect(() => {
     return () => {
@@ -782,7 +809,7 @@ export default function ExtractPage() {
               <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white">
                 {/* Toolbar row */}
                 <div className="flex items-center gap-2 border-b border-gray-200 p-3">
-                  {/* Tabs toggle */}
+                  {/* Tabs toggle (always visible) */}
                   <div className="inline-flex items-center rounded-md border border-gray-200 bg-white text-xs">
                     <button
                       onClick={() => setActiveTab('pdf')}
@@ -793,69 +820,74 @@ export default function ExtractPage() {
                       className={`px-3 py-1.5 border-l border-gray-200 ${activeTab === 'summary' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
                     >Summary</button>
                   </div>
-                  {/* Search in file */}
-                  <button onClick={handleExplainMathTables} className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    Explain math & table
-                  </button>
-                  <div className="relative ml-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={searchInputRef}
-                        value={searchQuery}
-                        onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Search in file"
-                        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      />
-                      {(previewType === 'text' || previewType === 'csv') && (
-                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                          <button
-                            onClick={() => goToPrevMatch(countOccurrences(previewText || '', searchQuery))}
-                            className="rounded border border-gray-200 bg-white px-2 py-1 hover:bg-gray-50"
-                            title="Previous"
-                          >
-                            Prev
-                          </button>
-                          <span className="min-w-[70px] text-center">
-                            {searchQuery ? `${Math.min(currentMatch + 1, Math.max(1, countOccurrences(previewText || '', searchQuery)))} / ${countOccurrences(previewText || '', searchQuery)}` : ''}
-                          </span>
-                          <button
-                            onClick={() => goToNextMatch(countOccurrences(previewText || '', searchQuery))}
-                            className="rounded border border-gray-200 bg-white px-2 py-1 hover:bg-gray-50"
-                            title="Next"
-                          >
-                            Next
-                          </button>
+
+                  {/* The following controls show only in File View */}
+                  {activeTab === 'pdf' && (
+                    <>
+                      <button onClick={handleExplainMathTables} className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <Sparkles className="h-4 w-4 text-purple-600" />
+                        Explain math & table
+                      </button>
+                      <div className="relative ml-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={searchInputRef}
+                            value={searchQuery}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            placeholder="Search in file"
+                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                          {(previewType === 'text' || previewType === 'csv') && (
+                            <div className="flex items-center gap-1 text-xs text-gray-600">
+                              <button
+                                onClick={() => goToPrevMatch(countOccurrences(previewText || '', searchQuery))}
+                                className="rounded border border-gray-200 bg-white px-2 py-1 hover:bg-gray-50"
+                                title="Previous"
+                              >
+                                Prev
+                              </button>
+                              <span className="min-w-[70px] text-center">
+                                {searchQuery ? `${Math.min(currentMatch + 1, Math.max(1, countOccurrences(previewText || '', searchQuery)))} / ${countOccurrences(previewText || '', searchQuery)}` : ''}
+                              </span>
+                              <button
+                                onClick={() => goToNextMatch(countOccurrences(previewText || '', searchQuery))}
+                                className="rounded border border-gray-200 bg-white px-2 py-1 hover:bg-gray-50"
+                                title="Next"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Zoom control */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowZoomMenu((s) => !s)}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
-                    >
-                      {zoom}%
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                    {showZoomMenu && (
-                      <div className="absolute right-0 top-full z-10 mt-1 w-24 overflow-hidden rounded-md border border-gray-200 bg-white shadow">
-                        {[50, 80, 100, 125, 150].map((z) => (
-                          <button
-                            key={z}
-                            onClick={() => { setZoom(z); setShowZoomMenu(false) }}
-                            className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${zoom === z ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
-                          >
-                            {z}%
-                          </button>
-                        ))}
                       </div>
-                    )}
-                  </div>
-                  <button className="inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
+                      {/* Zoom control */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowZoomMenu((s) => !s)}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          {zoom}%
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        {showZoomMenu && (
+                          <div className="absolute right-0 top-full z-10 mt-1 w-24 overflow-hidden rounded-md border border-gray-200 bg-white shadow">
+                            {[50, 80, 100, 125, 150].map((z) => (
+                              <button
+                                key={z}
+                                onClick={() => { setZoom(z); setShowZoomMenu(false) }}
+                                className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${zoom === z ? 'bg-gray-50 text-gray-900' : 'text-gray-700'}`}
+                              >
+                                {z}%
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button className="inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-50">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                   {/* Podcast feature removed */}
                 </div>
 
@@ -1152,7 +1184,7 @@ export default function ExtractPage() {
                   {/* Guided prompt */}
                   <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
                     <span className="truncate">Generate summary of this paper, Results of the paper, Conc</span>
-                    <button className="text-gray-500 hover:text-gray-700">+13 more</button>
+                    <button onClick={() => setShowSuggestionsModal(true)} className="text-gray-500 hover:text-gray-700">+13 more</button>
                   </div>
 
                   <div className="flex items-end gap-2">
@@ -1179,6 +1211,46 @@ export default function ExtractPage() {
               </div>
             </div>
           </main>
+        {/* Suggestions Modal */}
+        {showSuggestionsModal && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4" onClick={() => setShowSuggestionsModal(false)}>
+            <div className="mt-16 w-full max-w-2xl rounded-lg bg-white shadow-lg ring-1 ring-gray-200" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                <div className="text-sm font-medium text-gray-900">Suggestions <span className="text-gray-500">({generalSuggestions.length} results)</span></div>
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <span className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5">esc</span>
+                  <button className="rounded p-1 hover:bg-gray-100" onClick={() => setShowSuggestionsModal(false)}>
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="px-4 pt-3">
+                <div className="flex items-center gap-6 border-b border-gray-200 text-sm">
+                  <button onClick={() => setSuggestionsTab('general')} className={`pb-2 ${suggestionsTab === 'general' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-600'}`}>General ({generalSuggestions.length})</button>
+                  <button onClick={() => setSuggestionsTab('mine')} className={`pb-2 ${suggestionsTab === 'mine' ? 'border-b-2 border-orange-500 text-orange-600' : 'text-gray-600'}`}>My questions ({myQuestions.length})</button>
+                </div>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+                {suggestionsTab === 'general' ? (
+                  <ul className="list-disc pl-5 text-sm text-gray-800 space-y-2">
+                    {generalSuggestions.map((s) => (
+                      <li key={s}>
+                        <button
+                          onClick={() => { setCurrentMessage(s); setShowSuggestionsModal(false) }}
+                          className="text-left hover:underline"
+                        >
+                          {s}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-500">No saved questions yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </div>
     )
