@@ -38,6 +38,7 @@ export type Team = {
 };
 
 export type ChatMessage = {
+  timestamp: any | string;
   id: string;
   team_id: string;
   sender_id: string;

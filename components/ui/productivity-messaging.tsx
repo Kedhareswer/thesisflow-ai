@@ -282,6 +282,14 @@ export function ProductivityMessage({
                 {isAI ? 'Nova AI Assistant' : user.name}
               </span>
               
+              {/* Mention indicator */}
+              {message.mentions?.some(m => m.id === currentUserId) && (
+                <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+                  <Target className="h-3 w-3 mr-1" />
+                  Mentioned you
+                </Badge>
+              )}
+              
               {isAI && <Sparkles className="w-3 h-3 text-blue-500" />}
               
               <ProductivityStatusBadge 
@@ -337,7 +345,13 @@ export function ProductivityMessage({
               <MessageWithMentions 
                 content={message.content} 
                 mentions={message.mentions} 
-                className={isAI ? "prose prose-sm max-w-none" : ""}
+                className={cn(
+                  isAI ? "prose prose-sm max-w-none" : "",
+                  // Highlight messages that mention the current user
+                  message.mentions?.some(m => m.id === currentUserId) && 
+                  "bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-lg border-l-4 border-l-yellow-400"
+                )}
+                currentUserId={currentUserId}
               />
             ) : (
               <MessageAttachment message={message} />

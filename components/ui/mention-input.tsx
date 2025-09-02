@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { User, Bot, FileText, File, Image, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export interface MentionData {
   id: string
@@ -35,13 +36,7 @@ interface ParsedContent {
   mentions: MentionData[]
 }
 
-// Nova AI default mention
-const NOVA_AI: MentionData = {
-  id: 'nova-ai',
-  type: 'ai',
-  name: 'Nova AI',
-  avatar: '/assistant-avatar.svg'
-}
+
 
 export function MentionInput({
   value,
@@ -74,11 +69,7 @@ export function MentionInput({
       // Find mention data
       let mentionData: MentionData | undefined
       
-      if (id === 'nova-ai') {
-        mentionData = NOVA_AI
-      } else {
-        mentionData = [...users, ...files].find(item => item.id === id)
-      }
+      mentionData = [...users, ...files].find(item => item.id === id)
       
       if (mentionData) {
         mentions.push(mentionData)
@@ -91,7 +82,7 @@ export function MentionInput({
 
   // Get all available mention options
   const getAllMentions = (): MentionData[] => {
-    return [NOVA_AI, ...users, ...files]
+    return [...users, ...files]
   }
 
   // Filter suggestions based on query
@@ -258,15 +249,6 @@ export function MentionInput({
             🎯 Mention Someone!
           </div>
           
-          {/* Nova AI */}
-          <div 
-            className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer rounded"
-            onClick={() => insertMention(NOVA_AI)}
-          >
-            <Bot className="h-4 w-4 text-blue-500" />
-            <span>Nova AI - AI Assistant</span>
-          </div>
-          
           {/* Users */}
           {users.map(user => (
             <div 
@@ -316,12 +298,14 @@ export interface MessageWithMentionsProps {
   content: string
   mentions?: MentionData[]
   className?: string
+  currentUserId?: string
 }
 
 export function MessageWithMentions({ 
   content, 
   mentions = [], 
-  className = "" 
+  className = "", 
+  currentUserId 
 }: MessageWithMentionsProps) {
   // Parse content and render with mention chips
   const renderContent = () => {
@@ -338,7 +322,7 @@ export function MessageWithMentions({
 
     while ((match = mentionRegex.exec(content)) !== null) {
       const [fullMatch, name, id] = match
-      const mentionData = mentions.find(m => m.id === id) || NOVA_AI
+      const mentionData = mentions.find(m => m.id === id)
       
       // Add text before mention
       if (match.index > lastIndex) {
@@ -349,17 +333,32 @@ export function MessageWithMentions({
         )
       }
       
-      // Add mention chip
-      parts.push(
-        <Badge
-          key={`mention-${id}-${match.index}`}
-          variant="secondary"
-          className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs bg-primary/10 text-primary"
-        >
-          {getMentionIcon(mentionData)}
-          <span>{name}</span>
-        </Badge>
-      )
+      // Add mention chip only if mentionData exists
+      if (mentionData) {
+        parts.push(
+          <Badge
+            key={`mention-${id}-${match.index}`}
+            variant="secondary"
+            className={cn(
+              "inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs",
+              // Highlight mentions of the current user
+              currentUserId && mentionData.id === currentUserId
+                ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                : "bg-primary/10 text-primary"
+            )}
+          >
+            {getMentionIcon(mentionData)}
+            <span>{name}</span>
+          </Badge>
+        )
+      } else {
+        // Fallback: just show the @name if mention data not found
+        parts.push(
+          <span key={`mention-${id}-${match.index}`} className="text-muted-foreground">
+            @{name}
+          </span>
+        )
+      }
       
       lastIndex = match.index + fullMatch.length
     }
@@ -379,7 +378,7 @@ export function MessageWithMentions({
   return renderContent()
 }
 
-function getMentionIcon(mention: MentionData) {
+function getMentionIcon(mention: MentionData, currentUserId?: string) {
   switch (mention.type) {
     case 'user':
       return (

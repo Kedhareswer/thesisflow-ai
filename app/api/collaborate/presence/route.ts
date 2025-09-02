@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { getAuthUser, requireAuth, createSupabaseAdmin } from '@/lib/auth-utils'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const user = await requireAuth(request, "collaborate-presence");
     
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
     }
 
     const { status, activity } = await request.json()
@@ -21,8 +19,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status. Must be online, away, or offline' }, { status: 400 })
     }
 
-    // Update user presence
-    const { data, error } = await supabase
+    // Update user presence in the dedicated user_presence table
+    const { data, error } = await supabaseAdmin
       .from('user_presence')
       .upsert({
         user_id: user.id,
@@ -54,15 +52,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const user = await requireAuth(request, "collaborate-presence");
     
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    const supabaseAdmin = createSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: "Service configuration error" },
+        { status: 500 }
+      );
     }
 
     const { searchParams } = new URL(request.url)
@@ -72,35 +69,73 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Team ID required' }, { status: 400 })
     }
 
-    // Get team members presence
-    const { data: teamMembers, error: teamError } = await supabase
+    // Get team members first
+    const { data: teamMembers, error: teamError } = await supabaseAdmin
       .from('team_members')
-      .select(`
-        user_id,
-        user_profiles!inner(id, full_name, email, avatar_url),
-        user_presence(status, activity, last_seen, updated_at)
-      `)
+      .select('user_id')
       .eq('team_id', teamId)
 
     if (teamError) {
       console.error('Error getting team members:', teamError)
-      return NextResponse.json({ error: 'Failed to get team presence' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to get team members' }, { status: 500 })
+    }
+
+    if (!teamMembers || teamMembers.length === 0) {
+      return NextResponse.json({ 
+        success: true,
+        presence: [] 
+      })
+    }
+
+    // Get user profiles for team members
+    const userIds = teamMembers.map(m => m.user_id)
+    const { data: userProfiles, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', userIds)
+
+    if (profileError) {
+      console.error('Error getting user profiles:', profileError)
+      return NextResponse.json({ error: 'Failed to get user profiles' }, { status: 500 })
+    }
+
+    // Get presence data for team members
+    const { data: presenceData, error: presenceError } = await supabaseAdmin
+      .from('user_presence')
+      .select('user_id, status, activity, last_seen, updated_at')
+      .in('user_id', userIds)
+
+    if (presenceError) {
+      console.error('Error getting presence data:', presenceError)
+      // Continue without presence data
+    }
+
+    // Create a map of presence data by user_id
+    const presenceMap = new Map()
+    if (presenceData) {
+      presenceData.forEach(p => {
+        presenceMap.set(p.user_id, p)
+      })
     }
 
     // Format the data
-    const presenceData = teamMembers?.map((member: any) => ({
-      id: member.user_id,
-      name: member.user_profiles?.full_name || member.user_profiles?.email || 'Unknown',
-      email: member.user_profiles?.email,
-      avatar: member.user_profiles?.avatar_url,
-      status: member.user_presence?.status || 'offline',
-      activity: member.user_presence?.activity,
-      lastSeen: member.user_presence?.last_seen,
-      updatedAt: member.user_presence?.updated_at
-    })) || []
+    const formattedPresence = userProfiles?.map((profile: any) => {
+      const presence = presenceMap.get(profile.id)
+      return {
+        id: profile.id,
+        name: profile.full_name || profile.email || 'Unknown',
+        email: profile.email,
+        avatar: profile.avatar_url,
+        status: presence?.status || 'offline',
+        activity: presence?.activity || null,
+        lastSeen: presence?.last_seen || profile.updated_at,
+        updatedAt: presence?.updated_at || profile.updated_at
+      }
+    }) || []
 
     return NextResponse.json({ 
-      presence: presenceData
+      success: true,
+      presence: formattedPresence
     })
 
   } catch (error) {

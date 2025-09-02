@@ -349,11 +349,8 @@ export default function CollaboratePage() {
   // Update user presence
   const updatePresence = useCallback(async (status: 'online' | 'away' | 'offline', activity?: string) => {
     try {
-      await fetch('/api/collaborate/presence', {
+      await apiCall('/api/collaborate/presence', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ status, activity }),
       })
       
@@ -361,14 +358,13 @@ export default function CollaboratePage() {
     } catch (error) {
       console.error('Error updating presence:', error)
     }
-  }, [])
+  }, [apiCall])
 
   // Load team presence data
   const loadTeamPresence = useCallback(async (teamId: string) => {
     try {
-      const response = await fetch(`/api/collaborate/presence?teamId=${teamId}`)
-      if (response.ok) {
-        const data = await response.json()
+      const data = await apiCall(`/api/collaborate/presence?teamId=${teamId}`)
+      if (data.success) {
         const presenceMap: Record<string, EnhancedUser> = {}
         
         data.presence.forEach((p: any) => {
@@ -388,7 +384,7 @@ export default function CollaboratePage() {
     } catch (error) {
       console.error('Error loading team presence:', error)
     }
-  }, [])
+  }, [apiCall])
 
   // Handle AI assistance
   const handleAIAssistance = useCallback(async (prompt: string, context?: string) => {
@@ -397,6 +393,41 @@ export default function CollaboratePage() {
     setIsProcessingAI(true)
     
     try {
+      // First, persist the user's message that mentions Nova AI
+      let userMessageId: string | undefined;
+      let userMessage: ChatMessage | undefined;
+      
+      try {
+        const userMessageResult = await collaborateService.sendMessage(
+          selectedTeamId,
+          user.id,
+          prompt,
+          'text',
+          (currentMentions || []).map(m => m.id),
+          undefined // Use API to get message ID
+        )
+        
+        if (userMessageResult.success && userMessageResult.message) {
+          userMessageId = userMessageResult.message.id;
+          userMessage = {
+            id: userMessageResult.message.id,
+            senderId: user.id,
+            senderName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'You',
+            senderAvatar: user.user_metadata?.avatar_url,
+            content: prompt,
+            timestamp: (userMessageResult.message as any).timestamp || (userMessageResult.message as any).created_at || new Date().toISOString(),
+            teamId: selectedTeamId,
+            type: 'text'
+          };
+          
+          // Add user message to local state
+          setMessages(prev => [...prev, userMessage!]);
+        }
+      } catch (error) {
+        console.error('Error persisting user message:', error)
+        // Continue with AI processing even if user message fails to persist
+      }
+      
       // Get recent messages for context
       const recentMessages = messages.slice(-10).map(msg => ({
         id: msg.id,
@@ -433,19 +464,54 @@ export default function CollaboratePage() {
 
       const response = await novaAI.processMessage(prompt, aiContext)
       
-      // Add AI response as a message
+      // Create AI message
       const aiMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
         senderId: 'nova-ai',
         senderName: 'Nova AI',
         senderAvatar: '/assistant-avatar.svg',
-        content: response.content,
+        content: `🤖 **Nova AI Response:**\n\n${response.content}`,
         timestamp: new Date().toISOString(),
         teamId: selectedTeamId,
         type: 'text'
       }
       
+      // Add AI message to local state
       setMessages(prev => [...prev, aiMessage])
+      
+      // Send AI message through collaboration service to persist it
+      // We'll send it as the current user but mark it as AI in metadata
+      try {
+        const aiMessageContent = `🤖 **Nova AI Response:**\n\n${response.content}`;
+        
+        // For AI messages, use API fallback to get the message ID for proper state management
+        const result = await collaborateService.sendMessage(
+          selectedTeamId,
+          user.id, // Send as current user for authentication
+          aiMessageContent,
+          'text',
+          [], // No mentions for AI responses
+          undefined // Don't use socket for AI messages to get proper response
+        )
+        
+        if (result.success && result.message) {
+          // Update the local AI message with the persisted message data
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessage.id 
+              ? {
+                  ...msg,
+                  id: result.message!.id,
+                  content: result.message!.content,
+                  timestamp: (result.message as any).timestamp || (result.message as any).created_at || new Date().toISOString(),
+                  status: 'sent'
+                }
+              : msg
+          ))
+        }
+      } catch (error) {
+        console.error('Error persisting AI message:', error)
+        // Don't show error to user, message is still visible locally
+      }
       
     } catch (error) {
       console.error('Error with AI assistance:', error)
@@ -469,10 +535,14 @@ export default function CollaboratePage() {
       // Detect AI requests
       const isAIRequest = NovaAIService.isNovaAIMentioned(newMessage)
       if (isAIRequest) {
-        await handleAIAssistance(newMessage)
+        // Clear input immediately for better UX
+        const messageToSend = newMessage;
         setNewMessage('')
         setCurrentMentions([])
         setReplyingTo(null)
+        
+        // Process AI request
+        await handleAIAssistance(messageToSend)
         return
       }
 
@@ -503,7 +573,8 @@ export default function CollaboratePage() {
           user.id,
           optimisticMessage.content,
           'text',
-          (currentMentions || []).map(m => m.id)
+          (currentMentions || []).map(m => m.id),
+          socket // Pass the socket instance
         )
       }
     } catch (error) {
@@ -516,7 +587,7 @@ export default function CollaboratePage() {
     } finally {
       setIsSendingMessage(false)
     }
-  }, [newMessage, selectedTeamId, isSendingMessage, currentMentions, replyingTo, handleAIAssistance, updatePresence, collaborateService, toast, user])
+  }, [newMessage, selectedTeamId, isSendingMessage, currentMentions, replyingTo, handleAIAssistance, updatePresence, collaborateService, toast, user, socket])
 
   // Member management handlers
   const changeMemberRole = useCallback(async (teamId: string, memberId: string, newRole: 'viewer' | 'editor' | 'admin') => {
@@ -675,28 +746,26 @@ export default function CollaboratePage() {
         selectedTeamId,
         (newMessage: ChatMessage) => {
           setMessages(prev => {
-            // De-dup temp optimistic messages for same user/content
-            const withoutMatchingTemps = prev.filter(m => {
-              const isTemp = (m.id as string)?.startsWith?.('temp-')
-              return !(isTemp && m.senderId === newMessage.senderId && m.content === newMessage.content)
-            })
-            // Skip if already exists by id
-            const exists = withoutMatchingTemps.some(msg => msg.id === newMessage.id)
-            if (exists) return withoutMatchingTemps
-
-            const updated = [...withoutMatchingTemps, newMessage]
-
+            // Check if message already exists to prevent duplicates
+            const exists = prev.some(msg => msg.id === newMessage.id)
+            if (exists) return prev
+            
+            const updated = [...prev, newMessage]
+            
+            // Auto-scroll only if already at bottom
             setTimeout(() => {
               if (isScrolledToBottom) {
                 scrollToBottom()
               } else {
+                // Increment unread count if not at bottom
                 setUnreadCount(prev => prev + 1)
               }
             }, 10)
-
+            
             return updated
           })
-        }
+        },
+        socket // Pass the socket instance
       )
       
       // Setup scroll listener
@@ -1347,13 +1416,28 @@ export default function CollaboratePage() {
                                   )
                                 }
                                 
+                                // Check if this is an AI message by content pattern
+                                const isAIMessage = message.content.includes('🤖 **Nova AI Response:**') || message.senderId === 'nova-ai';
+                                
                                 // Find sender user info with presence
-                                const senderUser = selectedTeam.members.find(m => m.id === message.senderId) || {
-                                  id: message.senderId,
-                                  name: message.senderName || 'Unknown User',
-                                  email: '',
-                                  avatar: message.senderAvatar,
-                                  status: 'offline' as const
+                                let senderUser;
+                                if (isAIMessage) {
+                                  // For AI messages, create a special sender user
+                                  senderUser = {
+                                    id: 'nova-ai',
+                                    name: 'Nova AI',
+                                    email: '',
+                                    avatar: '/assistant-avatar.svg',
+                                    status: 'online' as const
+                                  }
+                                } else {
+                                  senderUser = selectedTeam.members.find(m => m.id === message.senderId) || {
+                                    id: message.senderId,
+                                    name: message.senderName || 'Unknown User',
+                                    email: '',
+                                    avatar: message.senderAvatar,
+                                    status: 'offline' as const
+                                  }
                                 }
 
                                 // Get user presence status
@@ -1365,10 +1449,10 @@ export default function CollaboratePage() {
                                     key={message.id}
                                     message={{
                                       id: message.id,
-                                      senderId: message.senderId,
+                                      senderId: isAIMessage ? 'nova-ai' : message.senderId,
                                       content: message.content,
                                       timestamp: message.timestamp,
-                                      type: message.senderId === 'nova-ai' ? 'ai_response' : (message.type as "text" | "image" | "file" | "audio" | "system"),
+                                      type: isAIMessage ? 'ai_response' : (message.type as "text" | "image" | "file" | "audio" | "system"),
                                       reactions: (message as any).reactions || {},
                                       mentions: (message as any).mentions || [],
                                       replyTo: (message as any).replyTo || null,
@@ -1380,7 +1464,8 @@ export default function CollaboratePage() {
                                         const original = teamMessages.find(m => m.id === (message as any).replyTo)
                                         if (!original) return undefined
                                         const info = selectedTeam.members.find(m => m.id === original.senderId)
-                                        return original.senderId === 'nova-ai' ? 'Nova AI' : (info?.name || original.senderName)
+                                        const isOriginalFromAI = original.content.includes('🤖 **Nova AI Response:**') || original.senderId === 'nova-ai';
+                                        return isOriginalFromAI ? 'Nova AI' : (info?.name || original.senderName)
                                       })(),
                                       status: (message.id || '').startsWith('temp-') ? 'sending' : 'sent',
                                       priority: 'normal',
@@ -1409,8 +1494,9 @@ export default function CollaboratePage() {
                                       const replyMessage = teamMessages.find(m => m.id === messageId)
                                       if (replyMessage) {
                                         // Find the sender's name
+                                        const isReplyFromAI = replyMessage.content.includes('🤖 **Nova AI Response:**') || replyMessage.senderId === 'nova-ai';
                                         const senderInfo = selectedTeam.members.find(m => m.id === replyMessage.senderId)
-                                        const senderName = replyMessage.senderId === 'nova-ai' 
+                                        const senderName = isReplyFromAI 
                                           ? 'Nova AI' 
                                           : senderInfo?.name || replyMessage.senderName || 'Unknown User'
                                         

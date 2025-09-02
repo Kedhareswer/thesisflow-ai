@@ -252,7 +252,7 @@ io.on('connection', async (socket) => {
         return;
       }
 
-      // Create message in database
+      // Create message in database (avoid FK-based embeds to work without DB relationships)
       const { data: message, error } = await supabase
         .from('chat_messages')
         .insert({
@@ -264,14 +264,7 @@ io.on('connection', async (socket) => {
           metadata: {},
           created_at: new Date().toISOString()
         })
-        .select(`
-          *,
-          sender:user_profiles!chat_messages_sender_id_fkey(
-            id,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .single();
 
       if (error) {
@@ -279,6 +272,13 @@ io.on('connection', async (socket) => {
         socket.emit('error', { message: 'Failed to send message' });
         return;
       }
+
+      // Fetch sender profile separately to avoid FK dependency
+      const { data: senderProfile } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, avatar_url')
+        .eq('id', socket.userId)
+        .single();
 
       // Broadcast message to team members
       io.to(`team:${teamId}`).emit('new_message', {
@@ -288,8 +288,8 @@ io.on('connection', async (socket) => {
         timestamp: message.created_at,
         teamId: message.team_id,
         senderId: message.sender_id,
-        senderName: message.sender?.full_name || 'Unknown User',
-        senderAvatar: message.sender?.avatar_url || null,
+        senderName: senderProfile?.full_name || 'Unknown User',
+        senderAvatar: senderProfile?.avatar_url || null,
         mentions: message.mentions || [],
         metadata: message.metadata || {}
       });

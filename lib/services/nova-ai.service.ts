@@ -22,6 +22,11 @@ export interface NovaAIResponse {
 
 export class NovaAIService {
   private static instance: NovaAIService
+  private nebiusApiKey: string
+  
+  constructor() {
+    this.nebiusApiKey = process.env.NEXT_PUBLIC_NEBIUS_API_KEY || ''
+  }
   
   public static getInstance(): NovaAIService {
     if (!NovaAIService.instance) {
@@ -31,37 +36,47 @@ export class NovaAIService {
   }
 
   /**
-   * Process a user message and generate contextual AI response
+   * Process a message with Nova AI using Nebius API
    */
   async processMessage(
-    userMessage: string, 
+    message: string,
     context: NovaAIContext
   ): Promise<NovaAIResponse> {
     try {
-      const prompt = this.buildContextualPrompt(userMessage, context)
+      const systemPrompt = this.buildSystemPrompt(context)
       
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.nebiusApiKey}`
+        },
         body: JSON.stringify({
-          message: prompt,
-          model: 'gpt-4-turbo-preview',
-          systemPrompt: this.getSystemPrompt(context.actionType),
-          temperature: 0.7,
-          maxTokens: 1000
+          model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          max_tokens: 1000,
+          temperature: 0.6,
+          top_p: 0.9,
+          top_k: 50,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: message }
+          ]
         })
       })
 
       if (!response.ok) {
-        throw new Error('AI service unavailable')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Nebius API error:', response.status, errorData)
+        throw new Error(`Nebius API error: ${errorData.error?.message || response.statusText}`)
       }
 
       const data = await response.json()
-      return this.parseAIResponse(data.content, context)
+      const aiContent = data.choices?.[0]?.message?.content || 'No response generated'
+      return this.parseAIResponse(aiContent, context)
     } catch (error) {
       console.error('Nova AI error:', error)
       return {
-        content: "I'm having trouble connecting right now. Let me know if you'd like to try again!",
+        content: "I'm having trouble connecting right now. Please check your Nebius API configuration and try again!",
         confidence: 0,
         type: 'response'
       }
@@ -132,20 +147,38 @@ Focus on:
       .join('\n')
 
     try {
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.nebiusApiKey}`
+        },
         body: JSON.stringify({
-          message: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}`,
-          model: 'gpt-4-turbo-preview',
-          systemPrompt: 'You are a productivity assistant. Provide concise, actionable suggestions.',
+          model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          max_tokens: 200,
           temperature: 0.8,
-          maxTokens: 200
+          top_p: 0.9,
+          top_k: 50,
+          messages: [
+            { 
+              role: "system", 
+              content: 'You are a productivity assistant. Provide concise, actionable suggestions.' 
+            },
+            { 
+              role: "user", 
+              content: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}` 
+            }
+          ]
         })
       })
 
+      if (!response.ok) {
+        throw new Error(`Nebius API error: ${response.statusText}`)
+      }
+
       const data = await response.json()
-      return data.content
+      const content = data.choices?.[0]?.message?.content || ''
+      return content
         .split('\n')
         .filter((line: string) => line.trim())
         .slice(0, 3)
@@ -206,7 +239,30 @@ Please provide a helpful, contextual response as Nova AI, a productivity-focused
   }
 
   /**
-   * Parse AI response and extract structured information
+   * Build system prompt based on context
+   */
+  private buildSystemPrompt(context: NovaAIContext): string {
+    const basePrompt = `You are Nova AI, a helpful productivity assistant for team collaboration. 
+    
+Your role is to:
+- Help team members with their questions and tasks
+- Provide clear, actionable advice
+- Maintain a professional but friendly tone
+- Suggest relevant tools or resources when appropriate
+
+Current context:
+- Team: ${context.teamId || 'Unknown'}
+- Action type: ${context.actionType || 'general'}
+- Recent messages: ${context.recentMessages?.length || 0} messages
+- Team members: ${context.mentionedUsers?.length || 0} users mentioned
+
+Respond in a helpful, concise manner. If you need more context, ask clarifying questions.`
+
+    return basePrompt
+  }
+
+  /**
+   * Process a message with Nova AI
    */
   private parseAIResponse(content: string, context: NovaAIContext): NovaAIResponse {
     // Extract action items (lines starting with *, -, or numbers)
