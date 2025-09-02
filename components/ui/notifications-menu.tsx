@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { TeamInvitation } from "@/components/ui/team-invitation"
+import { NotificationItem } from "@/components/ui/notification-types"
 import { notificationCache } from "@/lib/services/cache.service"
 import {
   DropdownMenu,
@@ -441,19 +442,19 @@ export default function NotificationsMenu() {
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : notifications.length > 0 ? (
-          <div className="max-h-96 overflow-y-auto p-1">
+          <div className="max-h-96 overflow-y-auto">
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="mb-2">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="unread">Unread</TabsTrigger>
-                <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 mb-2">
+                <TabsTrigger value="all" className="text-xs">All ({notifications.length})</TabsTrigger>
+                <TabsTrigger value="unread" className="text-xs">Unread ({unread.length})</TabsTrigger>
+                <TabsTrigger value="team" className="text-xs">Team ({team.length})</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="all">
-                <div className="space-y-1">
+              <TabsContent value="all" className="mt-0">
+                <div className="space-y-0">
                   {notifications.map((notification) => (
                     notification.type === "team_invitation" && notification.data ? (
-                      <div key={notification.id} className="p-2">
+                      <div key={notification.id} className="p-2 border-b border-gray-100">
                         <TeamInvitation
                           invitation={{
                             id: notification.data.invitation_id || notification.id,
@@ -474,62 +475,44 @@ export default function NotificationsMenu() {
                         />
                       </div>
                     ) : (
-                      <DropdownMenuItem
+                      <NotificationItem
                         key={notification.id}
-                        className={`group p-0 cursor-pointer ${!notification.read ? "bg-blue-50" : ""}`}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
-                        <div className="w-full p-3 flex items-start gap-3">
-                          <div className="text-lg">{getNotificationIcon(notification.type)}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium text-sm truncate">{notification.title}</p>
-                              <div className="flex items-center gap-1 ml-2">
-                                {!notification.read && <div className="w-2 h-2 bg-blue-500 rounded-full" />}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    deleteNotification(notification.id)
-                                  }}
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                            <p className="text-xs text-gray-600 mt-1 truncate">{notification.message}</p>
-                            <p className="text-xs text-gray-400 mt-1">{formatTime(notification.created_at)}</p>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
+                        notification={notification}
+                        onMarkRead={markAsRead}
+                        onDelete={deleteNotification}
+                        onClick={handleNotificationClick}
+                      />
                     )
                   ))}
 
                   {notifications.some((n) => n.read) && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={clearAllRead} className="justify-center">
-                        <Trash2 className="h-4 w-4 mr-2" />
+                    <div className="p-2 border-t border-gray-200">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearAllRead}
+                        className="w-full justify-center text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
                         Clear read notifications
-                      </DropdownMenuItem>
-                    </>
+                      </Button>
+                    </div>
                   )}
                 </div>
               </TabsContent>
 
-              <TabsContent value="unread">
-                <div className="space-y-1">
+              <TabsContent value="unread" className="mt-0">
+                <div className="space-y-0">
                   {unread.length === 0 ? (
                     <div className="py-8 text-center text-gray-500">
                       <Bell className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p className="text-sm">You're all caught up</p>
+                      <p className="text-sm">You're all caught up!</p>
+                      <p className="text-xs text-gray-400 mt-1">No unread notifications</p>
                     </div>
                   ) : (
                     unread.map((notification) => (
                       notification.type === "team_invitation" && notification.data ? (
-                        <div key={notification.id} className="p-2">
+                        <div key={notification.id} className="p-2 border-b border-gray-100">
                           <TeamInvitation
                             invitation={{
                               id: notification.data.invitation_id || notification.id,
@@ -550,52 +533,31 @@ export default function NotificationsMenu() {
                           />
                         </div>
                       ) : (
-                        <DropdownMenuItem
+                        <NotificationItem
                           key={notification.id}
-                          className={`group p-0 cursor-pointer ${!notification.read ? "bg-blue-50" : ""}`}
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          <div className="w-full p-3 flex items-start gap-3">
-                            <div className="text-lg">{getNotificationIcon(notification.type)}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium text-sm truncate">{notification.title}</p>
-                                <div className="flex items-center gap-1 ml-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      deleteNotification(notification.id)
-                                    }}
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-600 mt-1 truncate">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">{formatTime(notification.created_at)}</p>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
+                          notification={notification}
+                          onMarkRead={markAsRead}
+                          onDelete={deleteNotification}
+                          onClick={handleNotificationClick}
+                        />
                       )
                     ))
                   )}
                 </div>
               </TabsContent>
 
-              <TabsContent value="team">
-                <div className="space-y-1">
+              <TabsContent value="team" className="mt-0">
+                <div className="space-y-0">
                   {team.length === 0 ? (
                     <div className="py-8 text-center text-gray-500">
                       <Bell className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                       <p className="text-sm">No team notifications</p>
+                      <p className="text-xs text-gray-400 mt-1">Team activity will appear here</p>
                     </div>
                   ) : (
                     team.map((notification) => (
                       notification.type === "team_invitation" && notification.data ? (
-                        <div key={notification.id} className="p-2">
+                        <div key={notification.id} className="p-2 border-b border-gray-100">
                           <TeamInvitation
                             invitation={{
                               id: notification.data.invitation_id || notification.id,
@@ -616,35 +578,13 @@ export default function NotificationsMenu() {
                           />
                         </div>
                       ) : (
-                        <DropdownMenuItem
+                        <NotificationItem
                           key={notification.id}
-                          className={`group p-0 cursor-pointer ${!notification.read ? "bg-blue-50" : ""}`}
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          <div className="w-full p-3 flex items-start gap-3">
-                            <div className="text-lg">{getNotificationIcon(notification.type)}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium text-sm truncate">{notification.title}</p>
-                                <div className="flex items-center gap-1 ml-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      deleteNotification(notification.id)
-                                    }}
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-600 mt-1 truncate">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">{formatTime(notification.created_at)}</p>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
+                          notification={notification}
+                          onMarkRead={markAsRead}
+                          onDelete={deleteNotification}
+                          onClick={handleNotificationClick}
+                        />
                       )
                     ))
                   )}
