@@ -182,7 +182,7 @@ export default function HomePage() {
               <Button 
                 size="lg" 
                 className="focus-ring"
-                onClick={() => handleProtectedAction('/ai-agents')}
+                onClick={() => handleProtectedAction('/explorer')}
               >
                   Start Exploring
                   <ArrowRight className="ml-2 h-4 w-4" />

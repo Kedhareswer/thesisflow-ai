@@ -91,14 +91,55 @@ export async function GET(request: NextRequest) {
     }
     unreadCount = countRes.count || 0
 
-    const normalized = (notifications || []).map((n: any) => ({
-      ...n,
-      read: typeof n.is_read === 'boolean' ? n.is_read : (typeof n.read === 'boolean' ? n.read : Boolean(n.read_at)),
-    }))
+    // Enrich notifications with user and team data
+    const enrichedNotifications = await Promise.all(
+      (notifications || []).map(async (n: any) => {
+        const enrichedData = { ...n.data }
+
+        // Get sender/user info if sender_id exists
+        if (n.data?.sender_id) {
+          const { data: sender } = await supabaseAdmin.auth.admin.getUserById(n.data.sender_id)
+          if (sender?.user) {
+            enrichedData.user_name = sender.user.user_metadata?.full_name || sender.user.user_metadata?.name || sender.user.email?.split('@')[0]
+            enrichedData.user_avatar = sender.user.user_metadata?.avatar_url
+          }
+        }
+
+        // Get team info if team_id exists
+        if (n.data?.team_id) {
+          const { data: team } = await supabaseAdmin
+            .from('teams')
+            .select('name, description')
+            .eq('id', n.data.team_id)
+            .single()
+          if (team) {
+            enrichedData.team_name = team.name
+          }
+        }
+
+        // Get project info if project_id exists  
+        if (n.data?.project_id) {
+          const { data: project } = await supabaseAdmin
+            .from('projects')
+            .select('name, title')
+            .eq('id', n.data.project_id)
+            .single()
+          if (project) {
+            enrichedData.project_name = project.name || project.title
+          }
+        }
+
+        return {
+          ...n,
+          data: enrichedData,
+          read: typeof n.is_read === 'boolean' ? n.is_read : (typeof n.read === 'boolean' ? n.read : Boolean(n.read_at)),
+        }
+      })
+    )
 
     return NextResponse.json({
       success: true,
-      notifications: normalized,
+      notifications: enrichedNotifications,
       unreadCount: unreadCount || 0,
       hasMore: (notifications?.length || 0) === limit
     })

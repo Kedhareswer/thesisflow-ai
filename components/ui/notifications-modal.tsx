@@ -66,9 +66,9 @@ function NotificationItem({ notification, onMarkRead, onDelete, onClick }: {
   }
 
   const { data } = notification
-  const userName = data?.user_name || data?.author_name || data?.inviter_name || "Someone"
-  const userAvatar = data?.user_avatar || data?.author_avatar || data?.inviter_avatar
-  const targetName = data?.project_name || data?.team_name || data?.document_name
+  const userName = data?.user_name || data?.author_name || data?.inviter_name || data?.sender_name || "Someone"
+  const userAvatar = data?.user_avatar || data?.author_avatar || data?.inviter_avatar || data?.sender_avatar
+  const targetName = data?.project_name || data?.team_name || data?.document_name || data?.channel_name || data?.workspace_name
 
   const getActionText = (type: string) => {
     switch (type) {
