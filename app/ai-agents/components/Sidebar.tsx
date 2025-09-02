@@ -3,9 +3,8 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bot, PenLine, MessageSquare, BookOpen, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Clock, Trash2, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown, Home } from "lucide-react"
+import { PenLine, MessageSquare, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown, Home } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import { useAIChat } from "@/lib/hooks/use-ai-chat"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 
@@ -22,11 +21,9 @@ const NotificationBell = React.lazy(() => import("@/app/collaborate/components/n
 
 const navItems = [
   { label: "Thesis Flow", href: "/", id: "home", icon: Home },
-  { label: "AI Agent", href: "/ai-agents", id: "ai-agent", icon: Bot },
   { label: "Explorer", href: "/explorer", id: "explorer", icon: Lightbulb },
   { label: "AI Writer", href: "/writer", id: "ai-writer", icon: PenLine },
   { label: "Chat with PDF", href: "/chat-pdf", id: "chat-pdf", icon: MessageSquare, external: true, externalHref: QUANTUM_PDF_URL },
-  { label: "Literature Review", href: "/literature-review", id: "lit-review", icon: BookOpen },
   { label: "Find Topics", href: "/topics", id: "find-topics", icon: Search },
   { label: "Planner", href: "/planner", id: "planner", icon: Calendar },
   { label: "Collaborate", href: "/collaborate", id: "collaborate", icon: Users },
@@ -39,16 +36,6 @@ const navItems = [
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading, signOut } = useSupabaseAuth()
-  const { sessions, clearAllSessions } = useAIChat()
-  
-  // Get recent chats (max 5, most recent first)
-  const recentChats = sessions.slice(0, 5)
-  
-  const handleClearHistory = () => {
-    if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
-      clearAllSessions()
-    }
-  }
 
   // Simple avatar used in profile dropdown
   const SimpleAvatar = ({ size = "sm" }: { size?: "sm" | "md" }) => {
@@ -186,73 +173,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           })}
         </nav>
 
-        {/* Recent Chats Section */}
-        {recentChats.length > 0 && (
-          <div className="mt-4 px-1">
-            {/* Section Header */}
-            {!collapsed && (
-              <div className="mx-2 mb-2 flex items-center justify-between px-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-3 w-3" />
-                  Recent Chats
-                </div>
-                {recentChats.length > 0 && (
-                  <button
-                    onClick={handleClearHistory}
-                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors normal-case"
-                    title="Clear all chat history"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Clear
-                  </button>
-                )}
-              </div>
-            )}
-            
-            {/* Chat List */}
-            <div className="space-y-0.5">
-              {recentChats.map((chat) => {
-                const isCurrentChat = pathname.includes(`/ai-agents/chat/${chat.id}`)
-                const timeAgo = new Date().getTime() - chat.updatedAt.getTime() < 3600000 
-                  ? `${Math.floor((new Date().getTime() - chat.updatedAt.getTime()) / 60000)}m ago`
-                  : `${Math.floor((new Date().getTime() - chat.updatedAt.getTime()) / 3600000)}h ago`
-                
-                return (
-                  <Link 
-                    key={chat.id} 
-                    href={`/ai-agents/chat/${chat.id}`} 
-                    className="block" 
-                    title={collapsed ? chat.title : `${chat.title} • ${timeAgo}`}
-                  >
-                    <div
-                      className={`relative mx-2 flex items-center rounded-md py-2 text-sm transition-colors ${
-                        isCurrentChat ? "text-orange-600 bg-orange-50" : "text-gray-600 hover:bg-gray-50"
-                      } ${collapsed ? "justify-center" : "gap-3 px-2"}`}
-                    >
-                      {/* Left rail only when expanded */}
-                      {!collapsed && (
-                        <span
-                          className={`absolute left-0 top-1/2 -translate-y-1/2 h-4 rounded-sm ${isCurrentChat ? "w-1 bg-orange-500" : "w-0"}`}
-                        />
-                      )}
-                      
-                      {/* Chat Icon */}
-                      <MessageSquare className={`h-4 w-4 flex-shrink-0 ${isCurrentChat ? "text-orange-600" : "text-gray-400"}`} />
-                      
-                      {/* Chat Details */}
-                      {!collapsed && (
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">{chat.title}</div>
-                          <div className="text-xs text-gray-400">{timeAgo}</div>
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Bottom card - show only when not collapsed AND unauthenticated */}
         {!collapsed && !isLoading && !user && (
