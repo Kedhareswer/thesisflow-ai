@@ -176,12 +176,13 @@ class CollaborateService {
     teamId: string,
     userId: string,
     content: string,
-    type: 'text' | 'system' = 'text'
+    type: 'text' | 'system' = 'text',
+    mentions?: string[]
   ): Promise<{ success: boolean; message?: ChatMessage; error?: string }> {
     try {
       // If socket connected, send via websocket only (server persists and broadcasts)
       if (socketService.isConnected()) {
-        socketService.sendMessage(teamId, content, type);
+        socketService.sendMessage(teamId, content, type, mentions);
         return { success: true };
       }
 
@@ -196,6 +197,7 @@ class CollaborateService {
           userId,
           content,
           type,
+          mentions,
         }),
       });
 
@@ -253,6 +255,7 @@ class CollaborateService {
           timestamp: data.timestamp,
           teamId: data.teamId,
           type: data.type,
+          mentions: Array.isArray(data.mentions) ? data.mentions : [],
         });
       }
     };

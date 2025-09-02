@@ -262,7 +262,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
         body: JSON.stringify({
           teamId: team.id,
           content: newMessage.trim(),
-          mentions: currentMentions,
+          mentions: currentMentions.map(m => m.id),
           type: 'text',
         }),
       })

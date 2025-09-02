@@ -1,7 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react'
-import { Input } from '@/components/ui/input'
+import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -28,7 +27,7 @@ export interface MentionInputProps {
   className?: string
   users?: MentionData[]
   files?: MentionData[]
-  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
+  onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void
 }
 
 interface ParsedContent {
@@ -56,19 +55,11 @@ export function MentionInput({
 }: MentionInputProps) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestionQuery, setSuggestionQuery] = useState("")
-  const [cursorPosition, setCursorPosition] = useState(0)
   const [suggestions, setSuggestions] = useState<MentionData[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
 
-  // DEBUG: Log props on mount and input changes
-  React.useEffect(() => {
-    console.log('MentionInput mounted with props:', { users, files, usersLength: users.length, filesLength: files.length })
-  }, [users, files])
-
-  React.useEffect(() => {
-    console.log('Value changed:', value, 'Contains @:', value.includes('@'))
-  }, [value])
+  // Simplified logs removed for production
 
   // Parse content to extract mentions and clean text
   const parseContent = (content: string): ParsedContent => {
@@ -114,38 +105,50 @@ export function MentionInput({
     )
   }
 
-  // Handle input change
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    const cursorPos = e.target.selectionStart || 0
-    
-    setCursorPosition(cursorPos)
-    
-    // Check if we're typing a mention
-    const beforeCursor = newValue.substring(0, cursorPos)
-    const mentionMatch = beforeCursor.match(/@([^@\s]*)$/)
-    
-    console.log('Input changed:', { newValue, beforeCursor, mentionMatch })
-    
-    if (mentionMatch) {
-      const query = mentionMatch[1]
-      const filteredSuggestions = filterSuggestions(query)
-      console.log('Mention detected:', { query, filteredSuggestions, allMentions: getAllMentions() })
-      
-      setSuggestionQuery(query)
-      setSuggestions(filteredSuggestions)
+  // Render highlighted content (@mentions colored)
+  const renderHighlighted = (text: string) => {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>')
+    return escaped.replace(/@(\w+)/g, '<span class="bg-primary/10 text-primary px-1 rounded">@$1</span>')
+  }
+
+  // Sync external value into editor
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el) return
+    // Avoid flicker: only update if text differs from innerText
+    if (el.innerText !== value) {
+      el.innerHTML = renderHighlighted(value)
+    }
+  }, [value])
+
+  // Handle contenteditable input
+  const handleEditorInput = () => {
+    const el = editorRef.current
+    if (!el) return
+    const text = el.innerText
+    // Detect mention query near caret (simple: use end of text)
+    const match = text.match(/@([^@\s]*)$/)
+    if (match) {
+      setSuggestionQuery(match[1])
+      setSuggestions(filterSuggestions(match[1]))
       setShowSuggestions(true)
       setSelectedIndex(0)
     } else {
       setShowSuggestions(false)
     }
-
-    const parsed = parseContent(newValue)
-    onChange(newValue, parsed.mentions)
+    const parsed = parseContent(text)
+    // Re-apply highlighting
+    el.innerHTML = renderHighlighted(parsed.text)
+    placeCaretAtEnd(el)
+    onChange(parsed.text, parsed.mentions)
   }
 
   // Handle key down events
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (showSuggestions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -169,31 +172,24 @@ export function MentionInput({
 
   // Insert mention at cursor position
   const insertMention = (mention: MentionData) => {
-    const input = inputRef.current
-    if (!input) return
-
-    const beforeCursor = value.substring(0, cursorPosition)
-    const afterCursor = value.substring(cursorPosition)
-    
-    // Find the @ symbol that started the mention
-    const mentionStart = beforeCursor.lastIndexOf('@')
-    if (mentionStart === -1) return
-
-    const beforeMention = value.substring(0, mentionStart)
+    const el = editorRef.current
+    if (!el) return
+    const text = el.innerText
+    const atIndex = text.lastIndexOf('@')
+    const before = atIndex >= 0 ? text.substring(0, atIndex) : text
+    let after = atIndex >= 0 ? text.substring(atIndex) : ''
+    // Remove the @partial token fully (from @ up to first whitespace or end)
+    const tokenMatch = after.match(/^@[^\s]*/)
+    const tokenLength = tokenMatch ? tokenMatch[0].length : 0
+    const afterWithoutQuery = after.substring(tokenLength)
+    // Use proper mention format that parseContent expects
     const mentionText = `@[${mention.name}](${mention.id})`
-    const newValue = beforeMention + mentionText + afterCursor
-
-    const parsed = parseContent(newValue)
-    onChange(newValue, parsed.mentions)
-    
+    const nextText = `${before}${mentionText} ${afterWithoutQuery}`
+    el.innerHTML = renderHighlighted(nextText)
+    placeCaretAtEnd(el)
+    const parsed = parseContent(nextText)
+    onChange(parsed.text, parsed.mentions)
     setShowSuggestions(false)
-    
-    // Set cursor position after the mention
-    setTimeout(() => {
-      const newCursorPos = beforeMention.length + mentionText.length
-      input.setSelectionRange(newCursorPos, newCursorPos)
-      input.focus()
-    }, 0)
   }
 
   // Get file icon based on type
@@ -241,25 +237,22 @@ export function MentionInput({
 
   return (
     <div className="relative">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={handleInputChange}
+      <div
+        ref={editorRef}
+        role="textbox"
+        contentEditable={!disabled}
+        suppressContentEditableWarning
+        onInput={handleEditorInput}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={className}
+        data-placeholder={placeholder}
+        className={`min-h-[42px] px-4 py-2 rounded-full border bg-white outline-none focus:border-primary/50 ${className}`}
+        style={{whiteSpace:'pre-wrap'}}
       />
       
-      {/* Always show popup when typing @ */}
-      {value.includes('@') && (
+      {/* Suggestions dropdown anchored to input */}
+      {showSuggestions && (
         <div 
-          className="fixed bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-[10000] min-w-[300px]"
-          style={{
-            bottom: '100px',
-            left: '50%',
-            transform: 'translateX(-50%)'
-          }}
+          className="absolute bottom-full mb-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-[1000] w-[320px]"
         >
           <div className="text-sm font-semibold mb-2 text-blue-600">
             🎯 Mention Someone!
@@ -361,7 +354,7 @@ export function MessageWithMentions({
         <Badge
           key={`mention-${id}-${match.index}`}
           variant="secondary"
-          className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs"
+          className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs bg-primary/10 text-primary"
         >
           {getMentionIcon(mentionData)}
           <span>{name}</span>
@@ -404,4 +397,16 @@ function getMentionIcon(mention: MentionData) {
     default:
       return <User className="h-3 w-3" />
   }
+}
+
+function placeCaretAtEnd(el: HTMLElement) {
+  try {
+    el.focus()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  } catch {}
 }

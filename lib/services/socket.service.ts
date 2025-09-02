@@ -142,7 +142,12 @@ class SocketService {
   }
 
   // Send a new message to a team
-  sendMessage(teamId: string, message: string, type: "text" | "system" = "text"): void {
+  sendMessage(
+    teamId: string,
+    message: string,
+    type: "text" | "system" = "text",
+    mentions?: string[]
+  ): void {
     if (!this.socket || !this.userId) return
 
     this.socket.emit(SocketEvent.NEW_MESSAGE, {
@@ -150,6 +155,7 @@ class SocketService {
       userId: this.userId,
       content: message,
       type,
+      mentions: Array.isArray(mentions) ? mentions : undefined,
     })
   }
 

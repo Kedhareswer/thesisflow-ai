@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       // Fallback: query chat_messages directly (no FK-based embed)
       let query = supabaseAdmin
         .from('chat_messages')
-        .select('id, content, message_type, created_at, team_id, sender_id, mentions, metadata')
+        .select('id, content, message_type, created_at, team_id, sender_id, mentions, metadata, reply_to')
         .eq('team_id', teamId)
         .order('created_at', { ascending: false })
         .limit(limit)
@@ -113,7 +113,8 @@ export async function GET(request: NextRequest) {
         ? null
         : (msg.sender?.avatar_url || msg.sender_avatar_url || null),
       mentions: msg.mentions || [],
-      metadata: msg.metadata || {}
+      metadata: msg.metadata || {},
+      replyTo: msg.reply_to || null
     }));
 
 
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request, "collaborate-messages");
     
-    const { teamId, content, type = 'text', mentions = [] } = await request.json();
+    const { teamId, content, type = 'text', mentions = [], replyTo } = await request.json();
 
     if (!teamId || !content?.trim()) {
       return NextResponse.json(
@@ -187,12 +188,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract mentions from content (format: @username or @user_id)
-    const mentionPattern = /@(\w+)/g;
-    const contentMentions = [...content.matchAll(mentionPattern)].map(match => match[1]);
-    
-    // Combine with explicit mentions
-    const allMentions = [...new Set([...mentions, ...contentMentions])];
+    // Normalize mentions: UI sends objects or IDs. Also parse inline @[name](id)
+    const normalizedExplicit = (Array.isArray(mentions) ? mentions : []).map((m: any) => {
+      if (!m) return null
+      if (typeof m === 'string') return m
+      if (typeof m === 'object' && m.id) return m.id
+      return null
+    }).filter(Boolean) as string[]
+
+    const bracketRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
+    const bracketMatches = Array.from(content.matchAll(bracketRegex)) as RegExpMatchArray[]
+    const bracketIds = bracketMatches
+      .map((match) => (typeof match[2] === 'string' ? match[2] : ''))
+      .filter((v): v is string => !!v)
+
+    const atWordRegex = /@(\w+)/g
+    const atWordMatches = Array.from(content.matchAll(atWordRegex)) as RegExpMatchArray[]
+    const atWordIds = atWordMatches
+      .map((match) => (typeof match[1] === 'string' ? match[1] : ''))
+      .filter((v): v is string => !!v)
+
+    const allMentions = Array.from(new Set([...
+      normalizedExplicit,
+      ...bracketIds,
+      ...atWordIds,
+    ]))
     
     // Validate mentioned users are team members
     let validMentions: string[] = [];
@@ -215,6 +235,7 @@ export async function POST(request: NextRequest) {
         content: content.trim(),
         message_type: type,
         mentions: validMentions,
+        reply_to: replyTo || null,
         metadata: {},
         created_at: new Date().toISOString()
       })

@@ -1,0 +1,303 @@
+"use client"
+
+import { ProductivityMessage, ProductivityUser } from '@/components/ui/productivity-messaging'
+
+export interface NovaAIContext {
+  teamId: string
+  recentMessages: ProductivityMessage[]
+  currentUser: ProductivityUser
+  mentionedUsers: ProductivityUser[]
+  conversationTopic?: string
+  actionType: 'general' | 'summarize' | 'action_items' | 'clarify' | 'research' | 'decision'
+}
+
+export interface NovaAIResponse {
+  content: string
+  suggestions?: string[]
+  actionItems?: string[]
+  relatedTopics?: string[]
+  confidence: number
+  type: 'response' | 'clarification' | 'action_plan' | 'summary'
+}
+
+export class NovaAIService {
+  private static instance: NovaAIService
+  
+  public static getInstance(): NovaAIService {
+    if (!NovaAIService.instance) {
+      NovaAIService.instance = new NovaAIService()
+    }
+    return NovaAIService.instance
+  }
+
+  /**
+   * Process a user message and generate contextual AI response
+   */
+  async processMessage(
+    userMessage: string, 
+    context: NovaAIContext
+  ): Promise<NovaAIResponse> {
+    try {
+      const prompt = this.buildContextualPrompt(userMessage, context)
+      
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: prompt,
+          model: 'gpt-4-turbo-preview',
+          systemPrompt: this.getSystemPrompt(context.actionType),
+          temperature: 0.7,
+          maxTokens: 1000
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('AI service unavailable')
+      }
+
+      const data = await response.json()
+      return this.parseAIResponse(data.content, context)
+    } catch (error) {
+      console.error('Nova AI error:', error)
+      return {
+        content: "I'm having trouble connecting right now. Let me know if you'd like to try again!",
+        confidence: 0,
+        type: 'response'
+      }
+    }
+  }
+
+  /**
+   * Handle direct AI assistance requests
+   */
+  async handleAIAssistance(
+    prompt: string,
+    messageContext: ProductivityMessage,
+    context: NovaAIContext
+  ): Promise<NovaAIResponse> {
+    const assistancePrompt = `
+The user is asking for help with this message: "${messageContext.content}"
+
+Their request: "${prompt}"
+
+Please provide helpful assistance based on the conversation context.
+`
+
+    return this.processMessage(assistancePrompt, {
+      ...context,
+      actionType: 'clarify'
+    })
+  }
+
+  /**
+   * Generate meeting summary and action items
+   */
+  async summarizeConversation(
+    messages: ProductivityMessage[],
+    context: Omit<NovaAIContext, 'recentMessages' | 'actionType'>
+  ): Promise<NovaAIResponse> {
+    const conversationText = messages
+      .filter(m => m.type !== 'system' && m.type !== 'ai_response')
+      .map(m => `${m.senderId}: ${m.content}`)
+      .join('\n')
+
+    const prompt = `
+Please summarize this team conversation and extract key action items:
+
+${conversationText}
+
+Focus on:
+1. Main topics discussed
+2. Decisions made
+3. Action items with assignees
+4. Next steps
+5. Key insights
+`
+
+    return this.processMessage(prompt, {
+      ...context,
+      recentMessages: messages,
+      actionType: 'summarize'
+    })
+  }
+
+  /**
+   * Suggest follow-up questions or actions
+   */
+  async getSuggestions(context: NovaAIContext): Promise<string[]> {
+    const lastFewMessages = context.recentMessages.slice(-5)
+    const conversationContext = lastFewMessages
+      .map(m => m.content)
+      .join('\n')
+
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}`,
+          model: 'gpt-4-turbo-preview',
+          systemPrompt: 'You are a productivity assistant. Provide concise, actionable suggestions.',
+          temperature: 0.8,
+          maxTokens: 200
+        })
+      })
+
+      const data = await response.json()
+      return data.content
+        .split('\n')
+        .filter((line: string) => line.trim())
+        .slice(0, 3)
+    } catch {
+      return [
+        "Would you like me to summarize the key points?",
+        "Should we create action items from this discussion?",
+        "Do you need clarification on any topics?"
+      ]
+    }
+  }
+
+  /**
+   * Build contextual prompt with conversation history
+   */
+  private buildContextualPrompt(userMessage: string, context: NovaAIContext): string {
+    const recentContext = context.recentMessages
+      .slice(-10)
+      .map(m => `${this.getUserName(m.senderId, context)}: ${m.content}`)
+      .join('\n')
+
+    const mentionedUsersContext = context.mentionedUsers.length > 0 
+      ? `\nMentioned team members: ${context.mentionedUsers.map(u => u.name).join(', ')}`
+      : ''
+
+    const topicContext = context.conversationTopic 
+      ? `\nConversation topic: ${context.conversationTopic}`
+      : ''
+
+    return `
+Context from recent conversation:
+${recentContext}
+
+Current user: ${context.currentUser.name}${mentionedUsersContext}${topicContext}
+
+User's message: "${userMessage}"
+
+Please provide a helpful, contextual response as Nova AI, a productivity-focused assistant.
+`
+  }
+
+  /**
+   * Get system prompt based on action type
+   */
+  private getSystemPrompt(actionType: NovaAIContext['actionType']): string {
+    const basePrompt = `You are Nova AI, a productivity-focused assistant for team collaboration. You help teams be more productive through intelligent suggestions, summaries, and insights.`
+
+    const actionPrompts = {
+      general: `${basePrompt} Provide helpful, concise responses that advance the conversation productively.`,
+      summarize: `${basePrompt} Focus on creating clear summaries with actionable insights and next steps.`,
+      action_items: `${basePrompt} Extract and organize clear action items with suggested assignees and deadlines.`,
+      clarify: `${basePrompt} Help clarify complex topics and provide additional context or alternatives.`,
+      research: `${basePrompt} Provide research suggestions, relevant information, and helpful resources.`,
+      decision: `${basePrompt} Help structure decision-making with pros/cons, considerations, and recommendations.`
+    }
+
+    return actionPrompts[actionType]
+  }
+
+  /**
+   * Parse AI response and extract structured information
+   */
+  private parseAIResponse(content: string, context: NovaAIContext): NovaAIResponse {
+    // Extract action items (lines starting with *, -, or numbers)
+    const actionItemRegex = /^[\s]*(?:[*\-•]|\d+\.)\s+(.+)$/gm
+    const actionItems = []
+    let match
+
+    while ((match = actionItemRegex.exec(content)) !== null) {
+      actionItems.push(match[1].trim())
+    }
+
+    // Determine response type
+    let type: NovaAIResponse['type'] = 'response'
+    if (content.toLowerCase().includes('summary') || content.toLowerCase().includes('recap')) {
+      type = 'summary'
+    } else if (actionItems.length > 0 || content.toLowerCase().includes('action')) {
+      type = 'action_plan'
+    } else if (content.includes('?') || content.toLowerCase().includes('clarif')) {
+      type = 'clarification'
+    }
+
+    // Extract suggestions (questions or recommendations)
+    const suggestions = content
+      .split('\n')
+      .filter(line => line.includes('?') || line.toLowerCase().includes('suggest'))
+      .slice(0, 3)
+
+    return {
+      content,
+      actionItems: actionItems.length > 0 ? actionItems : undefined,
+      suggestions: suggestions.length > 0 ? suggestions : undefined,
+      confidence: 0.85,
+      type
+    }
+  }
+
+  /**
+   * Get user name from context
+   */
+  private getUserName(userId: string, context: NovaAIContext): string {
+    if (userId === context.currentUser.id) {
+      return context.currentUser.name
+    }
+    
+    const user = context.mentionedUsers.find(u => u.id === userId)
+    return user?.name || 'Unknown User'
+  }
+
+  /**
+   * Check if message mentions Nova AI
+   */
+  static isNovaAIMentioned(message: string): boolean {
+    const novaPatterns = [
+      /@nova/i,
+      /@nova-ai/i,
+      /nova ai/i,
+      /hey nova/i,
+      /nova,/i,
+      /nova:/i
+    ]
+    
+    return novaPatterns.some(pattern => pattern.test(message))
+  }
+
+  /**
+   * Extract Nova AI command from message
+   */
+  static extractNovaCommand(message: string): {
+    command: string
+    action: NovaAIContext['actionType']
+  } | null {
+    const commandPatterns = {
+      summarize: /(?:summar|recap|overview)/i,
+      action_items: /(?:action|task|todo|follow.?up)/i,
+      clarify: /(?:clarify|explain|help.*understand)/i,
+      research: /(?:research|find|look.*up)/i,
+      decision: /(?:decide|choice|option|recommend)/i
+    }
+
+    for (const [action, pattern] of Object.entries(commandPatterns)) {
+      if (pattern.test(message)) {
+        return {
+          command: message,
+          action: action as NovaAIContext['actionType']
+        }
+      }
+    }
+
+    return {
+      command: message,
+      action: 'general'
+    }
+  }
+}

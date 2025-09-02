@@ -5,6 +5,15 @@ import Sidebar from "../ai-agents/components/Sidebar"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { MentionInput, MessageWithMentions, type MentionData } from "@/components/ui/mention-input"
+import { 
+  ProductivityMessage as EnhancedMessage, 
+  ProductivityMessageInput as EnhancedMessageInput, 
+  ProductivityChatHeader as EnhancedChatHeader,
+  ProductivityUser as EnhancedUser,
+  ProductivityMessage as EnhancedMessageType
+} from '@/components/ui/productivity-messaging'
+import { NovaAIService } from '@/lib/services/nova-ai.service'
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -131,7 +140,15 @@ export default function CollaboratePage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [newMessage, setNewMessage] = useState("")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  
+  // Enhanced productivity features
+  const [userPresence, setUserPresence] = useState<Record<string, EnhancedUser>>({})
+  const [replyingTo, setReplyingTo] = useState<EnhancedMessageType | null>(null)
+  const [isProcessingAI, setIsProcessingAI] = useState(false)
+  const [lastActivity, setLastActivity] = useState(Date.now())
+  const novaAI = NovaAIService.getInstance()
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [currentMentions, setCurrentMentions] = useState<MentionData[]>([])
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
@@ -275,7 +292,12 @@ export default function CollaboratePage() {
           content: msg.content,
           timestamp: msg.timestamp,
           teamId: msg.teamId,
-          type: msg.type || 'text'
+          type: msg.type || 'text',
+          // preserve mentions array if provided by API
+          // @ts-ignore - extended at runtime
+          mentions: msg.mentions || [],
+          // @ts-ignore - extended at runtime  
+          replyTo: msg.replyTo || null
         }))
         
         // Reverse messages so newest appears at bottom (WhatsApp style)
@@ -285,6 +307,216 @@ export default function CollaboratePage() {
       console.error('Error loading messages:', error)
     }
   }, [apiCall])
+
+  // Enhanced messaging functions
+  
+  // Handle message reactions
+  const handleMessageReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!selectedTeamId) return
+    
+    try {
+      const response = await fetch('/api/collaborate/reactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messageId,
+          emoji,
+          action: 'add' // We'll determine add/remove based on current state
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Update messages with new reaction data
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, reactions: data.reactions }
+            : msg
+        ))
+      }
+    } catch (error) {
+      console.error('Error handling reaction:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add reaction",
+        variant: "destructive",
+      })
+    }
+  }, [selectedTeamId, toast])
+
+  // Update user presence
+  const updatePresence = useCallback(async (status: 'online' | 'away' | 'offline', activity?: string) => {
+    try {
+      await fetch('/api/collaborate/presence', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status, activity }),
+      })
+      
+      // Removed setLastActivity from here to prevent re-render loops
+    } catch (error) {
+      console.error('Error updating presence:', error)
+    }
+  }, [])
+
+  // Load team presence data
+  const loadTeamPresence = useCallback(async (teamId: string) => {
+    try {
+      const response = await fetch(`/api/collaborate/presence?teamId=${teamId}`)
+      if (response.ok) {
+        const data = await response.json()
+        const presenceMap: Record<string, EnhancedUser> = {}
+        
+        data.presence.forEach((p: any) => {
+          presenceMap[p.id] = {
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            avatar: p.avatar,
+            status: p.status as 'online' | 'offline' | 'away' | 'busy',
+            activity: p.activity,
+            lastSeen: p.lastSeen
+          }
+        })
+        
+        setUserPresence(presenceMap)
+      }
+    } catch (error) {
+      console.error('Error loading team presence:', error)
+    }
+  }, [])
+
+  // Handle AI assistance
+  const handleAIAssistance = useCallback(async (prompt: string, context?: string) => {
+    if (!selectedTeamId || !user) return
+    
+    setIsProcessingAI(true)
+    
+    try {
+      // Get recent messages for context
+      const recentMessages = messages.slice(-10).map(msg => ({
+        id: msg.id,
+        senderId: msg.senderId,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        type: msg.type as any,
+        reactions: {},
+        status: 'sent' as const,
+        mentions: (msg as any).mentions || []
+      }))
+
+      const selectedTeam = teams.find(t => t.id === selectedTeamId)
+      const teamMembers = selectedTeam?.members.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        avatar: m.avatar,
+        status: userPresence[m.id]?.status || 'offline' as const
+      })) || []
+
+      const aiContext = {
+        teamId: selectedTeamId,
+        recentMessages,
+        currentUser: {
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          status: 'online' as const
+        },
+        mentionedUsers: teamMembers,
+        actionType: NovaAIService.extractNovaCommand(prompt)?.action || 'general' as const
+      }
+
+      const response = await novaAI.processMessage(prompt, aiContext)
+      
+      // Add AI response as a message
+      const aiMessage: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        senderId: 'nova-ai',
+        senderName: 'Nova AI',
+        senderAvatar: '/assistant-avatar.svg',
+        content: response.content,
+        timestamp: new Date().toISOString(),
+        teamId: selectedTeamId,
+        type: 'text'
+      }
+      
+      setMessages(prev => [...prev, aiMessage])
+      
+    } catch (error) {
+      console.error('Error with AI assistance:', error)
+      toast({
+        title: "AI Assistant Error",
+        description: "Nova AI is temporarily unavailable",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessingAI(false)
+    }
+  }, [selectedTeamId, user, messages, teams, userPresence, novaAI, toast])
+
+  // Enhanced message sending with AI detection
+  const handleSendMessage = useCallback(async () => {
+    if (!newMessage.trim() || !selectedTeamId || isSendingMessage) return
+
+    setIsSendingMessage(true)
+
+    try {
+      // Detect AI requests
+      const isAIRequest = NovaAIService.isNovaAIMentioned(newMessage)
+      if (isAIRequest) {
+        await handleAIAssistance(newMessage)
+        setNewMessage('')
+        setCurrentMentions([])
+        setReplyingTo(null)
+        return
+      }
+
+      // Optimistic UI message
+      if (user) {
+        const tempId = `temp-${Date.now()}`
+        const optimisticMessage: ChatMessage = {
+          id: tempId,
+          senderId: user.id,
+          senderName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'You',
+          senderAvatar: user.user_metadata?.avatar_url,
+          content: newMessage,
+          timestamp: new Date().toISOString(),
+          teamId: selectedTeamId,
+          type: 'text',
+        }
+        setMessages(prev => [...prev, { ...optimisticMessage, ...(replyingTo ? ({ replyTo: replyingTo.id } as any) : {}), ...(currentMentions?.length ? ({ mentions: currentMentions } as any) : {}) } as any])
+        // Immediately clear input and reply state
+        setNewMessage('')
+        setCurrentMentions([])
+        setReplyingTo(null)
+        // Keep presence fresh
+        updatePresence('online', 'Active in chat')
+
+        // Send via realtime service (socket preferred, API fallback handled inside)
+        await collaborateService.sendMessage(
+          selectedTeamId,
+          user.id,
+          optimisticMessage.content,
+          'text',
+          (currentMentions || []).map(m => m.id)
+        )
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to send message',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }, [newMessage, selectedTeamId, isSendingMessage, currentMentions, replyingTo, handleAIAssistance, updatePresence, collaborateService, toast, user])
 
   // Member management handlers
   const changeMemberRole = useCallback(async (teamId: string, memberId: string, newRole: 'viewer' | 'editor' | 'admin') => {
@@ -431,31 +663,37 @@ export default function CollaboratePage() {
     }
   }, [])
 
+  // Enhanced team selection with presence loading
   useEffect(() => {
     if (selectedTeamId) {
       loadMessages(selectedTeamId)
+      loadTeamPresence(selectedTeamId)
+      updatePresence('online', 'Viewing team chat')
       
       // Subscribe to real-time messages for this team
       const unsubscribe = collaborateService.subscribeToMessages(
         selectedTeamId,
         (newMessage: ChatMessage) => {
           setMessages(prev => {
-            // Check if message already exists to prevent duplicates
-            const exists = prev.some(msg => msg.id === newMessage.id)
-            if (exists) return prev
-            
-            const updated = [...prev, newMessage]
-            
-            // Auto-scroll only if already at bottom
+            // De-dup temp optimistic messages for same user/content
+            const withoutMatchingTemps = prev.filter(m => {
+              const isTemp = (m.id as string)?.startsWith?.('temp-')
+              return !(isTemp && m.senderId === newMessage.senderId && m.content === newMessage.content)
+            })
+            // Skip if already exists by id
+            const exists = withoutMatchingTemps.some(msg => msg.id === newMessage.id)
+            if (exists) return withoutMatchingTemps
+
+            const updated = [...withoutMatchingTemps, newMessage]
+
             setTimeout(() => {
               if (isScrolledToBottom) {
                 scrollToBottom()
               } else {
-                // Increment unread count if not at bottom
                 setUnreadCount(prev => prev + 1)
               }
             }, 10)
-            
+
             return updated
           })
         }
@@ -482,6 +720,69 @@ export default function CollaboratePage() {
       scrollToBottom()
     }
   }, [selectedTeamId, scrollToBottom])
+
+  // Activity tracking and auto-away
+  useEffect(() => {
+    let lastActivityTime = Date.now()
+    let presenceUpdateTimeout: NodeJS.Timeout | null = null
+
+    const throttledUpdatePresence = (status: 'online' | 'away' | 'offline', activity?: string) => {
+      if (presenceUpdateTimeout) {
+        clearTimeout(presenceUpdateTimeout)
+      }
+      
+      presenceUpdateTimeout = setTimeout(() => {
+        updatePresence(status, activity)
+      }, 2000) // Throttle presence updates to every 2 seconds
+    }
+
+    const handleActivity = () => {
+      lastActivityTime = Date.now()
+      setLastActivity(lastActivityTime)
+      
+      // Only update presence if we haven't updated recently
+      if (!presenceUpdateTimeout) {
+        throttledUpdatePresence('online', 'Active')
+      }
+    }
+
+    const handleInactivity = () => {
+      const timeSinceLastActivity = Date.now() - lastActivityTime
+      if (timeSinceLastActivity > 300000) { // 5 minutes
+        updatePresence('away', 'Away from keyboard')
+      }
+    }
+
+    // Only set up event listeners if we have a selected team
+    if (selectedTeamId) {
+      // Track user activity
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+      events.forEach(event => {
+        document.addEventListener(event, handleActivity, { passive: true })
+      })
+
+      // Check for inactivity every minute
+      const inactivityInterval = setInterval(handleInactivity, 60000)
+
+      // Set user as online when component mounts
+      updatePresence('online', 'Active in chat')
+
+      // Cleanup
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleActivity)
+        })
+        clearInterval(inactivityInterval)
+        
+        if (presenceUpdateTimeout) {
+          clearTimeout(presenceUpdateTimeout)
+        }
+        
+        // Set offline when leaving
+        updatePresence('offline')
+      }
+    }
+  }, [selectedTeamId, updatePresence]) // Removed lastActivity from dependencies
 
   // Handle invitation URL parameter
   useEffect(() => {
@@ -605,35 +906,7 @@ export default function CollaboratePage() {
     }
   }
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedTeamId) return
-
-    try {
-      setIsSendingMessage(true)
-      
-      const data = await apiCall('/api/collaborate/messages', {
-        method: 'POST',
-        body: JSON.stringify({
-          teamId: selectedTeamId,
-          content: newMessage.trim(),
-          type: 'text',
-        }),
-      })
-
-      if (data.success) {
-        setNewMessage("")
-        loadMessages(selectedTeamId)
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSendingMessage(false)
-    }
-  }
+  // Old handleSendMessage removed - using enhanced version with AI functionality
 
   const handleInviteMember = async () => {
     if (!inviteEmail.trim() || !selectedTeamId) return
@@ -811,15 +1084,15 @@ export default function CollaboratePage() {
 
   return (
     <RouteGuard requireAuth={true}>
-      <div className="flex min-h-screen bg-[#F8F9FA]">
+      <div className="flex min-h-screen bg-[#F8F9FA] overflow-hidden">
           {/* Global Navigation Sidebar */}
           <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v=>!v)} />
 
           {/* Collaborate workspace */}
-          <div className="flex-1 bg-background">
+          <div className="flex-1 bg-background overflow-hidden">
         {/* Modern Header */}
         {/* Removed duplicate header here */}
-        <div className="container mx-auto px-6 py-8 max-w-7xl">
+        <div className="container mx-auto px-6 pt-4 pb-0 max-w-7xl h-full">
           {/* Upgrade Banner for Free Users */}
           <div className="mb-6">
             <TeamLimitBanner currentUsage={teams.length} />
@@ -1023,38 +1296,29 @@ export default function CollaboratePage() {
                       </TabsList>
 
                       <TabsContent value="chat" className="mt-0 p-0">
-                        <div className="h-[600px] flex flex-col bg-background">
-                          {/* Chat Header */}
-                          <div className="px-6 py-4 border-b bg-muted/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="relative">
-                                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                                  <Users className="w-5 h-5 text-primary" />
-                                </div>
-                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-sm">{selectedTeam.name}</h3>
-                                <p className="text-xs text-muted-foreground">{selectedTeam.members.length} members</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <Video className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => setIsSettingsOpen(true)}
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
+                        <div className="h-[calc(100vh-200px)] relative flex flex-col bg-background">
+                          {/* Enhanced Productivity Chat Header */}
+                          <EnhancedChatHeader
+                            title={selectedTeam.name}
+                            subtitle={selectedTeam.description || "Hyper-productive team collaboration"}
+                            members={selectedTeam.members.map((m) => ({
+                              id: m.id,
+                              name: m.name || m.email,
+                              email: m.email,
+                              avatar: m.avatar,
+                              status: userPresence[m.id]?.status || (m.status as "online" | "offline" | "away" | "busy"),
+                              activity: userPresence[m.id]?.activity,
+                              lastSeen: m.lastActive,
+                              role: m.role
+                            }))}
+                            onSearchClick={() => {/* TODO: Implement search */}}
+                            onCallClick={() => {/* TODO: Implement call */}}
+                            onVideoClick={() => {/* TODO: Implement video */}}
+                            onSettingsClick={() => setIsSettingsOpen(true)}
+                          />
 
-                          {/* Messages Area */}
-                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-muted/5 relative">
+                          {/* Enhanced Messages Area */}
+                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-background">
                             {teamMessages.length === 0 ? (
                               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                                 <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
@@ -1065,10 +1329,13 @@ export default function CollaboratePage() {
                               </div>
                             ) : (
                               teamMessages.map((message, index) => {
-                                const isOwnMessage = message.senderId === user?.id
-                                const prevMessage = index > 0 ? teamMessages[index - 1] : null
-                                const showAvatar = !isOwnMessage && (!prevMessage || prevMessage.senderId !== message.senderId)
                                 const isSystemMessage = message.type === 'system'
+                                const prevMessage = index > 0 ? teamMessages[index - 1] : null
+                                const isConsecutive = Boolean(prevMessage && 
+                                  prevMessage.senderId === message.senderId && 
+                                  prevMessage.type !== 'system' && 
+                                  message.type !== 'system' &&
+                                  (new Date(message.timestamp).getTime() - new Date(prevMessage.timestamp).getTime()) < 300000) // 5 minutes
                                 
                                 if (isSystemMessage) {
                                   return (
@@ -1080,57 +1347,94 @@ export default function CollaboratePage() {
                                   )
                                 }
                                 
+                                // Find sender user info with presence
+                                const senderUser = selectedTeam.members.find(m => m.id === message.senderId) || {
+                                  id: message.senderId,
+                                  name: message.senderName || 'Unknown User',
+                                  email: '',
+                                  avatar: message.senderAvatar,
+                                  status: 'offline' as const
+                                }
+
+                                // Get user presence status
+                                const presenceStatus = userPresence[senderUser.id]?.status || senderUser.status as "online" | "offline" | "away" | "busy"
+                                const userActivity = userPresence[senderUser.id]?.activity
+                                
                                 return (
-                                  <div key={message.id} className={`flex items-end gap-2 animate-fade-in ${
-                                    isOwnMessage ? 'flex-row-reverse' : 'flex-row'
-                                  }`}>
-                                    {/* Avatar for received messages */}
-                                    {!isOwnMessage && (
-                                      <div className="flex-shrink-0 mb-1">
-                                        {showAvatar ? (
-                                          <Avatar className="w-7 h-7">
-                                            <AvatarImage src={message.senderAvatar || ''} />
-                                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                              {message.senderName?.charAt(0)?.toUpperCase() || 'U'}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        ) : (
-                                          <div className="w-7 h-7" />
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Message Bubble */}
-                                    <div className={`max-w-[70%] relative group ${
-                                      isOwnMessage ? 'ml-auto' : 'mr-auto'
-                                    }`}>
-                                      {/* Sender name for received messages */}
-                                      {!isOwnMessage && showAvatar && (
-                                        <div className="text-xs text-muted-foreground mb-1 px-3">
-                                          {message.senderName}
-                                        </div>
-                                      )}
-                                      
-                                      {/* Message content */}
-                                      <div className={`px-4 py-2 rounded-2xl shadow-sm ${
-                                        isOwnMessage 
-                                          ? 'bg-primary text-primary-foreground rounded-br-md' 
-                                          : 'bg-background border rounded-bl-md'
-                                      }`}>
-                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                  <EnhancedMessage
+                                    key={message.id}
+                                    message={{
+                                      id: message.id,
+                                      senderId: message.senderId,
+                                      content: message.content,
+                                      timestamp: message.timestamp,
+                                      type: message.senderId === 'nova-ai' ? 'ai_response' : (message.type as "text" | "image" | "file" | "audio" | "system"),
+                                      reactions: (message as any).reactions || {},
+                                      mentions: (message as any).mentions || [],
+                                      replyTo: (message as any).replyTo || null,
+                                      replyToContent: (() => {
+                                        const original = teamMessages.find(m => m.id === (message as any).replyTo)
+                                        return original?.content
+                                      })(),
+                                      replyToSenderName: (() => {
+                                        const original = teamMessages.find(m => m.id === (message as any).replyTo)
+                                        if (!original) return undefined
+                                        const info = selectedTeam.members.find(m => m.id === original.senderId)
+                                        return original.senderId === 'nova-ai' ? 'Nova AI' : (info?.name || original.senderName)
+                                      })(),
+                                      status: (message.id || '').startsWith('temp-') ? 'sending' : 'sent',
+                                      priority: 'normal',
+                                      category: 'discussion'
+                                    }}
+                                    user={{
+                                      id: senderUser.id,
+                                      name: senderUser.name || senderUser.email,
+                                      email: senderUser.email,
+                                      avatar: senderUser.avatar,
+                                      status: presenceStatus,
+                                      activity: userActivity,
+                                      lastSeen: userPresence[senderUser.id]?.lastSeen
+                                    }}
+                                    allUsers={selectedTeam.members.map(m => ({
+                                      id: m.id,
+                                      name: m.name || m.email,
+                                      email: m.email,
+                                      avatar: m.avatar,
+                                      status: userPresence[m.id]?.status || 'offline',
+                                      activity: userPresence[m.id]?.activity
+                                    }))}
+                                    currentUserId={user?.id || ''}
+                                    isConsecutive={isConsecutive}
+                                    onReply={(messageId) => {
+                                      const replyMessage = teamMessages.find(m => m.id === messageId)
+                                      if (replyMessage) {
+                                        // Find the sender's name
+                                        const senderInfo = selectedTeam.members.find(m => m.id === replyMessage.senderId)
+                                        const senderName = replyMessage.senderId === 'nova-ai' 
+                                          ? 'Nova AI' 
+                                          : senderInfo?.name || replyMessage.senderName || 'Unknown User'
                                         
-                                        {/* Timestamp */}
-                                        <div className={`text-xs mt-1 opacity-70 ${
-                                          isOwnMessage ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground'
-                                        }`}>
-                                          {new Date(message.timestamp).toLocaleTimeString([], { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit' 
-                                          })}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
+                                        setReplyingTo({
+                                          id: replyMessage.id,
+                                          senderId: replyMessage.senderId,
+                                          senderName: senderName,
+                                          content: replyMessage.content,
+                                          timestamp: replyMessage.timestamp,
+                                          type: replyMessage.type as any,
+                                          reactions: {},
+                                          status: 'sent'
+                                        })
+                                      }
+                                    }}
+                                    onReact={handleMessageReaction}
+                                    onPin={(messageId) => {
+                                      // TODO: Implement pin functionality
+                                      console.log('Pin message:', messageId)
+                                    }}
+                                    onAIAssist={(messageId, context) => {
+                                      handleAIAssistance(`Help me understand this message: "${context}"`)
+                                    }}
+                                  />
                                 )
                               })
                             )}
@@ -1138,11 +1442,11 @@ export default function CollaboratePage() {
 
                           {/* Scroll to Bottom Button */}
                           {showScrollButton && (
-                            <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
+                            <div className="absolute bottom-24 right-6 z-10">
                               <Button
                                 onClick={scrollToBottom}
                                 size="sm"
-                                className="rounded-full px-3 py-2 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all animate-bounce"
+                                className="rounded-full px-3 py-2 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
                               >
                                 <div className="flex items-center gap-1">
                                   <span className="text-xs">
@@ -1154,39 +1458,39 @@ export default function CollaboratePage() {
                             </div>
                           )}
 
-                          {/* Message Input */}
-                          <div className="px-4 py-3 border-t bg-background">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 relative">
-                                <Input
-                                  placeholder="Type a message..."
+                          {/* Enhanced Productivity Message Input */}
+                          <EnhancedMessageInput
                                   value={newMessage}
-                                  onChange={(e) => setNewMessage(e.target.value)}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                      e.preventDefault()
-                                      handleSendMessage()
-                                    }
+                                  onChange={(val, mentions) => {
+                                    setNewMessage(val)
+                                    setCurrentMentions(mentions)
                                   }}
-                                  onFocus={scrollToBottom}
-                                  className="pr-12 rounded-full border-muted-foreground/20 focus:border-primary/50 transition-colors"
-                                  disabled={isSendingMessage}
-                                />
-                              </div>
-                              <Button
-                                onClick={handleSendMessage}
-                                disabled={!newMessage.trim() || isSendingMessage}
-                                size="sm"
-                                className="rounded-full w-10 h-10 p-0 shadow-md hover:shadow-lg transition-shadow"
-                              >
-                                {isSendingMessage ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Send className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </div>
+                            onSend={handleSendMessage}
+                            onAttach={() => {
+                              // TODO: Implement file attachment
+                              console.log('Attach file clicked')
+                            }}
+                            onAIAssist={handleAIAssistance}
+                            disabled={isSendingMessage || isProcessingAI}
+                            placeholder="Type a message... Use @ to mention team members or @nova for AI assistance"
+                                  users={(selectedTeam?.members || []).map((m) => ({
+                                    id: m.id,
+                                    type: 'user' as const,
+                                    name: m.name || m.email,
+                                    email: m.email,
+                                    avatar: m.avatar,
+                                  }))}
+                                  files={[]}
+                            currentUser={user ? {
+                              id: user.id,
+                              name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me',
+                              email: user.email || '',
+                              avatar: user.user_metadata?.avatar_url,
+                              status: 'online'
+                            } : undefined}
+                            replyingTo={replyingTo || undefined}
+                            onCancelReply={() => setReplyingTo(null)}
+                          />
                         </div>
                       </TabsContent>
 
