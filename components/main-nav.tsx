@@ -16,8 +16,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useEffect, useState, lazy, Suspense } from "react"
 
-// Lazy load the notification bell
-const NotificationBell = lazy(() => import("@/app/collaborate/components/notification-bell"))
+// Lazy load the notifications menu
+const NotificationsMenu = lazy(() => import("@/components/ui/notifications-menu"))
 
 const navigation = [
   { name: "AI Agents", href: "/ai-agents", icon: Bot },
@@ -179,9 +179,9 @@ export function MainNav() {
           <div className="flex items-center space-x-4">
             {user && !isLoading ? (
               <>
-                {/* Notification Bell */}
+                {/* Notifications Menu */}
                 <Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
-                  <NotificationBell />
+                  <NotificationsMenu />
                 </Suspense>
                 
               <DropdownMenu
