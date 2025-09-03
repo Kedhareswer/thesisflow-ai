@@ -947,7 +947,7 @@ export default function PlannerPage() {
 
       {/* Enhanced Task Creation/Edit Modal */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingTask && (editingTask as Task).id ? (
@@ -1013,7 +1013,7 @@ export default function PlannerPage() {
                       )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={taskForm.control}
                         name="due_date"
@@ -1073,7 +1073,7 @@ export default function PlannerPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={taskForm.control}
                         name="status"
