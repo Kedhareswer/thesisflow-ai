@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon, Activity } from "lucide-react"
+import { CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon, Activity } from "lucide-react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { ProjectCalendar } from "./components/project-calendar"
+import { FullScreenCalendar } from "@/components/ui/fullscreen-calendar"
 import { GanttChart } from "@/components/ui/gantt"
 import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
@@ -32,11 +32,39 @@ import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { parseISO, parse, isValid, format } from "date-fns"
 
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const calendarData = useMemo(() => {
+    return tasks
+      .filter((task) => {
+        if (!task.due_date) return false
+        const date = task.due_date.includes("T")
+          ? parseISO(task.due_date)
+          : parse(task.due_date, "yyyy-MM-dd", new Date())
+        return isValid(date)
+      })
+      .map((task) => {
+        const date = task.due_date!.includes("T")
+          ? parseISO(task.due_date!)
+          : parse(task.due_date!, "yyyy-MM-dd", new Date())
+        const timeStr = task.due_date!.includes("T") ? format(date, "p") : ""
+        return {
+          day: date,
+          events: [
+            {
+              id: task.id,
+              name: task.title,
+              time: timeStr,
+              datetime: task.due_date!,
+            },
+          ],
+        }
+      })
+  }, [tasks])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const { toast } = useToast()
@@ -361,7 +389,7 @@ export default function PlannerPage() {
               <TrendingUp className="h-5 w-5 text-purple-600" />
               <div>
                 <p className="text-2xl font-bold text-gray-900">
-                  {Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length)}%
+                  {projects.length ? Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length) : 0}%
                 </p>
                 <p className="text-sm text-gray-600">Avg Progress</p>
               </div>
@@ -568,7 +596,7 @@ export default function PlannerPage() {
             Overview
           </TabsTrigger>
           <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
+            <CalendarIcon className="h-4 w-4" />
             Calendar
           </TabsTrigger>
           <TabsTrigger value="gantt" className="flex items-center gap-2">
@@ -580,19 +608,12 @@ export default function PlannerPage() {
             Analytics
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="overview" className="space-y-6">
           {renderOverview()}
         </TabsContent>
 
         <TabsContent value="calendar" className="space-y-6">
-          <ProjectCalendar
-            projects={projects}
-            tasks={tasks}
-            onEditTask={openEditTask}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={openCreateTask}
-          />
+          <FullScreenCalendar data={calendarData} />
         </TabsContent>
 
         <TabsContent value="gantt" className="space-y-6">
@@ -616,7 +637,7 @@ export default function PlannerPage() {
                 <p className="text-gray-600">Comprehensive insights into your research productivity and project performance</p>
               </div>
               <div className="flex items-center gap-2">
-                <Select value={timeRange} onValueChange={(value: '7d' | '30d' | '90d') => setTimeRange(value)}>
+                <Select value={timeRange} onValueChange={(value: string) => setTimeRange(value as '7d' | '30d' | '90d')}>
                   <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>
