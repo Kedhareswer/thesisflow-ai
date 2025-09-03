@@ -144,11 +144,16 @@ export class AnalyticsService {
       .in('status', ['planning', 'active'])
       .lte('created_at', endDate.toISOString())
 
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('project_id', projects?.map(p => p.id) || [])
-      .lte('created_at', endDate.toISOString())
+    const projectIds = projects?.map(p => p.id) || []
+    let tasks: any[] = []
+    if (projectIds.length > 0) {
+      const { data: t } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('project_id', projectIds)
+        .lte('created_at', endDate.toISOString())
+      tasks = t || []
+    }
 
     const activeProjects = projects?.length || 0
     const completedTasks = tasks?.filter(t => t.status === 'completed').length || 0
@@ -180,12 +185,17 @@ export class AnalyticsService {
       .gte('created_at', previousStartDate.toISOString())
       .lte('created_at', previousEndDate.toISOString())
 
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('project_id', projects?.map(p => p.id) || [])
-      .gte('created_at', previousStartDate.toISOString())
-      .lte('created_at', previousEndDate.toISOString())
+    const prevProjectIds = projects?.map(p => p.id) || []
+    let tasks: any[] = []
+    if (prevProjectIds.length > 0) {
+      const { data: t } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('project_id', prevProjectIds)
+        .gte('created_at', previousStartDate.toISOString())
+        .lte('created_at', previousEndDate.toISOString())
+      tasks = t || []
+    }
 
     const activeProjects = projects?.length || 0
     const completedTasks = tasks?.filter(t => t.status === 'completed').length || 0
@@ -301,13 +311,24 @@ export class AnalyticsService {
       .order('updated_at', { ascending: false })
       .limit(10)
 
-    // Get recent comments
-    const { data: recentComments } = await supabase
-      .from('task_comments')
-      .select('id, content, created_at, task_id')
-      .in('task_id', projectIds)
-      .order('created_at', { ascending: false })
-      .limit(5)
+    // Get task IDs for these projects to fetch recent comments
+    const { data: taskIdRows } = await supabase
+      .from('tasks')
+      .select('id')
+      .in('project_id', projectIds)
+    const taskIds = (taskIdRows || []).map(t => t.id)
+
+    // Get recent comments for tasks under these projects
+    let recentComments: any[] = []
+    if (taskIds.length > 0) {
+      const { data: rc } = await supabase
+        .from('task_comments')
+        .select('id, content, created_at, task_id')
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      recentComments = rc || []
+    }
 
     const activities: any[] = []
 
