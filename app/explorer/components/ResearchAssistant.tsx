@@ -15,7 +15,6 @@ import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResearchSession } from "@/components/research-session-provider"
-import { AIResponse } from "./AIResponse"
 import MarkdownRenderer from "@/components/common/MarkdownRenderer"
 import { Badge } from "@/components/ui/badge"
 
@@ -380,55 +379,56 @@ ASSISTANT:`
                   message.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
-                {message.role === "assistant" ? (
-                  <>
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="w-full">
-                      <AIResponse
-                        content={message.content}
-                        provider={message.provider}
-                        model={message.model}
-                      />
-                      <div className="flex items-center gap-2 mt-2 px-4">
-                        <span className="text-xs opacity-70">
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-xl px-6 py-4",
-                        "bg-primary text-primary-foreground"
-                      )}
-                    >
-                      <div className="text-sm whitespace-pre-wrap leading-6">
-                        {message.content}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs opacity-70">
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2"
-                          onClick={() => handleRevertToMessage(message.id)}
-                          aria-label="Revert to this prompt"
-                          title="Revert to this prompt"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                  </>
+                {message.role === "assistant" && (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-primary" />
+                  </div>
+                )}
+                                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-xl px-6 py-4",
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    )}
+                  >
+                    {message.role === "assistant" ? (
+                      <MarkdownRenderer content={message.content} />
+                    ) : (
+                      <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
+                    )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs opacity-70">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
+                    {message.role === "assistant" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={() => copyToClipboard(message.content)}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    )}
+                    {message.role === "user" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={() => handleRevertToMessage(message.id)}
+                        aria-label="Revert to this prompt"
+                        title="Revert to this prompt"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {message.role === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                    <User className="w-5 h-5 text-primary-foreground" />
+                  </div>
                 )}
               </div>
             ))}
