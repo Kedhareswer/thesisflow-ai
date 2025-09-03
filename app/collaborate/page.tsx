@@ -2,7 +2,7 @@
 
 import type React from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MentionInput, MessageWithMentions, type MentionData } from "@/components/ui/mention-input"
@@ -61,7 +61,7 @@ import {
   Lock
 } from "lucide-react"
 
-import { useSocket } from "@/components/socket-provider"
+import { useSocket as useAppSocket } from "@/lib/services/socket.service"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { RouteGuard } from "@/components/route-guard"
@@ -172,8 +172,9 @@ export default function CollaboratePage() {
   const [collapsed, setCollapsed] = useState(false)
 
   const { toast } = useToast()
-  const { socket } = useSocket()
   const { user, isLoading: authLoading, session } = useSupabaseAuth()
+  // Use authenticated socket from lib (attaches Supabase token)
+  const socket = useAppSocket(user?.id || null)
 
   // API helper functions
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -199,16 +200,56 @@ export default function CollaboratePage() {
     return response.json()
   }, [session])
 
-  // Load teams
+  // Load teams (prefer websocket request-response, fallback to REST once)
   const loadTeams = useCallback(async () => {
     if (!user || !session) return
-    
     try {
       setIsLoading(true)
       setError(null)
-      
+
+      // Try sockets first for a single-shot fetch (no polling)
+      if (socket && (socket as any).connected) {
+        await new Promise<void>((resolve) => {
+          const handleTeams = (payload: any) => {
+            if (!payload) return
+            ;(socket as any).off('user-teams', handleTeams)
+            if (payload.success) {
+              const transformed = (payload.teams || []).map((team: any) => ({
+                id: team.id,
+                name: team.name,
+                description: team.description,
+                category: team.category,
+                isPublic: team.is_public,
+                createdAt: team.created_at,
+                owner: team.owner_id,
+                members: (team.members || []).map((member: any) => ({
+                  id: member.user_id,
+                  name: member.user_profile?.full_name || member.email || 'Unknown User',
+                  email: member.email || member.user_profile?.email || '',
+                  avatar: member.user_profile?.avatar_url,
+                  status: member.user_profile?.status || 'offline',
+                  role: member.role,
+                  joinedAt: member.joined_at,
+                  lastActive: member.user_profile?.last_active || member.joined_at,
+                })),
+              }))
+              setTeams(transformed)
+              if (!selectedTeamId && transformed.length > 0) {
+                setSelectedTeamId(transformed[0].id)
+              }
+            } else {
+              setError(payload.error || 'Failed to load teams')
+            }
+            resolve()
+          }
+          ;(socket as any).on('user-teams', handleTeams)
+          ;(socket as any).emit('get_user_teams')
+        })
+        return
+      }
+
+      // Fallback to REST once (no interval/polling)
       const data = await apiCall('/api/collaborate/teams')
-      
       if (data.success) {
         const transformedTeams = data.teams.map((team: any) => ({
           id: team.id,
@@ -229,9 +270,7 @@ export default function CollaboratePage() {
             lastActive: member.user_profile?.last_active || member.joined_at
           })) || []
         }))
-        
         setTeams(transformedTeams)
-        
         if (!selectedTeamId && transformedTeams?.length > 0) {
           setSelectedTeamId(transformedTeams[0].id)
         }
@@ -242,7 +281,7 @@ export default function CollaboratePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, apiCall])
+  }, [user, session, socket, apiCall, selectedTeamId])
 
   // Handle invitation responses
   const handleInvitationResponse = useCallback(async (invitationId: string, action: 'accept' | 'reject') => {
@@ -279,10 +318,55 @@ export default function CollaboratePage() {
   // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
     if (!teamId) return
-    
+    console.log('[loadMessages] Loading messages for team:', teamId, 'Socket connected:', socket?.connected)
     try {
-      const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
+      if (socket && (socket as any).connected) {
+        console.log('[loadMessages] Using socket to load messages')
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              console.log('[loadMessages] Socket timeout, falling back to API')
+              ;(socket as any).off('messages', handler)
+              reject(new Error('Socket timeout'))
+            }, 5000) // 5 second timeout
+            
+            const handler = (payload: any) => {
+              console.log('[loadMessages] Socket response:', payload)
+              clearTimeout(timeout)
+              if (!payload || payload.teamId !== teamId) return
+              const formatted: ChatMessage[] = (payload.messages || []).map((msg: any) => ({
+                id: msg.id,
+                senderId: msg.senderId,
+                senderName: msg.senderName || 'Unknown User',
+                senderAvatar: msg.senderAvatar,
+                content: msg.content,
+                timestamp: msg.timestamp,
+                teamId: msg.teamId,
+                type: msg.type || 'text',
+                // @ts-ignore - extended at runtime
+                mentions: Array.isArray(msg.mentions) ? msg.mentions : [],
+                // @ts-ignore - extended at runtime
+                replyTo: msg.replyTo || null,
+              }))
+              console.log('[loadMessages] Formatted messages:', formatted)
+              setMessages(formatted.reverse())
+              ;(socket as any).off('messages', handler)
+              resolve()
+            }
+            ;(socket as any).on('messages', handler)
+            ;(socket as any).emit('get_messages', { teamId, limit: 50 })
+          })
+          return
+        } catch (socketError) {
+          console.log('[loadMessages] Socket failed, using API fallback:', socketError)
+          // Continue to API fallback
+        }
+      }
       
+      // Fallback to API if socket unavailable or failed
+      console.log('[loadMessages] Using API fallback to load messages')
+      const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
+      console.log('[loadMessages] API response:', data)
       if (data.success) {
         const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
           id: msg.id,
@@ -293,20 +377,20 @@ export default function CollaboratePage() {
           timestamp: msg.timestamp,
           teamId: msg.teamId,
           type: msg.type || 'text',
-          // preserve mentions array if provided by API
           // @ts-ignore - extended at runtime
           mentions: msg.mentions || [],
-          // @ts-ignore - extended at runtime  
-          replyTo: msg.replyTo || null
+          // @ts-ignore - extended at runtime
+          replyTo: msg.replyTo || null,
         }))
-        
-        // Reverse messages so newest appears at bottom (WhatsApp style)
+        console.log('[loadMessages] API formatted messages:', formattedMessages)
         setMessages(formattedMessages.reverse())
+      } else {
+        console.error('[loadMessages] API returned error:', data.error)
       }
     } catch (error) {
       console.error('Error loading messages:', error)
     }
-  }, [apiCall])
+  }, [apiCall, socket])
 
   // Enhanced messaging functions
   
@@ -346,45 +430,71 @@ export default function CollaboratePage() {
     }
   }, [selectedTeamId, toast])
 
-  // Update user presence
+  // Update user presence (prefer websocket; fallback to API if needed)
   const updatePresence = useCallback(async (status: 'online' | 'away' | 'offline', activity?: string) => {
     try {
+      if (socket && (socket as any).connected) {
+        ;(socket as any).emit('update-status', status)
+        // Optimistically update current user's activity locally
+        if (user?.id) {
+          setUserPresence(prev => ({
+            ...prev,
+            [user.id]: {
+              ...(prev[user.id] || {
+                id: user.id,
+                name: user.user_metadata?.full_name || user.email || 'You',
+                email: user.email || '',
+                avatar: user.user_metadata?.avatar_url,
+                status: 'online' as const,
+              }),
+              status,
+              activity,
+              lastSeen: new Date().toISOString(),
+            } as any,
+          }))
+        }
+        return
+      }
+      // Fallback to API when socket unavailable
       await apiCall('/api/collaborate/presence', {
         method: 'POST',
         body: JSON.stringify({ status, activity }),
       })
-      
-      // Removed setLastActivity from here to prevent re-render loops
     } catch (error) {
       console.error('Error updating presence:', error)
     }
-  }, [apiCall])
+  }, [apiCall, socket, user])
 
-  // Load team presence data
+  // Load team presence data via socket request-response (no REST polling)
   const loadTeamPresence = useCallback(async (teamId: string) => {
+    if (!socket) return
     try {
-      const data = await apiCall(`/api/collaborate/presence?teamId=${teamId}`)
-      if (data.success) {
-        const presenceMap: Record<string, EnhancedUser> = {}
-        
-        data.presence.forEach((p: any) => {
-          presenceMap[p.id] = {
-            id: p.id,
-            name: p.name,
-            email: p.email,
-            avatar: p.avatar,
-            status: p.status as 'online' | 'offline' | 'away' | 'busy',
-            activity: p.activity,
-            lastSeen: p.lastSeen
-          }
-        })
-        
-        setUserPresence(presenceMap)
-      }
+      await new Promise<void>((resolve) => {
+        ;(socket as any).emit('get_team_presence', { teamId })
+        const handler = (payload: any) => {
+          if (!payload || payload.teamId !== teamId) return
+          const presenceMap: Record<string, EnhancedUser> = {}
+          ;(payload.members || []).forEach((p: any) => {
+            presenceMap[p.id] = {
+              id: p.id,
+              name: p.name,
+              email: p.email,
+              avatar: p.avatar,
+              status: (p.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+              activity: p.activity,
+              lastSeen: p.lastSeen,
+            }
+          })
+          setUserPresence(presenceMap)
+          ;(socket as any).off('team-presence', handler)
+          resolve()
+        }
+        ;(socket as any).on('team-presence', handler)
+      })
     } catch (error) {
-      console.error('Error loading team presence:', error)
+      console.error('Error loading team presence (socket):', error)
     }
-  }, [apiCall])
+  }, [socket])
 
   // Handle AI assistance
   const handleAIAssistance = useCallback(async (prompt: string, context?: string) => {
@@ -548,7 +658,7 @@ export default function CollaboratePage() {
 
       // Optimistic UI message
       if (user) {
-        const tempId = `temp-${Date.now()}`
+        const tempId = `client-${Date.now()}`
         const optimisticMessage: ChatMessage = {
           id: tempId,
           senderId: user.id,
@@ -567,14 +677,15 @@ export default function CollaboratePage() {
         // Keep presence fresh
         updatePresence('online', 'Active in chat')
 
-        // Send via realtime service (socket preferred, API fallback handled inside)
+        // Send via realtime service (socket preferred, include optimistic id for correlation)
         await collaborateService.sendMessage(
           selectedTeamId,
           user.id,
           optimisticMessage.content,
           'text',
           (currentMentions || []).map(m => m.id),
-          socket // Pass the socket instance
+          socket, // Pass the socket instance
+          tempId
         )
       }
     } catch (error) {
@@ -734,7 +845,7 @@ export default function CollaboratePage() {
     }
   }, [])
 
-  // Enhanced team selection with presence loading
+  // Enhanced team selection with presence loading and realtime presence subscriptions
   useEffect(() => {
     if (selectedTeamId) {
       loadMessages(selectedTeamId)
@@ -749,8 +860,19 @@ export default function CollaboratePage() {
             // Check if message already exists to prevent duplicates
             const exists = prev.some(msg => msg.id === newMessage.id)
             if (exists) return prev
-            
-            const updated = [...prev, newMessage]
+
+            // Replace optimistic by clientMessageId if present
+            const clientId = (newMessage as any).clientMessageId
+            let updated = prev
+            if (clientId) {
+              updated = prev.map(m => (m.id === clientId ? { ...newMessage } : m))
+              // if not found, append
+              if (!updated.some(m => m.id === newMessage.id)) {
+                updated = [...updated, newMessage]
+              }
+            } else {
+              updated = [...prev, newMessage]
+            }
             
             // Auto-scroll only if already at bottom
             setTimeout(() => {
@@ -768,6 +890,55 @@ export default function CollaboratePage() {
         socket // Pass the socket instance
       )
       
+      // Subscribe to realtime presence via socket
+      const handleStatusChanged = (data: any) => {
+        if (!data) return
+        const { userId, status, teamId } = data
+        if (teamId && teamId !== selectedTeamId) return
+        setUserPresence(prev => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {} as any),
+            status,
+            lastSeen: new Date().toISOString(),
+          } as any,
+        }))
+      }
+      const handleUserJoined = (data: any) => {
+        if (!data) return
+        const { userId, teamId } = data
+        if (teamId && teamId !== selectedTeamId) return
+        setUserPresence(prev => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {} as any),
+            status: 'online',
+            lastSeen: new Date().toISOString(),
+          } as any,
+        }))
+      }
+      const handleUserLeft = (data: any) => {
+        if (!data) return
+        const { userId, teamId } = data
+        if (teamId && teamId !== selectedTeamId) return
+        setUserPresence(prev => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {} as any),
+            status: 'offline',
+            lastSeen: new Date().toISOString(),
+          } as any,
+        }))
+      }
+      
+      if (socket) {
+        ;(socket as any).on('user-status-changed', handleStatusChanged)
+        ;(socket as any).on('user-joined', handleUserJoined)
+        ;(socket as any).on('user-left', handleUserLeft)
+        // Request live presence snapshot on join (server should respond with 'team-presence')
+        ;(socket as any).emit('join_team', { teamId: selectedTeamId })
+      }
+      
       // Setup scroll listener
       if (messagesContainerRef.current) {
         messagesContainerRef.current.addEventListener('scroll', checkScrollPosition)
@@ -776,12 +947,18 @@ export default function CollaboratePage() {
       // Cleanup
       return () => {
         unsubscribe()
+        if (socket) {
+          ;(socket as any).off('user-status-changed', handleStatusChanged)
+          ;(socket as any).off('user-joined', handleUserJoined)
+          ;(socket as any).off('user-left', handleUserLeft)
+          ;(socket as any).emit('leave_team', { teamId: selectedTeamId })
+        }
         if (messagesContainerRef.current) {
           messagesContainerRef.current.removeEventListener('scroll', checkScrollPosition)
         }
       }
     }
-  }, [selectedTeamId, loadMessages, scrollToBottom, checkScrollPosition, isScrolledToBottom])
+  }, [selectedTeamId, loadMessages, loadTeamPresence, checkScrollPosition, socket])
   
   // Auto-scroll to bottom when messages first load
   useEffect(() => {
@@ -1070,7 +1247,21 @@ export default function CollaboratePage() {
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.description.toLowerCase().includes(searchTerm.toLowerCase()),
   )
-  const teamMessages = messages.filter((m) => m.teamId === selectedTeamId);
+  const teamMessages = useMemo(() => {
+    const list = messages.filter((m) => m.teamId === selectedTeamId)
+    const map = new Map<string, ChatMessage>()
+    for (const m of list) {
+      map.set(m.id, m)
+    }
+    if (map.size !== list.length) {
+      try {
+        console.warn('[CollaboratePage] Deduped duplicate message IDs', { duplicates: list.length - map.size })
+      } catch {}
+    }
+    const deduped = Array.from(map.values())
+    deduped.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    return deduped
+  }, [messages, selectedTeamId])
 
   // Utility functions
   const getStatusColor = (status: User["status"]) => {
@@ -1400,8 +1591,14 @@ export default function CollaboratePage() {
                               teamMessages.map((message, index) => {
                                 const isSystemMessage = message.type === 'system'
                                 const prevMessage = index > 0 ? teamMessages[index - 1] : null
+                                // Normalize AI messages to a stable sender id to avoid
+                                // treating AI responses as the current user after persistence
+                                const isAIMessage = message.content.includes('🤖 **Nova AI Response:**') || message.senderId === 'nova-ai'
+                                const prevIsAIMessage = Boolean(prevMessage && (prevMessage.content?.includes('🤖 **Nova AI Response:**') || prevMessage.senderId === 'nova-ai'))
+                                const currentSenderForGrouping = isAIMessage ? 'nova-ai' : message.senderId
+                                const prevSenderForGrouping = prevMessage ? (prevIsAIMessage ? 'nova-ai' : prevMessage.senderId) : null
                                 const isConsecutive = Boolean(prevMessage && 
-                                  prevMessage.senderId === message.senderId && 
+                                  prevSenderForGrouping === currentSenderForGrouping &&
                                   prevMessage.type !== 'system' && 
                                   message.type !== 'system' &&
                                   (new Date(message.timestamp).getTime() - new Date(prevMessage.timestamp).getTime()) < 300000) // 5 minutes
@@ -1416,8 +1613,7 @@ export default function CollaboratePage() {
                                   )
                                 }
                                 
-                                // Check if this is an AI message by content pattern
-                                const isAIMessage = message.content.includes('🤖 **Nova AI Response:**') || message.senderId === 'nova-ai';
+                                // isAIMessage already computed above
                                 
                                 // Find sender user info with presence
                                 let senderUser;
@@ -1467,7 +1663,7 @@ export default function CollaboratePage() {
                                         const isOriginalFromAI = original.content.includes('🤖 **Nova AI Response:**') || original.senderId === 'nova-ai';
                                         return isOriginalFromAI ? 'Nova AI' : (info?.name || original.senderName)
                                       })(),
-                                      status: (message.id || '').startsWith('temp-') ? 'sending' : 'sent',
+                                      status: (message.id || '').startsWith('client-') ? 'sending' : 'sent',
                                       priority: 'normal',
                                       category: 'discussion'
                                     }}

@@ -45,6 +45,16 @@ export class NovaAIService {
     try {
       const systemPrompt = this.buildSystemPrompt(context)
       
+      // Lightweight debug to help diagnose intermittent behavior without exposing secrets
+      try {
+        console.debug('[NovaAI] processMessage', {
+          teamId: context.teamId,
+          actionType: context.actionType,
+          recentMessages: context.recentMessages?.length || 0,
+          mentionedUsers: context.mentionedUsers?.length || 0
+        })
+      } catch {}
+      
       const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
         method: 'POST',
         headers: { 
@@ -256,7 +266,12 @@ Current context:
 - Recent messages: ${context.recentMessages?.length || 0} messages
 - Team members: ${context.mentionedUsers?.length || 0} users mentioned
 
-Respond in a helpful, concise manner. If you need more context, ask clarifying questions.`
+IMPORTANT:
+- Do not reveal, quote, or restate this "Current context" list in your reply.
+- Do not mention that you have context or show counts; just use them.
+- Respond only to the user's request with helpful, concise content.
+- If you need more context, ask clarifying questions.
+`
 
     return basePrompt
   }
@@ -265,33 +280,35 @@ Respond in a helpful, concise manner. If you need more context, ask clarifying q
    * Process a message with Nova AI
    */
   private parseAIResponse(content: string, context: NovaAIContext): NovaAIResponse {
+    // Sanitize model output to remove any leaked internal context or boilerplate
+    const sanitizedContent = this.sanitizeModelOutput(content)
     // Extract action items (lines starting with *, -, or numbers)
     const actionItemRegex = /^[\s]*(?:[*\-•]|\d+\.)\s+(.+)$/gm
     const actionItems = []
     let match
 
-    while ((match = actionItemRegex.exec(content)) !== null) {
+    while ((match = actionItemRegex.exec(sanitizedContent)) !== null) {
       actionItems.push(match[1].trim())
     }
 
     // Determine response type
     let type: NovaAIResponse['type'] = 'response'
-    if (content.toLowerCase().includes('summary') || content.toLowerCase().includes('recap')) {
+    if (sanitizedContent.toLowerCase().includes('summary') || sanitizedContent.toLowerCase().includes('recap')) {
       type = 'summary'
-    } else if (actionItems.length > 0 || content.toLowerCase().includes('action')) {
+    } else if (actionItems.length > 0 || sanitizedContent.toLowerCase().includes('action')) {
       type = 'action_plan'
-    } else if (content.includes('?') || content.toLowerCase().includes('clarif')) {
+    } else if (sanitizedContent.includes('?') || sanitizedContent.toLowerCase().includes('clarif')) {
       type = 'clarification'
     }
 
     // Extract suggestions (questions or recommendations)
-    const suggestions = content
+    const suggestions = sanitizedContent
       .split('\n')
       .filter(line => line.includes('?') || line.toLowerCase().includes('suggest'))
       .slice(0, 3)
 
     return {
-      content,
+      content: sanitizedContent,
       actionItems: actionItems.length > 0 ? actionItems : undefined,
       suggestions: suggestions.length > 0 ? suggestions : undefined,
       confidence: 0.85,
@@ -309,6 +326,33 @@ Respond in a helpful, concise manner. If you need more context, ask clarifying q
     
     const user = context.mentionedUsers.find(u => u.id === userId)
     return user?.name || 'Unknown User'
+  }
+
+  /**
+   * Remove any model responses that echo internal context or meta prefaces.
+   * This helps ensure consistent, user-focused replies.
+   */
+  private sanitizeModelOutput(text: string): string {
+    if (!text) return ''
+    let cleaned = text
+      // Remove leading Nova AI prefaces
+      .replace(/^\s*🤖.*?\n+/i, '')
+      .replace(/^\s*\*\*?nova ai response:?\*\*?\s*/i, '')
+    
+    // Remove echoed context sections
+    cleaned = cleaned.replace(/^[\s\S]*?(?:^\s*(?:Current context:|I have the following context:|Context:)\s*\n[\s\S]*?(?:\n\s*\n|$))/im, (m) => {
+      // If the entire message is just echoed context, drop it
+      return ''
+    })
+    
+    // Remove bullet lines that list our context if they appear at the top
+    cleaned = cleaned.replace(/^(?:[-*]\s*(?:Team|Action type|Recent messages|Team members):.*\n?){1,}/gmi, '')
+    
+    cleaned = cleaned.trim()
+    if (!cleaned) {
+      cleaned = "I'm ready to help. Could you clarify what you'd like me to do?"
+    }
+    return cleaned
   }
 
   /**

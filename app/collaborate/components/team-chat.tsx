@@ -84,41 +84,43 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     return response.json()
   }, [])
   
-  // Load chat messages
+  // Load chat messages via socket
   const loadMessages = useCallback(async () => {
-    if (!team?.id) return
-    
+    if (!team?.id || !socket) return
     try {
       setIsLoading(true)
-      
-      const data = await apiCall(`/api/collaborate/messages?teamId=${team.id}&limit=50`)
-      
-      if (data.success) {
-        const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
-          id: msg.id,
-          senderId: msg.sender_id,
-          senderName: msg.sender?.full_name || 'Unknown User',
-          senderAvatar: msg.sender?.avatar_url,
-          content: msg.content,
-          timestamp: msg.created_at,
-          teamId: msg.team_id,
-          type: msg.message_type || "text",
-          mentions: msg.mentions ? JSON.parse(msg.mentions) : [],
-        }))
-        
-        setMessages(formattedMessages)
-      }
+      await new Promise<void>((resolve) => {
+        const handler = (payload: any) => {
+          if (!payload || payload.teamId !== team.id) return
+          const formattedMessages: ChatMessage[] = (payload.messages || []).map((msg: any) => ({
+            id: msg.id,
+            senderId: msg.senderId,
+            senderName: msg.senderName || 'Unknown User',
+            senderAvatar: msg.senderAvatar,
+            content: msg.content,
+            timestamp: msg.timestamp,
+            teamId: msg.teamId,
+            type: msg.type || 'text',
+            mentions: Array.isArray(msg.mentions) ? msg.mentions : [],
+          }))
+          setMessages(formattedMessages)
+          socket.off('messages', handler)
+          resolve()
+        }
+        socket.on('messages', handler)
+        socket.emit('get_messages', { teamId: team.id, limit: 50 })
+      })
     } catch (error) {
-      console.error('Error loading messages:', error)
+      console.error('Error loading messages (socket):', error)
       toast({
-        title: "Error",
-        description: "Failed to load chat messages",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load chat messages',
+        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)
     }
-  }, [team?.id, apiCall, toast])
+  }, [team?.id, socket, toast])
   
   // Load team files for mentions
   const loadTeamFiles = useCallback(async () => {
@@ -205,10 +207,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       }
     }
 
-    const handleMemberUpdate = () => {
-      // Refresh messages to get latest member info
-      loadMessages()
-    }
+    const handleMemberUpdate = () => {}
 
     // Join team room
     socket.emit(SocketEvent.JOIN_TEAM, { teamId: team.id, userId: user?.id })
@@ -256,21 +255,16 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
         })
       }
       
-      // Send message via API
-      const data = await apiCall('/api/collaborate/messages', {
-        method: 'POST',
-        body: JSON.stringify({
+      // Send message via socket
+      if (socket) {
+        socket.emit(SocketEvent.NEW_MESSAGE, {
           teamId: team.id,
           content: newMessage.trim(),
-          mentions: currentMentions.map(m => m.id),
           type: 'text',
-        }),
-      })
-      
-      if (data.success) {
+          mentions: currentMentions.map(m => m.id),
+        })
         setNewMessage('')
         setCurrentMentions([])
-        // Message will be added via socket event
       }
     } catch (error) {
       console.error('Error sending message:', error)

@@ -178,18 +178,23 @@ class CollaborateService {
     content: string,
     type: 'text' | 'system' = 'text',
     mentions?: string[],
-    socket?: any // Accept socket instance from the page
-  ): Promise<{ success: boolean; message?: ChatMessage; error?: string }> {
+    socket?: any, // Accept socket instance from the page
+    clientMessageId?: string, // correlation id supplied by caller
+    metadata?: Record<string, any>
+  ): Promise<{ success: boolean; message?: ChatMessage; error?: string; clientMessageId?: string }> {
     try {
       // If socket connected, send via websocket only (server persists and broadcasts)
       if (socket && socket.connected) {
+        const idToUse = clientMessageId || `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         socket.emit('new_message', {
           teamId,
           content,
           type,
           mentions,
+          clientMessageId: idToUse,
+          metadata: metadata || {},
         });
-        return { success: true };
+        return { success: true, message: { id: idToUse } as any, clientMessageId: idToUse };
       }
 
       // Fallback: send via API when offline
@@ -210,6 +215,7 @@ class CollaborateService {
           content,
           type,
           mentions,
+          metadata: metadata || {},
         }),
       });
 
@@ -271,6 +277,8 @@ class CollaborateService {
           teamId: data.teamId,
           type: data.type,
           mentions: Array.isArray(data.mentions) ? data.mentions : [],
+          // Preserve correlation id for optimistic replacement
+          clientMessageId: data.clientMessageId,
         });
       }
     };

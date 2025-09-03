@@ -141,7 +141,7 @@ io.use(async (socket, next) => {
 
 // Handle socket connections
 io.on('connection', async (socket) => {
-  console.log(`User connected: ${socket.userId} (${socket.id})`);
+  console.log(`User connected: ${socket.userId} (${socket.id})`)
 
   // Store connection info
   activeConnections.set(socket.id, { userId: socket.userId, teamIds: new Set() });
@@ -165,10 +165,12 @@ io.on('connection', async (socket) => {
   socket.on('join_team', (data) => {
     try {
       const { teamId } = data;
+      console.log(`[join_team] User ${socket.userId} joining team ${teamId}`)
       
       // Verify team membership
       checkTeamMembership(socket.userId, teamId).then(isMember => {
         if (!isMember) {
+          console.log(`[join_team] User ${socket.userId} is not a member of team ${teamId}`)
           socket.emit('error', { message: 'Not a member of this team' });
           return;
         }
@@ -243,7 +245,7 @@ io.on('connection', async (socket) => {
   // Handle chat messages
   socket.on('new_message', async (data) => {
     try {
-      const { teamId, content, type = 'text', mentions = [] } = data;
+      const { teamId, content, type = 'text', mentions = [], clientMessageId, metadata = {} } = data;
 
       // Verify team membership
       const isMember = await checkTeamMembership(socket.userId, teamId);
@@ -261,7 +263,7 @@ io.on('connection', async (socket) => {
           content,
           message_type: type,
           mentions,
-          metadata: {},
+          metadata: metadata,
           created_at: new Date().toISOString()
         })
         .select('*')
@@ -284,14 +286,18 @@ io.on('connection', async (socket) => {
       io.to(`team:${teamId}`).emit('new_message', {
         id: message.id,
         content: message.content,
-        type: message.message_type,
+        // Preserve AI responses as ai_response type for consistent UI rendering
+        type: message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova AI Response:**')
+          ? 'ai_response'
+          : message.message_type,
         timestamp: message.created_at,
         teamId: message.team_id,
         senderId: message.sender_id,
         senderName: senderProfile?.full_name || 'Unknown User',
         senderAvatar: senderProfile?.avatar_url || null,
         mentions: message.mentions || [],
-        metadata: message.metadata || {}
+        metadata: message.metadata || {},
+        clientMessageId,
       });
 
       // Send notifications for mentions
@@ -317,6 +323,91 @@ io.on('connection', async (socket) => {
     }
   });
 
+  // Serve teams for the authenticated user (replace REST fetch on client)
+  socket.on('get_user_teams', async () => {
+    try {
+      const userId = socket.userId;
+      if (!userId) return;
+
+      // Get team ids where the user is a member
+      const { data: memberRows } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId);
+
+      const teamIds = Array.from(new Set((memberRows || []).map((r) => r.team_id)));
+
+      // Fetch teams where user is owner or member
+      const inClause = teamIds.length
+        ? `,id.in.(${teamIds.map((id) => `"${id}"`).join(',')})`
+        : '';
+      const orFilter = `owner_id.eq.${userId}${inClause}`;
+      let teamQuery = supabase
+        .from('teams')
+        .select('*')
+        .or(orFilter);
+
+      const { data: teams, error: teamsError } = await teamQuery;
+      if (teamsError) return;
+
+      const allTeamIds = (teams || []).map((t) => t.id);
+      if (allTeamIds.length === 0) {
+        socket.emit('user-teams', { success: true, teams: [] });
+        return;
+      }
+
+      // Fetch members for these teams
+      const { data: members } = await supabase
+        .from('team_members')
+        .select('team_id, user_id, role, joined_at')
+        .in('team_id', allTeamIds);
+
+      const userIds = Array.from(new Set((members || []).map((m) => m.user_id)));
+      let profilesMap = new Map();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, email, avatar_url, status, last_active')
+          .in('id', userIds);
+        (profiles || []).forEach((p) => profilesMap.set(p.id, p));
+      }
+
+      const teamsWithMembers = (teams || []).map((team) => {
+        const teamMembers = (members || []).filter((m) => m.team_id === team.id).map((m) => {
+          const prof = profilesMap.get(m.user_id) || {};
+          return {
+            user_id: m.user_id,
+            role: m.role,
+            joined_at: m.joined_at,
+            email: prof.email,
+            user_profile: {
+              full_name: prof.full_name,
+              avatar_url: prof.avatar_url,
+              status: prof.status,
+              last_active: prof.last_active,
+              email: prof.email,
+            },
+          };
+        });
+
+        return {
+          id: team.id,
+          name: team.name,
+          description: team.description,
+          category: team.category,
+          is_public: team.is_public,
+          created_at: team.created_at,
+          owner_id: team.owner_id,
+          members: teamMembers,
+        };
+      });
+
+      socket.emit('user-teams', { success: true, teams: teamsWithMembers });
+    } catch (e) {
+      socket.emit('user-teams', { success: false, error: 'Failed to load teams' });
+    }
+  });
+
   // Handle typing indicators
   socket.on('typing', ({ teamId }) => {
     socket.to(`team:${teamId}`).emit('typing', {
@@ -332,6 +423,89 @@ io.on('connection', async (socket) => {
       teamId,
       isTyping: false
     });
+  });
+
+  // Serve initial messages on request
+  socket.on('get_messages', async ({ teamId, limit = 50 }) => {
+    try {
+      // Verify membership
+      const isMember = await checkTeamMembership(socket.userId, teamId);
+      if (!isMember) return;
+
+      const { data: rows, error } = await supabase
+        .from('chat_messages')
+        .select('id, team_id, sender_id, content, message_type, mentions, created_at')
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) return;
+
+      // Fetch sender profiles in batch
+      const senderIds = Array.from(new Set((rows || []).map(r => r.sender_id))).filter(Boolean);
+      let profilesMap = new Map();
+      if (senderIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('user_profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', senderIds);
+        (profs || []).forEach(p => profilesMap.set(p.id, p));
+      }
+
+      const messages = (rows || []).map(r => ({
+        id: r.id,
+        teamId: r.team_id,
+        senderId: r.sender_id,
+        senderName: profilesMap.get(r.sender_id)?.full_name || 'Unknown User',
+        senderAvatar: profilesMap.get(r.sender_id)?.avatar_url || null,
+        content: r.content,
+        type: r.message_type || 'text',
+        mentions: r.mentions || [],
+        timestamp: r.created_at,
+      }));
+
+      socket.emit('messages', { teamId, messages });
+    } catch (e) {
+      // no-op
+    }
+  });
+
+  // Serve presence snapshot on request
+  socket.on('get_team_presence', async ({ teamId }) => {
+    try {
+      const isMember = await checkTeamMembership(socket.userId, teamId);
+      if (!isMember) return;
+
+      const { data: members } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('team_id', teamId);
+
+      const userIds = (members || []).map(m => m.user_id);
+      if (userIds.length === 0) {
+        socket.emit('team-presence', { teamId, members: [] });
+        return;
+      }
+
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, email, avatar_url, status, last_active')
+        .in('id', userIds);
+
+      const payload = (profiles || []).map(p => ({
+        id: p.id,
+        name: p.full_name || p.email || 'Unknown',
+        email: p.email,
+        avatar: p.avatar_url,
+        status: p.status || 'offline',
+        activity: null,
+        lastSeen: p.last_active,
+      }));
+
+      socket.emit('team-presence', { teamId, members: payload });
+    } catch (e) {
+      // no-op
+    }
   });
 
   // Handle status updates

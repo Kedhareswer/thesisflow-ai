@@ -102,7 +102,10 @@ export async function GET(request: NextRequest) {
     const formattedMessages = (messages || []).map((msg: any) => ({
       id: msg.id,
       content: msg.content,
-      type: msg.message_type,
+      // Normalize AI messages to ai_response for consistent UI
+      type: (msg.message_type === 'text' && typeof msg.content === 'string' && msg.content.includes('🤖 **Nova AI Response:**'))
+        ? 'ai_response'
+        : msg.message_type,
       timestamp: msg.created_at,
       teamId: msg.team_id,
       senderId: msg.sender_id,
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request, "collaborate-messages");
     
-    const { teamId, content, type = 'text', mentions = [], replyTo } = await request.json();
+    const { teamId, content, type = 'text', mentions = [], replyTo, metadata = {} } = await request.json();
 
     if (!teamId || !content?.trim()) {
       return NextResponse.json(
@@ -236,7 +239,7 @@ export async function POST(request: NextRequest) {
         message_type: type,
         mentions: validMentions,
         reply_to: replyTo || null,
-        metadata: {},
+        metadata: metadata,
         created_at: new Date().toISOString()
       })
       .select('*')
@@ -322,7 +325,10 @@ export async function POST(request: NextRequest) {
     const formattedMessage = {
       id: message.id,
       content: message.content,
-      type: message.message_type,
+      // Normalize AI messages to ai_response for consistent UI
+      type: (message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova AI Response:**'))
+        ? 'ai_response'
+        : message.message_type,
       timestamp: message.created_at,
       teamId: message.team_id,
       senderId: message.sender_id,
