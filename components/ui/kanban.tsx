@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 export const Kanban = () => {
   return (
-    <div className={cn("h-screen w-full bg-neutral-900 text-neutral-50")}>
+    <div className={cn("w-full min-h-[480px] rounded-lg border bg-card text-foreground")}>
       <Board />
     </div>
   );
@@ -24,32 +24,32 @@ const Board = () => {
   const [cards, setCards] = useState(DEFAULT_CARDS);
 
   return (
-    <div className="flex h-full w-full gap-3 overflow-scroll p-12">
+    <div className="flex h-full w-full gap-4 overflow-auto p-6">
       <Column
         title="Backlog"
         column="backlog"
-        headingColor="text-neutral-500"
+        headingColor="text-muted-foreground"
         cards={cards}
         setCards={setCards}
       />
       <Column
         title="TODO"
         column="todo"
-        headingColor="text-yellow-200"
+        headingColor="text-yellow-700"
         cards={cards}
         setCards={setCards}
       />
       <Column
         title="In progress"
         column="doing"
-        headingColor="text-blue-200"
+        headingColor="text-blue-700"
         cards={cards}
         setCards={setCards}
       />
       <Column
         title="Complete"
         column="done"
-        headingColor="text-emerald-200"
+        headingColor="text-emerald-700"
         cards={cards}
         setCards={setCards}
       />
@@ -182,7 +182,7 @@ const Column = ({
     <div className="w-56 shrink-0">
       <div className="mb-3 flex items-center justify-between">
         <h3 className={`font-medium ${headingColor}`}>{title}</h3>
-        <span className="rounded text-sm text-neutral-400">
+        <span className="rounded text-sm text-muted-foreground">
           {filteredCards.length}
         </span>
       </div>
@@ -190,8 +190,8 @@ const Column = ({
         onDrop={handleDragEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`h-full w-full transition-colors ${
-          active ? "bg-neutral-800/50" : "bg-neutral-800/0"
+        className={`h-full w-full rounded-md transition-colors ${
+          active ? "bg-muted/50" : "bg-transparent"
         }`}
       >
         {filteredCards.map((c) => {
@@ -217,9 +217,9 @@ const Card = ({ title, id, column, handleDragStart }: CardProps) => {
         layoutId={id}
         draggable="true"
         onDragStart={(e) => handleDragStart(e, { title, id, column })}
-        className="cursor-grab rounded border border-neutral-700 bg-neutral-800 p-3 active:cursor-grabbing"
+        className="cursor-grab rounded-md border bg-secondary p-3 shadow-sm active:cursor-grabbing"
       >
-        <p className="text-sm text-neutral-100">{title}</p>
+        <p className="text-sm text-foreground">{title}</p>
       </motion.div>
     </>
   );
@@ -235,7 +235,7 @@ const DropIndicator = ({ beforeId, column }: DropIndicatorProps) => {
     <div
       data-before={beforeId || "-1"}
       data-column={column}
-      className="my-0.5 h-0.5 w-full bg-violet-400 opacity-0"
+      className="my-0.5 h-0.5 w-full bg-primary opacity-0"
     />
   );
 };
@@ -269,10 +269,10 @@ const BurnBarrel = ({
       onDrop={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`mt-10 grid h-56 w-56 shrink-0 place-content-center rounded border text-3xl ${
+      className={`mt-10 grid h-56 w-56 shrink-0 place-content-center rounded-md border text-3xl ${
         active
-          ? "border-red-800 bg-red-800/20 text-red-500"
-          : "border-neutral-500 bg-neutral-500/20 text-neutral-500"
+          ? "bg-destructive/10 text-destructive border-destructive/50"
+          : "bg-muted text-muted-foreground"
       }`}
     >
       {active ? <FaFire className="animate-bounce" /> : <FiTrash />}
@@ -313,18 +313,18 @@ const AddCard = ({ column, setCards }: AddCardProps) => {
             onChange={(e) => setText(e.target.value)}
             autoFocus
             placeholder="Add new task..."
-            className="w-full rounded border border-violet-400 bg-violet-400/20 p-3 text-sm text-neutral-50 placeholder-violet-300 focus:outline-0"
+            className="w-full rounded-md border border-primary/40 bg-primary/10 p-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none"
           />
           <div className="mt-1.5 flex items-center justify-end gap-1.5">
             <button
               onClick={() => setAdding(false)}
-              className="px-3 py-1.5 text-xs text-neutral-400 transition-colors hover:text-neutral-50"
+              className="px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               Close
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 rounded bg-neutral-50 px-3 py-1.5 text-xs text-neutral-950 transition-colors hover:bg-neutral-300"
+              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <span>Add</span>
               <FiPlus />
@@ -335,7 +335,7 @@ const AddCard = ({ column, setCards }: AddCardProps) => {
         <motion.button
           layout
           onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-400 transition-colors hover:text-neutral-50"
+          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <span>Add card</span>
           <FiPlus />
