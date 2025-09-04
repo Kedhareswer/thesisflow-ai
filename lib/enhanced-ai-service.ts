@@ -10,6 +10,12 @@ export interface GenerateTextOptions {
   userId?: string
 }
 
+export interface GenerateTextStreamOptions extends GenerateTextOptions {
+  onToken?: (token: string) => void
+  onProgress?: (progress: { message?: string; percentage?: number }) => void
+  onError?: (error: string) => void
+}
+
 export interface GenerateTextResult {
   success: boolean
   content?: string
@@ -1244,6 +1250,121 @@ SENTIMENT: [positive/neutral/negative]`
       keyPoints,
       readingTime,
       sentiment,
+    }
+  }
+
+  /**
+   * Generate text with streaming support
+   */
+  async generateTextStream(options: GenerateTextStreamOptions): Promise<void> {
+    try {
+      console.log("Enhanced AI Service: Starting streaming text generation...")
+      
+      // Load user API keys
+      const userApiKeys = await this.loadUserApiKeys(options.userId)
+      const availableProviders = userApiKeys
+        .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
+        .map((key) => key.provider as AIProvider)
+
+      if (availableProviders.length === 0) {
+        options.onError?.("No valid API keys available. Please configure API keys in Settings.")
+        return
+      }
+
+      // Determine which provider to use
+      let selectedProvider = options.provider
+      if (!selectedProvider || !availableProviders.includes(selectedProvider)) {
+        selectedProvider = availableProviders[0]
+      }
+
+      // Get the API key for the selected provider
+      const userApiKey = userApiKeys.find(
+        (key) => key.provider === selectedProvider && key.is_active && key.test_status === "valid" && key.decrypted_key
+      )
+
+      if (!userApiKey || !userApiKey.decrypted_key) {
+        options.onError?.(`No valid API key for ${selectedProvider}`)
+        return
+      }
+
+      // Get provider configuration
+      const providerConfig = AI_PROVIDERS[selectedProvider]
+      if (!providerConfig) {
+        options.onError?.(`Unknown provider: ${selectedProvider}`)
+        return
+      }
+
+      // Determine model to use
+      const selectedModel = options.model && providerConfig.models.includes(options.model)
+        ? options.model
+        : providerConfig.models[0]
+
+      console.log(`Enhanced AI Service: Streaming with ${selectedProvider} using model ${selectedModel}`)
+
+      // Call the streaming API for the provider
+      await this.callProviderStreamingAPI(selectedProvider, userApiKey.decrypted_key, {
+        ...options,
+        model: selectedModel,
+        provider: selectedProvider,
+      })
+
+    } catch (error) {
+      console.error("Enhanced AI Service: Error in generateTextStream:", error)
+      options.onError?.(error instanceof Error ? error.message : "Unknown error occurred")
+    }
+  }
+
+  /**
+   * Call provider streaming API - simulates streaming by chunking responses
+   */
+  private async callProviderStreamingAPI(
+    provider: AIProvider,
+    apiKey: string,
+    options: GenerateTextStreamOptions,
+  ): Promise<void> {
+    try {
+      console.log(`Enhanced AI Service: Starting streaming call to ${provider}`)
+      
+      options.onProgress?.({ message: `Connecting to ${provider}...` })
+
+      // For now, we'll simulate streaming by getting the full response and chunking it
+      // In a real implementation, you'd use the provider's streaming API
+      const result = await this.callProviderAPI(provider, apiKey, options)
+
+      if (!result.success || !result.content) {
+        options.onError?.(result.error || "Failed to generate response")
+        return
+      }
+
+      // Simulate streaming by sending content in chunks
+      const content = result.content
+      const chunkSize = 3 // Characters per chunk for realistic streaming effect
+      let sentChars = 0
+
+      options.onProgress?.({ message: "Generating response...", percentage: 0 })
+
+      // Stream the content character by character in small chunks
+      for (let i = 0; i < content.length; i += chunkSize) {
+        const chunk = content.slice(i, i + chunkSize)
+        options.onToken?.(chunk)
+        sentChars += chunk.length
+
+        // Update progress
+        const percentage = Math.round((sentChars / content.length) * 100)
+        options.onProgress?.({ 
+          message: "Generating response...", 
+          percentage 
+        })
+
+        // Add small delay to simulate real streaming
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+
+      options.onProgress?.({ message: "Response complete", percentage: 100 })
+
+    } catch (error) {
+      console.error(`Enhanced AI Service: Error in streaming call to ${provider}:`, error)
+      options.onError?.(error instanceof Error ? error.message : `Failed to stream from ${provider}`)
     }
   }
 

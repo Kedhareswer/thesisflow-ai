@@ -135,6 +135,7 @@
     "socket.io": "latest",
     "socket.io-client": "latest",
     "sonner": "latest",
+    "streamdown": "^1.1.10",
     "stripe": "^18.4.0",
     "svelte": "latest",
     "tailwind-merge": "^2.6.0",

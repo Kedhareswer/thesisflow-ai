@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@source "../node_modules/streamdown/dist/index.js";
+
 @layer base {
   :root {
     /* Global brand background: #F8F9FA (approx hsl(210 17% 98%)) */

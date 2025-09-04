@@ -11,7 +11,7 @@ export interface AIProviderConfig {
 }
 
 export interface AIResponse {
-  content: string
+  response: string
   provider: AIProvider
   model: string
   usage?: {
@@ -19,6 +19,13 @@ export interface AIResponse {
     completionTokens: number
     totalTokens: number
   }
+}
+
+export interface StreamingCallbacks {
+  onToken?: (token: string) => void
+  onProgress?: (progress: { message?: string; percentage?: number }) => void
+  onError?: (error: string) => void
+  onDone?: (metadata: { totalTokens: number; processingTime: number }) => void
 }
 
 // Provider configurations
@@ -117,49 +124,180 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
 
 // Client-side service that uses API routes instead of direct API calls
 export class AIProviderService {
-  static async generateResponse(prompt: string, provider?: AIProvider, model?: string): Promise<AIResponse> {
-    // If no provider specified, use the best available one
-    if (!provider) {
-      provider = AIProviderDetector.getBestProvider()
-      if (!provider) {
-        throw new Error("No AI providers are configured. Please add at least one API key to your environment variables.")
-      }
+  private static async getAuthHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
     }
+
     try {
-      // Use our secure API route instead of direct API calls
-      const response = await fetch("/api/ai/generate", {
-        method: "POST",
-        // Build headers with optional Supabase auth token if available
-        headers: await (async () => {
-          const base: Record<string, string> = {
-            "Content-Type": "application/json",
-          }
-          try {
-            const { supabase } = await import("./supabase")
-            const { data } = await supabase.auth.getSession()
-            const token = data.session?.access_token
-            if (token) {
-              base["Authorization"] = `Bearer ${token}`
-            }
-          } catch {
-            // Supabase not available (e.g., during SSR), ignore
-          }
-          return base as HeadersInit
-        })(),
+      // Try to get auth token from Supabase client
+      const { supabase } = await import('@/integrations/supabase/client')
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+    } catch (error) {
+      console.warn('Could not get auth token:', error)
+    }
+
+    return headers
+  }
+
+  static async generateResponse(
+    prompt: string,
+    provider: AIProvider,
+    model: string,
+    options: {
+      temperature?: number
+      maxTokens?: number
+      systemPrompt?: string
+    } = {}
+  ): Promise<AIResponse> {
+    try {
+      const headers = await this.getAuthHeaders()
+      
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers,
         body: JSON.stringify({
           prompt,
           provider,
-          model: model || AI_PROVIDERS[provider].models[0],
+          model,
+          temperature: options.temperature || 0.7,
+          maxTokens: options.maxTokens || 1000,
+          systemPrompt: options.systemPrompt,
         }),
       })
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
+        const errorData = await response.text()
+        throw new Error(`API request failed: ${response.status} - ${errorData}`)
       }
 
-      return await response.json()
+      const data = await response.json()
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Unknown error occurred')
+      }
+
+      return {
+        response: data.content,
+        provider: data.provider,
+        model: data.model,
+        usage: data.usage
+      }
     } catch (error) {
-      console.error(`Error with ${provider}:`, error)
+      console.error('Error generating AI response:', error)
+      throw error
+    }
+  }
+
+  static async streamChat(
+    message: string,
+    provider: AIProvider,
+    model: string,
+    callbacks: StreamingCallbacks,
+    options: {
+      temperature?: number
+      maxTokens?: number
+      systemPrompt?: string
+    } = {}
+  ): Promise<void> {
+    try {
+      // Get auth token for SSE (EventSource can't set custom headers)
+      let authToken = ''
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { session } } = await supabase.auth.getSession()
+        authToken = session?.access_token || ''
+      } catch (error) {
+        console.warn('Could not get auth token for streaming:', error)
+      }
+
+      // Build URL with query parameters
+      const params = new URLSearchParams({
+        message,
+        provider,
+        model,
+        temperature: (options.temperature || 0.7).toString(),
+        maxTokens: (options.maxTokens || 2000).toString(),
+      })
+
+      if (options.systemPrompt) {
+        params.set('systemPrompt', options.systemPrompt)
+      }
+
+      if (authToken) {
+        params.set('access_token', authToken)
+      }
+
+      const url = `/api/ai/chat/stream?${params.toString()}`
+
+      // Create EventSource for SSE
+      const eventSource = new EventSource(url)
+      let streamComplete = false
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          
+          switch (data.type) {
+            case 'init':
+              callbacks.onProgress?.({ message: 'Connected, starting generation...' })
+              break
+            case 'token':
+              callbacks.onToken?.(data.content)
+              break
+            case 'progress':
+              callbacks.onProgress?.(data)
+              break
+            case 'done':
+              streamComplete = true
+              callbacks.onDone?.({
+                totalTokens: data.totalTokens,
+                processingTime: data.processingTime
+              })
+              eventSource.close()
+              break
+            case 'error':
+              callbacks.onError?.(data.error)
+              eventSource.close()
+              break
+          }
+        } catch (error) {
+          console.error('Error parsing SSE data:', error)
+          callbacks.onError?.('Failed to parse streaming response')
+        }
+      }
+
+      eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error)
+        if (!streamComplete) {
+          callbacks.onError?.('Connection to AI service lost')
+        }
+        eventSource.close()
+      }
+
+      // Return a promise that resolves when streaming is complete
+      return new Promise((resolve, reject) => {
+        const originalOnDone = callbacks.onDone
+        const originalOnError = callbacks.onError
+
+        callbacks.onDone = (metadata: { totalTokens: number; processingTime: number }) => {
+          originalOnDone?.(metadata)
+          resolve()
+        }
+
+        callbacks.onError = (error: string) => {
+          originalOnError?.(error)
+          reject(new Error(error))
+        }
+      })
+
+    } catch (error) {
+      console.error('Error starting streaming chat:', error)
+      callbacks.onError?.(error instanceof Error ? error.message : 'Unknown streaming error')
       throw error
     }
   }

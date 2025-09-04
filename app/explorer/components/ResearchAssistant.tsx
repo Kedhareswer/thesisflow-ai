@@ -10,12 +10,12 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { type AIProvider, AI_PROVIDERS, AIProviderService } from "@/lib/ai-providers"
+import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResearchSession } from "@/components/research-session-provider"
-import MarkdownRenderer from "@/components/common/MarkdownRenderer"
+import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
 
 interface Message {
@@ -203,10 +203,24 @@ export function ResearchAssistant({
     }
 
     setMessages(prev => [...prev, userMessage])
+    const userMessageContent = value.trim()
     setValue("")
     adjustHeight()
     setIsSending(true)
     setIsTyping(true)
+
+    // Create placeholder assistant message for streaming
+    const assistantMessageId = (Date.now() + 1).toString()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      provider: selectedProvider,
+      model: selectedModel
+    }
+    
+    setMessages(prev => [...prev, assistantMessage])
 
     try {
       // Build comprehensive system prompt with session context
@@ -224,52 +238,64 @@ ${researchContext}
 
 Use this research context to provide more relevant and targeted responses. Reference specific papers, topics, or ideas from the context when relevant.`
         : basePrompt
-      
-      // Prepare conversation history for context (compact transcript)
-      const conversationHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
 
-      // Compose a single prompt including system context and concise chat history
-      const transcript = conversationHistory
-        .slice(-12) // keep recent turns to control token usage
-        .map(m => `${m.role.toUpperCase()}: ${m.content}`)
-        .join("\n")
+      // Set up streaming callbacks
+      const streamingCallbacks: StreamingCallbacks = {
+        onToken: (token: string) => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: msg.content + token }
+              : msg
+          ))
+        },
+        onProgress: (progress) => {
+          // Optional: could show progress indicator
+          console.log('Streaming progress:', progress)
+        },
+        onError: (error: string) => {
+          console.error("Streaming error:", error)
+          toast({
+            title: "Streaming Error",
+            description: error,
+            variant: "destructive"
+          })
+          setIsTyping(false)
+          setIsSending(false)
+        },
+        onDone: (metadata) => {
+          console.log('Streaming complete:', metadata)
+          setIsTyping(false)
+          setIsSending(false)
+          
+          // Save messages to session
+          addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
+          
+          // Use a timeout to ensure state has updated, then save the assistant message
+          setTimeout(() => {
+            setMessages(currentMessages => {
+              const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
+              if (finalMessage?.content) {
+                addChatMessage('assistant', finalMessage.content, researchContext ? ['research_context'] : undefined)
+              }
+              return currentMessages
+            })
+          }, 100)
+        }
+      }
 
-      const composedPrompt = `${systemPrompt}
-
-=== CONVERSATION SO FAR ===
-${transcript || "(no prior messages)"}
-
-USER: ${value.trim()}
-ASSISTANT:`
-
-      const apiResponse = await AIProviderService.generateResponse(
-        composedPrompt,
+      // Start streaming
+      await AIProviderService.streamChat(
+        userMessageContent,
         selectedProvider,
-        selectedModel
+        selectedModel,
+        streamingCallbacks,
+        {
+          systemPrompt,
+          temperature: 0.7,
+          maxTokens: 2000
+        }
       )
 
-      // Handle both AIResponse type and API response format
-      const content = typeof apiResponse === 'string' 
-        ? apiResponse 
-        : (apiResponse as any).response || apiResponse.content || 'No response received'
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content,
-        timestamp: new Date(),
-        provider: selectedProvider,
-        model: selectedModel
-      }
-      
-      setMessages(prev => [...prev, assistantMessage])
-      
-      // Save both messages to session
-      addChatMessage('user', value.trim(), researchContext ? ['research_context'] : undefined)
-      addChatMessage('assistant', content, researchContext ? ['research_context'] : undefined)
     } catch (error) {
       console.error("Error sending message:", error)
       toast({
@@ -277,7 +303,6 @@ ASSISTANT:`
         description: "Failed to get response from AI provider",
         variant: "destructive"
       })
-    } finally {
       setIsSending(false)
       setIsTyping(false)
     }
@@ -393,7 +418,9 @@ ASSISTANT:`
                     )}
                   >
                     {message.role === "assistant" ? (
-                      <MarkdownRenderer content={message.content} />
+                      <Response parseIncompleteMarkdown={true}>
+                        {message.content}
+                      </Response>
                     ) : (
                       <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
                     )}
