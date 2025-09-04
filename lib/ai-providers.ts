@@ -28,6 +28,10 @@ export interface StreamingCallbacks {
   onDone?: (metadata: { totalTokens: number; processingTime: number }) => void
 }
 
+export interface StreamingController {
+  abort: () => void
+}
+
 // Provider configurations
 export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   gemini: {
@@ -203,7 +207,7 @@ export class AIProviderService {
       maxTokens?: number
       systemPrompt?: string
     } = {}
-  ): Promise<void> {
+  ): Promise<StreamingController> {
     try {
       // Get auth token for SSE (EventSource can't set custom headers)
       let authToken = ''
@@ -279,21 +283,15 @@ export class AIProviderService {
         eventSource.close()
       }
 
-      // Return a promise that resolves when streaming is complete
-      return new Promise((resolve, reject) => {
-        const originalOnDone = callbacks.onDone
-        const originalOnError = callbacks.onError
-
-        callbacks.onDone = (metadata: { totalTokens: number; processingTime: number }) => {
-          originalOnDone?.(metadata)
-          resolve()
+      // Return streaming controller with abort functionality
+      const controller: StreamingController = {
+        abort: () => {
+          eventSource.close()
+          callbacks.onError?.('Stream aborted by user')
         }
+      }
 
-        callbacks.onError = (error: string) => {
-          originalOnError?.(error)
-          reject(new Error(error))
-        }
-      })
+      return controller
 
     } catch (error) {
       console.error('Error starting streaming chat:', error)

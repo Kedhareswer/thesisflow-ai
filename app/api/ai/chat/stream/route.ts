@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
-import { EnhancedAIService } from '@/lib/enhanced-ai-service';
+import { enhancedAIService } from '@/lib/enhanced-ai-service';
 import { createClient } from '@supabase/supabase-js';
 import { type AIProvider } from '@/lib/ai-providers';
 
@@ -15,7 +15,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const aiService = new EnhancedAIService();
+const aiService = enhancedAIService;
 
 interface RateLimitResult {
   allowed: boolean;

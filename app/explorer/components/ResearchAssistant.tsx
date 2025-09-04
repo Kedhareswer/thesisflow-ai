@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap, RotateCcw } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap, RotateCcw, X } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks } from "@/lib/ai-providers"
+import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -84,6 +84,7 @@ export function ResearchAssistant({
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [streamingController, setStreamingController] = useState<StreamingController | null>(null)
 
   // Map provider → local logo assets placed under /public
   const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
@@ -138,6 +139,20 @@ export function ResearchAssistant({
     const newHeight = Math.min(textarea.scrollHeight, 200)
     textarea.style.height = `${newHeight}px`
   }, [])
+
+
+  const handleAbortStream = useCallback(() => {
+    if (streamingController) {
+      streamingController.abort()
+      setStreamingController(null)
+      setIsSending(false)
+      setIsTyping(false)
+      toast({
+        title: "Stream Cancelled",
+        description: "AI response generation was cancelled"
+      })
+    }
+  }, [streamingController, toast])
 
   // Load available providers on mount
   useEffect(() => {
@@ -261,11 +276,13 @@ Use this research context to provide more relevant and targeted responses. Refer
           })
           setIsTyping(false)
           setIsSending(false)
+          setStreamingController(null)
         },
         onDone: (metadata) => {
           console.log('Streaming complete:', metadata)
           setIsTyping(false)
           setIsSending(false)
+          setStreamingController(null)
           
           // Save messages to session
           addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
@@ -284,7 +301,7 @@ Use this research context to provide more relevant and targeted responses. Refer
       }
 
       // Start streaming
-      await AIProviderService.streamChat(
+      const controller = await AIProviderService.streamChat(
         userMessageContent,
         selectedProvider,
         selectedModel,
@@ -295,6 +312,8 @@ Use this research context to provide more relevant and targeted responses. Refer
           maxTokens: 2000
         }
       )
+      
+      setStreamingController(controller)
 
     } catch (error) {
       console.error("Error sending message:", error)
@@ -663,17 +682,30 @@ Use this research context to provide more relevant and targeted responses. Refer
             className="min-h-[110px] max-h-[320px] resize-none text-sm"
             disabled={isSending}
           />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!value.trim() || isSending || !selectedProvider || !selectedModel}
-            className="px-4"
-          >
-            {isSending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ArrowRight className="w-4 h-4" />
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={handleSendMessage}
+              disabled={!value.trim() || isSending || !selectedProvider || !selectedModel}
+              className="px-4"
+            >
+              {isSending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRight className="w-4 h-4" />
+              )}
+            </Button>
+            {streamingController && (
+              <Button
+                onClick={handleAbortStream}
+                variant="outline"
+                size="sm"
+                className="px-3"
+                title="Cancel streaming response"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       </div>
     </div>
