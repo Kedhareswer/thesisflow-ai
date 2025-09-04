@@ -381,7 +381,7 @@ Use this research context to provide more relevant and targeted responses. Refer
 
 
   return (
-    <div className="flex flex-col h-[75vh] md:h-[80vh] lg:h-[85vh] bg-white rounded-lg border">
+    <div className="flex flex-col h-[85vh] md:h-[90vh] lg:h-[95vh] bg-white rounded-lg border">
       {/* Header */}
       <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
         <div className="flex items-center gap-2">
@@ -404,7 +404,7 @@ Use this research context to provide more relevant and targeted responses. Refer
       </div>
 
       {/* Messages */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-8">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 md:p-6">
         {messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <Bot className="w-14 h-14 mx-auto mb-4 opacity-50" />
@@ -430,7 +430,7 @@ Use this research context to provide more relevant and targeted responses. Refer
                 )}
                                   <div
                     className={cn(
-                      "max-w-[85%] rounded-xl px-6 py-4",
+                      "max-w-[90%] rounded-xl px-6 py-4",
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
@@ -497,7 +497,7 @@ Use this research context to provide more relevant and targeted responses. Refer
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t bg-muted/30 px-6 py-6">
+      <div className="border-t bg-muted/30 px-4 py-4">
         {/* Research Context Display */}
         {hasContext && (
           contextCollapsed ? (
@@ -679,7 +679,7 @@ Use this research context to provide more relevant and targeted responses. Refer
             }}
             onKeyDown={handleKeyDown}
             placeholder="Ask your research question..."
-            className="min-h-[110px] max-h-[320px] resize-none text-sm"
+            className="min-h-[80px] max-h-[200px] resize-none text-sm"
             disabled={isSending}
           />
           <div className="flex flex-col gap-2">
