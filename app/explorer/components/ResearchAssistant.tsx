@@ -17,7 +17,7 @@ import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
-import { Reasoning } from "@/components/ai-elements/reasoning"
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning"
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@/components/ai-elements/sources"
 
 interface Message {
@@ -106,8 +106,7 @@ export function ResearchAssistant({
   const [isSending, setIsSending] = useState(false)
   const [streamingController, setStreamingController] = useState<StreamingController | null>(null)
 
-  // Reasoning panel state
-  const [reasoningOpen, setReasoningOpen] = useState(false)
+  // Reasoning panel text content and optional progress (shown within content)
   const [reasoningLines, setReasoningLines] = useState<string[]>([])
   const [reasoningProgress, setReasoningProgress] = useState<number | undefined>(undefined)
 
@@ -176,8 +175,6 @@ export function ResearchAssistant({
         title: "Stream Cancelled",
         description: "AI response generation was cancelled"
       })
-      // Ensure reasoning panel closes on abort
-      setReasoningOpen(false)
       setReasoningLines([])
       setReasoningProgress(undefined)
     }
@@ -247,7 +244,6 @@ export function ResearchAssistant({
     // reset reasoning panel for new stream; it will auto-open on first progress
     setReasoningLines([])
     setReasoningProgress(undefined)
-    setReasoningOpen(false)
 
     // Create placeholder assistant message for streaming
     const assistantMessageId = (Date.now() + 1).toString()
@@ -289,9 +285,8 @@ Use this research context to provide more relevant and targeted responses. Refer
           ))
         },
         onProgress: (progress) => {
-          // Show reasoning panel and update with progress messages/percentages
+          // Update with progress messages/percentages
           console.log('Streaming progress:', progress)
-          setReasoningOpen(true)
           if (typeof progress?.percentage === 'number') {
             setReasoningProgress(progress.percentage)
           }
@@ -316,8 +311,6 @@ Use this research context to provide more relevant and targeted responses. Refer
           setIsTyping(false)
           setIsSending(false)
           setStreamingController(null)
-          // Close and clear reasoning panel on error
-          setReasoningOpen(false)
           setReasoningLines([])
           setReasoningProgress(undefined)
         },
@@ -326,7 +319,7 @@ Use this research context to provide more relevant and targeted responses. Refer
           setIsTyping(false)
           setIsSending(false)
           setStreamingController(null)
-          // Mark reasoning as complete and close shortly after
+          // Mark reasoning as complete and clear shortly after
           setReasoningLines(prev => {
             if (prev.length === 0 || prev[prev.length - 1] !== 'Response complete') {
               return [...prev, 'Response complete']
@@ -335,7 +328,6 @@ Use this research context to provide more relevant and targeted responses. Refer
           })
           setReasoningProgress(100)
           setTimeout(() => {
-            setReasoningOpen(false)
             setReasoningLines([])
             setReasoningProgress(undefined)
           }, 600)
@@ -460,12 +452,23 @@ Use this research context to provide more relevant and targeted responses. Refer
       </div>
 
       {/* Reasoning Panel */}
-      <Reasoning
-        open={reasoningOpen}
-        onOpenChange={setReasoningOpen}
-        lines={reasoningLines}
-        progress={reasoningProgress}
-      />
+      <Reasoning className="w-full" isStreaming={isSending}>
+        <ReasoningTrigger />
+        <ReasoningContent>
+          {typeof reasoningProgress === 'number' && (
+            <div className="text-[11px] text-muted-foreground mb-1">Progress: {Math.round(reasoningProgress)}%</div>
+          )}
+          {reasoningLines.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Initializing...</div>
+          ) : (
+            <ul className="space-y-1.5">
+              {reasoningLines.map((line, idx) => (
+                <li key={idx} className="text-xs leading-5">{line}</li>
+              ))}
+            </ul>
+          )}
+        </ReasoningContent>
+      </Reasoning>
 
       {/* Messages */}
       <Conversation className="flex-1 p-4 md:p-6">

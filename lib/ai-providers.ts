@@ -37,92 +37,96 @@ export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
   gemini: {
     name: "Google Gemini",
     models: [
-      "gemini-1.5-flash", // Free model - default
-      "gemini-1.5-flash-8b", // Free model
-      "gemini-2.0-flash", // Free model
-      "gemini-2.5-flash", // Free model
-      "gemini-2.5-flash-lite-preview", // Free model
-      "gemini-1.5-pro", // Paid model
-      "gemini-2.5-pro" // Paid model
+      "gemini-2.5-flash", // Best price-performance, default
+      "gemini-2.5-flash-lite", // Cost-optimized
+      "gemini-2.5-pro", // State-of-the-art thinking model
+      "gemini-2.0-flash", // Next-gen features
+      "gemini-2.0-flash-lite", // Cost-efficient 2.0
+      "gemini-1.5-flash", // Fast and versatile
+      "gemini-1.5-flash-8b", // Small model
+      "gemini-1.5-pro" // Mid-size multimodal
     ],
     maxTokens: 1048576, // 1M tokens for Gemini 2.5
-    supportedFeatures: ["text", "chat", "summarization", "analysis", "multimodal", "vision", "long-context"],
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "multimodal", "vision", "long-context", "thinking"],
   },
   aiml: {
     name: "AIML API",
     models: [
-      "gpt-4o-mini", // Free/cheaper model - default
-      "gpt-4.1-mini", // Free/cheaper model
-      "gemini-2.5-flash-preview", // Free model
-      "deepseek-r1", // Free model
-      "deepseek-v3", // Free model
-      "gpt-4o", // Paid model
-      "gpt-4.1", // Paid model
-      "claude-3.5-sonnet", // Paid model
-      "claude-3.7-sonnet", // Paid model
-      "gemini-2.5-pro-preview" // Paid model
+      "gpt-4o-mini", // Cost-effective default
+      "gpt-4o", // OpenAI flagship
+      "o3-mini", // Reasoning model
+      "openai/o3-2025-04-16", // Latest o3
+      "openai/gpt-4.1-2025-04-14", // GPT-4.1
+      "openai/gpt-4.1-mini-2025-04-14", // GPT-4.1 mini
+      "deepseek-chat", // DeepSeek V3
+      "deepseek/deepseek-r1", // DeepSeek reasoning
+      "claude-3-5-sonnet-20241022", // Claude 3.5 Sonnet
+      "claude-3-5-haiku-20241022", // Claude 3.5 Haiku
+      "anthropic/claude-opus-4.1", // Claude 4.1 Opus
+      "anthropic/claude-sonnet-4", // Claude 4 Sonnet
+      "gemini-2.5-flash", // Gemini 2.5 Flash
+      "gemini-2.5-pro", // Gemini 2.5 Pro
+      "meta-llama/Llama-3.3-70B-Instruct-Turbo", // Llama 3.3 70B
+      "qwen-max-2025-01-25" // Qwen Max latest
     ],
-    maxTokens: 200000, // GPT-4.1 supports up to 1M tokens
+    maxTokens: 1000000, // GPT-4.1 supports up to 1M tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "code", "reasoning", "multimodal"],
   },
   groq: {
     name: "Groq",
     models: [
-      "llama-3.1-8b-instant", // Free model - default
-      "gemma2-9b-it", // Free model
-      "deepseek-r1-distill-qwen-32b", // Free model
-      "qwen-qwq-32b", // Free model
-      "llama-3.3-70b-versatile", // Free model
-      "mistral-saba-24b", // Free model
-      "llama-4-scout-17b-16e-instruct", // Potentially paid
-      "llama-4-maverick-17b-128e-instruct" // Potentially paid
+      "llama-3.1-8b-instant", // Production default
+      "llama-3.3-70b-versatile", // Production large
+      "meta-llama/llama-guard-4-12b", // Safety model
+      "openai/gpt-oss-120b", // GPT OSS 120B
+      "openai/gpt-oss-20b", // GPT OSS 20B
+      "whisper-large-v3", // Audio transcription
+      "whisper-large-v3-turbo" // Fast audio transcription
     ],
     maxTokens: 128000, // Llama 3.3 supports 128k tokens
-    supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference", "reasoning"],
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference", "reasoning", "audio"],
   },
   openai: {
     name: "OpenAI",
     models: [
-      "gpt-4o-mini", // Cheaper model - default
-      "gpt-3.5-turbo", // Cheaper model
-      "gpt-4.1-mini", // Cheaper model
-      "gpt-4.1-nano", // Cheaper model
-      "o3-mini", // Cheaper reasoning model
-      "o4-mini", // Cheaper model
-      "gpt-4o", // Paid model
-      "gpt-4-turbo", // Paid model
-      "gpt-4.1", // Paid model
-      "o3" // Expensive reasoning model
+      "gpt-4o-mini", // Cost-optimized default
+      "gpt-4o", // Flagship multimodal
+      "o3-mini", // Reasoning model
+      "o3", // Advanced reasoning
+      "gpt-4-turbo", // Previous generation
+      "gpt-3.5-turbo" // Legacy cost-effective
     ],
-    maxTokens: 1000000, // GPT-4.1 supports up to 1M tokens
+    maxTokens: 200000, // o3 supports up to 200k tokens
     supportedFeatures: ["text", "chat", "summarization", "analysis", "function-calling", "reasoning", "multimodal"],
   },
   anthropic: {
     name: "Anthropic",
     models: [
-      "claude-3.5-haiku", // Cheaper model - default
-      "claude-3-haiku", // Cheaper model
-      "claude-2.0", // Cheaper model
-      "claude-2.1", // Cheaper model
-      "claude-3-sonnet", // Mid-tier model
-      "claude-3.5-sonnet", // Expensive model
-      "claude-3-opus" // Most expensive model
+      "claude-3.5-haiku", // Fast and cost-effective default
+      "claude-3.5-sonnet", // High-performance
+      "claude-3.7-sonnet", // Extended thinking capable
+      "claude-sonnet-4", // Claude 4 Sonnet
+      "claude-opus-4", // Claude 4 Opus
+      "claude-opus-4.1", // Most capable model
+      "claude-3-opus" // Previous flagship
     ],
-    maxTokens: 200000, // Claude 3.5 supports up to 200k tokens
-    supportedFeatures: ["text", "chat", "summarization", "analysis", "reasoning", "long-context"],
+    maxTokens: 200000, // Claude models support up to 200k tokens
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "reasoning", "long-context", "thinking"],
   },
   mistral: {
     name: "Mistral AI",
     models: [
-      "mistral-small-latest", // Cheaper model - default
-      "mistral-small", // Cheaper model
-      "mistral-medium-latest", // Mid-tier model
-      "mistral-medium", // Mid-tier model
-      "mistral-large-latest", // Expensive model
-      "mistral-large" // Expensive model
+      "mistral-small-2407", // Cost-effective default
+      "mistral-medium-2508", // Mid-tier performance
+      "mistral-large-2411", // Flagship model
+      "codestral-2508", // Code-specialized
+      "pixtral-large-2411", // Vision model
+      "ministral-3b-2410", // Ultra-compact
+      "ministral-8b-2410", // Compact model
+      "mistral-nemo" // Open model
     ],
-    maxTokens: 32768, // Mistral supports up to 32k tokens
-    supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference"],
+    maxTokens: 128000, // Mistral Large supports up to 128k tokens
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "fast-inference", "code", "vision"],
   },
 }
 

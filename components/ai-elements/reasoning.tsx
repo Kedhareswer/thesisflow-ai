@@ -1,124 +1,80 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef } from "react"
-import { Brain, X } from "lucide-react"
+import React, { useEffect, useState, useContext } from "react"
 import { cn } from "@/lib/utils"
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
-import { Progress } from "@/components/ui/progress"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
-export interface ReasoningProps {
-  open: boolean
-  onOpenChange?: (open: boolean) => void
-  title?: string
-  lines?: string[]
-  progress?: number
-  className?: string
+// Internal context to share state with Trigger/Content
+type ReasoningCtx = { isStreaming?: boolean; open: boolean }
+const ReasoningContext = React.createContext<ReasoningCtx>({ isStreaming: false, open: false })
+
+export interface ReasoningProps extends React.ComponentProps<typeof Collapsible> {
+  /** Whether the reasoning is currently streaming (auto-opens and closes) */
+  isStreaming?: boolean
 }
 
 /**
- * Reasoning panel that shows live progress messages and a percentage bar.
- * Controlled via `open` prop. Auto-scrolls to latest line when lines update.
+ * Composable Reasoning container built on shadcn/ui Collapsible.
+ * - Auto-opens when `isStreaming` is true and closes when false
+ * - Use with <ReasoningTrigger /> and <ReasoningContent /> as children
  */
-export function Reasoning({
-  open,
-  onOpenChange,
-  title = "Reasoning",
-  lines = [],
-  progress,
-  className,
-}: ReasoningProps) {
-  const contentRef = useRef<HTMLDivElement | null>(null)
+export function Reasoning({ isStreaming, className, children, ...props }: ReasoningProps) {
+  const [open, setOpen] = useState<boolean>(false)
 
-  // Auto-scroll to bottom when lines update and panel is open
+  // Auto-open/close based on streaming state
   useEffect(() => {
-    if (!open) return
-    const el = contentRef.current
-    if (!el) return
-    // Scroll smoothly to bottom
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-  }, [lines, open])
-
-  const hasProgress = typeof progress === "number" && progress >= 0
-  const safeProgress = useMemo(() => {
-    if (!hasProgress) return undefined
-    if (progress! < 0) return 0
-    if (progress! > 100) return 100
-    return Math.round(progress!)
-  }, [progress, hasProgress])
+    setOpen(!!isStreaming)
+  }, [isStreaming])
 
   return (
-    <Collapsible open={open} onOpenChange={onOpenChange}>
-      <div
-        className={cn(
-          "mb-3 mx-4 md:mx-6",
-          open ? "" : "hidden",
-          className
-        )}
-        role="region"
-        aria-label="AI Reasoning Panel"
-      >
-        <div className="rounded-xl border bg-emerald-50/60 border-emerald-200/70 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-2 bg-emerald-100/60 border-b border-emerald-200/70">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-emerald-500 flex items-center justify-center">
-                <Brain className="w-3.5 h-3.5 text-white" />
-              </div>
-              <div className="text-sm font-medium text-emerald-800">{title}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenChange?.(false)}
-              className="inline-flex items-center justify-center rounded-md p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-200/50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1"
-              aria-label="Close reasoning panel"
-              title="Close reasoning"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Progress */}
-          {hasProgress && (
-            <div className="px-4 pt-3">
-              <Progress value={safeProgress} />
-              <div className="mt-1 flex items-center justify-end">
-                <span className="text-[11px] text-emerald-700 font-medium">{safeProgress}%</span>
-              </div>
-            </div>
-          )}
-
-          {/* Content */}
-          <CollapsibleContent forceMount>
-            <div ref={contentRef} className={cn(
-              "px-4 pb-4 mt-2 max-h-44 overflow-auto",
-              !hasProgress ? "pt-2" : ""
-            )}>
-              {lines.length === 0 ? (
-                <div className="text-xs text-emerald-700/80">Initializing...</div>
-              ) : (
-                <ul className="space-y-1.5">
-                  {lines.map((line, idx) => (
-                    <li key={idx} className="text-xs leading-5 text-emerald-900">
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </CollapsibleContent>
-        </div>
-      </div>
-    </Collapsible>
+    <ReasoningContext.Provider value={{ isStreaming, open }}>
+      <Collapsible open={open} onOpenChange={setOpen} {...props}>
+        <div className={cn("mb-3 mx-4 md:mx-6", className)}>{children}</div>
+      </Collapsible>
+    </ReasoningContext.Provider>
   )
 }
 
-// Optional primitive wrappers for future extensibility to mirror AI SDK API
-export const ReasoningContent = ({ children }: { children: React.ReactNode }) => (
-  <div className="px-4 pb-4 mt-2 max-h-44 overflow-auto">{children}</div>
-)
+export interface ReasoningTriggerProps extends React.ComponentProps<typeof CollapsibleTrigger> {
+  title?: string
+}
 
-export const ReasoningTrigger = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-  <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900">
-    {children}
-  </button>
-)
+export function ReasoningTrigger({ title = "Reasoning", className, children, ...props }: ReasoningTriggerProps) {
+  const { isStreaming, open } = useContext(ReasoningContext)
+  return (
+    <div className="rounded-lg border bg-muted/40">
+      <CollapsibleTrigger
+        {...props}
+        className={cn(
+          "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm",
+          "hover:bg-muted/60",
+          className,
+        )}
+      >
+        <span className="inline-flex items-center gap-2">
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              isStreaming ? "bg-primary animate-pulse" : "bg-muted-foreground/40"
+            )}
+          />
+          <span className="font-medium">{title}</span>
+        </span>
+        {open ? (
+          <ChevronUp className="h-4 w-4 opacity-70" />
+        ) : (
+          <ChevronDown className="h-4 w-4 opacity-70" />
+        )}
+      </CollapsibleTrigger>
+    </div>
+  )
+}
+
+export function ReasoningContent({ className, children, ...props }: React.ComponentProps<typeof CollapsibleContent>) {
+  return (
+    <CollapsibleContent {...props}>
+      <div className={cn("px-3 pt-2 pb-3", className)}>{children}</div>
+    </CollapsibleContent>
+  )
+}
