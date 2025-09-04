@@ -242,10 +242,69 @@ export class AIProviderService {
       const eventSource = new EventSource(url)
       let streamComplete = false
 
+      // Listen for named events emitted by the server
+      eventSource.addEventListener('init', (event: any) => {
+        try {
+          const data = JSON.parse(event.data)
+          callbacks.onProgress?.({ message: 'Connected, starting generation...' })
+        } catch (_) {}
+      })
+
+      eventSource.addEventListener('token', (event: any) => {
+        try {
+          const data = JSON.parse(event.data)
+          callbacks.onToken?.(data.content)
+        } catch (error) {
+          console.error('Error parsing token event:', error)
+        }
+      })
+
+      eventSource.addEventListener('progress', (event: any) => {
+        try {
+          const data = JSON.parse(event.data)
+          callbacks.onProgress?.(data)
+        } catch (error) {
+          console.error('Error parsing progress event:', error)
+        }
+      })
+
+      eventSource.addEventListener('done', (event: any) => {
+        try {
+          const data = JSON.parse(event.data)
+          streamComplete = true
+          callbacks.onDone?.({
+            totalTokens: data.totalTokens,
+            processingTime: data.processingTime
+          })
+        } catch (_) {}
+        eventSource.close()
+      })
+
+      // Server may emit an 'error' event with details; treat it as terminal
+      eventSource.addEventListener('error', (event: any) => {
+        try {
+          const data = JSON.parse((event as any).data || '{}')
+          if (data?.error) {
+            callbacks.onError?.(data.error)
+          } else {
+            callbacks.onError?.('Streaming error occurred')
+          }
+        } catch (_) {
+          callbacks.onError?.('Streaming error occurred')
+        }
+        streamComplete = true
+        eventSource.close()
+      })
+
+      // Optional: handle heartbeat pings to avoid console noise
+      eventSource.addEventListener('ping', (_event: any) => {
+        // No-op; heartbeat to keep the connection alive
+      })
+
+      // Fallback: handle untyped messages where server doesn't set event: <type>
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          
           switch (data.type) {
             case 'init':
               callbacks.onProgress?.({ message: 'Connected, starting generation...' })
@@ -275,9 +334,13 @@ export class AIProviderService {
         }
       }
 
+      eventSource.onopen = () => {
+        // Connection established
+      }
+
       eventSource.onerror = (error) => {
-        console.error('SSE connection error:', error)
         if (!streamComplete) {
+          console.error('SSE connection error:', error)
           callbacks.onError?.('Connection to AI service lost')
         }
         eventSource.close()
@@ -286,6 +349,7 @@ export class AIProviderService {
       // Return streaming controller with abort functionality
       const controller: StreamingController = {
         abort: () => {
+          streamComplete = true
           eventSource.close()
           callbacks.onError?.('Stream aborted by user')
         }

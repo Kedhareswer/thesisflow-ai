@@ -13,10 +13,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 
 interface Message {
   id: string
@@ -59,7 +59,6 @@ export function ResearchAssistant({
   } = useResearchSession()
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
   
   // Chat state
   // Initialize messages from session chat history
@@ -195,15 +194,7 @@ export function ResearchAssistant({
     }
   }, [selectedProvider, selectedModel])
 
-  // Auto-scroll to bottom when new messages are added
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  }, [messages])
+  // Auto-scroll handled by Conversation component
 
   const handleSendMessage = async () => {
     if (!value.trim() || isSending || !selectedProvider || !selectedModel) return
@@ -404,31 +395,32 @@ Use this research context to provide more relevant and targeted responses. Refer
       </div>
 
       {/* Messages */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 md:p-6">
-        {messages.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            <Bot className="w-14 h-14 mx-auto mb-4 opacity-50" />
-            <p>Start a conversation with your AI research assistant</p>
-            <p className="text-sm mt-2">
-              Select a provider and model, then type your message below
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-3",
-                  message.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                {message.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-primary" />
-                  </div>
-                )}
-                                  <div
+      <Conversation className="flex-1 p-4 md:p-6">
+        <ConversationContent>
+          {messages.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              <Bot className="w-14 h-14 mx-auto mb-4 opacity-50" />
+              <p>Start a conversation with your AI research assistant</p>
+              <p className="text-sm mt-2">
+                Select a provider and model, then type your message below
+              </p>
+            </div>
+          ) : (
+            <>
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "flex gap-3",
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  )}
+                >
+                  {message.role === "assistant" && (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bot className="w-5 h-5 text-primary" />
+                    </div>
+                  )}
+                  <div
                     className={cn(
                       "max-w-[90%] rounded-xl px-6 py-4",
                       message.role === "user"
@@ -443,58 +435,60 @@ Use this research context to provide more relevant and targeted responses. Refer
                     ) : (
                       <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
                     )}
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                    {message.role === "assistant" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2"
-                        onClick={() => copyToClipboard(message.content)}
-                      >
-                        <Copy className="w-3 h-3" />
-                      </Button>
-                    )}
-                    {message.role === "user" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2"
-                        onClick={() => handleRevertToMessage(message.id)}
-                        aria-label="Revert to this prompt"
-                        title="Revert to this prompt"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs opacity-70">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
+                      {message.role === "assistant" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2"
+                          onClick={() => copyToClipboard(message.content)}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      )}
+                      {message.role === "user" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2"
+                          onClick={() => handleRevertToMessage(message.id)}
+                          aria-label="Revert to this prompt"
+                          title="Revert to this prompt"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {message.role === "user" && (
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="bg-muted rounded-lg px-4 py-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
                   </div>
                 </div>
-                {message.role === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                )}
-              </div>
-            ))}
-            {isTyping && (
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-primary" />
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-2">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+              )}
+            </>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
       {/* Input Area */}
       <div className="border-t bg-muted/30 px-4 py-4">
