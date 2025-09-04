@@ -18,6 +18,7 @@ import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Reasoning } from "@/components/ai-elements/reasoning"
+import { Source, Sources, SourcesContent, SourcesTrigger } from "@/components/ai-elements/sources"
 
 interface Message {
   id: string
@@ -41,6 +42,25 @@ interface ResearchAssistantProps {
   personalities?: Personality[]
   selectedPersonality?: Personality
   onPersonalityChange?: (personality: Personality) => void
+}
+
+// Extract URLs from plain text assistant messages to power the Sources UI
+// Includes common URL terminators in the exclusion set and properly escapes closing bracket
+const URL_REGEX = /https?:\/\/[^\s)\]\}"'<>]+/g
+function extractUrlsFromText(text: string): string[] {
+  if (!text) return []
+  const matches = text.match(URL_REGEX) ?? []
+  const cleaned = matches.map((u) => u.replace(/[.,;:)\]]+$/, ""))
+  // Deduplicate while preserving order
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const u of cleaned) {
+    if (!seen.has(u)) {
+      seen.add(u)
+      result.push(u)
+    }
+  }
+  return result
 }
 
 export function ResearchAssistant({ 
@@ -482,9 +502,27 @@ Use this research context to provide more relevant and targeted responses. Refer
                     )}
                   >
                     {message.role === "assistant" ? (
-                      <Response parseIncompleteMarkdown={true}>
-                        {message.content}
-                      </Response>
+                      <>
+                        {(() => {
+                          const urls = extractUrlsFromText(message.content)
+                          if (urls.length === 0) return null
+                          return (
+                            <div className="mb-2">
+                              <Sources>
+                                <SourcesTrigger count={urls.length} />
+                                <SourcesContent>
+                                  {urls.map((u, i) => (
+                                    <Source key={`${message.id}-src-${i}`} href={u} title={u} />
+                                  ))}
+                                </SourcesContent>
+                              </Sources>
+                            </div>
+                          )
+                        })()}
+                        <Response parseIncompleteMarkdown={true}>
+                          {message.content}
+                        </Response>
+                      </>
                     ) : (
                       <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
                     )}
