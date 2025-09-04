@@ -455,11 +455,8 @@ export default function CollaboratePage() {
         }
         return
       }
-      // Fallback to API when socket unavailable
-      await apiCall('/api/collaborate/presence', {
-        method: 'POST',
-        body: JSON.stringify({ status, activity }),
-      })
+      // Socket-only approach - no API fallback
+      console.log('Socket not available for presence update')
     } catch (error) {
       console.error('Error updating presence:', error)
     }
