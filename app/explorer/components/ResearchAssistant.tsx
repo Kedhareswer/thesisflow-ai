@@ -17,6 +17,7 @@ import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
+import { Reasoning } from "@/components/ai-elements/reasoning"
 
 interface Message {
   id: string
@@ -85,6 +86,11 @@ export function ResearchAssistant({
   const [isSending, setIsSending] = useState(false)
   const [streamingController, setStreamingController] = useState<StreamingController | null>(null)
 
+  // Reasoning panel state
+  const [reasoningOpen, setReasoningOpen] = useState(false)
+  const [reasoningLines, setReasoningLines] = useState<string[]>([])
+  const [reasoningProgress, setReasoningProgress] = useState<number | undefined>(undefined)
+
   // Map provider → local logo assets placed under /public
   const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
     groq: "/groq-icon.svg",
@@ -150,6 +156,10 @@ export function ResearchAssistant({
         title: "Stream Cancelled",
         description: "AI response generation was cancelled"
       })
+      // Ensure reasoning panel closes on abort
+      setReasoningOpen(false)
+      setReasoningLines([])
+      setReasoningProgress(undefined)
     }
   }, [streamingController, toast])
 
@@ -214,6 +224,10 @@ export function ResearchAssistant({
     adjustHeight()
     setIsSending(true)
     setIsTyping(true)
+    // reset reasoning panel for new stream; it will auto-open on first progress
+    setReasoningLines([])
+    setReasoningProgress(undefined)
+    setReasoningOpen(false)
 
     // Create placeholder assistant message for streaming
     const assistantMessageId = (Date.now() + 1).toString()
@@ -255,25 +269,56 @@ Use this research context to provide more relevant and targeted responses. Refer
           ))
         },
         onProgress: (progress) => {
-          // Optional: could show progress indicator
+          // Show reasoning panel and update with progress messages/percentages
           console.log('Streaming progress:', progress)
+          setReasoningOpen(true)
+          if (typeof progress?.percentage === 'number') {
+            setReasoningProgress(progress.percentage)
+          }
+          const msg = progress?.message
+          if (typeof msg === 'string' && msg.length > 0) {
+            setReasoningLines(prev => {
+              if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
+              return [...prev, msg]
+            })
+          }
         },
         onError: (error: string) => {
           console.error("Streaming error:", error)
-          toast({
-            title: "Streaming Error",
-            description: error,
-            variant: "destructive"
-          })
+          // Suppress destructive toast if this was a user-initiated abort
+          if (error !== 'Stream aborted by user') {
+            toast({
+              title: "Streaming Error",
+              description: error,
+              variant: "destructive"
+            })
+          }
           setIsTyping(false)
           setIsSending(false)
           setStreamingController(null)
+          // Close and clear reasoning panel on error
+          setReasoningOpen(false)
+          setReasoningLines([])
+          setReasoningProgress(undefined)
         },
         onDone: (metadata) => {
           console.log('Streaming complete:', metadata)
           setIsTyping(false)
           setIsSending(false)
           setStreamingController(null)
+          // Mark reasoning as complete and close shortly after
+          setReasoningLines(prev => {
+            if (prev.length === 0 || prev[prev.length - 1] !== 'Response complete') {
+              return [...prev, 'Response complete']
+            }
+            return prev
+          })
+          setReasoningProgress(100)
+          setTimeout(() => {
+            setReasoningOpen(false)
+            setReasoningLines([])
+            setReasoningProgress(undefined)
+          }, 600)
           
           // Save messages to session
           addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
@@ -393,6 +438,14 @@ Use this research context to provide more relevant and targeted responses. Refer
           Clear
         </Button>
       </div>
+
+      {/* Reasoning Panel */}
+      <Reasoning
+        open={reasoningOpen}
+        onOpenChange={setReasoningOpen}
+        lines={reasoningLines}
+        progress={reasoningProgress}
+      />
 
       {/* Messages */}
       <Conversation className="flex-1 p-4 md:p-6">
