@@ -559,7 +559,7 @@ class EnhancedAIService {
       usage: {
         promptTokens: data.usage?.input_tokens,
         completionTokens: data.usage?.output_tokens,
-        totalTokens: data.usage?.input_tokens + data.usage?.output_tokens,
+        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
       },
     }
   }
@@ -573,29 +573,91 @@ class EnhancedAIService {
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling Mistral API...")
 
+    // Map UI model names to actual Mistral API model names
+    const modelMapping: Record<string, string> = {
+      "mistral-small-2407": "mistral-small-latest",
+      "mistral-medium-2508": "mistral-medium-latest", 
+      "mistral-large-2411": "mistral-large-latest",
+      "codestral-2508": "codestral-latest",
+      "pixtral-large-2411": "pixtral-large-latest",
+      "ministral-3b-2410": "ministral-3b-latest",
+      "ministral-8b-2410": "ministral-8b-latest",
+      "mistral-nemo": "open-mistral-nemo"
+    }
+
+    const actualModel = modelMapping[model] || model || "mistral-small-latest"
+    console.log(`Enhanced AI Service: Using Mistral model: ${actualModel} (mapped from ${model})`)
+
+    // Ensure reasonable limits for Mistral API
+    const clampedMaxTokens = Math.min(maxTokens, 32768) // Mistral has lower token limits
+    const clampedTemperature = Math.max(0.0, Math.min(1.0, temperature)) // Ensure valid range
+
+    const requestBody = {
+      model: actualModel,
+      max_tokens: clampedMaxTokens,
+      temperature: clampedTemperature,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    }
+
+    console.log("Enhanced AI Service: Mistral request body:", {
+      model: requestBody.model,
+      max_tokens: requestBody.max_tokens,
+      temperature: requestBody.temperature,
+      messageLength: prompt.length
+    })
+
     const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: model || "mistral-large-latest",
-        max_tokens: maxTokens,
-        temperature: temperature,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error("Enhanced AI Service: Mistral API error data:", errorData)
-      throw new Error(`Mistral API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+      const errorText = await response.text().catch(() => "Unknown error")
+      let errorData: any = {}
+      
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText }
+      }
+      
+      console.error("Enhanced AI Service: Mistral API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        model: actualModel,
+        originalModel: model
+      })
+      
+      // Provide more specific error messages for common issues
+      let errorMessage = `Mistral API error: ${response.status} - ${response.statusText}`
+      
+      if (response.status === 400) {
+        if (errorData.message?.includes('model')) {
+          errorMessage = `Mistral model '${actualModel}' not supported or invalid`
+        } else if (errorData.message?.includes('token')) {
+          errorMessage = `Mistral API token limit exceeded (requested: ${clampedMaxTokens})`
+        } else {
+          errorMessage = `Mistral API bad request: ${errorData.message || 'Invalid parameters'}`
+        }
+      } else if (response.status === 401) {
+        errorMessage = "Mistral API authentication failed - check API key"
+      } else if (response.status === 429) {
+        errorMessage = "Mistral API rate limit exceeded - try again later"
+      } else if (response.status >= 500) {
+        errorMessage = "Mistral API server error - service temporarily unavailable"
+      }
+      
+      throw new Error(errorMessage)
     }
 
     const data = await response.json()
@@ -617,7 +679,7 @@ class EnhancedAIService {
       success: true,
       content,
       provider: "mistral",
-      model,
+      model: actualModel,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
@@ -1398,4 +1460,5 @@ SENTIMENT: [positive/neutral/negative]`
   }
 
 }
+
 export const enhancedAIService = new EnhancedAIService()
