@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Send, Users, Minimize2 } from "lucide-react"
@@ -10,6 +9,7 @@ import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from "@/hooks/use-toast"
 import { useSocket, SocketEvent } from '@/lib/services/socket.service'
 import { MentionInput, MentionData, MessageWithMentions } from '@/components/ui/mention-input'
+import { Response } from '@/src/components/ai-elements/response'
 
 interface User {
   id: string
@@ -80,10 +80,50 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       const error = await response.json().catch(() => ({ error: 'Network error' }))
       throw new Error(error.error || `HTTP ${response.status}`)
     }
-
     return response.json()
   }, [])
   
+  // Format message date label for grouping
+  const formatDate = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp)
+      const now = new Date()
+      const isToday = date.toDateString() === now.toDateString()
+      const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString()
+      
+      if (isToday) return 'Today'
+      if (isYesterday) return 'Yesterday'
+      return date.toLocaleDateString()
+    } catch {
+      return 'Invalid date'
+    }
+  }
+
+  // Group messages by date
+  const groupMessagesByDate = (messages: ChatMessage[]) => {
+    const groupedMessages: Record<string, ChatMessage[]> = {}
+    messages.forEach((message) => {
+      const date = formatDate(message.timestamp)
+      if (!groupedMessages[date]) {
+        groupedMessages[date] = []
+      }
+      groupedMessages[date].push(message)
+    })
+    return groupedMessages
+  }
+
+  // Determine if a message is from Nova AI Assistant
+  const isAIMessage = (message: ChatMessage) => {
+    const name = (message.senderName || '').toLowerCase()
+    const id = (message.senderId || '').toLowerCase()
+    // Heuristics: explicit type, known id, or recognizable name
+    return (
+      (message as any).type === 'ai' ||
+      id === 'nova-ai' || id === 'nova_ai' || id === 'assistant' ||
+      name.includes('nova ai') || name.includes('nova ai assistant') || name === 'assistant'
+    )
+  }
+
   // Load chat messages via socket
   const loadMessages = useCallback(async () => {
     if (!team?.id || !socket) return
@@ -367,36 +407,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     }
   }
   
-  // Format message date
-  const formatDate = (timestamp: string) => {
-    try {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const isToday = date.toDateString() === now.toDateString()
-      const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString()
-      
-      if (isToday) return 'Today'
-      if (isYesterday) return 'Yesterday'
-      return date.toLocaleDateString()
-    } catch {
-      return 'Invalid date'
-    }
-  }
   
-  // Group messages by date
-  const groupMessagesByDate = (messages: ChatMessage[]) => {
-    const groups: { [key: string]: ChatMessage[] } = {}
-    
-    messages.forEach(message => {
-      const dateKey = formatDate(message.timestamp)
-      if (!groups[dateKey]) {
-        groups[dateKey] = []
-      }
-      groups[dateKey].push(message)
-    })
-    
-    return groups
-  }
   
   // Get status badge color
   const getStatusColor = (status: string) => {
@@ -496,12 +507,20 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                             <span className="font-medium text-sm">{message.senderName}</span>
                             <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
                           </div>
-                          <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                            <MessageWithMentions 
-                              content={message.content}
-                              mentions={message.mentions}
-                            />
-                          </div>
+                          {isAIMessage(message) ? (
+                            <div className="prose prose-sm max-w-none text-gray-900">
+                              <Response>
+                                {message.content}
+                              </Response>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                              <MessageWithMentions 
+                                content={message.content}
+                                mentions={message.mentions}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -509,7 +528,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                 )
               })}
             </div>
-          ))
+          ))}
         )}
         
         {/* Typing indicator */}
