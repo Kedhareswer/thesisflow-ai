@@ -382,7 +382,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   ) => {
     try {
       // Load from cache first for immediate display
-      const cachedMessages = await chatStorage.getMessages(conversationId, limit, beforeMessageId);
+      const cachedMessages = await chatStorage.getMessages(conversationId, limit);
       if (cachedMessages.length > 0) {
         dispatch({ type: 'SET_MESSAGES', payload: { conversationId, messages: cachedMessages } });
       }
@@ -447,7 +447,15 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
     
     // Also update local cache
-    ChatService.markAsRead(conversationId, messageId).catch(console.error);
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await ChatService.markAsRead(conversationId, user.id, messageId);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, [isSocketConnected, socketMarkAsRead]);
 
   // Typing methods
@@ -506,20 +514,20 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const lastSync = await chatStorage.getLastSync('messages', conversationId);
+      const lastSync = await chatStorage.getLastSync('messages');
       const timestamp = lastSync || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
       const updatedMessages = await ChatService.getMessagesUpdatedSince(conversationId, user.id, timestamp);
       
       if (updatedMessages.length > 0) {
-        await chatStorage.saveMessages(conversationId, updatedMessages);
+        await chatStorage.saveMessages(updatedMessages);
         
         updatedMessages.forEach(message => {
           dispatch({ type: 'ADD_MESSAGE', payload: message });
         });
       }
 
-      await chatStorage.setLastSync('messages', new Date().toISOString(), conversationId);
+      await chatStorage.setLastSync('messages', new Date().toISOString());
     } catch (error) {
       console.error('Error syncing messages:', error);
     }

@@ -260,6 +260,14 @@ Your role is to:
 - Maintain a professional but friendly tone
 - Suggest relevant tools or resources when appropriate
 
+FORMATTING REQUIREMENTS:
+- Use proper GitHub-Flavored Markdown (GFM) for all content
+- For tables: Put each row on its own line with proper header separators (| --- | --- |)
+- For lists: Use proper bullet points (- item) or numbered lists (1. item)
+- For code: Use \`inline code\` or \`\`\`language blocks\`\`\`
+- Separate paragraphs with blank lines
+- Use **bold** and *italic* appropriately
+
 Current context:
 - Team: ${context.teamId || 'Unknown'}
 - Action type: ${context.actionType || 'general'}
@@ -271,6 +279,7 @@ IMPORTANT:
 - Do not mention that you have context or show counts; just use them.
 - Respond only to the user's request with helpful, concise content.
 - If you need more context, ask clarifying questions.
+- Always format your response using proper GFM markdown as specified above.
 `
 
     return basePrompt

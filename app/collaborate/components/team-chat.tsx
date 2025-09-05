@@ -119,9 +119,72 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     // Heuristics: explicit type, known id, or recognizable name
     return (
       (message as any).type === 'ai' ||
-      id === 'nova-ai' || id === 'nova_ai' || id === 'assistant' ||
-      name.includes('nova ai') || name.includes('nova ai assistant') || name === 'assistant'
+      id === 'nova-ai' || id === 'nova_ui' || id === 'assistant' ||
+      name.includes('nova ai') || name.includes('nova ai assistant') || name === 'assistant' || name.includes('nova')
     )
+  }
+
+  // Normalize AI output to fix common markdown formatting issues
+  const normalizeAIOutput = (text: string): string => {
+    if (!text) return text
+    
+    let normalized = text
+    
+    // Fix inline pipe tables - detect lines with multiple pipes and convert to proper table format
+    const tableLineRegex = /^(.+\|.+\|.+)$/gm
+    const tableMatches = normalized.match(tableLineRegex)
+    
+    if (tableMatches && tableMatches.length >= 2) {
+      // This looks like an inline table, let's normalize it
+      const tableLines = tableMatches.map(line => line.trim())
+      
+      // Check if we need to add a separator row after the first line (header)
+      if (tableLines.length >= 1) {
+        const firstLine = tableLines[0]
+        const columnCount = (firstLine.match(/\|/g) || []).length + 1
+        
+        // Create separator row if it doesn't exist
+        const secondLine = tableLines[1] || ''
+        const isSeparatorRow = /^\s*\|\s*[-:]+\s*\|/.test(secondLine)
+        
+        if (!isSeparatorRow && columnCount >= 2) {
+          // Insert a proper separator row
+          const separator = '| ' + Array(columnCount - 1).fill('---').join(' | ') + ' |'
+          tableLines.splice(1, 0, separator)
+        }
+        
+        // Replace the original inline table with properly formatted one
+        let tableText = tableLines.join('\n')
+        
+        // Replace the original table matches in the text
+        tableMatches.forEach((match, index) => {
+          if (index === 0) {
+            // Replace first match with the entire normalized table
+            normalized = normalized.replace(match, '\n\n' + tableText + '\n\n')
+          } else {
+            // Remove other matches as they're now part of the table
+            normalized = normalized.replace(match, '')
+          }
+        })
+      }
+    }
+    
+    // Fix bullet points - convert various bullet formats to proper markdown
+    normalized = normalized.replace(/^\s*[•·▪▫‣⁃]\s+/gm, '- ')
+    normalized = normalized.replace(/^\s*[*]\s+(?![*])/gm, '- ') // Convert * bullets to - but preserve **bold**
+    
+    // Fix numbered lists - ensure proper spacing
+    normalized = normalized.replace(/^\s*(\d+)[.):]\s*/gm, '$1. ')
+    
+    // Ensure code blocks have proper spacing
+    normalized = normalized.replace(/```(\w+)?\n/g, '\n```$1\n')
+    normalized = normalized.replace(/\n```$/gm, '\n```\n')
+    
+    // Clean up excessive whitespace but preserve intentional formatting
+    normalized = normalized.replace(/\n{4,}/g, '\n\n\n') // Max 3 newlines
+    normalized = normalized.trim()
+    
+    return normalized
   }
 
   // Load chat messages via socket
@@ -337,11 +400,14 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   
   // Get team members as mention data
   const getTeamMentions = (): MentionData[] => {
-    if (!team?.members) {
-      console.log('No team members available for mentions')
-      return []
-    }
-    
+    const teamMentions: MentionData[] = [
+      {
+        id: 'nova-ai',
+        name: 'Nova',
+        avatar: '/anthropic-icon.png',
+        type: 'ai'
+      }
+    ]
     const mentions = team.members.map(member => ({
       id: member.id,
       type: 'user' as const,
@@ -455,7 +521,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       </div>
       
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -509,8 +575,8 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                           </div>
                           {isAIMessage(message) ? (
                             <div className="prose prose-sm max-w-none text-gray-900">
-                              <Response>
-                                {message.content}
+                              <Response parseIncompleteMarkdown={true}>
+                                {normalizeAIOutput(message.content)}
                               </Response>
                             </div>
                           ) : (
@@ -528,7 +594,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                 )
               })}
             </div>
-          ))}
+          ))
         )}
         
         {/* Typing indicator */}
@@ -548,12 +614,12 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       </div>
       
       {/* Message input */}
-      <div className="p-4 border-t bg-gray-50 rounded-b-lg">
+      <div className="p-4 border-t bg-gray-50 rounded-b-lg shrink-0">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <MentionInput
             value={newMessage}
             onChange={handleMentionChange}
-            placeholder="Type your message... Use @ to mention team members, Nova AI, or files"
+            placeholder="Type your message... Use @ to mention team members, Nova, or files"
             disabled={isSending}
             className="flex-1"
             users={getTeamMentions()}
