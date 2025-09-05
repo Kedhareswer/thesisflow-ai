@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -12,7 +12,6 @@ import { Pricing } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
 import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
 
 export default function HomePage() {
   const { user } = useSupabaseAuth()
@@ -173,30 +172,46 @@ export default function HomePage() {
         </div>
         
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex space-x-8">
-          <Link href="/explorer" className="font-mono hover:text-[#FF6B2C] transition-colors">
-            Explorer
-          </Link>
-          <Link href="/planner" className="font-mono hover:text-[#FF6B2C] transition-colors">
-            Planner
-          </Link>
-          <Link href="/collaborate" className="font-mono hover:text-[#FF6B2C] transition-colors">
-            Collaborate
-          </Link>
-          <Link href="/pricing" className="font-mono hover:text-[#FF6B2C] transition-colors">
-            Pricing
-          </Link>
-        </nav>
+        {user && (
+          <nav className="hidden md:flex space-x-8">
+            <Link href="/explorer" className="font-mono hover:text-[#FF6B2C] transition-colors">
+              Explorer
+            </Link>
+            <Link href="/planner" className="font-mono hover:text-[#FF6B2C] transition-colors">
+              Planner
+            </Link>
+            <Link href="/collaborate" className="font-mono hover:text-[#FF6B2C] transition-colors">
+              Collaborate
+            </Link>
+            <Link href="#pricing" className="font-mono hover:text-[#FF6B2C] transition-colors">
+              Pricing
+            </Link>
+          </nav>
+        )}
         
         {/* Desktop CTA + Mobile Menu */}
         <div className="flex items-center space-x-4">
-          <Button 
-            className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
-            onClick={() => handleProtectedAction('/explorer')}
-          >
-            Get Started
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          {user ? (
+            <Button 
+              asChild
+              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
+            >
+              <Link href="/changelog">
+                View Changelog
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button 
+              asChild
+              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
+            >
+              <Link href="/signup">
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          )}
           
           {/* Mobile Menu */}
           <Sheet>
@@ -207,25 +222,43 @@ export default function HomePage() {
             </SheetTrigger>
             <SheetContent>
               <div className="flex flex-col space-y-4 mt-8">
-                <Link href="/explorer" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                  Explorer
-                </Link>
-                <Link href="/planner" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                  Planner
-                </Link>
-                <Link href="/collaborate" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                  Collaborate
-                </Link>
-                <Link href="/pricing" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                  Pricing
-                </Link>
-                <Button 
-                  className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
-                  onClick={() => handleProtectedAction('/explorer')}
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                {user && (
+                  <>
+                    <Link href="/explorer" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                      Explorer
+                    </Link>
+                    <Link href="/planner" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                      Planner
+                    </Link>
+                    <Link href="/collaborate" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                      Collaborate
+                    </Link>
+                    <Link href="#pricing" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                      Pricing
+                    </Link>
+                  </>
+                )}
+                {user ? (
+                  <Button 
+                    asChild
+                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
+                  >
+                    <Link href="/changelog">
+                      View Changelog
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button 
+                    asChild
+                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
+                  >
+                    <Link href="/signup">
+                      Get Started
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
               </div>
             </SheetContent>
           </Sheet>
@@ -293,13 +326,16 @@ export default function HomePage() {
           transition={{ duration: 0.6, delay: 0.6 }}
           className="flex flex-col sm:flex-row gap-6 justify-center mb-12"
         >
-          <div className="flex flex-wrap justify-center gap-6">
-            <span className="text-sm font-mono text-muted-foreground">Research Explorer</span>
-            <span className="text-sm font-mono text-muted-foreground">Smart Summarizer</span>
-            <span className="text-sm font-mono text-muted-foreground">Project Planner</span>
-            <span className="text-sm font-mono text-muted-foreground">AI Tools</span>
-            <span className="text-sm font-mono text-muted-foreground">Collaboration Hub</span>
-            <span className="text-sm font-mono text-muted-foreground">Research Assistant</span>
+          <div className="flex flex-wrap justify-center gap-3">
+            {features.map((f) => (
+              <Link
+                key={f.title}
+                href={f.href}
+                className="text-sm font-mono border border-border text-muted-foreground rounded-full px-3 py-1 hover:text-[#FF6B2C] hover:border-[#FF6B2C] hover:bg-[#FF6B2C]/10 transition-colors"
+              >
+                {f.title}
+              </Link>
+            ))}
           </div>
         </motion.div>
 
@@ -360,6 +396,10 @@ export default function HomePage() {
                 </motion.div>
               )
             })}
+          </div>
+          {/* Keep original hover effects component (not removed) */}
+          <div className="mt-12">
+            <FeaturesSectionWithHoverEffects features={hoverFeatures} />
           </div>
         </div>
       </section>
@@ -481,6 +521,7 @@ export default function HomePage() {
 
       {/* Pricing Section */}
       <motion.div 
+        id="pricing"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
