@@ -14,6 +14,7 @@ export interface GenerateTextStreamOptions extends GenerateTextOptions {
   onToken?: (token: string) => void
   onProgress?: (progress: { message?: string; percentage?: number }) => void
   onError?: (error: string) => void
+  abortSignal?: AbortSignal
 }
 
 export interface GenerateTextResult {
@@ -1252,6 +1253,67 @@ SENTIMENT: [positive/neutral/negative]`
       sentiment,
     }
   }
+ 
+  /**
+   * Simulate streaming by chunking a full provider response.
+   * Returns true on success or if aborted (to prevent fallback from engaging after client disconnects).
+   */
+  private async callProviderStreamingAPI(
+    provider: AIProvider,
+    apiKey: string,
+    options: GenerateTextStreamOptions & { provider: AIProvider; model: string },
+  ): Promise<boolean> {
+    try {
+      const result = await this.callProviderAPI(provider, apiKey, {
+        prompt: options.prompt,
+        model: options.model,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+      })
+
+      if (!result.success || !result.content) {
+        if (!options.abortSignal?.aborted) {
+          options.onError?.(result.error || "Failed to generate content")
+        }
+        return false
+      }
+
+      const text = result.content
+      const total = text.length
+      let emitted = 0
+
+      while (emitted < total) {
+        if (options.abortSignal?.aborted) {
+          options.onProgress?.({
+            message: "Streaming aborted by client.",
+            percentage: Math.round((emitted / Math.max(total, 1)) * 100),
+          })
+          return true
+        }
+
+        const token = text.charAt(emitted)
+        if (token) {
+          options.onToken?.(token)
+        }
+        emitted += 1
+
+        if (emitted % 12 === 0 || emitted === total) {
+          options.onProgress?.({ percentage: Math.round((emitted / Math.max(total, 1)) * 100) })
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+
+      options.onProgress?.({ message: "Streaming complete", percentage: 100 })
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!options.abortSignal?.aborted) {
+        options.onError?.(message || "Streaming failed")
+      }
+      return false
+    }
+  }
 
   /**
    * Generate text with streaming support
@@ -1259,10 +1321,10 @@ SENTIMENT: [positive/neutral/negative]`
   async generateTextStream(options: GenerateTextStreamOptions): Promise<void> {
     try {
       console.log("Enhanced AI Service: Starting streaming text generation...")
-      
+
       // Load user API keys
       const userApiKeys = await this.loadUserApiKeys(options.userId)
-      const availableProviders = userApiKeys
+      let availableProviders = userApiKeys
         .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
         .map((key) => key.provider as AIProvider)
 
@@ -1271,144 +1333,69 @@ SENTIMENT: [positive/neutral/negative]`
         return
       }
 
-      // Determine which provider to use
-      let selectedProvider = options.provider
-      if (!selectedProvider || !availableProviders.includes(selectedProvider)) {
-        selectedProvider = availableProviders[0]
+      // Reorder providers to honor preferred provider first
+      if (options.provider && availableProviders.includes(options.provider)) {
+        availableProviders = [
+          options.provider,
+          ...availableProviders.filter((p) => p !== options.provider),
+        ]
       }
 
-      // Get the API key for the selected provider
-      const userApiKey = userApiKeys.find(
-        (key) => key.provider === selectedProvider && key.is_active && key.test_status === "valid" && key.decrypted_key
-      )
+      const errors: Array<{ provider: AIProvider; error: string }> = []
 
-      if (!userApiKey || !userApiKey.decrypted_key) {
-        options.onError?.(`No valid API key for ${selectedProvider}`)
-        return
-      }
+      for (const provider of availableProviders) {
+        if (options.abortSignal?.aborted) {
+          console.log("Enhanced AI Service: Streaming aborted before starting provider", provider)
+          return
+        }
 
-      // Get provider configuration
-      const providerConfig = AI_PROVIDERS[selectedProvider]
-      if (!providerConfig) {
-        options.onError?.(`Unknown provider: ${selectedProvider}`)
-        return
-      }
+        options.onProgress?.({ message: `Connecting to ${provider}...` })
 
-      // Determine model to use
-      const selectedModel = options.model && providerConfig.models.includes(options.model)
-        ? options.model
-        : providerConfig.models[0]
+        // Get API key for this provider
+        const userApiKey = userApiKeys.find(
+          (key) => key.provider === provider && key.is_active && key.test_status === "valid" && key.decrypted_key,
+        )
 
-      console.log(`Enhanced AI Service: Streaming with ${selectedProvider} using model ${selectedModel}`)
+        if (!userApiKey?.decrypted_key) {
+          errors.push({ provider, error: "No valid API key" })
+          continue
+        }
 
-      // Call the streaming API for the provider
-      await this.callProviderStreamingAPI(selectedProvider, userApiKey.decrypted_key, {
-        ...options,
-        model: selectedModel,
-        provider: selectedProvider,
-      })
+        const providerConfig = AI_PROVIDERS[provider]
+        if (!providerConfig) {
+          errors.push({ provider, error: "Unknown provider" })
+          continue
+        }
 
-    } catch (error) {
-      console.error("Enhanced AI Service: Error in generateTextStream:", error)
-      options.onError?.(error instanceof Error ? error.message : "Unknown error occurred")
-    }
-  }
+        const selectedModel = options.model && providerConfig.models.includes(options.model)
+          ? options.model
+          : providerConfig.models[0]
 
-  /**
-   * Call provider streaming API - simulates streaming by chunking responses
-   */
-  private async callProviderStreamingAPI(
-    provider: AIProvider,
-    apiKey: string,
-    options: GenerateTextStreamOptions,
-  ): Promise<void> {
-    try {
-      console.log(`Enhanced AI Service: Starting streaming call to ${provider}`)
-      
-      options.onProgress?.({ message: `Connecting to ${provider}...` })
+        console.log(`Enhanced AI Service: Streaming with ${provider} using model ${selectedModel}`)
 
-      // For now, we'll simulate streaming by getting the full response and chunking it
-      // In a real implementation, you'd use the provider's streaming API
-      const result = await this.callProviderAPI(provider, apiKey, options)
-
-      if (!result.success || !result.content) {
-        options.onError?.(result.error || "Failed to generate response")
-        return
-      }
-
-      // Simulate streaming by sending content in chunks
-      const content = result.content
-      const chunkSize = 3 // Characters per chunk for realistic streaming effect
-      let sentChars = 0
-
-      options.onProgress?.({ message: "Generating response...", percentage: 0 })
-
-      // Stream the content character by character in small chunks
-      for (let i = 0; i < content.length; i += chunkSize) {
-        const chunk = content.slice(i, i + chunkSize)
-        options.onToken?.(chunk)
-        sentChars += chunk.length
-
-        // Update progress
-        const percentage = Math.round((sentChars / content.length) * 100)
-        options.onProgress?.({ 
-          message: "Generating response...", 
-          percentage 
+        const ok = await this.callProviderStreamingAPI(provider, userApiKey.decrypted_key, {
+          ...options,
+          model: selectedModel,
+          provider,
         })
 
-        // Add small delay to simulate real streaming
-        await new Promise(resolve => setTimeout(resolve, 50))
+        if (ok) {
+          // Successful streaming; exit
+          return
+        }
+
+        // If failed, record and try next provider
+        errors.push({ provider, error: "Streaming failed" })
+        options.onProgress?.({ message: `Falling back from ${provider}...` })
       }
 
-      options.onProgress?.({ message: "Response complete", percentage: 100 })
-
+      // If we reached here, all providers failed
+      options.onError?.("All AI providers failed for streaming.")
     } catch (error) {
-      console.error(`Enhanced AI Service: Error in streaming call to ${provider}:`, error)
-      options.onError?.(error instanceof Error ? error.message : `Failed to stream from ${provider}`)
+      const message = error instanceof Error ? error.message : String(error)
+      options.onError?.(message || "Streaming failed")
     }
   }
 
-  /**
-   * Lightweight validation of an API key. For now, we only verify the format.
-   * You can extend this method to hit a cheap provider endpoint for deeper checks.
-   */
-  async testApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; model?: string; error?: string }> {
-    try {
-      // Basic length sanity check
-      if (!apiKey || apiKey.length < 10) {
-        return { valid: false, error: "API key too short" }
-      }
-
-      // Provider-specific regex patterns
-      const regexMap: Record<string, RegExp> = {
-        openai: /^sk-[A-Za-z0-9]{48,}$/,
-        groq: /^gsk_[A-Za-z0-9]{50,}$/,
-        gemini: /^AIza[A-Za-z0-9_-]{35,}$/,
-        anthropic: /^sk-ant-[A-Za-z0-9]{40,}$/,
-        mistral: /^[A-Za-z0-9]{32,}$/,
-        aiml: /.{10,}/,
-      }
-
-      const pattern = regexMap[provider]
-      if (pattern && !pattern.test(apiKey)) {
-        return { valid: false, error: "API key format looks invalid" }
-      }
-
-      // Mapping of default models per provider for UI feedback
-      const defaultModelMap: Record<string, string> = {
-        openai: "gpt-4o",
-        groq: "llama-3.1-70b-versatile",
-        gemini: "gemini-1.5-pro",
-        anthropic: "claude-3-sonnet",
-        mistral: "mistral-small",
-        aiml: "claude-3-sonnet",
-      }
-
-      return { valid: true, model: defaultModelMap[provider] }
-    } catch (error) {
-      return { valid: false, error: error instanceof Error ? error.message : "Unknown error" }
-    }
-  }
 }
-
 export const enhancedAIService = new EnhancedAIService()

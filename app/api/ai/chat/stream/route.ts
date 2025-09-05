@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
               maxTokens: maxTokens || 2000,
               temperature: temperature || 0.7,
               userId: user.id,
+              abortSignal: request.signal,
               onToken: (token: string) => {
                 if (closed) return;
                 totalTokens++;
