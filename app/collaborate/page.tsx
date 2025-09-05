@@ -13,6 +13,8 @@ import {
   ProductivityUser as EnhancedUser,
   ProductivityMessage as EnhancedMessageType
 } from '@/components/ui/productivity-messaging'
+import { StreamingAIMessage } from '@/components/ui/streaming-ai-message'
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { NovaAIService } from '@/lib/services/nova-ai.service'
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,7 +60,11 @@ import {
   Eye,
   AlertCircle,
   Globe,
-  Lock
+  Lock,
+  Bot,
+  Copy,
+  Reply,
+  Brain
 } from "lucide-react"
 
 import { useSocket as useAppSocket } from "@/lib/services/socket.service"
@@ -145,7 +151,7 @@ export default function CollaboratePage() {
   const [userPresence, setUserPresence] = useState<Record<string, EnhancedUser>>({})
   const [replyingTo, setReplyingTo] = useState<EnhancedMessageType | null>(null)
   const [isProcessingAI, setIsProcessingAI] = useState(false)
-  const [lastActivity, setLastActivity] = useState(Date.now())
+  // Removed lastActivity state to prevent infinite loop - using local variable in useEffect instead
   const novaAI = NovaAIService.getInstance()
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [currentMentions, setCurrentMentions] = useState<MentionData[]>([])
@@ -281,7 +287,7 @@ export default function CollaboratePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, session, socket, apiCall, selectedTeamId])
+  }, [user, session, socket, apiCall])
 
   // Handle invitation responses
   const handleInvitationResponse = useCallback(async (invitationId: string, action: 'accept' | 'reject') => {
@@ -493,7 +499,7 @@ export default function CollaboratePage() {
     }
   }, [socket])
 
-  // Handle AI assistance
+  // Handle AI assistance with streaming
   const handleAIAssistance = useCallback(async (prompt: string, context?: string) => {
     if (!selectedTeamId || !user) return
     
@@ -535,8 +541,8 @@ export default function CollaboratePage() {
         // Continue with AI processing even if user message fails to persist
       }
       
-      // Get recent messages for context
-      const recentMessages = messages.slice(-10).map(msg => ({
+      // Get recent messages for context (last 50 messages for better context)
+      const recentMessages = messages.slice(-100).map(msg => ({
         id: msg.id,
         senderId: msg.senderId,
         content: msg.content,
@@ -546,6 +552,11 @@ export default function CollaboratePage() {
         status: 'sent' as const,
         mentions: (msg as any).mentions || []
       }))
+      
+      // Debug: Log recent messages to see what's being passed to AI
+      console.log('[AI Context] Total messages:', messages.length)
+      console.log('[AI Context] Recent messages count:', recentMessages.length)
+      console.log('[AI Context] Recent messages:', recentMessages.slice(-5)) // Show last 5 for debugging
 
       const selectedTeam = teams.find(t => t.id === selectedTeamId)
       const teamMembers = selectedTeam?.members.map(m => ({
@@ -569,56 +580,96 @@ export default function CollaboratePage() {
         actionType: NovaAIService.extractNovaCommand(prompt)?.action || 'general' as const
       }
 
-      const response = await novaAI.processMessage(prompt, aiContext)
-      
-      // Create AI message
+      // Create initial AI message for streaming
+      const aiMessageId = `ai-${Date.now()}`
       const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
+        id: aiMessageId,
         senderId: 'nova-ai',
         senderName: 'Nova AI',
         senderAvatar: '/assistant-avatar.svg',
-        content: `🤖 **Nova AI Response:**\n\n${response.content}`,
+        content: '', // Start with empty content for streaming
         timestamp: new Date().toISOString(),
         teamId: selectedTeamId,
         type: 'text'
       }
       
-      // Add AI message to local state
+      // Add AI message to local state immediately
       setMessages(prev => [...prev, aiMessage])
       
-      // Send AI message through collaboration service to persist it
-      // We'll send it as the current user but mark it as AI in metadata
-      try {
-        const aiMessageContent = `🤖 **Nova AI Response:**\n\n${response.content}`;
-        
-        // For AI messages, use API fallback to get the message ID for proper state management
-        const result = await collaborateService.sendMessage(
-          selectedTeamId,
-          user.id, // Send as current user for authentication
-          aiMessageContent,
-          'text',
-          [], // No mentions for AI responses
-          undefined // Don't use socket for AI messages to get proper response
-        )
-        
-        if (result.success && result.message) {
-          // Update the local AI message with the persisted message data
+      // Start streaming AI response
+      let streamedContent = ''
+      
+      await novaAI.processMessageStream(
+        prompt,
+        aiContext,
+        // onChunk - update the message content as chunks arrive
+        (chunk: string) => {
+          streamedContent += chunk
           setMessages(prev => prev.map(msg => 
-            msg.id === aiMessage.id 
-              ? {
-                  ...msg,
-                  id: result.message!.id,
-                  content: result.message!.content,
-                  timestamp: (result.message as any).timestamp || (result.message as any).created_at || new Date().toISOString(),
-                  status: 'sent'
-                }
+            msg.id === aiMessageId 
+              ? { ...msg, content: streamedContent }
               : msg
           ))
+        },
+        // onComplete - finalize the message
+        async (response) => {
+          const finalContent = `🤖 **Nova AI Response:**\n\n${response.content}`
+          
+          // Update the local AI message with final content
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: finalContent, status: 'sent' }
+              : msg
+          ))
+          
+          // Persist the final AI message
+          try {
+            const result = await collaborateService.sendMessage(
+              selectedTeamId,
+              user.id, // Send as current user for authentication
+              finalContent,
+              'text',
+              [], // No mentions for AI responses
+              undefined // Don't use socket for AI messages to get proper response
+            )
+            
+            if (result.success && result.message) {
+              // Update the local AI message with the persisted message data
+              setMessages(prev => prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? {
+                      ...msg,
+                      id: result.message!.id,
+                      content: result.message!.content,
+                      timestamp: (result.message as any).timestamp || (result.message as any).created_at || new Date().toISOString(),
+                      status: 'sent'
+                    }
+                  : msg
+              ))
+            }
+          } catch (error) {
+            console.error('Error persisting AI message:', error)
+            // Don't show error to user, message is still visible locally
+          }
+        },
+        // onError - handle streaming errors
+        (error) => {
+          console.error('AI streaming error:', error)
+          const errorContent = `🤖 **Nova AI Response:**\n\nI'm having trouble connecting right now. Please try again in a moment.`
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: errorContent, status: 'sent' }
+              : msg
+          ))
+          
+          toast({
+            title: "AI Assistant Error",
+            description: "Nova AI is temporarily unavailable",
+            variant: "destructive",
+          })
         }
-      } catch (error) {
-        console.error('Error persisting AI message:', error)
-        // Don't show error to user, message is still visible locally
-      }
+      )
       
     } catch (error) {
       console.error('Error with AI assistance:', error)
@@ -810,12 +861,21 @@ export default function CollaboratePage() {
     setSelectedTeamId((prev) => prev || team.id)
   }, [user])
 
+  // Track if teams have been loaded to prevent multiple calls
+  const teamsLoadedRef = useRef(false)
+
   // Effects
   useEffect(() => {
-    if (!authLoading && session && user) {
+    if (!authLoading && session && user && !teamsLoadedRef.current) {
+      teamsLoadedRef.current = true
       loadTeams()
     }
   }, [authLoading, session, user, loadTeams])
+
+  // Reset teams loaded flag when user changes
+  useEffect(() => {
+    teamsLoadedRef.current = false
+  }, [user?.id])
 
   // Real-time message subscription
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -981,7 +1041,7 @@ export default function CollaboratePage() {
 
     const handleActivity = () => {
       lastActivityTime = Date.now()
-      setLastActivity(lastActivityTime)
+      // Remove setLastActivity to prevent infinite loop - we don't need to track this in state
       
       // Only update presence if we haven't updated recently
       if (!presenceUpdateTimeout) {
@@ -1136,6 +1196,7 @@ export default function CollaboratePage() {
         
         setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
         setIsCreateTeamOpen(false)
+        teamsLoadedRef.current = false
         loadTeams()
       }
     } catch (error) {
@@ -1189,6 +1250,7 @@ export default function CollaboratePage() {
         setInviteEmail("")
         setInviteRole("viewer")
         setIsInviteDialogOpen(false)
+        teamsLoadedRef.current = false
         loadTeams()
       }
     } catch (error) {
@@ -1223,6 +1285,7 @@ export default function CollaboratePage() {
         })
         
         setInvitationDialog({ open: false })
+        teamsLoadedRef.current = false
         loadTeams() // Refresh teams to show the new team if accepted
       }
     } catch (error) {
@@ -1553,7 +1616,7 @@ export default function CollaboratePage() {
                       </TabsList>
 
                       <TabsContent value="chat" className="mt-0 p-0">
-                        <div className="h-[calc(100vh-200px)] relative flex flex-col bg-background">
+                        <div className="h-[85vh] md:h-[90vh] lg:h-[95vh] relative flex flex-col bg-background">
                           {/* Enhanced Productivity Chat Header */}
                           <EnhancedChatHeader
                             title={selectedTeam.name}
@@ -1612,25 +1675,136 @@ export default function CollaboratePage() {
                                 
                                 // isAIMessage already computed above
                                 
-                                // Find sender user info with presence
-                                let senderUser;
+                                // For AI messages, use the enhanced streaming component with ResearchAssistant-style rendering
                                 if (isAIMessage) {
-                                  // For AI messages, create a special sender user
-                                  senderUser = {
-                                    id: 'nova-ai',
-                                    name: 'Nova AI',
-                                    email: '',
-                                    avatar: '/assistant-avatar.svg',
-                                    status: 'online' as const
-                                  }
-                                } else {
-                                  senderUser = selectedTeam.members.find(m => m.id === message.senderId) || {
-                                    id: message.senderId,
-                                    name: message.senderName || 'Unknown User',
-                                    email: '',
-                                    avatar: message.senderAvatar,
-                                    status: 'offline' as const
-                                  }
+                                  const isStreaming = message.content === '' || (!message.content.includes('🤖 **Nova AI Response:**'))
+                                  const displayContent = message.content.includes('🤖 **Nova AI Response:**') 
+                                    ? message.content.replace('🤖 **Nova AI Response:**\n\n', '')
+                                    : message.content
+                                  
+                                  return (
+                                    <div key={message.id} className="flex gap-3 justify-start">
+                                      {/* AI Avatar */}
+                                      <div className="flex-shrink-0">
+                                        <div className="relative">
+                                          <Avatar className="h-8 w-8 ring-2 ring-blue-500">
+                                            <AvatarImage src="/assistant-avatar.svg" />
+                                            <AvatarFallback className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                              <Bot className="w-4 h-4" />
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          {isStreaming && (
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-background animate-pulse">
+                                              <Loader2 className="w-2 h-2 text-white animate-spin" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Message Content */}
+                                      <div className="flex-1 min-w-0">
+                                        {/* Header */}
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
+                                            Nova AI Assistant
+                                          </span>
+                                          <Sparkles className="w-3 h-3 text-blue-500" />
+                                          <Badge variant="outline" className="text-xs px-1.5 py-0 text-blue-600 border-blue-300">
+                                            {isStreaming ? 'thinking...' : 'online'}
+                                          </Badge>
+                                          <span className="text-xs text-muted-foreground">
+                                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        </div>
+
+                                        {/* Message Body with Enhanced Rendering */}
+                                        <div className="text-sm text-foreground leading-relaxed">
+                                          {/* Sources Panel */}
+                                          {(() => {
+                                            const urls = displayContent.match(/https?:\/\/[^\s)\]\}"'<>]+/g) || []
+                                            if (urls.length === 0) return null
+                                            return (
+                                              <div className="mb-2">
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                  <ExternalLink className="w-3 h-3" />
+                                                  <span>{urls.length} source{urls.length > 1 ? 's' : ''}</span>
+                                                </div>
+                                              </div>
+                                            )
+                                          })()}
+
+                                          {/* Enhanced Response with Markdown */}
+                                          <div className="prose prose-sm max-w-none">
+                                            <MarkdownRenderer 
+                                              content={displayContent} 
+                                              className=""
+                                            />
+                                          </div>
+                                          
+                                          {isStreaming && (
+                                            <span className="inline-block w-0.5 h-4 bg-blue-500 ml-1 animate-pulse" />
+                                          )}
+                                        </div>
+
+                                        {/* Message Actions */}
+                                        <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(displayContent)
+                                              toast({ title: "Copied", description: "AI response copied to clipboard" })
+                                            }}
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                          
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() => {
+                                              const replyMessage = teamMessages.find(m => m.id === message.id)
+                                              if (replyMessage) {
+                                                setReplyingTo({
+                                                  id: replyMessage.id,
+                                                  senderId: replyMessage.senderId,
+                                                  senderName: 'Nova AI',
+                                                  content: replyMessage.content,
+                                                  timestamp: replyMessage.timestamp,
+                                                  type: replyMessage.type as any,
+                                                  reactions: {},
+                                                  status: 'sent'
+                                                })
+                                              }
+                                            }}
+                                          >
+                                            <Reply className="h-3 w-3" />
+                                          </Button>
+                                          
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() => handleAIAssistance(`Help me understand this AI response: "${displayContent}"`)}
+                                            title="Ask Nova AI about this"
+                                          >
+                                            <Brain className="h-3 w-3 text-blue-500" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                
+                                // Find sender user info with presence for non-AI messages
+                                const senderUser = selectedTeam.members.find(m => m.id === message.senderId) || {
+                                  id: message.senderId,
+                                  name: message.senderName || 'Unknown User',
+                                  email: '',
+                                  avatar: message.senderAvatar,
+                                  status: 'offline' as const
                                 }
 
                                 // Get user presence status
@@ -1642,10 +1816,10 @@ export default function CollaboratePage() {
                                     key={message.id}
                                     message={{
                                       id: message.id,
-                                      senderId: isAIMessage ? 'nova-ai' : message.senderId,
+                                      senderId: message.senderId,
                                       content: message.content,
                                       timestamp: message.timestamp,
-                                      type: isAIMessage ? 'ai_response' : (message.type as "text" | "image" | "file" | "audio" | "system"),
+                                      type: message.type as "text" | "image" | "file" | "audio" | "system",
                                       reactions: (message as any).reactions || {},
                                       mentions: (message as any).mentions || [],
                                       replyTo: (message as any).replyTo || null,
@@ -2017,6 +2191,7 @@ export default function CollaboratePage() {
             onLeaveTeam={() => {
               setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
               setSelectedTeamId(null)
+              teamsLoadedRef.current = false
               loadTeams()
             }}
             apiCall={apiCall}

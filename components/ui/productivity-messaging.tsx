@@ -39,6 +39,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MentionInput, MentionData, MessageWithMentions } from './mention-input'
+import { MarkdownRenderer } from './markdown-renderer'
 
 // Enhanced Types
 export interface ProductivityUser {
@@ -342,17 +343,28 @@ export function ProductivityMessage({
           {/* Message Body */}
           <div className="text-sm text-foreground leading-relaxed">
             {message.type === 'text' || message.type === 'ai_response' ? (
-              <MessageWithMentions 
-                content={message.content} 
-                mentions={message.mentions} 
-                className={cn(
-                  isAI ? "prose prose-sm max-w-none" : "",
-                  // Highlight messages that mention the current user
-                  message.mentions?.some(m => m.id === currentUserId) && 
-                  "bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-lg border-l-4 border-l-yellow-400"
-                )}
-                currentUserId={currentUserId}
-              />
+              isAI ? (
+                <MarkdownRenderer 
+                  content={message.content} 
+                  className={cn(
+                    "prose prose-sm max-w-none",
+                    // Highlight messages that mention the current user
+                    message.mentions?.some(m => m.id === currentUserId) && 
+                    "bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-lg border-l-4 border-l-yellow-400"
+                  )}
+                />
+              ) : (
+                <MessageWithMentions 
+                  content={message.content} 
+                  mentions={message.mentions} 
+                  className={cn(
+                    // Highlight messages that mention the current user
+                    message.mentions?.some(m => m.id === currentUserId) && 
+                    "bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-lg border-l-4 border-l-yellow-400"
+                  )}
+                  currentUserId={currentUserId}
+                />
+              )
             ) : (
               <MessageAttachment message={message} />
             )}

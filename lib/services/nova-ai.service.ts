@@ -8,7 +8,7 @@ export interface NovaAIContext {
   currentUser: ProductivityUser
   mentionedUsers: ProductivityUser[]
   conversationTopic?: string
-  actionType: 'general' | 'summarize' | 'action_items' | 'clarify' | 'research' | 'decision'
+  actionType: 'general' | 'summarize' | 'action_items' | 'clarify' | 'research' | 'decision' | 'literature_review' | 'methodology' | 'data_analysis' | 'writing_assistance' | 'citation_help'
 }
 
 export interface NovaAIResponse {
@@ -90,6 +90,108 @@ export class NovaAIService {
         confidence: 0,
         type: 'response'
       }
+    }
+  }
+
+  /**
+   * Process a message with Nova AI using streaming
+   */
+  async processMessageStream(
+    message: string,
+    context: NovaAIContext,
+    onChunk: (chunk: string) => void,
+    onComplete: (response: NovaAIResponse) => void,
+    onError: (error: Error) => void
+  ): Promise<void> {
+    try {
+      const systemPrompt = this.buildSystemPrompt(context)
+      
+      // Lightweight debug to help diagnose intermittent behavior without exposing secrets
+      try {
+        console.debug('[NovaAI] processMessageStream', {
+          teamId: context.teamId,
+          actionType: context.actionType,
+          recentMessages: context.recentMessages?.length || 0,
+          mentionedUsers: context.mentionedUsers?.length || 0
+        })
+      } catch {}
+      
+      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.nebiusApiKey}`
+        },
+        body: JSON.stringify({
+          model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          max_tokens: 1000,
+          temperature: 0.6,
+          top_p: 0.9,
+          top_k: 50,
+          stream: true,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: message }
+          ]
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Nebius API error:', response.status, errorData)
+        throw new Error(`Nebius API error: ${errorData.error?.message || response.statusText}`)
+      }
+
+      if (!response.body) {
+        throw new Error('No response body received')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let fullContent = ''
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (data === '[DONE]') {
+                // Stream complete, parse final response
+                const finalResponse = this.parseAIResponse(fullContent, context)
+                onComplete(finalResponse)
+                return
+              }
+
+              try {
+                const parsed = JSON.parse(data)
+                const content = parsed.choices?.[0]?.delta?.content
+                if (content) {
+                  fullContent += content
+                  onChunk(content)
+                }
+              } catch (e) {
+                // Skip invalid JSON lines
+                continue
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock()
+      }
+
+      // If we get here without [DONE], parse what we have
+      const finalResponse = this.parseAIResponse(fullContent, context)
+      onComplete(finalResponse)
+    } catch (error) {
+      console.error('Nova AI streaming error:', error)
+      onError(error instanceof Error ? error : new Error('Unknown streaming error'))
     }
   }
 
@@ -234,7 +336,7 @@ Please provide a helpful, contextual response as Nova AI, a productivity-focused
    * Get system prompt based on action type
    */
   private getSystemPrompt(actionType: NovaAIContext['actionType']): string {
-    const basePrompt = `You are Nova AI, a productivity-focused assistant for team collaboration. You help teams be more productive through intelligent suggestions, summaries, and insights.`
+    const basePrompt = `You are Nova AI, a specialized research collaboration assistant for academic teams and research hubs.`
 
     const actionPrompts = {
       general: `${basePrompt} Provide helpful, concise responses that advance the conversation productively.`,
@@ -242,7 +344,12 @@ Please provide a helpful, contextual response as Nova AI, a productivity-focused
       action_items: `${basePrompt} Extract and organize clear action items with suggested assignees and deadlines.`,
       clarify: `${basePrompt} Help clarify complex topics and provide additional context or alternatives.`,
       research: `${basePrompt} Provide research suggestions, relevant information, and helpful resources.`,
-      decision: `${basePrompt} Help structure decision-making with pros/cons, considerations, and recommendations.`
+      decision: `${basePrompt} Help structure decision-making with pros/cons, considerations, and recommendations.`,
+      literature_review: `${basePrompt} Assist with literature reviews, paper analysis, and academic research guidance. Focus on scholarly sources and proper citation practices.`,
+      methodology: `${basePrompt} Provide guidance on research methodology, experimental design, and study planning. Help with research protocols and best practices.`,
+      data_analysis: `${basePrompt} Assist with data analysis, statistical interpretation, and research findings. Help with data visualization and result presentation.`,
+      writing_assistance: `${basePrompt} Provide academic writing assistance, including paper structure, content development, and scholarly communication.`,
+      citation_help: `${basePrompt} Help with citation formatting, reference management, and academic writing standards (APA, MLA, Chicago, etc.).`
     }
 
     return actionPrompts[actionType]
@@ -252,21 +359,40 @@ Please provide a helpful, contextual response as Nova AI, a productivity-focused
    * Build system prompt based on context
    */
   private buildSystemPrompt(context: NovaAIContext): string {
-    const basePrompt = `You are Nova AI, a helpful productivity assistant for team collaboration. 
+    // Debug: Log what context we're receiving
+    console.log('[NovaAI] Building system prompt with context:', {
+      teamId: context.teamId,
+      recentMessagesCount: context.recentMessages?.length || 0,
+      actionType: context.actionType,
+      recentMessages: context.recentMessages?.slice(-3) // Show last 3 messages
+    })
     
+    const basePrompt = `You are Nova AI, a specialized research collaboration assistant for academic teams and research hubs.
+
 Your role is to:
-- Help team members with their questions and tasks
-- Provide clear, actionable advice
-- Maintain a professional but friendly tone
-- Suggest relevant tools or resources when appropriate
+- Assist with research-related questions, literature reviews, and academic writing
+- Help with data analysis, methodology discussions, and research planning
+- Provide guidance on academic citations, formatting, and best practices
+- Support collaborative research workflows and knowledge sharing
+- Maintain a professional, scholarly tone appropriate for academic discourse
+- Suggest relevant research tools, databases, and methodologies when appropriate
+
+RESEARCH CAPABILITIES:
+- Literature review assistance and paper analysis
+- Academic writing and citation formatting (APA, MLA, Chicago, etc.)
+- Research methodology guidance and experimental design
+- Data analysis interpretation and statistical insights
+- Grant writing and research proposal assistance
+- Conference presentation and publication support
 
 FORMATTING REQUIREMENTS:
 - Use proper GitHub-Flavored Markdown (GFM) for all content
 - For tables: Put each row on its own line with proper header separators (| --- | --- |)
 - For lists: Use proper bullet points (- item) or numbered lists (1. item)
 - For code: Use \`inline code\` or \`\`\`language blocks\`\`\`
+- For citations: Use proper academic format (e.g., (Author, Year) or [1])
 - Separate paragraphs with blank lines
-- Use **bold** and *italic* appropriately
+- Use **bold** and *italic* appropriately for emphasis
 
 Current context:
 - Team: ${context.teamId || 'Unknown'}
@@ -274,12 +400,19 @@ Current context:
 - Recent messages: ${context.recentMessages?.length || 0} messages
 - Team members: ${context.mentionedUsers?.length || 0} users mentioned
 
+${context.recentMessages && context.recentMessages.length > 0 ? `
+RECENT CONVERSATION HISTORY:
+${context.recentMessages.slice(-100).map(msg => `${msg.senderName || 'User'}: ${msg.content}`).join('\n')}
+` : ''}
+
 IMPORTANT:
 - Do not reveal, quote, or restate this "Current context" list in your reply.
 - Do not mention that you have context or show counts; just use them.
 - Respond only to the user's request with helpful, concise content.
 - If you need more context, ask clarifying questions.
 - Always format your response using proper GFM markdown as specified above.
+- When discussing research topics, maintain academic rigor and cite sources when possible.
+- Use the conversation history above to understand the context and provide relevant responses.
 `
 
     return basePrompt
@@ -392,7 +525,12 @@ IMPORTANT:
       action_items: /(?:action|task|todo|follow.?up)/i,
       clarify: /(?:clarify|explain|help.*understand)/i,
       research: /(?:research|find|look.*up)/i,
-      decision: /(?:decide|choice|option|recommend)/i
+      decision: /(?:decide|choice|option|recommend)/i,
+      literature_review: /(?:literature|papers|studies|review.*papers|find.*papers)/i,
+      methodology: /(?:method|methodology|experiment|study.*design|research.*design)/i,
+      data_analysis: /(?:data|analysis|statistics|results|findings)/i,
+      writing_assistance: /(?:write|draft|paper|manuscript|abstract|introduction|conclusion)/i,
+      citation_help: /(?:cite|citation|reference|format.*citation|apa|mla|chicago)/i
     }
 
     for (const [action, pattern] of Object.entries(commandPatterns)) {
