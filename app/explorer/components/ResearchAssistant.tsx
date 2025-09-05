@@ -17,21 +17,9 @@ import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { 
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/src/components/ai-elements/conversation"
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/src/components/ai-elements/reasoning"
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@/src/components/ai-elements/sources"
-import { Actions, Action } from "@/src/components/ai-elements/actions"
 import { Branch, BranchMessages, BranchSelector, BranchPrevious, BranchNext, BranchPage } from "@/src/components/ai-elements/branch"
 import { Task, TaskTrigger, TaskContent, TaskItem, TaskItemFile } from "@/src/components/ai-elements/task"
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from "@/src/components/ai-elements/tool"
@@ -526,14 +514,6 @@ Use this research context to provide more relevant and targeted responses. Refer
     }
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied",
-      description: "Message copied to clipboard"
-    })
-  }
-
   const clearChat = () => {
     setMessages([])
     setValue("")
@@ -901,14 +881,7 @@ function MessageContent({
   reasoningLines: string[]
 }) {
   const { toast } = useToast()
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied",
-      description: "Message copied to clipboard"
-    })
-  }
+ 
   
   return (
     <div
@@ -924,12 +897,56 @@ function MessageContent({
       )}
       <div
         className={cn(
-          "max-w-[90%] rounded-xl px-6 py-4",
+          "group relative max-w-[90%] rounded-xl px-6 py-4",
           message.role === "user"
             ? "bg-primary text-primary-foreground"
             : "bg-muted"
         )}
       >
+        {message.role === "user" && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 size-7 shrink-0 rounded-full text-primary-foreground/80 hover:text-primary-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  aria-label="Revert to this prompt"
+                  disabled={isSending}
+                  onClick={() => onRevert(message.id)}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Revert to this prompt</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {message.role === "assistant" && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 size-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  aria-label="Copy response"
+                  onClick={() => {
+                    navigator.clipboard.writeText(message.content)
+                    toast({ title: "Copied", description: "Response copied to clipboard" })
+                  }}
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Copy response</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {message.role === "assistant" ? (
           <>
             {/* Sources Panel */}
@@ -1024,29 +1041,17 @@ function MessageContent({
               )
             })()}
 
-            {/* Actions Panel */}
+            {/* Actions Panel (minimal list, no copy buttons) */}
             {(() => {
               const actions = extractActionsFromText(message.content)
               if (actions.length === 0) return null
               return (
-                <div className="mt-2">
-                  <Actions>
-                    {actions.map((action, i) => (
-                      <Action 
-                        key={`${message.id}-action-${i}`}
-                        tooltip={action}
-                        onClick={() => {
-                          navigator.clipboard.writeText(action)
-                          toast({
-                            title: "Action Copied",
-                            description: "Action item copied to clipboard"
-                          })
-                        }}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Action>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <ul className="list-disc pl-5 space-y-1">
+                    {actions.slice(0, 5).map((a, i) => (
+                      <li key={`${message.id}-act-${i}`}>{a}</li>
                     ))}
-                  </Actions>
+                  </ul>
                 </div>
               )
             })()}
@@ -1054,57 +1059,6 @@ function MessageContent({
         ) : (
           <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
         )}
-        <div className="flex items-center gap-2 mt-2">
-          {message.role === "assistant" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2"
-              onClick={() => copyToClipboard(message.content)}
-            >
-              <Copy className="w-3 h-3" />
-            </Button>
-          )}
-          {message.role === "user" && (
-            <TooltipProvider>
-              <AlertDialog>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 gap-1"
-                        aria-label="Revert to this prompt"
-                        disabled={isSending}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span className="text-xs">Revert</span>
-                      </Button>
-                    </AlertDialogTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Revert chat to before this prompt</p>
-                  </TooltipContent>
-                </Tooltip>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Revert to this prompt?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will trim the chat to before this user message. You can edit and resend the prompt.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => onRevert(message.id)}>
-                      Revert
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </TooltipProvider>
-          )}
-        </div>
       </div>
       {message.role === "user" && (
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
