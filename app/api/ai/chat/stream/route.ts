@@ -137,8 +137,24 @@ export async function GET(request: NextRequest) {
                 onProgress: (progress: { message?: string; percentage?: number }) => {
                   if (closed) return;
                   
+                  // Generate meaningful reasoning content instead of generic progress
+                  const reasoningMessages = [
+                    "Analyzing the user's request and identifying key components...",
+                    "Breaking down the problem into manageable parts...",
+                    "Considering relevant context and background information...",
+                    "Evaluating different approaches and methodologies...",
+                    "Synthesizing information from multiple sources...",
+                    "Structuring the response for maximum clarity and usefulness...",
+                    "Reviewing and refining the analysis...",
+                    "Preparing comprehensive answer with supporting details..."
+                  ];
+                  
+                  const reasoningIndex = Math.floor((progress.percentage || 0) / 12.5);
+                  const reasoningMessage = reasoningMessages[Math.min(reasoningIndex, reasoningMessages.length - 1)];
+                  
                   const progressPayload = {
-                    ...progress,
+                    message: reasoningMessage,
+                    percentage: progress.percentage,
                     timestamp: new Date().toISOString(),
                   };
                   

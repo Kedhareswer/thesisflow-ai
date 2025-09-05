@@ -16,6 +16,18 @@ import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { 
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog"
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/src/components/ai-elements/conversation"
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/src/components/ai-elements/reasoning"
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@/src/components/ai-elements/sources"
@@ -953,25 +965,6 @@ function MessageContent({
               </div>
             )}
 
-            {/* Tools Panel */}
-            {(() => {
-              const tools = extractToolsFromText(message.content)
-              if (tools.length === 0) return null
-              return (
-                <div className="mb-2 space-y-2">
-                  {tools.map((tool, i) => (
-                    <Tool key={`${message.id}-tool-${i}`} defaultOpen={false}>
-                      <ToolHeader type={tool.name} state={tool.status} />
-                      <ToolContent>
-                        {tool.input && <ToolInput input={tool.input} />}
-                        {tool.output && <ToolOutput output={tool.output} errorText={undefined} />}
-                      </ToolContent>
-                    </Tool>
-                  ))}
-                </div>
-              )
-            })()}
-
             {/* Tasks Panel */}
             {(() => {
               const tasks = extractTasksFromText(message.content)
@@ -989,6 +982,25 @@ function MessageContent({
                         ))}
                       </TaskContent>
                     </Task>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* Tools Panel */}
+            {(() => {
+              const tools = extractToolsFromText(message.content)
+              if (tools.length === 0) return null
+              return (
+                <div className="mb-2 space-y-2">
+                  {tools.map((tool, i) => (
+                    <Tool key={`${message.id}-tool-${i}`} defaultOpen={false}>
+                      <ToolHeader type={tool.name} state={tool.status} />
+                      <ToolContent>
+                        {tool.input && <ToolInput input={tool.input} />}
+                        {tool.output && <ToolOutput output={tool.output} errorText={undefined} />}
+                      </ToolContent>
+                    </Tool>
                   ))}
                 </div>
               )
@@ -1043,9 +1055,6 @@ function MessageContent({
           <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
         )}
         <div className="flex items-center gap-2 mt-2">
-          <span className="text-xs opacity-70">
-            {message.timestamp.toLocaleTimeString()}
-          </span>
           {message.role === "assistant" && (
             <Button
               variant="ghost"
@@ -1057,16 +1066,43 @@ function MessageContent({
             </Button>
           )}
           {message.role === "user" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2"
-              onClick={() => onRevert(message.id)}
-              aria-label="Revert to this prompt"
-              title="Revert to this prompt"
-            >
-              <RotateCcw className="w-3 h-3" />
-            </Button>
+            <TooltipProvider>
+              <AlertDialog>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 gap-1"
+                        aria-label="Revert to this prompt"
+                        disabled={isSending}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span className="text-xs">Revert</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Revert chat to before this prompt</p>
+                  </TooltipContent>
+                </Tooltip>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Revert to this prompt?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will trim the chat to before this user message. You can edit and resend the prompt.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onRevert(message.id)}>
+                      Revert
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </TooltipProvider>
           )}
         </div>
       </div>
