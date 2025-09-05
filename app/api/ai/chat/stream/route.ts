@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
     let controller: ReadableStreamDefaultController<Uint8Array>;
     let closed = false;
     let totalTokens = 0;
+    let hadTerminalError = false;
 
     const stream = new ReadableStream<Uint8Array>({
       start(c) {
@@ -157,6 +158,8 @@ export async function GET(request: NextRequest) {
                 
                 controller.enqueue(encoder.encode(`event: error\n`));
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
+                // Mark that a terminal error occurred so we don't emit a conflicting 'done'
+                hadTerminalError = true;
               }
             });
             
@@ -178,15 +181,18 @@ export async function GET(request: NextRequest) {
           .then(() => {
             if (closed) return;
             
-            const donePayload = {
-              type: 'done',
-              totalTokens,
-              processingTime: Date.now() - startTime,
-              timestamp: new Date().toISOString(),
-            };
-            
-            controller.enqueue(encoder.encode(`event: done\n`));
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`));
+            // Only emit 'done' if no terminal error was sent during streaming
+            if (!hadTerminalError) {
+              const donePayload = {
+                type: 'done',
+                totalTokens,
+                processingTime: Date.now() - startTime,
+                timestamp: new Date().toISOString(),
+              };
+              
+              controller.enqueue(encoder.encode(`event: done\n`));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`));
+            }
             
             try { controller.close(); } catch {}
             closed = true;
@@ -202,6 +208,7 @@ export async function GET(request: NextRequest) {
             
             controller.enqueue(encoder.encode(`event: error\n`));
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
+            hadTerminalError = true;
             
             try { controller.close(); } catch {}
             closed = true;
