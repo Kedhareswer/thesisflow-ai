@@ -81,16 +81,22 @@ interface ConversationItemProps {
 }
 
 function ConversationItem({ conversation, isActive, onClick }: ConversationItemProps) {
+  const normalizeNovaName = (name: string) =>
+    (name || '')
+      .replace(/\bNova\s+AI\s+Assistant\b/gi, 'Nova Assistant')
+      .replace(/\bNova\s+AI\b/gi, 'Nova');
+
   const getConversationName = () => {
     if (conversation.type === 'group') {
-      return conversation.name || 'Group Chat';
+      return normalizeNovaName(conversation.name || 'Group Chat');
     }
     
     // For direct messages, show the other participant's name
     const otherParticipant = conversation.participants?.find(
       (p: any) => p.user_id !== conversation.current_user_id
     );
-    return otherParticipant?.user?.full_name || otherParticipant?.user?.username || 'Unknown User';
+    const n = otherParticipant?.user?.full_name || otherParticipant?.user?.username || 'Unknown User';
+    return normalizeNovaName(n);
   };
 
   const getConversationAvatar = () => {

@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/lib/supabase';
+import { Response } from '@/src/components/ai-elements/response';
 
 interface MessageItemProps {
   message: Message;
@@ -21,7 +22,15 @@ export function MessageItem({ message, showSender }: MessageItemProps) {
   }, []);
 
   const isOwnMessage = currentUser?.id === message.sender_id;
-  const senderName = message.sender?.full_name || message.sender?.username || 'Unknown User';
+  const rawSenderName = message.sender?.full_name || message.sender?.username || 'Unknown User';
+  // Normalize assistant naming (e.g., "Nova AI" -> "Nova")
+  const senderName = React.useMemo(() => {
+    let name = rawSenderName;
+    name = name.replace(/\bNova\s+AI\b/gi, 'Nova');
+    name = name.replace(/\bNova\s+AI\s+Assistant\b/gi, 'Nova Assistant');
+    return name;
+  }, [rawSenderName]);
+
   const senderAvatar = message.sender?.avatar_url;
 
   const getMessageTime = () => {
@@ -129,9 +138,12 @@ export function MessageItem({ message, showSender }: MessageItemProps) {
           >
             {/* Message Content */}
             {message.message_type === 'text' && (
-              <p className="text-sm whitespace-pre-wrap break-words">
+              <Response
+                parseIncompleteMarkdown={true}
+                className="text-sm [&_p]:mb-2 [&_table]:text-xs [&_pre]:text-[12px] [&_code]:text-[12px]"
+              >
                 {message.content}
-              </p>
+              </Response>
             )}
 
             {message.message_type === 'image' && (

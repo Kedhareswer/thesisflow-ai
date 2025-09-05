@@ -14,7 +14,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const [isTyping, setIsTyping] = useState(false);
   const { sendMessage, startTyping, stopTyping, isSocketConnected } = useChatContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTyping = useCallback(() => {
     if (!isTyping && message.trim()) {
@@ -98,7 +98,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   }, []);
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
+    <div className="sticky bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white p-4">
       {/* Connection Status */}
       {!isSocketConnected && (
         <div className="mb-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
@@ -115,7 +115,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="min-h-[40px] max-h-[120px] resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            className="min-h-[40px] max-h-[120px] resize-none border-gray-300 focus-visible:ring-2 focus-visible:ring-blue-500"
             rows={1}
           />
         </div>

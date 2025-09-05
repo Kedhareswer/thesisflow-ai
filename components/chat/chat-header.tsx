@@ -10,16 +10,23 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ conversation }: ChatHeaderProps) {
+  const normalizeNovaName = (name: string) =>
+    name
+      ?.replace(/\bNova\s+AI\s+Assistant\b/gi, 'Nova Assistant')
+      .replace(/\bNova\s+AI\b/gi, 'Nova');
+
   const getConversationName = () => {
     if (conversation.type === 'group') {
-      return conversation.name || 'Group Chat';
+      const n = conversation.name || 'Group Chat';
+      return normalizeNovaName(n);
     }
     
     // For direct messages, show the other participant's name
     const otherParticipant = conversation.participants?.find(
       (p: any) => p.user_id !== conversation.created_by // This is simplified
     );
-    return otherParticipant?.user?.full_name || otherParticipant?.user?.username || 'Unknown User';
+    const n = otherParticipant?.user?.full_name || otherParticipant?.user?.username || 'Unknown User';
+    return normalizeNovaName(n);
   };
 
   const getConversationAvatar = () => {
