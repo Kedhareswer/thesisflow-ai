@@ -126,12 +126,7 @@ const faqs = [
     question: 'Can I export results?',
     answer:
       'Yes. Summaries and extractions can be exported to JSON, CSV, Markdown, or Text. You can also copy rich text from the UI where supported.',
-  },
-  {
-    question: 'Is there a free plan?',
-    answer:
-      'A free tier may be available depending on your deployment. See the Pricing section for the latest plans and limits.',
-  },
+  }
 ];
 
 export function AccordionComponent() {
