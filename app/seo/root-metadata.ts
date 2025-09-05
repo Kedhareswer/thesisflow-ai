@@ -6,6 +6,17 @@ export const metadata: Metadata = {
   title: 'ThesisFlow-AI — AI Research Platform for Discovery, Summarization, and Collaboration',
   description:
     'Accelerate your research with ThesisFlow-AI. Discover papers, summarize instantly, plan projects, and collaborate with your team — all in one place.',
+  applicationName: 'ThesisFlow-AI',
+  keywords: [
+    'AI research platform',
+    'academic summarizer',
+    'research collaboration tool',
+    'AI paper summarizer',
+    'thesis assistant',
+    'research assistant',
+    'research productivity software'
+  ],
+  generator: 'v0.dev',
   openGraph: {
     title: 'ThesisFlow-AI — AI Research Platform',
     description:

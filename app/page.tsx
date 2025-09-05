@@ -13,7 +13,6 @@ import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/
 import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
-export { metadata } from "./seo/root-metadata"
 
 // metadata moved to app/seo/root-metadata.ts
 
