@@ -530,38 +530,7 @@ export default function HomePage() {
         <Pricing />
       </motion.div>
 
-      {/* CTA Section */}
-      <section className="py-24 bg-foreground text-background">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-4xl font-bold font-mono mb-4">Ready to accelerate your research?</h2>
-            <p className="text-xl font-mono opacity-90 mb-8 leading-relaxed">
-              Join thousands of researchers already using our platform to advance their work.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" variant="secondary" asChild className="font-mono">
-                <Link href="/signup">
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-background/20 text-background hover:bg-background/10 font-mono"
-                onClick={() => handleProtectedAction('/explorer')}
-              >
-                View Demo
-              </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      
     </div>
   )
 }
