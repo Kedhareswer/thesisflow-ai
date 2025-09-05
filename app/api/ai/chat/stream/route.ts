@@ -68,7 +68,6 @@ export async function GET(request: NextRequest) {
     let controller: ReadableStreamDefaultController<Uint8Array>;
     let closed = false;
     let totalTokens = 0;
-    let hadTerminalError = false;
 
     const stream = new ReadableStream<Uint8Array>({
       start(c) {
@@ -114,66 +113,178 @@ export async function GET(request: NextRequest) {
               ? `${systemPrompt}\n\nUser: ${message.trim()}\nAssistant:`
               : message.trim();
 
-            // Stream the AI response
-            await aiService.generateTextStream({
-              prompt: fullPrompt,
-              provider: provider,
-              model: model,
-              maxTokens: maxTokens || 2000,
-              temperature: temperature || 0.7,
-              userId: user.id,
-              abortSignal: request.signal,
-              onToken: (token: string) => {
+            // Stream the AI response with fallback handling
+            try {
+              await aiService.generateTextStream({
+                prompt: fullPrompt,
+                provider: provider,
+                model: model,
+                temperature: temperature,
+                maxTokens: maxTokens,
+                userId: user.id,
+                onToken: (token: string) => {
+                  if (closed) return;
+                  totalTokens++;
+                  
+                  const tokenPayload = {
+                    content: token,
+                    timestamp: new Date().toISOString(),
+                  };
+                  
+                  controller.enqueue(encoder.encode(`event: token\n`));
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(tokenPayload)}\n\n`));
+                },
+                onProgress: (progress: { message?: string; percentage?: number }) => {
+                  if (closed) return;
+                  
+                  const progressPayload = {
+                    ...progress,
+                    timestamp: new Date().toISOString(),
+                  };
+                  
+                  controller.enqueue(encoder.encode(`event: progress\n`));
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(progressPayload)}\n\n`));
+                },
+                onError: (error: string) => {
+                  if (closed) return;
+                  
+                  console.error('Streaming error:', error);
+                  
+                  // Check if this is a model compatibility error that should trigger fallback
+                  const isCompatibilityError = error.includes('400') || 
+                                             error.includes('Bad Request') || 
+                                             error.includes('model') || 
+                                             error.includes('unsupported') ||
+                                             error.includes('not found') ||
+                                             error.includes('invalid');
+                  
+                  if (isCompatibilityError) {
+                    // Send progress message about trying fallback
+                    const fallbackProgressPayload = {
+                      message: `Model incompatible, trying alternative provider...`,
+                      percentage: 25,
+                      timestamp: new Date().toISOString(),
+                    };
+                    
+                    controller.enqueue(encoder.encode(`event: progress\n`));
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(fallbackProgressPayload)}\n\n`));
+                    
+                    // Attempt fallback with different provider
+                    attemptFallback();
+                    return;
+                  }
+                  
+                  const errorPayload = {
+                    error,
+                    timestamp: new Date().toISOString(),
+                  };
+                  
+                  controller.enqueue(encoder.encode(`event: error\n`));
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
+                  
+                  try { controller.close(); } catch {}
+                  closed = true;
+                },
+              });
+            } catch (streamError) {
+              if (closed) return;
+              
+              console.error('Stream generation failed, attempting fallback:', streamError);
+              
+              // Send progress about fallback attempt
+              const fallbackProgressPayload = {
+                message: 'Primary model failed, trying alternative...',
+                percentage: 30,
+                timestamp: new Date().toISOString(),
+              };
+              
+              controller.enqueue(encoder.encode(`event: progress\n`));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(fallbackProgressPayload)}\n\n`));
+              
+              // Attempt fallback
+              await attemptFallback();
+            }
+            
+            // Fallback function to try alternative providers/models
+            async function attemptFallback() {
+              try {
+                // Try streaming with no specific provider (let service choose fallback)
+                await aiService.generateTextStream({
+                  prompt: fullPrompt,
+                  temperature: temperature,
+                  maxTokens: maxTokens,
+                  userId: user.id,
+                  // Don't specify provider to trigger automatic fallback
+                  onToken: (token: string) => {
+                    if (closed) return;
+                    totalTokens++;
+                    
+                    const tokenPayload = {
+                      content: token,
+                      timestamp: new Date().toISOString(),
+                    };
+                    
+                    controller.enqueue(encoder.encode(`event: token\n`));
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(tokenPayload)}\n\n`));
+                  },
+                  onProgress: (progress: { message?: string; percentage?: number }) => {
+                    if (closed) return;
+                    
+                    const progressPayload = {
+                      ...progress,
+                      timestamp: new Date().toISOString(),
+                    };
+                    
+                    controller.enqueue(encoder.encode(`event: progress\n`));
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(progressPayload)}\n\n`));
+                  },
+                  onError: (error: string) => {
+                    if (closed) return;
+                    
+                    console.error('Fallback streaming error:', error);
+                    
+                    const errorPayload = {
+                      error: `All providers failed: ${error}`,
+                      timestamp: new Date().toISOString(),
+                    };
+                    
+                    controller.enqueue(encoder.encode(`event: error\n`));
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
+                    
+                    try { controller.close(); } catch {}
+                    closed = true;
+                  },
+                });
+              } catch (fallbackError) {
                 if (closed) return;
-                totalTokens++;
                 
-                const tokenPayload = {
-                  type: 'token',
-                  content: token,
-                  index: totalTokens,
-                };
-                
-                controller.enqueue(encoder.encode(`event: token\n`));
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(tokenPayload)}\n\n`));
-              },
-              onProgress: (progress: { message?: string; percentage?: number }) => {
-                if (closed) return;
-                
-                const progressPayload = {
-                  type: 'progress',
-                  ...progress,
-                };
-                
-                controller.enqueue(encoder.encode(`event: progress\n`));
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(progressPayload)}\n\n`));
-              },
-              onError: (error: string) => {
-                if (closed) return;
+                console.error('All fallback attempts failed:', fallbackError);
                 
                 const errorPayload = {
-                  type: 'error',
-                  error,
+                  error: `All AI providers failed. Please try again later.`,
                   timestamp: new Date().toISOString(),
                 };
                 
                 controller.enqueue(encoder.encode(`event: error\n`));
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
-                // Mark that a terminal error occurred so we don't emit a conflicting 'done'
-                hadTerminalError = true;
+                
+                try { controller.close(); } catch {}
+                closed = true;
               }
-            });
-            
+            } 
           } catch (error) {
             if (closed) return;
             
             const errorPayload = {
-              type: 'error',
               error: error instanceof Error ? error.message : 'Unknown error occurred',
               timestamp: new Date().toISOString(),
             };
             
             controller.enqueue(encoder.encode(`event: error\n`));
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
+            
+            try { controller.close(); } catch {}
+            closed = true;
           }
         };
 
@@ -181,18 +292,15 @@ export async function GET(request: NextRequest) {
           .then(() => {
             if (closed) return;
             
-            // Only emit 'done' if no terminal error was sent during streaming
-            if (!hadTerminalError) {
-              const donePayload = {
-                type: 'done',
-                totalTokens,
-                processingTime: Date.now() - startTime,
-                timestamp: new Date().toISOString(),
-              };
-              
-              controller.enqueue(encoder.encode(`event: done\n`));
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`));
-            }
+            const donePayload = {
+              type: 'done',
+              totalTokens,
+              processingTime: Date.now() - startTime,
+              timestamp: new Date().toISOString(),
+            };
+            
+            controller.enqueue(encoder.encode(`event: done\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`));
             
             try { controller.close(); } catch {}
             closed = true;
@@ -208,7 +316,6 @@ export async function GET(request: NextRequest) {
             
             controller.enqueue(encoder.encode(`event: error\n`));
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`));
-            hadTerminalError = true;
             
             try { controller.close(); } catch {}
             closed = true;

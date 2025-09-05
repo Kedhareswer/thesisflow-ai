@@ -32,7 +32,7 @@ export class ChatService {
     if (error) throw error;
 
     return data?.map(item => {
-      const conversation = item.conversations;
+      const conversation = item.conversations as any;
       return {
         ...conversation,
         unread_count: this.calculateUnreadCount(
@@ -40,7 +40,7 @@ export class ChatService {
           item.last_read_message_id,
           conversation.last_message_id
         )
-      };
+      } as Conversation;
     }) || [];
   }
 
@@ -63,7 +63,7 @@ export class ChatService {
     if (error) throw error;
 
     // Verify user is participant
-    const isParticipant = data?.participants?.some(p => p.user_id === userId);
+    const isParticipant = (data as any)?.participants?.some((p: any) => p.user_id === userId);
     if (!isParticipant) {
       throw new Error('Not authorized to access this conversation');
     }
@@ -86,14 +86,14 @@ export class ChatService {
 
     // Find existing direct conversation with the other user
     const existingConv = existing?.find(item => {
-      const conv = item.conversations;
+      const conv = item.conversations as any;
       return conv.type === 'direct' && 
              conv.participants?.length === 2 &&
-             conv.participants.some(p => p.user_id === otherUserId);
+             conv.participants.some((p: any) => p.user_id === otherUserId);
     });
 
     if (existingConv) {
-      return existingConv.conversations;
+      return existingConv.conversations as unknown as Conversation;
     }
 
     // Create new conversation
@@ -388,7 +388,7 @@ export class ChatService {
       .gt('conversations.updated_at', timestamp);
 
     if (error) throw error;
-    return data?.map(item => item.conversations) || [];
+    return data?.map(item => item.conversations as unknown as Conversation) || [];
   }
 
   static async getMessagesUpdatedSince(

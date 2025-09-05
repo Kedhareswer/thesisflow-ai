@@ -1341,23 +1341,15 @@ SENTIMENT: [positive/neutral/negative]`
         ]
       }
 
-      // Retry controls for transient issues
-      const maxRetries = 2
-      const baseDelay = 1000
-      const maxDelay = 8000
+      const errors: Array<{ provider: AIProvider; error: string }> = []
 
-      const errors: Array<{ provider: AIProvider; error: string; attempts: number }> = []
-      let emittedAnyToken = false
-
-      for (let providerIndex = 0; providerIndex < availableProviders.length; providerIndex++) {
-        const provider = availableProviders[providerIndex]
-
+      for (const provider of availableProviders) {
         if (options.abortSignal?.aborted) {
           console.log("Enhanced AI Service: Streaming aborted before starting provider", provider)
           return
         }
 
-        options.onProgress?.({ message: `Trying provider ${provider} (${providerIndex + 1}/${availableProviders.length})...` })
+        options.onProgress?.({ message: `Connecting to ${provider}...` })
 
         // Get API key for this provider
         const userApiKey = userApiKeys.find(
@@ -1365,98 +1357,40 @@ SENTIMENT: [positive/neutral/negative]`
         )
 
         if (!userApiKey?.decrypted_key) {
-          errors.push({ provider, error: "No valid API key", attempts: 0 })
-          options.onProgress?.({ message: `Skipping ${provider}: no valid API key` })
+          errors.push({ provider, error: "No valid API key" })
           continue
         }
 
         const providerConfig = AI_PROVIDERS[provider]
         if (!providerConfig) {
-          errors.push({ provider, error: "Unknown provider", attempts: 0 })
-          options.onProgress?.({ message: `Skipping ${provider}: unknown provider` })
+          errors.push({ provider, error: "Unknown provider" })
           continue
         }
 
-        let selectedModel = options.model && providerConfig.models.includes(options.model)
+        const selectedModel = options.model && providerConfig.models.includes(options.model)
           ? options.model
           : providerConfig.models[0]
 
-        if (options.model && !providerConfig.models.includes(options.model)) {
-          options.onProgress?.({ message: `Model ${options.model} not supported by ${provider}. Using ${selectedModel} instead.` })
-        }
-
         console.log(`Enhanced AI Service: Streaming with ${provider} using model ${selectedModel}`)
 
-        let lastError = ""
-        let attempts = 0
+        const ok = await this.callProviderStreamingAPI(provider, userApiKey.decrypted_key, {
+          ...options,
+          model: selectedModel,
+          provider,
+        })
 
-        for (let retry = 0; retry <= maxRetries; retry++) {
-          if (options.abortSignal?.aborted) {
-            options.onProgress?.({ message: "Streaming aborted by client." })
-            return
-          }
-
-          if (retry > 0) {
-            options.onProgress?.({ message: `Retrying ${provider} (attempt ${retry + 1}/${maxRetries + 1})...` })
-          } else {
-            options.onProgress?.({ message: `Connecting to ${provider}...` })
-          }
-
-          const ok = await this.callProviderStreamingAPI(provider, userApiKey.decrypted_key, {
-            ...options,
-            model: selectedModel,
-            provider,
-            onToken: (t: string) => {
-              emittedAnyToken = true
-              options.onToken?.(t)
-            },
-            onProgress: (p) => options.onProgress?.(p),
-            // Suppress immediate error emission to avoid client closing the stream; we'll decide how to handle it here
-            onError: (err: string) => {
-              lastError = err
-            },
-          })
-
-          attempts = retry + 1
-
-          if (ok) {
-            // Successful streaming (or clean abort); exit without emitting an error
-            return
-          }
-
-          // If failed and not aborted, decide whether to retry or fall back
-          if (options.abortSignal?.aborted) {
-            options.onProgress?.({ message: "Streaming aborted by client." })
-            return
-          }
-
-          const isPermanent = this.isPermanentError(lastError)
-          const isTransient = this.isTransientError(lastError)
-
-          if (isPermanent) {
-            errors.push({ provider, error: lastError || "Permanent error", attempts })
-            options.onProgress?.({ message: `Permanent error on ${provider}: ${lastError || "Unknown"}. Switching providers...` })
-            break // move to next provider
-          }
-
-          if (isTransient && retry < maxRetries) {
-            const delay = Math.min(baseDelay * Math.pow(2, retry), maxDelay)
-            options.onProgress?.({ message: `Transient error on ${provider}: ${lastError || "Unknown"}. Retrying in ${delay}ms...` })
-            await new Promise((resolve) => setTimeout(resolve, delay))
-            continue
-          }
-
-          // Non-transient or out of retries
-          errors.push({ provider, error: lastError || "Streaming failed", attempts })
-          options.onProgress?.({ message: `Falling back from ${provider} due to: ${lastError || "Streaming failed"}` })
-          break
+        if (ok) {
+          // Successful streaming; exit
+          return
         }
+
+        // If failed, record and try next provider
+        errors.push({ provider, error: "Streaming failed" })
+        options.onProgress?.({ message: `Falling back from ${provider}...` })
       }
 
       // If we reached here, all providers failed
-      const totalAttempts = errors.reduce((sum, e) => sum + e.attempts, 0)
-      const errorSummary = errors.map(e => `${e.provider}(${e.attempts}): ${e.error}`).join("; ")
-      options.onError?.(`All AI providers failed for streaming after ${totalAttempts} attempts. ${errorSummary}`)
+      options.onError?.("All AI providers failed for streaming.")
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       options.onError?.(message || "Streaming failed")
