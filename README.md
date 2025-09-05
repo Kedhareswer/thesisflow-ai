@@ -7,7 +7,7 @@
 
 *Transform your research workflow with intelligent AI-powered tools*
 
-![Thesis Flow AI](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
+![ThesisFlow-AI](https://img.shields.io/badge/Bolt-Research_Hub-blue?style=for-the-badge&logo=artificial-intelligence)
 
 | Frontend | Backend | AI & ML | Database | Real-time |
 |----------|---------|---------|----------|-----------|
@@ -16,16 +16,16 @@
 | [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/) | [![FastAPI](https://img.shields.io/badge/FastAPI-Python-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/) | [![Anthropic](https://img.shields.io/badge/Anthropic-Claude-8B5A3C?style=flat-square)](https://anthropic.com/) | [![S3](https://img.shields.io/badge/AWS-S3-orange?style=flat-square&logo=amazon-aws)](https://aws.amazon.com/s3/) | [![Webhook](https://img.shields.io/badge/Webhooks-Real--time-purple?style=flat-square)](https://webhook.site/) |
 | [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/) | [![Express](https://img.shields.io/badge/Express-4.x-lightgrey?style=flat-square&logo=express)](https://expressjs.com/) | [![Groq](https://img.shields.io/badge/Groq-LLaMA-red?style=flat-square)](https://groq.com/) | | |
 
-## 🎯 Key Features at a Glance
+## Key Features at a Glance
 
 ```mermaid
 mindmap
-  root((Thesis Flow AI))
+  root((ThesisFlow-AI))
     Literature Discovery
       Multi-source Search
       Citation Enhancement
-      PDF Viewer
-      Research Gaps
+        PDF Viewer
+        Research Gaps
     Smart Summarization
       Multi-format Support
       AI Provider Choice
@@ -73,7 +73,7 @@ mindmap
 
 ## Overview
 
-AI Research Hub is a comprehensive research platform designed to revolutionize the academic workflow. It integrates advanced AI capabilities, real-time collaboration, and robust project management for researchers and teams. Built with Next.js 15, React 19, and TypeScript, it provides a modern, scalable solution for academic research.
+ThesisFlow-AI is a comprehensive research platform designed to revolutionize the academic workflow. It integrates advanced AI capabilities, real-time collaboration, and robust project management for researchers and teams. Built with Next.js 15, React 19, and TypeScript, it provides a modern, scalable solution for academic research.
 
 ---
 
@@ -1390,6 +1390,51 @@ graph LR
 
 ## Recent Updates
 
+### Branding & SEO Refactor (Latest)
+
+| Change | Files | Description |
+|--------|-------|-------------|
+| Branding consistency | `head.tsx` | Unified Open Graph `site_name` and `application-name` to “ThesisFlow-AI”. |
+| Root SEO centralization | `app/seo/root-metadata.ts`, `app/page.tsx` | Moved root route metadata to a standalone module and re-exported from `app/page.tsx` for consistency and reuse. |
+| Home page FAQ | `components/ui/faq-accordion.tsx`, `app/page.tsx` | Added a polished FAQ accordion to the Home page, with navigation links and section anchor `#faq`. |
+| User-facing brand | Multiple | Ensured user-facing mentions use “ThesisFlow-AI” (keeping internal tokens unchanged). |
+
+### TypeScript & Collaboration Fixes
+
+- Ensured type-safe Team collaboration flows:
+  - `app/collaborate/page-client.tsx`: normalized Supabase team data to the UI `Team` shape and adapted data for `TeamChat`.
+  - `app/collaborate/components/team-management.tsx`: guarded optional `team.members` to eliminate undefined errors.
+- Chat components stability improvements:
+  - `components/chat/message-input.tsx` and `components/chat/user-search.tsx`: initialized debounce/timeout refs to fix “Expected 1 arguments, but got 0” TypeScript errors.
+
+### API Key Testing Route Unblocked
+
+- Implemented `testApiKey(provider, apiKey)` in `lib/enhanced-ai-service.ts`.
+- Fixes `app/api/user-api-keys/[provider]/test/route.ts` validation flow and updates `test_status` in Supabase on success.
+
+### SSE Streaming Architecture (Recap)
+
+```mermaid
+sequenceDiagram
+    participant UI as Client UI
+    participant SSE as /api/ai/chat/stream
+    participant Svc as EnhancedAIService
+    participant Prov as Provider API
+
+    UI->>SSE: Establish EventSource (auth, query params)
+    SSE-->>UI: event:init
+    SSE->>Svc: generateTextStream(onToken,onProgress)
+    Svc->>Prov: Streaming request
+    Prov-->>Svc: token...
+    Svc-->>SSE: token events
+    SSE-->>UI: event:token (append)
+    Svc-->>SSE: progress updates
+    SSE-->>UI: event:progress (update panel)
+    Prov-->>Svc: done
+    Svc-->>SSE: done
+    SSE-->>UI: event:done (finalize)
+```
+
 ### Enhanced AI Response System (Latest)
 - ✅ **Fixed Authentication Issues:** Resolved API authentication problems with proper session handling
 - ✅ **Eliminated Duplicate Responses:** Fixed multiple AI response generation with improved message handling
@@ -1451,13 +1496,6 @@ graph LR
 - ✅ Returns readability and naturalness scores with an explicit list of applied changes for transparency.
 - 🔧 Code: `lib/services/text-humanizer.service.ts`, API: `app/api/humanize/route.ts`
 - 🎯 UI: Updated Writer page to display scores and details without type errors.
-
-### Plagiarism Check (Real Implementation)
-- ✅ Implemented k-shingle fingerprinting, winnowing, Jaccard similarity, phrase-level matching, citation pattern detection, and structural analysis.
-- ✅ Detailed results: similarity percentage, matches (exact/near-duplicate/paraphrase), suspicious sections with severity and suggestions, fingerprint, and algorithms used.
-- 🔧 Code: `lib/services/plagiarism-detector.service.ts`, API: `app/api/plagiarism/route.ts`
-- 🖥️ UI: Writer page shows comprehensive analysis cards, match lists, and sources checked.
-- 🔐 No external API keys required; runs completely on server.
 
 ---
 
@@ -1565,6 +1603,6 @@ We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md) for
     <a href="https://github.com/Kedhareswer/ai-project-planner/issues">Request Feature</a> | 
     <a href="https://github.com/Kedhareswer/ai-project-planner/discussions">Join Discussion</a>
   </p>
-  <p>Last Updated: January 2025</p>
-  <p><strong>Status:</strong> ✅ Production Ready - Enhanced AI Response System Active</p>
+  <p>Last Updated: September 2025</p>
+  <p><strong>Status:</strong> ✅ Production Ready — Branding & SEO Refactor, FAQ Integration, TS Fixes, and API Key Testing Active</p>
 </div>

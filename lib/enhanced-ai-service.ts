@@ -59,6 +59,38 @@ export interface UserApiKey {
 }
 
 class EnhancedAIService {
+  /**
+   * Test whether a given API key is valid for the selected provider by making a
+   * lightweight completion request. Returns a model name if successful.
+   */
+  async testApiKey(
+    provider: string,
+    apiKey: string,
+  ): Promise<{ valid: boolean; error?: string; model?: string }> {
+    try {
+      if (!AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]) {
+        return { valid: false, error: `Unsupported provider: ${provider}` }
+      }
+      const providerConfig = AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]
+      const model = providerConfig.models[0]
+
+      // Use a tiny prompt that costs almost nothing
+      const result = await this.callProviderAPI(provider as any, apiKey, {
+        prompt: "ping",
+        model,
+        maxTokens: 1,
+        temperature: 0,
+      } as any)
+
+      if (result.success) {
+        return { valid: true, model: result.model || model }
+      }
+      return { valid: false, error: result.error }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      return { valid: false, error: errorMsg }
+    }
+  }
   private supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: {
       storageKey: "ai-research-platform-auth",

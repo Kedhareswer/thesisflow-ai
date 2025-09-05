@@ -12,6 +12,10 @@ import { Pricing } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
 import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
+import { AccordionComponent } from "@/components/ui/faq-accordion"
+export { metadata } from "./seo/root-metadata"
+
+// metadata moved to app/seo/root-metadata.ts
 
 export default function HomePage() {
   const { user } = useSupabaseAuth()
@@ -186,6 +190,9 @@ export default function HomePage() {
             <Link href="#pricing" className="font-mono hover:text-[#FF6B2C] transition-colors">
               Pricing
             </Link>
+            <Link href="#faq" className="font-mono hover:text-[#FF6B2C] transition-colors">
+              FAQ
+            </Link>
           </nav>
         )}
         
@@ -235,6 +242,9 @@ export default function HomePage() {
                     </Link>
                     <Link href="#pricing" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
                       Pricing
+                    </Link>
+                    <Link href="#faq" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                      FAQ
                     </Link>
                   </>
                 )}
@@ -530,6 +540,24 @@ export default function HomePage() {
         <Pricing />
       </motion.div>
 
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 bg-background">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-4xl font-bold font-mono text-foreground mb-4">Frequently Asked Questions</h2>
+            <p className="text-lg text-muted-foreground font-mono leading-relaxed">
+              Answers to common questions about ThesisFlow-AI.
+            </p>
+          </motion.div>
+          <AccordionComponent />
+        </div>
+      </section>
       
     </div>
   )

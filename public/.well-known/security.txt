@@ -6,7 +6,7 @@ Acknowledgments: https://thesisflow-ai.vercel.app/security/acknowledgments
 Preferred-Languages: en
 Canonical: https://thesisflow-ai.vercel.app/.well-known/security.txt
 
-# Security Policy for Thesis Flow AI
+# Security Policy for ThesisFlow-AI
 # 
 # We take security seriously and appreciate responsible disclosure.
 # 
@@ -29,4 +29,4 @@ Canonical: https://thesisflow-ai.vercel.app/.well-known/security.txt
 # Response time: We aim to respond within 48 hours.
 # Fix time: Critical issues will be addressed within 7 days.
 # 
-# Thank you for helping keep Thesis Flow AI secure!
+# Thank you for helping keep ThesisFlow-AI secure!

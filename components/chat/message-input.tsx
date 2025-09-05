@@ -14,7 +14,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const [isTyping, setIsTyping] = useState(false);
   const { sendMessage, startTyping, stopTyping, isSocketConnected } = useChatContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTyping = useCallback(() => {
     if (!isTyping && message.trim()) {
@@ -24,7 +24,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
 
     // Clear existing timeout
     if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
+      clearTimeout(typingTimeoutRef.current!);
     }
 
     // Set new timeout to stop typing
@@ -92,7 +92,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   React.useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+        clearTimeout(typingTimeoutRef.current!);
       }
     };
   }, []);

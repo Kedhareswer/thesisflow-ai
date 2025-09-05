@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+export { metadata } from "../seo/explorer-metadata"
 import { useSearchParams } from "next/navigation"
 import { BookOpen, Brain, Lightbulb, MessageCircle, Database, Smile, Briefcase, Zap, AlertTriangle, Sparkles } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"

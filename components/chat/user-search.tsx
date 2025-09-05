@@ -15,7 +15,7 @@ export function UserSearch() {
   const [isSearching, setIsSearching] = useState(false);
   
   const { searchUsers, createDirectConversation, setActiveConversation } = useChatContext();
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const dropdownRef = useClickAway<HTMLDivElement>(() => {
     setIsOpen(false);
@@ -47,7 +47,7 @@ export function UserSearch() {
 
     // Clear existing timeout
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+      clearTimeout(searchTimeoutRef.current!);
     }
 
     // Debounce search

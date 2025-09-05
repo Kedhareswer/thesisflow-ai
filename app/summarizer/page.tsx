@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+export { metadata } from "../seo/summarizer-metadata"
 import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import { ErrorHandler, type UserFriendlyError } from "@/lib/utils/error-handler"

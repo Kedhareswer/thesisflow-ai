@@ -25,15 +25,15 @@ interface User {
   lastActive: string
 }
 
-interface Team {
+export interface Team {
   id: string
   name: string
-  description: string
-  members: User[]
-  createdAt: string
-  isPublic: boolean
-  category: string
-  owner: string
+  description?: string
+  members?: User[]
+  createdAt?: string
+  isPublic?: boolean
+  category?: string
+  owner?: string
 }
 
 interface TeamManagementProps {
@@ -212,7 +212,7 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
   
   // Get user role in team
   const getUserRole = (team: Team): string => {
-    const member = team.members.find(m => m.id === user?.id)
+    const member = (team.members ?? []).find(m => m.id === user?.id)
     return member?.role || 'viewer'
   }
   
@@ -339,7 +339,7 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
                   </p>
                   <div className="flex items-center justify-between mb-4">
                     <AvatarGroup>
-                      {team.members.slice(0, 5).map(m => (
+                      {(team.members ?? []).slice(0, 5).map(m => (
                         <img key={m.id} src={m.avatar} alt={m.name} />
                       ))}
                     </AvatarGroup>
@@ -348,7 +348,7 @@ export function TeamManagement({ teams, onTeamSelect, onTeamsUpdate }: TeamManag
                     </Badge>
                   </div>
                   <div className="space-y-2">
-                    {team.members.map(member => {
+                    {(team.members ?? []).map(member => {
                       const canChangeRole = (userRole === 'owner' && member.role !== 'owner' && member.id !== user?.id) ||
                         (userRole === 'admin' && member.role !== 'owner' && member.role !== 'admin' && member.id !== user?.id)
                       return (

@@ -16,31 +16,31 @@ export default function SummarizerSEOHead({
   
   // Dynamic title generation
   const dynamicTitle = documentTitle 
-    ? `${documentTitle} - AI Summarizer | Thesis Flow AI`
+    ? `${documentTitle} - AI Summarizer | ThesisFlow-AI`
     : summaryStyle 
-    ? `${summaryStyle} Summary - AI Summarizer | Thesis Flow AI`
-    : "AI Summarizer - Thesis Flow AI | Comprehensive Research Platform";
+    ? `${summaryStyle} Summary - AI Summarizer | ThesisFlow-AI`
+    : "AI Summarizer - ThesisFlow-AI | Comprehensive Research Platform";
   
   // Dynamic description generation
   const dynamicDescription = customDescription || 
     (documentTitle 
-      ? `AI-powered summary of "${documentTitle}" using Thesis Flow AI's advanced document analysis. ${documentType ? `Specialized ${documentType} processing` : 'Multi-format support'} with sentiment analysis and key insights extraction.`
-      : "Advanced document summarization tool within Thesis Flow AI's comprehensive AI-powered research platform. Features multi-format support (PDF, DOCX, URLs), sentiment analysis, and multiple AI providers for academic and professional research workflows.");
+      ? `AI-powered summary of "${documentTitle}" using ThesisFlow-AI's advanced document analysis. ${documentType ? `Specialized ${documentType} processing` : 'Multi-format support'} with sentiment analysis and key insights extraction.`
+      : "Advanced document summarization tool within ThesisFlow-AI's comprehensive AI-powered research platform. Features multi-format support (PDF, DOCX, URLs), sentiment analysis, and multiple AI providers for academic and professional research workflows.");
   
   const title = dynamicTitle;
   const description = dynamicDescription;
 
   const ogImage = `${baseUrl}/og-image-1200x630.png`;
 const ogImageSmall = `${baseUrl}/og-image-600x315.png`; // Fallback for Twitter Lite or small clients
-const imageAlt = "Thesis Flow AI Summarizer - Transform documents into intelligent summaries";
+const imageAlt = "ThesisFlow-AI Summarizer - Transform documents into intelligent summaries";
 
   // Structured Data Objects
   const softwareApplicationSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "Thesis Flow AI - AI Summarizer",
+    name: "ThesisFlow-AI - AI Summarizer",
     alternateName: "Research Document Summarization Tool",
-    description: "Part of Thesis Flow AI's comprehensive AI-powered research platform. Advanced document summarization with multi-format support, sentiment analysis, and integration with literature discovery, academic writing, and team collaboration features.",
+    description: "Part of ThesisFlow-AI's comprehensive AI-powered research platform. Advanced document summarization with multi-format support, sentiment analysis, and integration with literature discovery, academic writing, and team collaboration features.",
     applicationCategory: "ResearchApplication",
     applicationSubCategory: "DocumentProcessing",
     operatingSystem: "All",
@@ -48,12 +48,12 @@ const imageAlt = "Thesis Flow AI Summarizer - Transform documents into intellige
     softwareVersion: "1.0.14",
     author: {
       "@type": "Organization",
-      name: "Thesis Flow AI",
+      name: "ThesisFlow-AI",
       url: baseUrl,
     },
     publisher: {
       "@type": "Organization",
-      name: "Thesis Flow AI",
+      name: "ThesisFlow-AI",
       url: baseUrl,
     },
     offers: {
@@ -101,8 +101,8 @@ const imageAlt = "Thesis Flow AI Summarizer - Transform documents into intellige
   const webApplicationSchema = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    name: "Thesis Flow AI - Document Summarizer",
-    description: "Advanced document summarization module within Thesis Flow AI's comprehensive research platform. Integrates with literature discovery, academic writing, team collaboration, and AI-powered research tools for complete research workflow management.",
+    name: "ThesisFlow-AI - Document Summarizer",
+    description: "Advanced document summarization module within ThesisFlow-AI's comprehensive research platform. Integrates with literature discovery, academic writing, team collaboration, and AI-powered research tools for complete research workflow management.",
     applicationCategory: "AcademicApplication",
     audience: {
       "@type": "Audience",
@@ -165,13 +165,13 @@ const imageAlt = "Thesis Flow AI Summarizer - Transform documents into intellige
       <meta name="description" content={description} />
       <meta
         name="keywords"
-        content="AI summarizer, research platform, academic document summary, PDF summarizer, DOCX summarizer, URL content extraction, literature discovery, research collaboration, academic writing, Thesis Flow AI, GPT-4o, Gemini, Claude, research workflow, team collaboration, citation management"
+        content="AI summarizer, research platform, academic document summary, PDF summarizer, DOCX summarizer, URL content extraction, literature discovery, research collaboration, academic writing, ThesisFlow-AI, GPT-4o, Gemini, Claude, research workflow, team collaboration, citation management"
       />
       <link rel="canonical" href={url} />
 
       {/* Open Graph */}
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="Thesis Flow AI" />
+      <meta property="og:site_name" content="ThesisFlow-AI" />
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:url" content={url} />
@@ -204,10 +204,10 @@ const imageAlt = "Thesis Flow AI Summarizer - Transform documents into intellige
       <link rel="dns-prefetch" href="//generativelanguage.googleapis.com" />
 
       {/* Additional SEO Meta Tags */}
-      <meta name="author" content="Thesis Flow AI" />
+      <meta name="author" content="ThesisFlow-AI" />
       <meta name="robots" content="index, follow" />
       <meta name="googlebot" content="index, follow" />
-      <meta name="application-name" content="Thesis Flow AI" />
+      <meta name="application-name" content="ThesisFlow-AI" />
       <meta name="theme-color" content="#2563eb" />
 
       {/* Structured Data - Enhanced for Research Tool */}

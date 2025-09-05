@@ -11,6 +11,7 @@ Allow: /summarizer
 Allow: /writer
 Allow: /collaborate
 Allow: /planner
+Allow: /changelog
 Allow: /pricing
 Allow: /about
 Allow: /contact
@@ -92,6 +93,7 @@ Allow: /summarizer
 Allow: /writer
 Allow: /collaborate
 Allow: /planner
+Allow: /changelog
 Allow: /pricing
 Allow: /about
 Allow: /contact
@@ -117,6 +119,7 @@ Allow: /summarizer
 Allow: /writer
 Allow: /collaborate
 Allow: /planner
+Allow: /changelog
 Allow: /pricing
 Allow: /about
 Allow: /contact

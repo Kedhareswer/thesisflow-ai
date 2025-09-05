@@ -2,18 +2,53 @@
 
 import { useState, useEffect } from 'react'
 import { LoginForm } from './components/login'
-import { TeamManagement } from './components/team-management'
 import { TeamChat } from './components/team-chat'
+import { TeamManagement, type Team as UiTeam } from './components/team-management'
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { collaborateService } from '@/lib/services/collaborate.service'
-import { Team } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
 
 export default function CollaborateClient() {
   const { user, isLoading: isAuthLoading } = useSupabaseAuth()
-  const [teams, setTeams] = useState<Team[]>([])
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
+  const [teams, setTeams] = useState<UiTeam[]>([])
+  const [selectedTeam, setSelectedTeam] = useState<UiTeam | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Normalize server team shape -> UI team shape
+  const normalizeTeams = (serverTeams: any[]): UiTeam[] => {
+    if (!Array.isArray(serverTeams)) return []
+    return serverTeams.map((t) => ({
+      id: t.id,
+      name: t.name ?? 'Untitled',
+      description: t.description ?? '',
+      members: Array.isArray(t.members) ? t.members : [],
+      createdAt: t.created_at ?? t.createdAt ?? new Date().toISOString(),
+      isPublic: (t.isPublic ?? t.is_public) ?? false,
+      category: t.category ?? 'Research',
+      owner: t.owner ?? t.owner_id ?? ''
+    }))
+  }
+  
+  // Convert UI team -> TeamChat's required shape
+  const toChatTeam = (t: UiTeam) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description || '',
+    members: (t.members || []).map((m: any) => ({
+      id: m.id,
+      name: m.name || m.email || 'Member',
+      email: m.email || '',
+      avatar: m.avatar,
+      status: m.status || 'offline',
+      role: m.role || 'viewer',
+      joinedAt: m.joinedAt || new Date().toISOString(),
+      lastActive: m.lastActive || new Date().toISOString(),
+    })),
+    createdAt: t.createdAt || new Date().toISOString(),
+    isPublic: Boolean(t.isPublic),
+    category: t.category || 'Research',
+    owner: t.owner || ''
+  })
   
   // Fetch teams when user is authenticated
   useEffect(() => {
@@ -23,7 +58,8 @@ export default function CollaborateClient() {
       try {
         setIsLoading(true)
         const userTeams = await collaborateService.getTeams(user.id)
-        setTeams(userTeams)
+        const normalized = normalizeTeams(userTeams)
+        setTeams(normalized)
       } catch (error) {
         console.error('Error fetching teams:', error)
       } finally {
@@ -39,7 +75,7 @@ export default function CollaborateClient() {
   }, [user])
   
   // Handle team selection
-  const handleTeamSelect = (team: Team) => {
+  const handleTeamSelect = (team: UiTeam) => {
     setSelectedTeam(team)
   }
   
@@ -54,7 +90,8 @@ export default function CollaborateClient() {
     
     try {
       const userTeams = await collaborateService.getTeams(user.id)
-      setTeams(userTeams)
+      const normalized = normalizeTeams(userTeams)
+      setTeams(normalized)
     } catch (error) {
       console.error('Error refreshing teams:', error)
     }
@@ -85,7 +122,7 @@ export default function CollaborateClient() {
     <div className="container max-w-screen-lg mx-auto py-8 px-4">
       {selectedTeam ? (
         <div className="bg-white dark:bg-gray-950 border rounded-lg shadow-sm h-[80vh]">
-          <TeamChat team={selectedTeam} onClose={handleCloseChat} />
+          <TeamChat team={toChatTeam(selectedTeam)} onClose={handleCloseChat} />
         </div>
       ) : (
         <div>
