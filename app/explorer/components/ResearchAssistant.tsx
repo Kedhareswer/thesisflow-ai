@@ -16,9 +16,9 @@ import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
-import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning"
-import { Source, Sources, SourcesContent, SourcesTrigger } from "@/components/ai-elements/sources"
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/src/components/ai-elements/conversation"
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/src/components/ai-elements/reasoning"
+import { Source, Sources, SourcesContent, SourcesTrigger } from "@/src/components/ai-elements/sources"
 
 interface Message {
   id: string
@@ -455,18 +455,10 @@ Use this research context to provide more relevant and targeted responses. Refer
       <Reasoning className="w-full" isStreaming={isSending}>
         <ReasoningTrigger />
         <ReasoningContent>
-          {typeof reasoningProgress === 'number' && (
-            <div className="text-[11px] text-muted-foreground mb-1">Progress: {Math.round(reasoningProgress)}%</div>
-          )}
-          {reasoningLines.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Initializing...</div>
-          ) : (
-            <ul className="space-y-1.5">
-              {reasoningLines.map((line, idx) => (
-                <li key={idx} className="text-xs leading-5">{line}</li>
-              ))}
-            </ul>
-          )}
+          {[
+            typeof reasoningProgress === 'number' ? `Progress: ${Math.round(reasoningProgress)}%` : undefined,
+            reasoningLines.length === 0 ? 'Initializing...' : reasoningLines.join('\n')
+          ].filter(Boolean).join('\n')}
         </ReasoningContent>
       </Reasoning>
 
