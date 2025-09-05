@@ -632,13 +632,17 @@ export function ProductivityMessageInput({
 
           {/* Input Area */}
           <div className="flex-1">
-            <div className="border rounded-lg p-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <div className={cn(
+              "border rounded-lg p-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all",
+              "hover:border-primary/30",
+              disabled && "opacity-50 cursor-not-allowed"
+            )}>
               <MentionInput
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
                 disabled={disabled}
-                className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 text-sm"
+                className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 text-sm bg-transparent"
                 users={enhancedUsers}
                 files={files}
                 onKeyDown={handleKeyDown}

@@ -64,7 +64,8 @@ import {
   Bot,
   Copy,
   Reply,
-  Brain
+  Brain,
+  Paperclip
 } from "lucide-react"
 
 import { useSocket as useAppSocket } from "@/lib/services/socket.service"
@@ -81,6 +82,7 @@ import { useUserPlan } from "@/hooks/use-user-plan"
 import { PlanStatus } from "@/components/ui/plan-status"
 import { TeamLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import { collaborateService } from "@/lib/services/collaborate.service"
+import { cn } from "@/lib/utils"
 
 // Type definitions
 interface User {
@@ -156,6 +158,8 @@ export default function CollaboratePage() {
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [currentMentions, setCurrentMentions] = useState<MentionData[]>([])
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
+  const lastScrollTimeRef = useRef<number>(0)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
   const [isInviting, setIsInviting] = useState(false)
@@ -596,6 +600,11 @@ export default function CollaboratePage() {
       // Add AI message to local state immediately
       setMessages(prev => [...prev, aiMessage])
       
+      // Auto-scroll to show the new AI message
+      setTimeout(() => {
+        throttledScrollToBottom(true) // Use smooth scrolling
+      }, 100)
+      
       // Start streaming AI response
       let streamedContent = ''
       
@@ -610,6 +619,9 @@ export default function CollaboratePage() {
               ? { ...msg, content: streamedContent }
               : msg
           ))
+          
+          // Throttled auto-scroll to prevent glitching
+          throttledScrollToBottom(true)
         },
         // onComplete - finalize the message
         async (response) => {
@@ -621,6 +633,11 @@ export default function CollaboratePage() {
               ? { ...msg, content: finalContent, status: 'sent' }
               : msg
           ))
+          
+          // Final scroll to bottom when AI response is complete
+          setTimeout(() => {
+            throttledScrollToBottom(true) // Use smooth scrolling
+          }, 200)
           
           // Persist the final AI message
           try {
@@ -882,6 +899,7 @@ export default function CollaboratePage() {
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
   
   // Check if scrolled to bottom
   const checkScrollPosition = useCallback(() => {
@@ -890,17 +908,41 @@ export default function CollaboratePage() {
       const isBottom = scrollTop + clientHeight >= scrollHeight - 10
       setIsScrolledToBottom(isBottom)
       setShowScrollButton(!isBottom)
+      
+      // Clear unread count when user scrolls to bottom
+      if (isBottom && unreadCount > 0) {
+        setUnreadCount(0)
+        setHasNewMessages(false)
     }
-  }, [])
+    }
+  }, [unreadCount])
   
   // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((smooth = true) => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+      const container = messagesContainerRef.current
+      if (smooth) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        })
+      } else {
+        container.scrollTop = container.scrollHeight
+      }
       setShowScrollButton(false)
       setUnreadCount(0)
+      setHasNewMessages(false)
     }
   }, [])
+
+  // Throttled scroll function for streaming content
+  const throttledScrollToBottom = useCallback((smooth = true) => {
+    const now = Date.now()
+    if (now - lastScrollTimeRef.current > 100) { // Throttle to max once per 100ms
+      lastScrollTimeRef.current = now
+      scrollToBottom(smooth)
+    }
+  }, [scrollToBottom])
 
   // Enhanced team selection with presence loading and realtime presence subscriptions
   useEffect(() => {
@@ -931,13 +973,14 @@ export default function CollaboratePage() {
               updated = [...prev, newMessage]
             }
             
-            // Auto-scroll only if already at bottom
+            // Auto-scroll only if already at bottom or if it's the user's own message
             setTimeout(() => {
-              if (isScrolledToBottom) {
+              if (isScrolledToBottom || newMessage.senderId === user?.id) {
                 scrollToBottom()
               } else {
-                // Increment unread count if not at bottom
+                // Increment unread count if not at bottom and not user's own message
                 setUnreadCount(prev => prev + 1)
+                setHasNewMessages(true)
               }
             }, 10)
             
@@ -1000,6 +1043,23 @@ export default function CollaboratePage() {
       if (messagesContainerRef.current) {
         messagesContainerRef.current.addEventListener('scroll', checkScrollPosition)
       }
+
+        // Setup typing listeners
+        const handleTyping = (data: { userId: string, teamId: string, isTyping: boolean }) => {
+          if (data.teamId === selectedTeamId && data.userId !== user?.id) {
+            setTypingUsers(prev => {
+              const newSet = new Set(prev)
+              if (data.isTyping) {
+                newSet.add(data.userId)
+              } else {
+                newSet.delete(data.userId)
+              }
+              return newSet
+            })
+          }
+        }
+
+        ;(socket as any).on('user-typing', handleTyping)
       
       // Cleanup
       return () => {
@@ -1013,16 +1073,19 @@ export default function CollaboratePage() {
         if (messagesContainerRef.current) {
           messagesContainerRef.current.removeEventListener('scroll', checkScrollPosition)
         }
+        ;(socket as any).off('user-typing')
       }
     }
   }, [selectedTeamId, loadMessages, loadTeamPresence, checkScrollPosition, socket])
   
-  // Auto-scroll to bottom when messages first load
+  // Auto-scroll to bottom when messages first load or team changes
   useEffect(() => {
     if (teamMessages.length > 0) {
-      scrollToBottom()
+      // Use immediate scroll (not smooth) for initial load
+      scrollToBottom(false)
     }
   }, [selectedTeamId, scrollToBottom])
+
 
   // Activity tracking and auto-away
   useEffect(() => {
@@ -1322,6 +1385,16 @@ export default function CollaboratePage() {
     deduped.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     return deduped
   }, [messages, selectedTeamId])
+
+  // Auto-scroll to bottom when chat is first opened
+  useEffect(() => {
+    if (selectedTeamId && teamMessages.length > 0) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        scrollToBottom(false)
+      }, 100)
+    }
+  }, [selectedTeamId, teamMessages.length, scrollToBottom])
 
   // Utility functions
   const getStatusColor = (status: User["status"]) => {
@@ -1640,12 +1713,28 @@ export default function CollaboratePage() {
                           {/* Enhanced Messages Area */}
                           <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-background">
                             {teamMessages.length === 0 ? (
-                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                                  <MessageSquare className="w-8 h-8" />
+                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full flex items-center justify-center mb-6">
+                                  <MessageSquare className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <h3 className="font-medium mb-1">No messages yet</h3>
-                                <p className="text-sm text-center max-w-xs">Start the conversation with your team members</p>
+                                <h3 className="font-semibold text-lg mb-2 text-foreground">Welcome to your team chat!</h3>
+                                <p className="text-sm text-center max-w-sm mb-4">
+                                  Start the conversation with your team members. You can mention people with @, ask Nova AI for help, or share files.
+                                </p>
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    <Bot className="w-3 h-3 mr-1" />
+                                    @nova for AI help
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    <Users className="w-3 h-3 mr-1" />
+                                    @username to mention
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    <Paperclip className="w-3 h-3 mr-1" />
+                                    Attach files
+                                  </Badge>
+                                </div>
                               </div>
                             ) : (
                               teamMessages.map((message, index) => {
@@ -1675,97 +1764,47 @@ export default function CollaboratePage() {
                                 
                                 // isAIMessage already computed above
                                 
-                                // For AI messages, use the enhanced streaming component with ResearchAssistant-style rendering
+                                // For AI messages, use the enhanced ProductivityMessage component for consistent alignment
                                 if (isAIMessage) {
-                                  const isStreaming = message.content === '' || (!message.content.includes('🤖 **Nova AI Response:**'))
                                   const displayContent = message.content.includes('🤖 **Nova AI Response:**') 
                                     ? message.content.replace('🤖 **Nova AI Response:**\n\n', '')
                                     : message.content
                                   
                                   return (
-                                    <div key={message.id} className="flex gap-3 justify-start">
-                                      {/* AI Avatar */}
-                                      <div className="flex-shrink-0">
-                                        <div className="relative">
-                                          <Avatar className="h-8 w-8 ring-2 ring-blue-500">
-                                            <AvatarImage src="/assistant-avatar.svg" />
-                                            <AvatarFallback className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                                              <Bot className="w-4 h-4" />
-                                            </AvatarFallback>
-                                          </Avatar>
-                                          {isStreaming && (
-                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-background animate-pulse">
-                                              <Loader2 className="w-2 h-2 text-white animate-spin" />
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* Message Content */}
-                                      <div className="flex-1 min-w-0">
-                                        {/* Header */}
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
-                                            Nova AI Assistant
-                                          </span>
-                                          <Sparkles className="w-3 h-3 text-blue-500" />
-                                          <Badge variant="outline" className="text-xs px-1.5 py-0 text-blue-600 border-blue-300">
-                                            {isStreaming ? 'thinking...' : 'online'}
-                                          </Badge>
-                                          <span className="text-xs text-muted-foreground">
-                                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                          </span>
-                                        </div>
-
-                                        {/* Message Body with Enhanced Rendering */}
-                                        <div className="text-sm text-foreground leading-relaxed">
-                                          {/* Sources Panel */}
-                                          {(() => {
-                                            const urls = displayContent.match(/https?:\/\/[^\s)\]\}"'<>]+/g) || []
-                                            if (urls.length === 0) return null
-                                            return (
-                                              <div className="mb-2">
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                  <ExternalLink className="w-3 h-3" />
-                                                  <span>{urls.length} source{urls.length > 1 ? 's' : ''}</span>
-                                                </div>
-                                              </div>
-                                            )
-                                          })()}
-
-                                          {/* Enhanced Response with Markdown */}
-                                          <div className="prose prose-sm max-w-none">
-                                            <MarkdownRenderer 
-                                              content={displayContent} 
-                                              className=""
-                                            />
-                                          </div>
-                                          
-                                          {isStreaming && (
-                                            <span className="inline-block w-0.5 h-4 bg-blue-500 ml-1 animate-pulse" />
-                                          )}
-                                        </div>
-
-                                        {/* Message Actions */}
-                                        <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0"
-                                            onClick={() => {
-                                              navigator.clipboard.writeText(displayContent)
-                                              toast({ title: "Copied", description: "AI response copied to clipboard" })
-                                            }}
-                                          >
-                                            <Copy className="h-3 w-3" />
-                                          </Button>
-                                          
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0"
-                                            onClick={() => {
-                                              const replyMessage = teamMessages.find(m => m.id === message.id)
+                                    <EnhancedMessage
+                                      key={message.id}
+                                      message={{
+                                        id: message.id,
+                                        senderId: 'nova-ai',
+                                        content: displayContent,
+                                        timestamp: message.timestamp,
+                                        type: 'ai_response',
+                                        reactions: {},
+                                        mentions: [],
+                                        status: 'sent',
+                                        priority: 'normal',
+                                        category: 'discussion'
+                                      }}
+                                      user={{
+                                        id: 'nova-ai',
+                                        name: 'Nova AI Assistant',
+                                        email: '',
+                                        avatar: '/assistant-avatar.svg',
+                                        status: 'online',
+                                        activity: 'AI Assistant'
+                                      }}
+                                      currentUserId={user?.id || ''}
+                                      allUsers={selectedTeam.members.map(m => ({
+                                        id: m.id,
+                                        name: m.name,
+                                        email: m.email,
+                                        avatar: m.avatar,
+                                        status: userPresence[m.id]?.status || m.status as "online" | "offline" | "away" | "busy",
+                                        activity: userPresence[m.id]?.activity
+                                      }))}
+                                      isConsecutive={isConsecutive}
+                                      onReply={(messageId) => {
+                                        const replyMessage = teamMessages.find(m => m.id === messageId)
                                               if (replyMessage) {
                                                 setReplyingTo({
                                                   id: replyMessage.id,
@@ -1779,22 +1818,14 @@ export default function CollaboratePage() {
                                                 })
                                               }
                                             }}
-                                          >
-                                            <Reply className="h-3 w-3" />
-                                          </Button>
-                                          
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0"
-                                            onClick={() => handleAIAssistance(`Help me understand this AI response: "${displayContent}"`)}
-                                            title="Ask Nova AI about this"
-                                          >
-                                            <Brain className="h-3 w-3 text-blue-500" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </div>
+                                      onReact={() => {}}
+                                      onEdit={() => {}}
+                                      onDelete={() => {}}
+                                      onPin={() => {}}
+                                      onAIAssist={(messageId, context) => {
+                                        handleAIAssistance(`Help me understand this AI response: "${context}"`)
+                                      }}
+                                    />
                                   )
                                 }
                                 
@@ -1897,19 +1928,53 @@ export default function CollaboratePage() {
                           {showScrollButton && (
                             <div className="absolute bottom-24 right-6 z-10">
                               <Button
-                                onClick={scrollToBottom}
+                                onClick={() => scrollToBottom()}
                                 size="sm"
-                                className="rounded-full px-3 py-2 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+                                className={cn(
+                                  "rounded-full px-3 py-2 shadow-lg transition-all",
+                                  hasNewMessages 
+                                    ? "bg-green-600 text-white hover:bg-green-700 animate-pulse" 
+                                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                                )}
                               >
                                 <div className="flex items-center gap-1">
-                                  <span className="text-xs">
-                                    {unreadCount > 0 ? `${unreadCount} new` : '↓'}
+                                  {hasNewMessages ? (
+                                    <>
+                                      <span className="text-xs font-medium">
+                                        {unreadCount > 0 ? `${unreadCount} new` : 'New message'}
                                   </span>
+                                      <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-xs">↓</span>
                                   <ChevronDown className="w-3 h-3" />
+                                    </>
+                                  )}
                                 </div>
                               </Button>
                             </div>
                           )}
+
+                          {/* Typing Indicator */}
+                          {typingUsers.size > 0 && (
+                            <div className="px-4 py-2 bg-muted/30 border-t">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="flex space-x-1">
+                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                                <span>
+                                  {Array.from(typingUsers).map(userId => {
+                                    const user = selectedTeam.members.find(m => m.id === userId)
+                                    return user?.name || 'Someone'
+                                  }).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
 
                           {/* Enhanced Productivity Message Input */}
                           <EnhancedMessageInput
@@ -1917,6 +1982,21 @@ export default function CollaboratePage() {
                                   onChange={(val, mentions) => {
                                     setNewMessage(val)
                                     setCurrentMentions(mentions)
+                                    
+                                    // Simple typing detection
+                                    if (val.trim() && selectedTeamId) {
+                                      // Emit typing event
+                                      if (socket) {
+                                        (socket as any).emit('typing', { teamId: selectedTeamId, isTyping: true })
+                                      }
+                                      
+                                      // Clear typing after 3 seconds
+                                      setTimeout(() => {
+                                        if (socket) {
+                                          (socket as any).emit('typing', { teamId: selectedTeamId, isTyping: false })
+                                        }
+                                      }, 3000)
+                                    }
                                   }}
                             onSend={handleSendMessage}
                             onAttach={() => {

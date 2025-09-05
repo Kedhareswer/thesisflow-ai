@@ -236,14 +236,23 @@ export function MentionInput({
         onInput={handleEditorInput}
         onKeyDown={handleKeyDown}
         data-placeholder={placeholder}
-        className={`min-h-[42px] px-4 py-2 rounded-full border bg-white outline-none focus:border-primary/50 ${className}`}
-        style={{whiteSpace:'pre-wrap'}}
+        className={cn(
+          "min-h-[42px] px-4 py-2 rounded-lg border bg-background outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all",
+          "placeholder:text-muted-foreground",
+          disabled && "opacity-50 cursor-not-allowed",
+          className
+        )}
+        style={{
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word'
+        }}
       />
       
       {/* Suggestions dropdown anchored to input */}
       {showSuggestions && (
         <div 
-          className="absolute bottom-full mb-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-[1000] w-[320px]"
+          className="absolute bottom-full mb-2 left-0 bg-background border border-border rounded-lg shadow-lg p-3 z-[1000] w-[320px]"
         >
           <div className="text-sm font-semibold mb-2 text-blue-600">
             🎯 Mention Someone!
@@ -253,7 +262,7 @@ export function MentionInput({
           {users.map(user => (
             <div 
               key={user.id}
-              className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer rounded"
+              className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer rounded transition-colors"
               onClick={() => insertMention(user)}
             >
               <Avatar className="h-4 w-4">
@@ -273,18 +282,18 @@ export function MentionInput({
           {files.slice(0, 5).map(file => (
             <div 
               key={file.id}
-              className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer rounded"
+              className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer rounded transition-colors"
               onClick={() => insertMention(file)}
             >
               <FileText className="h-4 w-4 text-green-500" />
               <div>
                 <div className="text-sm">{file.name}</div>
-                <div className="text-xs text-gray-500">File</div>
+                <div className="text-xs text-muted-foreground">File</div>
               </div>
             </div>
           ))}
           
-          <div className="text-xs text-gray-400 mt-2">
+          <div className="text-xs text-muted-foreground mt-2">
             Users: {users.length} | Files: {files.length}
           </div>
         </div>
