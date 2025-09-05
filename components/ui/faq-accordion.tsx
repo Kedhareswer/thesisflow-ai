@@ -82,57 +82,77 @@ export {
 };
 
 const faqs = [
-	{
-		question: 'Do You Offer Revisions On Designs?',
-		answer:
-			'Yes, I Provide Revisions To Ensure The Final Design Aligns Perfectly With Your Expectations.',
-	},
-	{
-		question: 'What Tools Do You Use For Your Work?',
-		answer:
-			'I use industry-standard design software including Adobe Creative Suite, Figma, and Sketch to create professional and polished designs.',
-	},
-	{
-		question: 'Can You Help With Branding From Scratch?',
-		answer:
-			'I offer comprehensive branding services from logo design to complete brand identity systems tailored to your business needs.',
-	},
-	{
-		question: 'How Do You Approach A New Project?',
-		answer:
-			'I begin with a thorough discovery phase to understand your goals, followed by research, conceptualization, design development, and refinement based on your feedback.',
-	},
-	{
-		question: 'What Is The Cost Of Your Services?',
-		answer:
-			'Pricing varies based on project scope and requirements. I offer customized quotes after understanding your specific needs to ensure fair and transparent pricing.',
-	},
+  {
+    question: 'What is ThesisFlow-AI?',
+    answer:
+      'ThesisFlow-AI is an end‑to‑end research workspace that helps you discover papers (Explorer), summarize documents and links (Smart Summarizer), plan work (Planner with Calendar/Gantt/Kanban), and collaborate with your team — all in one place.',
+  },
+  {
+    question: 'Which file formats and sources can I summarize?',
+    answer:
+      'You can summarize PDFs, DOCX/DOC, TXT, CSV tables, PowerPoint slides, images (with OCR), and web URLs. The extraction system pulls text, tables, and metadata where available and supports multiple export formats (JSON, CSV, Markdown, Text).',
+  },
+  {
+    question: 'Which AI providers and models are supported?',
+    answer:
+      'We support multiple providers including OpenAI (e.g., GPT‑4o, GPT‑4o‑mini), Anthropic (Claude 3.5), Google Gemini (1.5/2.5), Groq (Llama 3.1/3.3, Gemma), and Mistral (small/medium/large). Model availability depends on your configured keys.',
+  },
+  {
+    question: 'Do I need my own API keys?',
+    answer:
+      'You can use your own provider keys for full control and model choice. Keys are stored securely and can be validated via the built‑in “Test API Key” function. Some deployments may include default keys for trial usage.',
+  },
+  {
+    question: 'Is my data private and secure?',
+    answer:
+      'Yes. We use secure server‑side APIs, do not train models on your data, and integrate with Supabase for authentication and storage. Uploaded files are processed for extraction and summarization; you control what is saved to your workspace.',
+  },
+  {
+    question: 'Does chat and summarization stream in real time?',
+    answer:
+      'Yes. The AI chat and plan‑and‑execute routes use Server‑Sent Events (SSE) for token‑by‑token streaming with heartbeat and abort handling for reliability.',
+  },
+  {
+    question: 'Are there any rate limits?',
+    answer:
+      'Reasonable limits apply to protect service stability (e.g., AI chat streaming ~50 requests/hour by default). Project owners can tune limits in the backend configuration or database RPC policies.',
+  },
+  {
+    question: 'How does the Planner help with research projects?',
+    answer:
+      'Planner lets you create projects, tasks, and subtasks, visualize schedules on Calendar and Gantt, manage work on Kanban, and track analytics like progress and task status — all synced with your workspace.',
+  },
+  {
+    question: 'Can I export results?',
+    answer:
+      'Yes. Summaries and extractions can be exported to JSON, CSV, Markdown, or Text. You can also copy rich text from the UI where supported.',
+  },
+  {
+    question: 'Is there a free plan?',
+    answer:
+      'A free tier may be available depending on your deployment. See the Pricing section for the latest plans and limits.',
+  },
 ];
 
 export function AccordionComponent() {
-	return (
-		<main className="min-h-screen max-w-3xl w-full p-4 flex flex-col items-center justify-center md:p-8">
-			<div className="max-w-3xl w-full mx-auto">
-				<h2 className="mb-8 text-center text-2xl font-bold dark:text-white md:text-3xl">
-					Frequently Asked Questions
-				</h2>
-				<CustomAccordion
-					type="single"
-					collapsible
-					defaultValue="item-0"
-					className="space-y-6"
-				>
-					{faqs.map((faq, index) => (
-						<CustomAccordionItem
-							key={index}
-							value={`item-${index}`}
-						>
-							<CustomAccordionTrigger>{faq.question}</CustomAccordionTrigger>
-							<CustomAccordionContent>{faq.answer}</CustomAccordionContent>
-						</CustomAccordionItem>
-					))}
-				</CustomAccordion>
-			</div>
-		</main>
-	);
+  return (
+    <div className="max-w-3xl w-full mx-auto">
+      <CustomAccordion
+        type="single"
+        collapsible
+        defaultValue="item-0"
+        className="space-y-6"
+      >
+        {faqs.map((faq, index) => (
+          <CustomAccordionItem
+            key={index}
+            value={`item-${index}`}
+          >
+            <CustomAccordionTrigger>{faq.question}</CustomAccordionTrigger>
+            <CustomAccordionContent>{faq.answer}</CustomAccordionContent>
+          </CustomAccordionItem>
+        ))}
+      </CustomAccordion>
+    </div>
+  );
 }
