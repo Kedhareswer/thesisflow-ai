@@ -139,7 +139,7 @@ export class AIProviderService {
 
     try {
       // Try to get auth token from Supabase client
-      const { supabase } = await import('@/integrations/supabase/client')
+      const { supabase } = await import('../integrations/supabase/client')
       const { data: { session } } = await supabase.auth.getSession()
       
       if (session?.access_token) {
