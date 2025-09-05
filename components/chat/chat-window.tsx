@@ -51,7 +51,7 @@ export function ChatWindow() {
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+    <div className="flex-1 flex flex-col h-full">
       {/* Connection Status */}
       {!isSocketConnected && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2">
@@ -68,7 +68,7 @@ export function ChatWindow() {
       <ChatHeader conversation={activeConversation} />
 
       {/* Messages Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto bg-white pb-28">
+      <div className="flex-1 overflow-y-auto bg-white">
         <MessageList 
           messages={conversationMessages}
           conversationId={activeConversationId}
