@@ -583,16 +583,6 @@ Use this research context to provide more relevant and targeted responses. Refer
         </Button>
       </div>
 
-      {/* Reasoning Panel */}
-      <Reasoning className="w-full" isStreaming={isSending}>
-        <ReasoningTrigger />
-        <ReasoningContent>
-          {[
-            typeof reasoningProgress === 'number' ? `Progress: ${Math.round(reasoningProgress)}%` : undefined,
-            reasoningLines.length === 0 ? 'Initializing...' : reasoningLines.join('\n')
-          ].filter(Boolean).join('\n')}
-        </ReasoningContent>
-      </Reasoning>
 
       {/* Messages */}
       <Conversation className="flex-1 p-4 md:p-6">
@@ -629,7 +619,14 @@ Use this research context to provide more relevant and targeted responses. Refer
                         <BranchMessages>
                           {branches.map((branchMessage, branchIndex) => (
                             <div key={`${message.id}-branch-${branchIndex}`}>
-                              <MessageContent message={branchMessage} messageIndex={messageIndex} />
+                              <MessageContent 
+                                message={branchMessage} 
+                                messageIndex={messageIndex} 
+                                onRevert={handleRevertToMessage}
+                                isSending={isSending}
+                                reasoningProgress={reasoningProgress}
+                                reasoningLines={reasoningLines}
+                              />
                             </div>
                           ))}
                         </BranchMessages>
@@ -641,7 +638,14 @@ Use this research context to provide more relevant and targeted responses. Refer
                       </Branch>
                     )}
                     {!hasBranches && (
-                      <MessageContent message={displayMessage} messageIndex={messageIndex} />
+                      <MessageContent 
+                        message={displayMessage} 
+                        messageIndex={messageIndex} 
+                        onRevert={handleRevertToMessage}
+                        isSending={isSending}
+                        reasoningProgress={reasoningProgress}
+                        reasoningLines={reasoningLines}
+                      />
                     )}
                   </div>
                 )
@@ -869,17 +873,22 @@ Use this research context to provide more relevant and targeted responses. Refer
 }
 
 // Separate component for rendering individual messages to avoid duplication
-function MessageContent({ message, messageIndex }: { message: Message, messageIndex: number }) {
+function MessageContent({ 
+  message, 
+  messageIndex, 
+  onRevert,
+  isSending,
+  reasoningProgress,
+  reasoningLines
+}: { 
+  message: Message, 
+  messageIndex: number,
+  onRevert: (messageId: string) => void,
+  isSending: boolean,
+  reasoningProgress: number | null | undefined,
+  reasoningLines: string[]
+}) {
   const { toast } = useToast()
-  
-  const handleRevertToMessage = (messageId: string) => {
-    // This function would need to be passed down from parent component
-    // For now, we'll just show a toast
-    toast({
-      title: "Revert Feature",
-      description: "Revert functionality needs to be implemented at parent level"
-    })
-  }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -928,6 +937,21 @@ function MessageContent({ message, messageIndex }: { message: Message, messageIn
                 </div>
               )
             })()}
+
+            {/* Reasoning Panel - Only show for assistant messages during streaming */}
+            {message.role === "assistant" && isSending && (
+              <div className="mb-2">
+                <Reasoning className="w-full" isStreaming={isSending}>
+                  <ReasoningTrigger />
+                  <ReasoningContent>
+                    {[
+                      typeof reasoningProgress === 'number' ? `Progress: ${Math.round(reasoningProgress)}%` : undefined,
+                      reasoningLines.length === 0 ? 'Initializing...' : reasoningLines.join('\n')
+                    ].filter(Boolean).join('\n')}
+                  </ReasoningContent>
+                </Reasoning>
+              </div>
+            )}
 
             {/* Tools Panel */}
             {(() => {
@@ -1037,7 +1061,7 @@ function MessageContent({ message, messageIndex }: { message: Message, messageIn
               variant="ghost"
               size="sm"
               className="h-6 px-2"
-              onClick={() => handleRevertToMessage(message.id)}
+              onClick={() => onRevert(message.id)}
               aria-label="Revert to this prompt"
               title="Revert to this prompt"
             >

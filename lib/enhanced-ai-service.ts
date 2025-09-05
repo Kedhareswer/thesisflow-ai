@@ -1363,7 +1363,7 @@ SENTIMENT: [positive/neutral/negative]`
           options.onProgress?.({ percentage: Math.round((emitted / Math.max(total, 1)) * 100) })
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 20))
       }
 
       options.onProgress?.({ message: "Streaming complete", percentage: 100 })
