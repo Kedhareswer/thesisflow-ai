@@ -77,6 +77,7 @@ export function AIWritingAssistant({
     idf: Map<string, number>
     totalDocs: number
   } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const { toast } = useToast()
   const { session, getSelectedPapers } = useResearchSession()
@@ -95,6 +96,24 @@ export function AIWritingAssistant({
   const getAvailableModels = (provider: AIProvider) => {
     const providerConfig = AI_PROVIDERS[provider]
     return providerConfig?.models || ['gpt-4']
+  }
+
+  // Drag-and-drop handlers for uploader area
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true)
+  }
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false)
+  }
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files || [])
+    for (const f of files) {
+      try { await handleFileInput(f) } catch {}
+    }
   }
 
   // Template-specific writing styles
@@ -627,7 +646,12 @@ export function AIWritingAssistant({
 
       {/* Source files uploader — always visible (even when editor has content) */}
       {isAuthenticated && (
-        <div className="border-2 border-dashed rounded-md p-4 sm:p-6 flex flex-col items-center text-center">
+        <div
+          className={`border-2 border-dashed rounded-md p-4 sm:p-6 flex flex-col items-center text-center transition-colors ${isDragging ? 'bg-blue-50 border-blue-300' : ''}`}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+        >
           <Upload className="h-6 w-6 sm:h-8 sm:w-8 mb-3 text-muted-foreground" />
           <h3 className="text-base sm:text-lg font-medium mb-1">Add source files</h3>
           <p className="text-xs sm:text-sm text-muted-foreground mb-3 max-w-xl">
@@ -696,6 +720,41 @@ export function AIWritingAssistant({
           onClick={() => setShowSettings(!showSettings)}
         >
           <Settings className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!isAuthenticated || !currentDocumentContent}
+          onClick={async ()=>{
+            try{
+              setIsGenerating(true)
+              const { data: { session } } = await supabase.auth.getSession()
+              if (!session?.access_token) throw new Error('No valid session')
+              const templateStyle = getTemplateStyle()
+              const fixPrompt = `You are an expert LaTeX editor. Take the user's LaTeX fragment and fix any issues: escape special characters when needed, balance and normalize environments, ensure sections/subsections are well-structured, keep math valid (inline $...$ and display $$...$$), and conform to ${templateStyle}. Do not add a preamble (no \\documentclass or \\begin{document}). Return only the fixed LaTeX fragment.\n\n---\nCURRENT FRAGMENT:\n${currentDocumentContent}`
+              const resp = await fetch('/api/ai/generate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                  prompt: fixPrompt,
+                  provider: selectedProvider,
+                  model: selectedModel,
+                  temperature: 0.1,
+                  maxTokens: 1800,
+                })
+              })
+              const data = await resp.json()
+              if (!resp.ok || !data?.response) throw new Error(data?.error || 'Fix failed')
+              setGeneratedText(data.response)
+              toast({ title: 'Fix LaTeX ready', description: 'Review and Insert to apply changes.' })
+            }catch(err:any){
+              toast({ title: 'Fix failed', description: err?.message || 'Could not fix LaTeX.', variant: 'destructive' })
+            }finally{ setIsGenerating(false) }
+          }}
+        >
+          Fix LaTeX
         </Button>
       </div>
 

@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +37,8 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { useResearchSession } from "@/components/research-session-provider"
+import { searchSemanticScholar, getCitationData } from "@/app/explorer/semantic-scholar"
+import { Input } from "@/components/ui/input"
 
 interface LaTeXEditorProps {
   value: string
@@ -66,13 +69,152 @@ export function LaTeXEditor({
   const [template, setTemplate] = useState<string>(templateProp)
 
   useEffect(() => setTemplate(templateProp), [templateProp])
-  useEffect(() => { if (onTemplateChange) onTemplateChange(template) }, [template])
+  useEffect(() => { if (onTemplateChange) onTemplateChange(template) }, [template, onTemplateChange])
 
   // Context menu state for inline citations
   const [isCiteDialogOpen, setIsCiteDialogOpen] = useState(false)
   const [selectedLineRange, setSelectedLineRange] = useState<{start: number; end: number} | null>(null)
   const [selectedPaperIds, setSelectedPaperIds] = useState<string[]>([])
   const [perLineMode, setPerLineMode] = useState<boolean>(true)
+  const [advancedCiteMapping, setAdvancedCiteMapping] = useState(false)
+  const [lineMappings, setLineMappings] = useState<Record<number, string[]>>({})
+  const [isRefDialogOpen, setIsRefDialogOpen] = useState(false)
+  const [refToInsert, setRefToInsert] = useState<string>("")
+  const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false)
+  const [labelType, setLabelType] = useState<'eq'|'fig'|'tab'|'sec'>('eq')
+  const [labelText, setLabelText] = useState('')
+  // Cite by DOI/Title
+  const [isCiteLookupOpen, setIsCiteLookupOpen] = useState(false)
+  const [citeQuery, setCiteQuery] = useState("")
+  const [citeQueryType, setCiteQueryType] = useState<'doi'|'title'>('doi')
+  const [citeLookupLoading, setCiteLookupLoading] = useState(false)
+  const [citeLookupResult, setCiteLookupResult] = useState<any | null>(null)
+
+  // Simple cite completion overlay (Ctrl+Space when inside \cite{ )
+  const [citeCompletionOpen, setCiteCompletionOpen] = useState(false)
+  const [citeCompletionOptions, setCiteCompletionOptions] = useState<string[]>([])
+
+  // Format bibliography item based on template
+  const formatBibItem = useCallback((tpl: string, n: number, paper: any) => {
+    const authors = Array.isArray(paper.authors)
+      ? paper.authors.map((a: any) => (typeof a === 'string' ? a : a?.name || '')).filter(Boolean).join(', ')
+      : ''
+    const title = paper.title || 'Untitled'
+    const journal = paper.journal?.title || paper.journal || paper.venue || ''
+    const year = paper.year || paper.publication_year || ''
+    const doi = paper.doi ? ` doi: ${paper.doi}.` : ''
+    const url = paper.url ? ` URL: ${paper.url}.` : ''
+    if (tpl === 'ieee' || tpl === 'elsevier' || tpl === 'springer' || tpl === 'acm') {
+      return `\\bibitem{ref${n}} ${authors}, "${title}," ${journal ? `\\textit{${journal}}, ` : ''}${year}.${doi}`
+    }
+    // default/author-year minimal fallback
+    return `\\bibitem{ref${n}} ${authors} (${year}). ${title}.${journal ? ` ${journal}.` : ''}${doi || url}`
+  }, [])
+
+  // Collect reference keys from document
+  const collectRefKeys = useCallback(() => {
+    return Array.from(new Set((value.match(/\\bibitem\{(ref\d+)\}/g) || []).map(m => (m.match(/ref\d+/) || [''])[0]))).filter(Boolean)
+  }, [value])
+
+  // Collect labels from document
+  const collectLabels = useCallback(() => {
+    return Array.from(new Set((value.match(/\\label\{([^}]+)\}/g) || []).map(m => (m.match(/\{([^}]+)\}/)?.[1] || '')))).filter(Boolean)
+  }, [value])
+
+  // Handle textarea key events
+  const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Open cite completion with Ctrl+Space when inside \cite{
+    if ((e.ctrlKey || e.metaKey) && e.code === 'Space') {
+      const ta = editorRef.current
+      if (!ta) return
+      const pos = ta.selectionStart
+      const before = value.slice(0, pos)
+      const citeStart = before.lastIndexOf('\\cite{')
+      if (citeStart !== -1 && before.indexOf('}', citeStart) === -1) {
+        setCiteCompletionOptions(collectRefKeys())
+        setCiteCompletionOpen(true)
+        e.preventDefault()
+      }
+    }
+    if (e.key === 'Escape' && citeCompletionOpen) {
+      setCiteCompletionOpen(false)
+    }
+  }, [value, collectRefKeys, citeCompletionOpen])
+
+  // Insert a single reference (used by Cite by DOI/Title and cite completion)
+  const insertSingleReference = useCallback((paper: any, citeInPlace = true, addBib = true) => {
+    if (!editorRef.current) return
+    // compute next refN
+    const refRegex = /\\bibitem\{ref(\d+)\}/g
+    const existing = Array.from(value.matchAll(refRegex)).map(m => parseInt(m[1], 10))
+    const nextIndex = existing.length > 0 ? Math.max(...existing) + 1 : 1
+    const k = `ref${nextIndex}`
+    const bibItem = formatBibItem(template, nextIndex, paper) + '\n'
+
+    // ensure bibliography exists and append (optional)
+    let newValue = value
+    if (addBib) {
+      if (/\\begin\{thebibliography\}/.test(newValue)) {
+        newValue = newValue.replace(/\\end\{thebibliography\}/, `${bibItem}\\end{thebibliography}`)
+      } else {
+        newValue += `\n\n\\section*{References}\n\\begin{thebibliography}{99}\n${bibItem}\\end{thebibliography}`
+      }
+    }
+
+    // optionally insert cite key at caret inside \cite{...}
+    if (citeInPlace) {
+      const ta = editorRef.current
+      const pos = ta.selectionStart
+      const before = newValue.slice(0, pos)
+      const after = newValue.slice(pos)
+      const citeStart = before.lastIndexOf('\\cite{')
+      if (citeStart !== -1 && before.indexOf('}', citeStart) === -1) {
+        // inside braces, insert with comma if needed
+        const closePos = newValue.indexOf('}', citeStart)
+        const inside = newValue.slice(citeStart + 6, closePos)
+        const prefix = inside.trim() ? inside.trim() + ',' : ''
+        newValue = newValue.slice(0, citeStart + 6) + prefix + k + newValue.slice(closePos)
+        setTimeout(() => {
+          ta.focus();
+          ta.setSelectionRange(citeStart + 6 + (prefix ? prefix.length : 0) + k.length, citeStart + 6 + (prefix ? prefix.length : 0) + k.length)
+        }, 0)
+      } else {
+        // insert cite at caret
+        const citeText = `\\cite{${k}}`
+        newValue = before + citeText + after
+        setTimeout(() => {
+          ta.focus();
+          const newPos = pos + citeText.length
+          ta.setSelectionRange(newPos, newPos)
+        }, 0)
+      }
+    }
+
+    onChange(newValue)
+    toast({ title: 'Citation inserted', description: `Added ${k} and updated References.` })
+  }, [value, formatBibItem, template, onChange, toast])
+
+  // Listen for external requests to insert/replace references (from Citation Manager)
+  useEffect(() => {
+    const handler = (e: any) => {
+      try {
+        const detail = e?.detail || {}
+        const refsText = String(detail.refsText || '').trim()
+        const mode = detail.mode || 'insert'
+        if (!refsText) return
+        let nv = value
+        if (mode === 'replace' && /\\begin\{thebibliography\}/.test(nv)) {
+          nv = nv.replace(/\\begin\{thebibliography\}[\s\S]*?\\end\{thebibliography\}/, refsText)
+        } else {
+          nv += (nv.endsWith('\n') ? '' : '\n') + '\n' + refsText
+        }
+        onChange(nv)
+        toast({ title: 'References updated', description: mode==='replace'? 'Replaced existing thebibliography.' : 'Inserted thebibliography at end of document.' })
+      } catch (err) { console.error(err) }
+    }
+    window.addEventListener('writer-insert-references' as any, handler as any)
+    return () => window.removeEventListener('writer-insert-references' as any, handler as any)
+  }, [value, onChange, toast])
 
   // Compile LaTeX to HTML with math rendering
   const compileLatex = useCallback((latex: string) => {
@@ -81,7 +223,7 @@ export function LaTeXEditor({
       let html = latex
 
       // Build bibliography meta map for author-year rendering
-      const refMeta: Record<string, { author: string; year: string }> = {}
+      const refMeta: Record<string, { author: string; year: string; title?: string; journal?: string; doi?: string; url?: string }> = {}
       try {
         const bibRegex = /\\bibitem\{(ref\d+)\}([\s\S]*?)(?=(\\bibitem\{|\\end\{thebibliography\}))/g
         let m: RegExpExecArray | null
@@ -94,10 +236,20 @@ export function LaTeXEditor({
           author = (authorPart.split(',')[0] || authorPart).trim()
           const yearMatch = body.match(/\b(19|20)\d{2}\b/)
           const year = yearMatch ? yearMatch[0] : ''
-          refMeta[key] = { author, year }
+          const titleMatch = body.match(/"([^"]+)"/)
+          const journalMatch = body.match(/\\textit\{([^}]+)\}/)
+          const doiMatch = body.match(/doi:\s*([\w.\/-]+)/i)
+          const urlMatch = body.match(/https?:[^\s]+/i)
+          refMeta[key] = { author, year, title: titleMatch?.[1], journal: journalMatch?.[1], doi: doiMatch?.[1], url: urlMatch?.[0] }
         }
       } catch {}
-      
+
+      // Convert LaTeX document structure
+      html = html.replace(/\\documentclass\{[^}]+\}/g, "")
+      html = html.replace(/\\usepackage\{[^}]+\}/g, "")
+      html = html.replace(/\\begin\{document\}/g, "")
+      html = html.replace(/\\end\{document\}/g, "")
+
       // Convert LaTeX document structure
       html = html.replace(/\\documentclass\{[^}]+\}/g, "")
       html = html.replace(/\\usepackage\{[^}]+\}/g, "")
@@ -128,7 +280,29 @@ export function LaTeXEditor({
       html = html.replace(/\\begin\{quote\}/g, "<blockquote>")
       html = html.replace(/\\end\{quote\}/g, "</blockquote>")
       
+      // Convert labels and refs with hover previews
+      html = html.replace(/\\ref\{([^}]+)\}/g, (match, key) => {
+        // Find context around the label
+        const labelRegex = new RegExp(`\\\\label\\{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}([\\s\\S]*?)(?=\\\\label\\{|\\\\section|\\\\subsection|\\\\end\\{|$)`, 'i')
+        const labelMatch = latex.match(labelRegex)
+        const context = labelMatch ? labelMatch[1].trim().slice(0, 100) + '...' : 'Label not found'
+        return `<span class="ref-hover" data-tip="${key}: ${context}"><a href="#${key}">${key}</a></span>`
+      })
+      html = html.replace(/\\label\{([^}]+)\}/g, (_match, key) => `<span id="${key}"></span>`)
+      
       // Convert citations depending on template
+      const buildTip = (k: string) => {
+        const meta = refMeta[k]
+        if (!meta) return ''
+        const parts = [
+          meta.title ? `Title: ${meta.title}` : '',
+          meta.author || meta.year ? `By: ${meta.author || ''}${meta.year ? ` (${meta.year})` : ''}` : '',
+          meta.journal ? `Journal: ${meta.journal}` : '',
+          meta.doi ? `DOI: ${meta.doi}` : (meta.url ? `URL: ${meta.url}` : ''),
+        ].filter(Boolean)
+        return parts.join(' \n ')
+      }
+
       if (["apa","mla","chicago","harvard"].includes(template)) {
         html = html.replace(/\\cite\{([^}]+)\}/g, (_m, keys) => {
           const parts = String(keys).split(',').map((k: string) => k.trim())
@@ -136,20 +310,25 @@ export function LaTeXEditor({
             if (k.startsWith('ref')) {
               const meta = refMeta[k]
               if (meta && (meta.author || meta.year)) {
-                return `<a href="#${k}">${meta.author}${meta.year ? ' ' + meta.year : ''}</a>`
+                const tip = buildTip(k)
+                return `<span class="ref-hover" data-tip="${tip}"><a href="#${k}">${meta.author}${meta.year ? ' ' + meta.year : ''}</a></span>`
               }
               const n = k.replace('ref','')
-              return `<a href="#${k}">[${n}]</a>`
+              return `<span class="ref-hover" data-tip=""><a href="#${k}">[${n}]</a></span>`
             }
             // unknown key fallback
-            return `[${k}]`
+            return `<span class="ref-hover" data-tip="">[${k}]</span>`
           }).join('; ')
           return `(${formatted})`
         })
       } else {
         // Numeric styles
-        html = html.replace(/\\cite\{src(\d+)\}/g, (_m, n) => `<sup><a href="#ref${n}">[${n}]<\/a><\/sup>`)
-        html = html.replace(/\\cite\{ref(\d+)\}/g, (_m, n) => `<sup><a href="#ref${n}">[${n}]<\/a><\/sup>`)
+        html = html.replace(/\\cite\{src(\d+)\}/g, (_m, n) => `<span class="ref-hover" data-tip=""><sup><a href="#ref${n}">[${n}]<\/a><\/sup></span>`)
+        html = html.replace(/\\cite\{ref(\d+)\}/g, (_m, n) => {
+          const k = `ref${n}`
+          const tip = buildTip(k)
+          return `<span class=\"ref-hover\" data-tip=\"${tip}\"><sup><a href=\"#${k}\">[${n}]<\/a><\/sup></span>`
+        })
         html = html.replace(/\\cite\{([^}]+)\}/g, (_m, key) => `<cite>[${key}]</cite>`)
       }
 
@@ -179,8 +358,6 @@ export function LaTeXEditor({
           return `<div class="math-display math-error">${match}</div>`
         }
       })
-      html = html.replace(/\\ref\{([^}]+)\}/g, "<ref>$1</ref>")
-      html = html.replace(/\\label\{([^}]+)\}/g, "")
       
       // Convert line breaks and paragraphs
       html = html.replace(/\\\\/g, "<br/>")
@@ -239,7 +416,7 @@ export function LaTeXEditor({
       setCompileError(`Compilation error: ${error}`)
       console.error("LaTeX compilation error:", error)
     }
-  }, [])
+  }, [template])
 
   // Compile LaTeX whenever value changes
   useEffect(() => {
@@ -381,41 +558,81 @@ Cell 1 & Cell 2 & Cell 3 \\\\
     setSelectedLineRange(range)
   }
 
+
+  const insertAtCaret = (text: string) => {
+    if (!editorRef.current) return
+    const ta = editorRef.current
+    const pos = ta.selectionStart
+    const nv = value.slice(0, pos) + text + value.slice(pos)
+    onChange(nv)
+    setTimeout(()=>{ ta.focus(); const np = pos + text.length; ta.setSelectionRange(np, np) },0)
+  }
+
+  const handleInsertLabel = () => {
+    const base = labelText.trim().replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-_:.]/g,'').toLowerCase() || 'label'
+    const key = `${labelType}:${base}`
+    insertAtCaret(`\\label{${key}}`)
+    setIsLabelDialogOpen(false); setLabelText('')
+    toast({ title: 'Label inserted', description: `Inserted \\label{${key}}` })
+  }
+
+  const handleInsertRef = () => {
+    if (!refToInsert) { setIsRefDialogOpen(false); return }
+    insertAtCaret(`\\ref{${refToInsert}}`)
+    setIsRefDialogOpen(false); setRefToInsert('')
+    toast({ title: 'Reference inserted', description: `Inserted \\ref{${refToInsert}}` })
+  }
+
   const handleInsertCitations = () => {
-    if (!editorRef.current || selectedPaperIds.length === 0) {
-      setIsCiteDialogOpen(false)
-      return
-    }
+    if (!editorRef.current) { setIsCiteDialogOpen(false); return }
+    const textarea = editorRef.current
+
+    // Ensure something selected to cite
+    const anySelected = advancedCiteMapping && selectedLineRange
+      ? Object.values(lineMappings).some(arr => (arr?.length || 0) > 0)
+      : selectedPaperIds.length > 0
+    if (!anySelected) { setIsCiteDialogOpen(false); return }
+
     // Determine next reference indices by scanning existing \bibitem{refN}
     const refRegex = /\\bibitem\{ref(\d+)\}/g
     const existing = Array.from(value.matchAll(refRegex)).map(m => parseInt(m[1], 10))
     let nextIndex = existing.length > 0 ? Math.max(...existing) + 1 : 1
 
     const selectedPapers = getSelectedPapers()
-    const chosen = selectedPapers.filter((p: any) => selectedPaperIds.includes(String(p.id)))
+    const desiredIds: string[] = advancedCiteMapping && selectedLineRange
+      ? Array.from(new Set(Object.values(lineMappings).flat()))
+      : selectedPaperIds
 
-    // Build cite keys list and bibliography items
-    const citeKeys: string[] = []
+    // Map paper id -> refKey and build bib items once
+    const idToKey = new Map<string,string>()
     let bibItems = ''
-    for (const p of chosen) {
+    for (const id of desiredIds) {
+      const p = selectedPapers.find((x:any)=> String(x.id)===String(id))
+      if (!p) continue
       const k = `ref${nextIndex}`
-      citeKeys.push(k)
+      idToKey.set(String(id), k)
       bibItems += formatBibItem(template, nextIndex, p) + '\n'
       nextIndex++
     }
 
-    const textarea = editorRef.current
+    const citeKeys = Array.from(idToKey.values())
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
     const citeText = `\\cite{${citeKeys.join(',')}}`
 
     let newValue = value
-    if (perLineMode && selectedLineRange) {
+    if ((advancedCiteMapping && selectedLineRange) || (perLineMode && selectedLineRange)) {
       const lines = value.split('\n')
       const sIndex = Math.max(0, selectedLineRange.start - 1)
       const eIndex = Math.min(lines.length - 1, selectedLineRange.end - 1)
       for (let i = sIndex; i <= eIndex; i++) {
-        lines[i] = lines[i].replace(/\s*$/, '') + ' ' + citeText
+        let keysForLine = citeText
+        if (advancedCiteMapping) {
+          const ids = lineMappings[i+1] || selectedPaperIds // fallback same
+          const keys = ids.map(id=> idToKey.get(String(id))).filter(Boolean).join(',')
+          keysForLine = keys ? `\\cite{${keys}}` : ''
+        }
+        if (keysForLine) lines[i] = lines[i].replace(/\s*$/, '') + ' ' + keysForLine
       }
       newValue = lines.join('\n')
     } else {
@@ -442,22 +659,6 @@ Cell 1 & Cell 2 & Cell 3 \\\\
       textarea.setSelectionRange(pos, pos)
     }, 0)
     toast({ title: 'Citations inserted', description: 'Inline citations and references added.' })
-  }
-
-  const formatBibItem = (tpl: string, n: number, paper: any) => {
-    const authors = Array.isArray(paper.authors)
-      ? paper.authors.map((a: any) => (typeof a === 'string' ? a : a?.name || '')).filter(Boolean).join(', ')
-      : ''
-    const title = paper.title || 'Untitled'
-    const journal = paper.journal?.title || paper.journal || paper.venue || ''
-    const year = paper.year || paper.publication_year || ''
-    const doi = paper.doi ? ` doi: ${paper.doi}.` : ''
-    const url = paper.url ? ` URL: ${paper.url}.` : ''
-    if (tpl === 'ieee' || tpl === 'elsevier' || tpl === 'springer' || tpl === 'acm') {
-      return `\\bibitem{ref${n}} ${authors}, "${title}," ${journal ? `\\textit{${journal}}, ` : ''}${year}.${doi}`
-    }
-    // default/author-year minimal fallback
-    return `\\bibitem{ref${n}} ${authors} (${year}). ${title}.${journal ? ` ${journal}.` : ''}${doi || url}`
   }
 
   return (
@@ -601,6 +802,42 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                 <Code className="h-4 w-4" />
               </Button>
             </div>
+            {selectedLineRange && (
+              <div className="pt-2 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <input id="adv-map" type="checkbox" className="h-4 w-4" checked={advancedCiteMapping} onChange={(e)=>setAdvancedCiteMapping(e.target.checked)} />
+                  <Label htmlFor="adv-map" className="text-sm">Map different citations per line (max 2 per line)</Label>
+                </div>
+                {advancedCiteMapping && (
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {(() => { const lines = value.split('\n'); const s=selectedLineRange.start-1; const e=selectedLineRange.end-1; return lines.slice(s,e+1).map((ln, idx)=>{
+                      const lineIndex = s+idx+1
+                      const chosen = new Set(lineMappings[lineIndex]||[])
+                      const papers = getSelectedPapers()
+                      return (
+                        <div key={lineIndex} className="text-xs bg-gray-50 p-2 rounded border">
+                          <div className="font-medium truncate mb-1">Line {lineIndex}: {ln.trim().slice(0,80) || '(blank)'}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {papers.map((p:any)=>{
+                              const id = String(p.id)
+                              const checked = chosen.has(id)
+                              return (
+                                <label key={id} className="flex items-center gap-1">
+                                  <input type="checkbox" checked={checked} onChange={(e)=>{
+                                    setLineMappings(prev=>{ const cur = new Set(prev[lineIndex]||[]); if(e.target.checked){ if(cur.size<2) cur.add(id) } else { cur.delete(id) } return {...prev, [lineIndex]: Array.from(cur)} })
+                                  }} />
+                                  <span>{p.title?.slice(0,20) || 'Untitled'}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    }) })()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -645,6 +882,23 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                   <SelectItem value="general">General</SelectItem>
                 </SelectContent>
               </Select>
+              <Button variant="outline" size="sm" onClick={() => {
+                try {
+                  // Renumber bibitems to sequential ref1..refN and update cites
+                  const items = Array.from(value.matchAll(/\\bibitem\{(ref\d+)\}/g)).map(m=>m[1])
+                  const mapping: Record<string,string> = {}
+                  let idx=1
+                  for(const old of items){ mapping[old] = `ref${idx++}` }
+                  let nv = value.replace(/\\bibitem\{(ref\d+)\}/g, (_m, k)=> `\\bibitem{${mapping[k]||k}}`)
+                  nv = nv.replace(/\\cite\{([^}]+)\}/g, (_m, group: string)=>{
+                    const parts = group.split(',').map((s: string)=>s.trim())
+                    const mapped = parts.map((p: string)=> mapping[p]||p).join(',')
+                    return `\\cite{${mapped}}`
+                  })
+                  onChange(nv)
+                  toast({title:'Reformatted', description:'Citations and references renumbered for current template.'})
+                } catch(err){ console.error(err); toast({title:'Reformat failed', description:'Could not reformat citations.' , variant:'destructive'}) }
+              }}>Reformat now</Button>
             </div>
 
             {/* Fullscreen Toggle */}
@@ -680,6 +934,7 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                       ref={editorRef}
                       value={value}
                       onChange={(e) => onChange(e.target.value)}
+                      onKeyDown={handleTextareaKeyDown}
                       className="w-full h-full font-mono text-sm resize-none border-none focus:ring-0 focus:outline-none"
                       placeholder="% Start writing your LaTeX document here...\n\\documentclass{article}\n\\begin{document}\n\n\\section{Introduction}\nYour content here...\n\n\\end{document}"
                       spellCheck={false}
@@ -696,11 +951,40 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                     >
                       Mark citations (max 4 lines)
                     </ContextMenuItem>
+                    <ContextMenuItem inset onClick={() => setIsCiteLookupOpen(true)}>Cite by DOI/Title</ContextMenuItem>
                     <ContextMenuSeparator />
+                    <ContextMenuItem inset onClick={() => setIsLabelDialogOpen(true)}>Insert label (section/eq/fig/tab)</ContextMenuItem>
+                    <ContextMenuItem inset onClick={() => { setRefToInsert(collectLabels()[0] || ''); setIsRefDialogOpen(true) }}>Insert \\ref to…</ContextMenuItem>
                     <ContextMenuItem inset onClick={() => insertLatex('inline-math')}>Inline math $...$</ContextMenuItem>
                     <ContextMenuItem inset onClick={() => insertLatex('equation')}>Display equation $$...$$</ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
+                {citeCompletionOpen && (
+                  <div className="absolute left-6 bottom-6 z-50 bg-white border border-gray-200 rounded shadow p-2 text-xs w-64 max-h-40 overflow-auto">
+                    <div className="font-semibold mb-1">Citations</div>
+                    {citeCompletionOptions.length > 0 ? (
+                    citeCompletionOptions.map((k) => (
+                      <div key={k} className="px-1 py-0.5 cursor-pointer hover:bg-gray-100 rounded" onClick={() => {
+                        // Insert key into existing \cite{...} braces only (no new bib)
+                        const ta = editorRef.current; if (!ta) return; const pos = ta.selectionStart; const before = value.slice(0,pos); const citeStart = before.lastIndexOf('\\cite{'); if (citeStart!==-1 && before.indexOf('}', citeStart)===-1){ const closePos = value.indexOf('}', citeStart); const inside = value.slice(citeStart+6, closePos); const prefix = inside.trim()? inside.trim()+',': ''; const nv = value.slice(0, citeStart+6)+prefix+k+value.slice(closePos); onChange(nv); setCiteCompletionOpen(false);} }}>
+                        {k}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500">No existing refs. Select papers and use Mark citations, or use Cite by DOI/Title.</div>
+                  )}
+                    {getSelectedPapers().length > 0 && (
+                      <>
+                        <div className="font-semibold mt-2 mb-1">Selected Papers</div>
+                        {getSelectedPapers().slice(0,6).map((p:any, i:number) => (
+                          <div key={p.id || i} className="px-1 py-0.5 cursor-pointer hover:bg-gray-100 rounded" onClick={() => { insertSingleReference(p, true); setCiteCompletionOpen(false); }}>
+                            + {p.title}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -737,6 +1021,7 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                   ref={editorRef}
                   value={value}
                   onChange={(e) => onChange(e.target.value)}
+                  onKeyDown={handleTextareaKeyDown}
                   className="w-full h-full font-mono text-sm resize-none border-none focus:ring-0 focus:outline-none"
                   placeholder="% Start writing your LaTeX document here...\n\\documentclass{article}\n\\begin{document}\n\n\\section{Introduction}\nYour content here...\n\n\\end{document}"
                   spellCheck={false}
@@ -751,7 +1036,10 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                 >
                   Mark citations (max 4 lines)
                 </ContextMenuItem>
+                <ContextMenuItem inset onClick={() => setIsCiteLookupOpen(true)}>Cite by DOI/Title</ContextMenuItem>
                 <ContextMenuSeparator />
+                <ContextMenuItem inset onClick={() => setIsLabelDialogOpen(true)}>Insert label (section/eq/fig/tab)</ContextMenuItem>
+                <ContextMenuItem inset onClick={() => { setRefToInsert(collectLabels()[0] || ''); setIsRefDialogOpen(true) }}>Insert \\ref to…</ContextMenuItem>
                 <ContextMenuItem inset onClick={() => insertLatex('inline-math')}>Inline math $...$</ContextMenuItem>
                 <ContextMenuItem inset onClick={() => insertLatex('equation')}>Display equation $$...$$</ContextMenuItem>
               </ContextMenuContent>
@@ -840,6 +1128,103 @@ Cell 1 & Cell 2 & Cell 3 \\\\
             <Button variant="ghost" onClick={() => setIsCiteDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleInsertCitations} disabled={selectedPaperIds.length === 0}>Insert \cite</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Insert label */}
+      <Dialog open={isLabelDialogOpen} onOpenChange={setIsLabelDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Insert label</DialogTitle></DialogHeader>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Type</Label>
+            <Select value={labelType} onValueChange={(v)=>setLabelType(v as any)}>
+              <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="eq">Equation</SelectItem>
+                <SelectItem value="fig">Figure</SelectItem>
+                <SelectItem value="tab">Table</SelectItem>
+                <SelectItem value="sec">Section</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input placeholder="identifier (e.g., energy-balance)" value={labelText} onChange={(e)=>setLabelText(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={()=>setIsLabelDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleInsertLabel}>Insert \\label</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Insert \ref */}
+      <Dialog open={isRefDialogOpen} onOpenChange={setIsRefDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Insert reference (\\ref)</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-sm">Choose label</Label>
+            <Select value={refToInsert} onValueChange={(v)=>setRefToInsert(v)}>
+              <SelectTrigger className="h-8"><SelectValue placeholder="Select label" /></SelectTrigger>
+              <SelectContent>
+                {collectLabels().map((k)=> (<SelectItem key={k} value={k}>{k}</SelectItem>))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={()=>setIsRefDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleInsertRef}>Insert \\ref</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Cite by DOI/Title */}
+      <Dialog open={isCiteLookupOpen} onOpenChange={setIsCiteLookupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cite by DOI or Title</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm">Type</Label>
+              <Select value={citeQueryType} onValueChange={(v)=>setCiteQueryType(v as any)}>
+                <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="doi">DOI</SelectItem>
+                  <SelectItem value="title">Title</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input value={citeQuery} onChange={(e)=>setCiteQuery(e.target.value)} placeholder={citeQueryType==='doi'? '10.xxxx/...' : 'Paper title'} className="flex-1" />
+              <Button onClick={async ()=>{
+                try{
+                  setCiteLookupLoading(true); setCiteLookupResult(null)
+                  let paper:any = null
+                  if(citeQueryType==='doi'){
+                    const d = await getCitationData(citeQuery,'doi')
+                    paper = d ? { title:d.title, authors:d.authors||[], year:d.year, journal:d.journal, doi:d.doi, url:d.url } : null
+                  }else{
+                    const res = await searchSemanticScholar(citeQuery,1)
+                    if(res && res[0]){ 
+                      const r = res[0] as any
+                      const doi = (r as any).doi || (r as any).externalIds?.DOI
+                      const url = (r as any).url || (Array.isArray((r as any).urls) ? (r as any).urls[0] : undefined)
+                      paper = { title:r.title, authors:r.authors||[], year:r.year, journal:r.journal, doi, url }
+                    }
+                  }
+                  setCiteLookupResult(paper)
+                }catch(err){ console.error(err); toast({title:'Lookup failed', description:'Could not find the paper. Try a more specific query.', variant:'destructive'}) }
+                finally{ setCiteLookupLoading(false) }
+              }} disabled={!citeQuery || citeLookupLoading}>{citeLookupLoading? 'Searching...' : 'Search'}</Button>
+            </div>
+            {citeLookupResult && (
+              <div className="p-3 bg-gray-50 rounded border text-sm">
+                <div className="font-medium">{citeLookupResult.title || 'Untitled'}</div>
+                <div className="text-gray-600">{Array.isArray(citeLookupResult.authors)? citeLookupResult.authors.slice(0,3).map((a:any)=> typeof a==='string'? a : a?.name || '').join(', ') : ''}{citeLookupResult.year? ` (${citeLookupResult.year})` : ''}</div>
+                {citeLookupResult.doi && <div className="text-xs">DOI: {citeLookupResult.doi}</div>}
+                {citeLookupResult.url && <div className="text-xs truncate">URL: {citeLookupResult.url}</div>}
+                <div className="pt-2 text-right">
+                  <Button size="sm" onClick={()=>{ insertSingleReference(citeLookupResult, true); setIsCiteLookupOpen(false) }}>Insert \cite</Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -42,6 +42,7 @@ interface SemanticScholarPaper {
     PubMed?: string
   }
   url?: string
+  doi?: string
   tldr?: {
     model: string
     text: string

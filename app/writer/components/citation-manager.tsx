@@ -11,7 +11,9 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { EmptyState } from "@/components/ui/empty-state"
+import { useToast } from "@/hooks/use-toast"
 import { useSafeDOM } from "../hooks/use-safe-dom"
+import { cslEngine } from "@/lib/csl-engine"
 
 // Citation format types
 const CITATION_FORMATS = [
@@ -102,40 +104,74 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
     })
   }
 
+  // Build a simple thebibliography block from currently selected + manual citations
+  const buildTheBibliography = () => {
+    const allPapers = [...getSelectedPapers(), ...manualCitations]
+    
+    // Use CSL engine for consistent LaTeX bibliography
+    try {
+      return cslEngine.generateBibliography(allPapers, selectedTemplate)
+    } catch (error) {
+      console.warn('CSL bibliography generation failed, using fallback:', error)
+      
+      // Fallback to manual formatting
+      const all: Citation[] = [...papersToCitations(), ...manualCitations]
+      const items = all.map((c, i) => {
+        const n = i + 1
+        const authors = c.authors.join(', ')
+        const yr = c.year || ''
+        const j = c.journal ? ` \\textit{${c.journal}},` : ''
+        const doi = c.doi ? ` doi: ${c.doi}.` : ''
+        const url = !c.doi && c.url ? ` ${c.url}` : ''
+        return `\\bibitem{ref${n}} ${authors}${yr ? ` (${yr})` : ''}. "${c.title}."${j} ${doi || url}`
+      }).join('\n')
+      return `\\section*{References}\n\\begin{thebibliography}{99}\n${items}\n\\end{thebibliography}`
+    }
+  }
+
   // Format citations based on selected format
   const formatCitations = () => {
     setIsGenerating(true)
 
     setTimeout(() => {
       const allCitations = [...papersToCitations(), ...manualCitations]
-      let formatted = ""
-
-      if (citationFormat === "ieee") {
-        formatted = allCitations
-          .map((citation, index) => {
-            const authors = citation.authors.join(", ")
-            return `[${index + 1}] ${authors}, "${citation.title}," ${citation.journal ? `in ${citation.journal}, ` : ""}${citation.volume ? `vol. ${citation.volume}, ` : ""}${citation.issue ? `no. ${citation.issue}, ` : ""}${citation.pages ? `pp. ${citation.pages}, ` : ""}${citation.year || ""}.${citation.doi ? ` doi: ${citation.doi}.` : ""}`
-          })
-          .join("\n\n")
-      } else if (citationFormat === "apa") {
-        formatted = allCitations
-          .map((citation) => {
-            const lastAuthorIndex = citation.authors.length - 1
-            const authors =
-              lastAuthorIndex > 0
-                ? citation.authors.slice(0, lastAuthorIndex).join(", ") + ", & " + citation.authors[lastAuthorIndex]
-                : citation.authors.join("")
-
-            return `${authors}. (${citation.year || "n.d."}). ${citation.title}. ${citation.journal || ""}${citation.volume ? `, ${citation.volume}` : ""}${citation.issue ? `(${citation.issue})` : ""}${citation.pages ? `, ${citation.pages}` : ""}.${citation.doi ? ` https://doi.org/${citation.doi}` : ""}`
-          })
-          .join("\n\n")
-      } else {
-        formatted = allCitations
-          .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
-          .join("\n\n")
-      }
-
+      const allPapers = [...getSelectedPapers(), ...manualCitations]
+      
+      // Use CSL engine for robust formatting
+      const formatted = cslEngine.formatCitations(allPapers, citationFormat)
       setFormattedReferences(formatted)
+      
+      // Fallback to manual formatting if CSL fails
+      if (!formatted || formatted.trim().length === 0) {
+        let fallbackFormatted = ""
+        if (citationFormat === "ieee") {
+          fallbackFormatted = allCitations
+            .map((citation, index) => {
+              const authors = citation.authors.join(", ")
+              return `[${index + 1}] ${authors}, "${citation.title}," ${citation.journal ? `in ${citation.journal}, ` : ""}${citation.volume ? `vol. ${citation.volume}, ` : ""}${citation.issue ? `no. ${citation.issue}, ` : ""}${citation.pages ? `pp. ${citation.pages}, ` : ""}${citation.year || ""}.${citation.doi ? ` doi: ${citation.doi}.` : ""}`
+            })
+            .join("\n\n")
+        } else if (citationFormat === "apa") {
+          fallbackFormatted = allCitations
+            .map((citation) => {
+              const lastAuthorIndex = citation.authors.length - 1
+              const authors =
+                lastAuthorIndex > 0
+                  ? citation.authors.slice(0, lastAuthorIndex).join(", ") + ", & " + citation.authors[lastAuthorIndex]
+                  : citation.authors.join("")
+
+              return `${authors}. (${citation.year || "n.d."}). ${citation.title}. ${citation.journal || ""}${citation.volume ? `, ${citation.volume}` : ""}${citation.issue ? `(${citation.issue})` : ""}${citation.pages ? `, ${citation.pages}` : ""}.${citation.doi ? ` https://doi.org/${citation.doi}` : ""}`
+            })
+            .join("\n\n")
+        } else {
+          fallbackFormatted = allCitations
+            .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
+            .join("\n\n")
+        }
+        setFormattedReferences(fallbackFormatted)
+      } else {
+        setFormattedReferences(formatted)
+      }
       setIsGenerating(false)
     }, 1000)
   }
@@ -411,6 +447,26 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
               <Download className="h-3 w-3" />
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={() => {
+              const refs = buildTheBibliography()
+              window.dispatchEvent(new CustomEvent('writer-insert-references', { detail: { refsText: refs, mode: 'insert' } }))
+            }}
+            className="h-8 px-2 border-gray-300 bg-white hover:bg-gray-50"
+          >
+            Insert to Editor
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const refs = buildTheBibliography()
+              window.dispatchEvent(new CustomEvent('writer-insert-references', { detail: { refsText: refs, mode: 'replace' } }))
+            }}
+            className="h-8 px-2 border-gray-300 bg-white hover:bg-gray-50"
+          >
+            Replace
+          </Button>
         </div>
 
         {/* Summary - Compact */}
@@ -700,6 +756,26 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
             <Download className="h-4 w-4" />
           </Button>
         )}
+        <Button
+          variant="outline"
+          onClick={() => {
+            const refs = buildTheBibliography()
+            window.dispatchEvent(new CustomEvent('writer-insert-references', { detail: { refsText: refs, mode: 'insert' } }))
+          }}
+          className="h-9 px-3 border-gray-300 bg-white hover:bg-gray-50 transition-colors duration-200"
+        >
+          Insert to Editor
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            const refs = buildTheBibliography()
+            window.dispatchEvent(new CustomEvent('writer-insert-references', { detail: { refsText: refs, mode: 'replace' } }))
+          }}
+          className="h-9 px-3 border-gray-300 bg-white hover:bg-gray-50 transition-colors duration-200"
+        >
+          Replace
+        </Button>
       </div>
 
       {/* Summary */}
