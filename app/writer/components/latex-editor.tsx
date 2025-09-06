@@ -280,6 +280,32 @@ export function LaTeXEditor({
       html = html.replace(/\\begin\{quote\}/g, "<blockquote>")
       html = html.replace(/\\end\{quote\}/g, "</blockquote>")
       
+      // Convert tables
+      html = html.replace(/\\begin\{table\}(\[[^\]]*\])?/g, '<div class="latex-table">')
+      html = html.replace(/\\end\{table\}/g, '</div>')
+      html = html.replace(/\\centering\s*/g, '')
+      
+      // Convert tabular environments to HTML tables
+      html = html.replace(/\\begin\{tabular\}\{[^}]*\}/g, '<table class="latex-tabular border-collapse border border-gray-300 w-full">')
+      html = html.replace(/\\end\{tabular\}/g, '</table>')
+      html = html.replace(/\\hline\s*/g, '')
+      
+      // Convert table rows and cells
+      html = html.replace(/([^\\]|^)&/g, '$1</td><td class="border border-gray-300 px-2 py-1">')
+      html = html.replace(/\\\\\s*/g, '</td></tr>\n<tr><td class="border border-gray-300 px-2 py-1">')
+      
+      // Wrap first row in proper table structure
+      html = html.replace(/(<table[^>]*>)\s*([^<\n]+)/g, '$1\n<tbody>\n<tr><td class="border border-gray-300 px-2 py-1 font-semibold bg-gray-50">$2')
+      html = html.replace(/(<\/table>)/g, '</td></tr>\n</tbody>\n$1')
+      
+      // Convert captions
+      html = html.replace(/\\caption\{([^}]+)\}/g, '<div class="latex-caption text-center text-sm font-medium text-gray-700 mt-2 mb-4">$1</div>')
+      
+      // Convert figures
+      html = html.replace(/\\begin\{figure\}(\[[^\]]*\])?/g, '<div class="latex-figure my-6">')
+      html = html.replace(/\\end\{figure\}/g, '</div>')
+      html = html.replace(/\\includegraphics(\[[^\]]*\])?\{([^}]+)\}/g, '<img src="$2" alt="Figure" class="max-w-full h-auto mx-auto block border border-gray-200 rounded shadow-sm" />')
+      
       // Convert labels and refs with hover previews
       html = html.replace(/\\ref\{([^}]+)\}/g, (match, key) => {
         // Find context around the label
@@ -1310,6 +1336,47 @@ Cell 1 & Cell 2 & Cell 3 \\\\
           margin: 2rem 0;
           border: none;
           border-top: 1px solid #e5e5e5;
+        }
+        .latex-preview .latex-table {
+          margin: 1.5rem 0;
+          padding: 1rem;
+          background: #f9fafb;
+          border-radius: 0.5rem;
+          border: 1px solid #e5e7eb;
+        }
+        .latex-preview .latex-tabular {
+          margin: 0 auto;
+          background: white;
+          border-radius: 0.375rem;
+          overflow: hidden;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        .latex-preview .latex-tabular td {
+          padding: 0.75rem 1rem;
+        }
+        .latex-preview .latex-caption {
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 1rem;
+        }
+        .latex-preview .latex-figure {
+          text-align: center;
+          margin: 2rem 0;
+        }
+        .latex-preview .latex-figure img {
+          max-width: 80%;
+          height: auto;
+        }
+        .latex-preview .ref-hover {
+          color: #2563eb;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+        .latex-preview .ref-hover:hover {
+          color: #1d4ed8;
+          background-color: #eff6ff;
+          padding: 0 2px;
+          border-radius: 2px;
         }
       `}</style>
     </div>
