@@ -170,6 +170,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.10
         version: 9.0.10
+      '@types/katex':
+        specifier: ^0.16.7
+        version: 0.16.7
       '@types/multer':
         specifier: ^2.0.0
         version: 2.0.0

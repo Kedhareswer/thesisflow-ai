@@ -66,6 +66,7 @@
     "@types/d3": "^7.4.3",
     "@types/formidable": "^3.4.5",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/katex": "^0.16.7",
     "@types/multer": "^2.0.0",
     "@types/papaparse": "^5.3.16",
     "@types/tesseract.js": "^2.0.0",

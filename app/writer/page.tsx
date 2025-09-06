@@ -34,7 +34,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ResearchService } from "@/lib/services/research.service"
 import DocumentService, { Document } from "@/lib/services/document.service"
 import DocumentList from "./components/document-list"
-import RichTextEditor from "./components/rich-text-editor"
+import LaTeXEditor from "./components/latex-editor"
 import CitationManager from "./components/citation-manager"
 import AiWritingAssistant from "./components/ai-writing-assistant"
 import { VisualContentRenderer } from "./components/visual-content-renderer"
@@ -699,15 +699,6 @@ export default function WriterPage() {
               </Tooltip>
             </div>
           </div>
-          <div className="p-4 space-y-2 border-b border-gray-200 dark:border-gray-800">
-            <Link
-              href="/ai-assistant"
-              className="flex items-center gap-2 py-1.5 px-3 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <Lightbulb className="w-4 h-4" />
-              Create with AI
-            </Link>
-          </div>
           <DocumentList activeDocumentId={documentId || undefined} />
         </aside>
 
@@ -802,7 +793,7 @@ export default function WriterPage() {
               />
               <p className="text-gray-500 dark:text-gray-400 mb-8">Try mentioning a user with @</p>
 
-              <RichTextEditor
+              <LaTeXEditor
                 value={documentContent}
                 onChange={setDocumentContent}
                 className="min-h-[500px] border-none focus-within:ring-0 focus-within:ring-offset-0"
