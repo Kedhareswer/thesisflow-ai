@@ -1,6 +1,6 @@
 Contact: https://thesisflow-ai.vercel.app/contact
-Contact: mailto:security@boltresearchhub.com
-Expires: 2026-01-17T00:00:00.000Z
+Contact: mailto:paddyoaktreepot@gmail.com
+Expires: 2027-01-17T00:00:00.000Z
 Encryption: https://thesisflow-ai.vercel.app/.well-known/pgp-key.txt
 Acknowledgments: https://thesisflow-ai.vercel.app/security/acknowledgments
 Preferred-Languages: en

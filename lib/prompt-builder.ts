@@ -45,6 +45,10 @@ export function buildWritingPrompt(opts: PromptBuilderOptions): string {
     systemPrompt += ' Use ONLY the provided Retrieved Context and Session Context for factual statements. If the context is insufficient, explicitly state "insufficient context" rather than inventing facts.';
   }
 
+  if (uploadedSourceCount > 0) {
+    systemPrompt += ' The user has uploaded source files. Treat the "Retrieved Context from Uploaded Sources" as PRIMARY EVIDENCE. Ground all factual statements in these sources when relevant and include LaTeX citations using the form \\cite{srcN} that correspond to the numbered retrieved sources. Do NOT fabricate citations or refer to external sources not provided unless explicitly asked.';
+  }
+
   const taskPrompt = getTaskPrompt(writingTask);
 
   let contextNote = uploadedSourceCount > 0 ? `The user has provided ${uploadedSourceCount} additional source file(s) that may include relevant quotes or data.` : '';

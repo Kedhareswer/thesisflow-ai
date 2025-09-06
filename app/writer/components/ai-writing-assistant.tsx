@@ -439,12 +439,20 @@ export function AIWritingAssistant({
       context += `\nCurrent Document Content (preview):\n${contentPreview}${currentDocumentContent.length > 500 ? '...' : ''}\n`
     }
 
-    // Add RAG retrieved context from uploaded sources
-    if (ragEnabled && ragIndex && uploadedSources.length > 0) {
-      const queryHints = [writingTask, prompt, session?.currentTopic, documentTemplate]
-        .filter(Boolean)
-        .join(' | ')
-      const top = retrieveTopK(queryHints, 8)
+    // Add retrieved context from uploaded sources (always used when files are present)
+    if (uploadedSources.length > 0) {
+      let top: string[] = []
+      if (ragIndex) {
+        const queryHints = [writingTask, prompt, session?.currentTopic, documentTemplate]
+          .filter(Boolean)
+          .join(' | ')
+        top = retrieveTopK(queryHints, 8)
+      } else {
+        // Fallback: take first chunks if index isn't ready
+        const allTexts = uploadedSources.map((s) => s.content)
+        const allChunks = allTexts.flatMap((t) => chunkText(t))
+        top = allChunks.slice(0, 8)
+      }
       const joined = top
         .map((t, i) => `RETRIEVED SOURCE ${i + 1}:\n${t.substring(0, 800)}`)
         .join("\n\n---\n\n")
@@ -529,8 +537,9 @@ export function AIWritingAssistant({
       }
       
       // Extract the actual content from the JSON response
-      // Transform numeric citation markers into superscript links
-            const generatedContentRaw = data.response || data.content
+      // Also normalize placeholder citations like "RETRIEVED SOURCE 5" into valid LaTeX citations
+      let generatedContentRaw = data.response || data.content
+      generatedContentRaw = generatedContentRaw.replace(/\[?\s*RETRIEVED\s+SOURCE\s*(\d+)\s*\]?/gi, (_m: string, n: string) => `\\cite{src${n}}`)
       const citationNumbers = extractCitationNumbers(generatedContentRaw)
       // Build reference block using selected papers from Research Session (if any)
       const refPapers = getSelectedPapers()
@@ -608,24 +617,43 @@ export function AIWritingAssistant({
         />
       )}
 
-      {/* Show EmptyState when authenticated but no content */}
-      {/* Upload UI when no document content */}
-      {isAuthenticated && !currentDocumentContent.trim() && (
-        <div className="border-2 border-dashed rounded-md p-8 flex flex-col items-center text-center">
-          <Upload className="h-8 w-8 mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-medium mb-1">Add source files</h3>
-          <p className="text-sm text-muted-foreground mb-4 max-w-xs">
-            Upload PDF, DOCX or TXT files to provide context for the AI. These files will be indexed client-side and referenced via Retrieval-Augmented Generation (RAG).
+      {/* Source files uploader — always visible (even when editor has content) */}
+      {isAuthenticated && (
+        <div className="border-2 border-dashed rounded-md p-4 sm:p-6 flex flex-col items-center text-center">
+          <Upload className="h-6 w-6 sm:h-8 sm:w-8 mb-3 text-muted-foreground" />
+          <h3 className="text-base sm:text-lg font-medium mb-1">Add source files</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mb-3 max-w-xl">
+            Upload PDF, DOCX or TXT files to provide context for the AI. These files will be indexed on your device and used as primary evidence during generation along with your prompt.
           </p>
-          <Input
-            type="file"
-            accept={FileProcessor.getSupportedTypes().join(",")}
-            onChange={(e) => e.target.files && handleFileInput(e.target.files[0])}
-          />
+          <div className="flex flex-col sm:flex-row gap-2 items-center w-full max-w-xl">
+            <Input
+              type="file"
+              multiple
+              accept={FileProcessor.getSupportedTypes().join(",")}
+              onChange={(e) => {
+                const files = e.target.files
+                if (!files) return
+                Array.from(files).forEach((f) => handleFileInput(f))
+              }}
+              className="max-w-xs"
+            />
+            {uploadedSources.length > 0 && (
+              <div className="text-xs text-muted-foreground flex-1 text-left">
+                {uploadedSources.length} file{uploadedSources.length > 1 ? "s" : ""} added
+              </div>
+            )}
+          </div>
           {uploadedSources.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-3">
-              {uploadedSources.length} file{uploadedSources.length > 1 ? "s" : ""} added
-            </p>
+            <div className="mt-2 w-full max-w-xl text-xs text-left text-muted-foreground">
+              <ul className="list-disc pl-5">
+                {uploadedSources.slice(-5).map((s, i) => (
+                  <li key={`${s.name}-${i}`}>{s.name} • {s.metadata.wordCount} words</li>
+                ))}
+                {uploadedSources.length > 5 && (
+                  <li>… and {uploadedSources.length - 5} more</li>
+                )}
+              </ul>
+            </div>
           )}
         </div>
       )}
@@ -644,13 +672,13 @@ export function AIWritingAssistant({
             </Badge>
           ))}
           <div className="flex items-center gap-2 ml-2">
-            <Label className="text-xs">RAG</Label>
+            <Label className="text-xs">Use uploaded files (RAG)</Label>
             <input
               type="checkbox"
               checked={ragEnabled}
               onChange={(e) => setRagEnabled(e.target.checked)}
               className="h-4 w-4"
-              aria-label="Toggle retrieval augmented generation"
+              aria-label="Toggle retrieval augmented generation from uploaded files"
             />
           </div>
         </div>
@@ -703,7 +731,16 @@ export function AIWritingAssistant({
             className="min-h-[100px]"
           />
           <div className="flex items-center gap-2">
-            <Input type="file" accept={FileProcessor.getSupportedTypes().join(",")} onChange={(e) => e.target.files && handleFileInput(e.target.files[0])} />
+            <Input
+              type="file"
+              multiple
+              accept={FileProcessor.getSupportedTypes().join(",")}
+              onChange={(e) => {
+                const files = e.target.files
+                if (!files) return
+                Array.from(files).forEach((f) => handleFileInput(f))
+              }}
+            />
             <Label className="text-xs text-muted-foreground">Add .docx/.pdf/.txt as context</Label>
           </div>
           {uploadedSources.length > 0 && (

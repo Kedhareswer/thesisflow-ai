@@ -89,8 +89,27 @@ export function LaTeXEditor({
       html = html.replace(/\\begin\{quote\}/g, "<blockquote>")
       html = html.replace(/\\end\{quote\}/g, "</blockquote>")
       
-      // Convert citations
-      html = html.replace(/\\cite\{([^}]+)\}/g, "<cite>[$1]</cite>")
+      // Convert citations: srcN -> numeric [N], otherwise show key
+      html = html.replace(/\\cite\{src(\d+)\}/g, (_m, n) => `<sup>[${n}]</sup>`)
+      html = html.replace(/\\cite\{([^}]+)\}/g, (_m, key) => `<cite>[${key}]</cite>`)        
+
+      // Convert bracketed retrieval markers to numeric citations
+      html = html.replace(/\[?\s*RETRIEVED\s+SOURCE\s*(\d+)\s*\]?/gi, (_m, n) => `<sup>[${n}]</sup>`)
+
+      // Abstract environment
+      html = html.replace(/\\begin\{abstract\}([\s\S]*?)\\end\{abstract\}/g, (_m, inner) => {
+        const body = inner.trim()
+        return `<div class="latex-abstract"><h3>Abstract</h3><div>${body}</div></div>`
+      })
+
+      // Equation environments
+      html = html.replace(/\\begin\{equation\*?\}([\s\S]*?)\\end\{equation\*?\}/g, (match, math) => {
+        try {
+          return `<div class="math-display">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`
+        } catch {
+          return `<div class="math-display math-error">${match}</div>`
+        }
+      })
       html = html.replace(/\\ref\{([^}]+)\}/g, "<ref>$1</ref>")
       html = html.replace(/\\label\{([^}]+)\}/g, "")
       
@@ -119,6 +138,15 @@ export function LaTeXEditor({
       
       // Inline math: $ ... $
       html = html.replace(/\$([^$]+)\$/g, (match, math) => {
+        try {
+          return `<span class="math-inline">${katex.renderToString(math, { displayMode: false, throwOnError: false })}</span>`
+        } catch {
+          return `<span class="math-inline math-error">${match}</span>`
+        }
+      })
+
+      // Inline math variant: \( ... \)
+      html = html.replace(/\\\(([^)]+)\\\)/g, (match, math) => {
         try {
           return `<span class="math-inline">${katex.renderToString(math, { displayMode: false, throwOnError: false })}</span>`
         } catch {
@@ -570,6 +598,18 @@ Cell 1 & Cell 2 & Cell 3 \\\\
           margin: 1.5rem 0 1rem;
           padding-bottom: 0.5rem;
           border-bottom: 1px solid #e5e5e5;
+        }
+        .latex-preview .latex-abstract {
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.5rem;
+          padding: 1rem 1.25rem;
+          margin: 1rem 0 1.25rem;
+        }
+        .latex-preview .latex-abstract h3 {
+          margin: 0 0 0.5rem 0;
+          font-weight: 600;
+          color: #111827;
         }
         .latex-preview h2 {
           font-size: 1.5rem;
