@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { BookOpen, Brain, Lightbulb, MessageCircle, Database, Smile, Briefcase, Zap, AlertTriangle, Sparkles } from "lucide-react"
+import { BookOpen, Brain, Lightbulb, MessageCircle, Database, BarChart3, GraduationCap, Compass, FileText, AlertTriangle } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -24,27 +24,27 @@ const sectionDescriptionStyle = "text-gray-600"
 
 const personalities = [
   {
-    key: 'friendly',
-    name: 'Friendly',
-    description: 'Warm, supportive, and encouraging.',
-    systemPrompt: 'You are a friendly, supportive research assistant. Use positive language and emojis.',
-    icon: Smile,
+    key: 'analytical',
+    name: 'Analytical',
+    description: 'Clear, evidence-based, logical reasoning.',
+    systemPrompt: 'You are an analytical research assistant. Focus on evidence-based reasoning, logical structure, and breaking down complex concepts. Use clear, systematic approaches to data analysis and structured arguments.',
+    icon: BarChart3,
     color: [34, 197, 94] as [number, number, number],
   },
   {
-    key: 'formal',
-    name: 'Formal',
-    description: 'Professional, concise, and academic.',
-    systemPrompt: 'You are a formal, academic research assistant. Use professional and concise language.',
-    icon: Briefcase,
+    key: 'scholarly',
+    name: 'Scholarly',
+    description: 'Academic, well-cited, thorough, and rigorous.',
+    systemPrompt: 'You are a scholarly research assistant. Provide academic, well-cited, thorough responses aligned with research papers and literature reviews. Use rigorous methodology and formal academic language.',
+    icon: GraduationCap,
     color: [59, 130, 246] as [number, number, number],
   },
   {
-    key: 'motivational',
-    name: 'Motivational',
-    description: 'Inspires and motivates you to keep going.',
-    systemPrompt: 'You are a motivational coach. Encourage the user and celebrate their progress.',
-    icon: Zap,
+    key: 'exploratory',
+    name: 'Exploratory',
+    description: 'Curious, open-ended, idea-generating.',
+    systemPrompt: 'You are an exploratory research assistant. Be curious and open-ended in your approach. Focus on brainstorming hypotheses, exploring alternative approaches, and identifying research gaps. Encourage creative thinking.',
+    icon: Compass,
     color: [245, 158, 11] as [number, number, number],
   },
   {
@@ -56,11 +56,11 @@ const personalities = [
     color: [239, 68, 68] as [number, number, number],
   },
   {
-    key: 'playful',
-    name: 'Playful',
-    description: 'Light-hearted, uses humor and playful language.',
-    systemPrompt: 'You are a playful assistant. Use humor, jokes, and playful language.',
-    icon: Sparkles,
+    key: 'concise',
+    name: 'Concise',
+    description: 'Direct, minimal, to the point.',
+    systemPrompt: 'You are a concise research assistant. Provide direct, minimal responses without unnecessary elaboration. Focus on summaries, abstracts, and quick explanations that get straight to the point.',
+    icon: FileText,
     color: [168, 85, 247] as [number, number, number],
   },
 ]
