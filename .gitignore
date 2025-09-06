@@ -40,6 +40,6 @@ next-env.d.ts
 .next
 .vscode
 .cursorrules
+.cursor
+.kombai
 
-# Sentry Config File
-.env.sentry-build-plugin

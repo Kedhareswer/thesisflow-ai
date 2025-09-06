@@ -906,7 +906,7 @@ export default function WriterPage() {
                 value={documentTitle}
                 onChange={(e) => setDocumentTitle(e.target.value)}
               />
-              <p className="text-gray-500 dark:text-gray-400 mb-8">Try mentioning a user with @</p>
+              
 
               <LaTeXEditor
                 value={documentContent}
