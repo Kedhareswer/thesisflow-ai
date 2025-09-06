@@ -31,6 +31,11 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import katex from "katex"
 import "katex/dist/katex.min.css"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { useResearchSession } from "@/components/research-session-provider"
 
 interface LaTeXEditorProps {
   value: string
@@ -38,6 +43,8 @@ interface LaTeXEditorProps {
   className?: string
   onCollaboratorJoin?: (user: any) => void
   collaborators?: any[]
+  template?: string
+  onTemplateChange?: (tpl: string) => void
 }
 
 export function LaTeXEditor({ 
@@ -45,7 +52,9 @@ export function LaTeXEditor({
   onChange, 
   className,
   onCollaboratorJoin,
-  collaborators = []
+  collaborators = [],
+  template: templateProp = "ieee",
+  onTemplateChange,
 }: LaTeXEditorProps) {
   const [viewMode, setViewMode] = useState<"split" | "edit" | "preview">("split")
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -53,12 +62,41 @@ export function LaTeXEditor({
   const [compileError, setCompileError] = useState<string | null>(null)
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
+  const { getSelectedPapers } = useResearchSession()
+  const [template, setTemplate] = useState<string>(templateProp)
+
+  useEffect(() => setTemplate(templateProp), [templateProp])
+  useEffect(() => { if (onTemplateChange) onTemplateChange(template) }, [template])
+
+  // Context menu state for inline citations
+  const [isCiteDialogOpen, setIsCiteDialogOpen] = useState(false)
+  const [selectedLineRange, setSelectedLineRange] = useState<{start: number; end: number} | null>(null)
+  const [selectedPaperIds, setSelectedPaperIds] = useState<string[]>([])
+  const [perLineMode, setPerLineMode] = useState<boolean>(true)
 
   // Compile LaTeX to HTML with math rendering
   const compileLatex = useCallback((latex: string) => {
     try {
       // Basic LaTeX to HTML conversion
       let html = latex
+
+      // Build bibliography meta map for author-year rendering
+      const refMeta: Record<string, { author: string; year: string }> = {}
+      try {
+        const bibRegex = /\\bibitem\{(ref\d+)\}([\s\S]*?)(?=(\\bibitem\{|\\end\{thebibliography\}))/g
+        let m: RegExpExecArray | null
+        while ((m = bibRegex.exec(latex)) !== null) {
+          const key = m[1]
+          const body = m[2].replace(/\n/g, ' ').trim()
+          // Extract first author surname and year
+          let author = ''
+          const authorPart = body.split(/[\.\(]/)[0] || ''
+          author = (authorPart.split(',')[0] || authorPart).trim()
+          const yearMatch = body.match(/\b(19|20)\d{2}\b/)
+          const year = yearMatch ? yearMatch[0] : ''
+          refMeta[key] = { author, year }
+        }
+      } catch {}
       
       // Convert LaTeX document structure
       html = html.replace(/\\documentclass\{[^}]+\}/g, "")
@@ -68,6 +106,7 @@ export function LaTeXEditor({
       
       // Convert sections and headings
       html = html.replace(/\\section\{([^}]+)\}/g, "<h1>$1</h1>")
+      html = html.replace(/\\section\*\{([^}]+)\}/g, "<h1>$1</h1>")
       html = html.replace(/\\subsection\{([^}]+)\}/g, "<h2>$1</h2>")
       html = html.replace(/\\subsubsection\{([^}]+)\}/g, "<h3>$1</h3>")
       html = html.replace(/\\paragraph\{([^}]+)\}/g, "<h4>$1</h4>")
@@ -89,9 +128,30 @@ export function LaTeXEditor({
       html = html.replace(/\\begin\{quote\}/g, "<blockquote>")
       html = html.replace(/\\end\{quote\}/g, "</blockquote>")
       
-      // Convert citations: srcN -> numeric [N], otherwise show key
-      html = html.replace(/\\cite\{src(\d+)\}/g, (_m, n) => `<sup>[${n}]</sup>`)
-      html = html.replace(/\\cite\{([^}]+)\}/g, (_m, key) => `<cite>[${key}]</cite>`)        
+      // Convert citations depending on template
+      if (["apa","mla","chicago","harvard"].includes(template)) {
+        html = html.replace(/\\cite\{([^}]+)\}/g, (_m, keys) => {
+          const parts = String(keys).split(',').map((k: string) => k.trim())
+          const formatted = parts.map((k) => {
+            if (k.startsWith('ref')) {
+              const meta = refMeta[k]
+              if (meta && (meta.author || meta.year)) {
+                return `<a href="#${k}">${meta.author}${meta.year ? ' ' + meta.year : ''}</a>`
+              }
+              const n = k.replace('ref','')
+              return `<a href="#${k}">[${n}]</a>`
+            }
+            // unknown key fallback
+            return `[${k}]`
+          }).join('; ')
+          return `(${formatted})`
+        })
+      } else {
+        // Numeric styles
+        html = html.replace(/\\cite\{src(\d+)\}/g, (_m, n) => `<sup><a href="#ref${n}">[${n}]<\/a><\/sup>`)
+        html = html.replace(/\\cite\{ref(\d+)\}/g, (_m, n) => `<sup><a href="#ref${n}">[${n}]<\/a><\/sup>`)
+        html = html.replace(/\\cite\{([^}]+)\}/g, (_m, key) => `<cite>[${key}]</cite>`)
+      }
 
       // Convert bracketed retrieval markers to numeric citations
       html = html.replace(/\[?\s*RETRIEVED\s+SOURCE\s*(\d+)\s*\]?/gi, (_m, n) => `<sup>[${n}]</sup>`)
@@ -101,6 +161,15 @@ export function LaTeXEditor({
         const body = inner.trim()
         return `<div class="latex-abstract"><h3>Abstract</h3><div>${body}</div></div>`
       })
+
+      // Bibliography environment
+      html = html.replace(/\\begin\{thebibliography\}\{[^}]*\}/g, '<ol class="latex-bibliography">')
+      html = html.replace(/\\end\{thebibliography\}/g, '</ol>')
+      html = html.replace(/\\bibitem\{([^}]+)\}\s*/g, (_m, key) => `<li id="${key}">`)
+      // Close list items when another bibitem or end encountered (now looking for </ol> as end marker)
+      html = html.replace(/\n(?=\\bibitem\{|<\/ol>)/g, '</li>\n')
+      // Ensure last list item is closed before </ol>
+      html = html.replace(/(<li[^>]*>[^]*?)(<\/ol>)/g, (m, liPart, endTag) => liPart.endsWith('</li>') ? m : `${liPart}</li>${endTag}`)
 
       // Equation environments
       html = html.replace(/\\begin\{equation\*?\}([\s\S]*?)\\end\{equation\*?\}/g, (match, math) => {
@@ -293,6 +362,104 @@ Cell 1 & Cell 2 & Cell 3 \\\\
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [insertLatex])
 
+  // Helpers for inline citation creation
+  const getSelectionLineRange = () => {
+    if (!editorRef.current) return null
+    const text = value
+    const start = editorRef.current.selectionStart
+    const end = editorRef.current.selectionEnd
+    if (start === end) return null
+    const pre = text.slice(0, start)
+    const sel = text.slice(start, end)
+    const startLine = pre.split('\n').length
+    const selLines = sel.split('\n').length
+    return { start: startLine, end: startLine + selLines - 1 }
+  }
+
+  const handleContextMenuOpen = () => {
+    const range = getSelectionLineRange()
+    setSelectedLineRange(range)
+  }
+
+  const handleInsertCitations = () => {
+    if (!editorRef.current || selectedPaperIds.length === 0) {
+      setIsCiteDialogOpen(false)
+      return
+    }
+    // Determine next reference indices by scanning existing \bibitem{refN}
+    const refRegex = /\\bibitem\{ref(\d+)\}/g
+    const existing = Array.from(value.matchAll(refRegex)).map(m => parseInt(m[1], 10))
+    let nextIndex = existing.length > 0 ? Math.max(...existing) + 1 : 1
+
+    const selectedPapers = getSelectedPapers()
+    const chosen = selectedPapers.filter((p: any) => selectedPaperIds.includes(String(p.id)))
+
+    // Build cite keys list and bibliography items
+    const citeKeys: string[] = []
+    let bibItems = ''
+    for (const p of chosen) {
+      const k = `ref${nextIndex}`
+      citeKeys.push(k)
+      bibItems += formatBibItem(template, nextIndex, p) + '\n'
+      nextIndex++
+    }
+
+    const textarea = editorRef.current
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const citeText = `\\cite{${citeKeys.join(',')}}`
+
+    let newValue = value
+    if (perLineMode && selectedLineRange) {
+      const lines = value.split('\n')
+      const sIndex = Math.max(0, selectedLineRange.start - 1)
+      const eIndex = Math.min(lines.length - 1, selectedLineRange.end - 1)
+      for (let i = sIndex; i <= eIndex; i++) {
+        lines[i] = lines[i].replace(/\s*$/, '') + ' ' + citeText
+      }
+      newValue = lines.join('\n')
+    } else {
+      // Insert once at selection end
+      newValue = value.slice(0, end) + citeText + value.slice(end)
+    }
+
+    // Ensure bibliography section
+    const hasBiblio = /\\begin\{thebibliography\}/.test(newValue)
+    let withBiblio = newValue
+    if (!hasBiblio) {
+      withBiblio += `\n\n\\section*{References}\n\\begin{thebibliography}{99}\n${bibItems}\\end{thebibliography}`
+    } else {
+      withBiblio = withBiblio.replace(/\\end\{thebibliography\}/, `${bibItems}\\end{thebibliography}`)
+    }
+
+    onChange(withBiblio)
+    setIsCiteDialogOpen(false)
+    setSelectedPaperIds([])
+    // restore cursor roughly after citation
+    setTimeout(() => {
+      textarea.focus()
+      const pos = end + citeText.length
+      textarea.setSelectionRange(pos, pos)
+    }, 0)
+    toast({ title: 'Citations inserted', description: 'Inline citations and references added.' })
+  }
+
+  const formatBibItem = (tpl: string, n: number, paper: any) => {
+    const authors = Array.isArray(paper.authors)
+      ? paper.authors.map((a: any) => (typeof a === 'string' ? a : a?.name || '')).filter(Boolean).join(', ')
+      : ''
+    const title = paper.title || 'Untitled'
+    const journal = paper.journal?.title || paper.journal || paper.venue || ''
+    const year = paper.year || paper.publication_year || ''
+    const doi = paper.doi ? ` doi: ${paper.doi}.` : ''
+    const url = paper.url ? ` URL: ${paper.url}.` : ''
+    if (tpl === 'ieee' || tpl === 'elsevier' || tpl === 'springer' || tpl === 'acm') {
+      return `\\bibitem{ref${n}} ${authors}, "${title}," ${journal ? `\\textit{${journal}}, ` : ''}${year}.${doi}`
+    }
+    // default/author-year minimal fallback
+    return `\\bibitem{ref${n}} ${authors} (${year}). ${title}.${journal ? ` ${journal}.` : ''}${doi || url}`
+  }
+
   return (
     <div
       className={`${className} bg-white rounded-lg border border-gray-200 overflow-hidden ${
@@ -459,24 +626,26 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                 </div>
               </div>
             )}
-            
-            {/* Word Count Badge */}
-            <Badge variant="outline" className="bg-white text-gray-600 border-gray-300">
-              <Type className="h-3 w-3 mr-1" />
-              {value.split(/\s+/).filter(word => word.length > 0).length} words
-            </Badge>
-
-            {/* Compilation Status */}
-            {compileError ? (
-              <Badge variant="destructive" className="text-xs">
-                Compilation Error
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                <FileText className="h-3 w-3 mr-1" />
-                LaTeX Ready
-              </Badge>
-            )}
+            {/* Academic Template Selector (replaces word count + ready) */}
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-gray-600">Template</Label>
+              <Select value={template} onValueChange={setTemplate}>
+                <SelectTrigger className="h-8 min-w-[160px]">
+                  <SelectValue placeholder="Select template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ieee">IEEE</SelectItem>
+                  <SelectItem value="acm">ACM</SelectItem>
+                  <SelectItem value="springer">Springer</SelectItem>
+                  <SelectItem value="elsevier">Elsevier</SelectItem>
+                  <SelectItem value="apa">APA</SelectItem>
+                  <SelectItem value="mla">MLA</SelectItem>
+                  <SelectItem value="chicago">Chicago</SelectItem>
+                  <SelectItem value="harvard">Harvard</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Fullscreen Toggle */}
             <Button
@@ -505,19 +674,38 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                 </h3>
               </div>
               <div className="h-[calc(100%-41px)] p-4">
-                <Textarea
-                  ref={editorRef}
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  className="w-full h-full font-mono text-sm resize-none border-none focus:ring-0 focus:outline-none"
-                  placeholder="% Start writing your LaTeX document here...\n\documentclass{article}\n\begin{document}\n\n\section{Introduction}\nYour content here...\n\n\end{document}"
-                  spellCheck={false}
-                />
+                <ContextMenu onOpenChange={(open)=> open && handleContextMenuOpen()}>
+                  <ContextMenuTrigger className="w-full h-full">
+                    <Textarea
+                      ref={editorRef}
+                      value={value}
+                      onChange={(e) => onChange(e.target.value)}
+                      className="w-full h-full font-mono text-sm resize-none border-none focus:ring-0 focus:outline-none"
+                      placeholder="% Start writing your LaTeX document here...\n\\documentclass{article}\n\\begin{document}\n\n\\section{Introduction}\nYour content here...\n\n\\end{document}"
+                      spellCheck={false}
+                    />
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-56">
+                    <div className="px-2 py-1.5 text-xs text-gray-500">Selection tools</div>
+                    <ContextMenuItem
+                      inset
+                      disabled={!selectedLineRange || (selectedLineRange.end - selectedLineRange.start + 1) > 4}
+                      onClick={() => {
+                        setIsCiteDialogOpen(true)
+                      }}
+                    >
+                      Mark citations (max 4 lines)
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem inset onClick={() => insertLatex('inline-math')}>Inline math $...$</ContextMenuItem>
+                    <ContextMenuItem inset onClick={() => insertLatex('equation')}>Display equation $$...$$</ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               </div>
             </div>
 
             {/* Preview Panel */}
-            <div className="bg-white">
+            <div className={`bg-white ${template ? `latex-template-${template}` : ''}`}>
               <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
                 <h3 className="text-sm font-medium text-gray-700 flex items-center">
                   <Eye className="h-4 w-4 mr-2" />
@@ -543,14 +731,31 @@ Cell 1 & Cell 2 & Cell 3 \\\\
 
         {viewMode === "edit" && (
           <div className="h-full p-4 bg-white">
-            <Textarea
-              ref={editorRef}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              className="w-full h-full font-mono text-sm resize-none border-none focus:ring-0 focus:outline-none"
-              placeholder="% Start writing your LaTeX document here...\n\documentclass{article}\n\begin{document}\n\n\section{Introduction}\nYour content here...\n\n\end{document}"
-              spellCheck={false}
-            />
+            <ContextMenu onOpenChange={(open)=> open && handleContextMenuOpen()}>
+              <ContextMenuTrigger className="w-full h-full">
+                <Textarea
+                  ref={editorRef}
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  className="w-full h-full font-mono text-sm resize-none border-none focus:ring-0 focus:outline-none"
+                  placeholder="% Start writing your LaTeX document here...\n\\documentclass{article}\n\\begin{document}\n\n\\section{Introduction}\nYour content here...\n\n\\end{document}"
+                  spellCheck={false}
+                />
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-56">
+                <div className="px-2 py-1.5 text-xs text-gray-500">Selection tools</div>
+                <ContextMenuItem
+                  inset
+                  disabled={!selectedLineRange || (selectedLineRange.end - selectedLineRange.start + 1) > 4}
+                  onClick={() => setIsCiteDialogOpen(true)}
+                >
+                  Mark citations (max 4 lines)
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem inset onClick={() => insertLatex('inline-math')}>Inline math $...$</ContextMenuItem>
+                <ContextMenuItem inset onClick={() => insertLatex('equation')}>Display equation $$...$$</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           </div>
         )}
 
@@ -582,14 +787,61 @@ Cell 1 & Cell 2 & Cell 3 \\\\
             <span>Lines: {value.split("\n").length}</span>
             <span>•</span>
             <span>Characters: {value.length}</span>
+            <span>•</span>
+            <span>Words: {value.split(/\s+/).filter(w=>w).length}</span>
           </div>
           <div className="flex items-center space-x-2">
-            <span>LaTeX Document</span>
+            <span>LaTeX • {template.toUpperCase()}</span>
             {!compileError && <div className="w-2 h-2 bg-green-500 rounded-full" title="Compiled Successfully" />}
             {compileError && <div className="w-2 h-2 bg-red-500 rounded-full" title="Compilation Error" />}
           </div>
         </div>
       </div>
+
+      {/* Dialog: Mark citations */}
+      <Dialog open={isCiteDialogOpen} onOpenChange={setIsCiteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark citations for selected text</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Choose up to 4 papers to cite. They will be inserted as LaTeX citations and added to the References section.</p>
+            <div className="max-h-56 overflow-y-auto space-y-2">
+              {getSelectedPapers().length === 0 && (
+                <div className="text-sm text-muted-foreground">No selected papers available. Add papers in Explorer first.</div>
+              )}
+              {getSelectedPapers().map((p: any, idx: number) => (
+                <label key={String(p.id) || idx} className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedPaperIds.includes(String(p.id))}
+                    onChange={(e) => {
+                      const id = String(p.id)
+                      if (e.target.checked) {
+                        if (selectedPaperIds.length < 4) setSelectedPaperIds([...selectedPaperIds, id])
+                        else toast({ title: 'Limit reached', description: 'Select at most 4 references.' })
+                      } else {
+                        setSelectedPaperIds(selectedPaperIds.filter(x => x !== id))
+                      }
+                    }}
+                  />
+                  <span>
+                    <span className="font-medium">{p.title || 'Untitled'}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {(Array.isArray(p.authors) ? p.authors.slice(0, 3).map((a:any)=> typeof a === 'string' ? a : a?.name || '').filter(Boolean).join(', ') : '')}
+                      {p.year ? ` (${p.year})` : ''}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCiteDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleInsertCitations} disabled={selectedPaperIds.length === 0}>Insert \cite</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style jsx global>{`
         .latex-preview h1 {

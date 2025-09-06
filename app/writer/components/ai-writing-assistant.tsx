@@ -108,6 +108,14 @@ export function AIWritingAssistant({
         return 'Springer format with concise, formal academic writing';
       case 'elsevier':
         return 'Elsevier format with structured academic writing and formal tone';
+      case 'apa':
+        return 'APA style with author-year citations, formal academic tone, and structured headings per APA guidelines';
+      case 'mla':
+        return 'MLA style with author-page inline citations and humanities-focused academic tone';
+      case 'chicago':
+        return 'Chicago style (author-date) with formal narrative style and comprehensive referencing';
+      case 'harvard':
+        return 'Harvard referencing style with author-year citations and concise academic prose';
       default:
         return 'standard academic style';
     }
