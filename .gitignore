@@ -36,10 +36,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.kiro
-.next
-.vscode
-.cursorrules
-.cursor
-.kombai
-
+# IDE and tool directories
+.kiro/
+.next/
+.vscode/
+.cursorrules/
+.cursor/
+.kombai/
