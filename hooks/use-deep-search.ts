@@ -8,7 +8,7 @@ export interface DeepSearchItem {
   url: string
   snippet?: string
   source: string
-  kind?: 'web' | 'scholar'
+  kind?: 'web' | 'scholar' | 'docs' | 'news'
   score?: number
 }
 

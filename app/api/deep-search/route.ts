@@ -79,6 +79,95 @@ async function tavilySearch(query: string, limit = 10) {
   }))
 }
 
+// Context7 MCP: docs/dev search (server-only; optional)
+async function context7Docs(query: string, limit = 10) {
+  const base = process.env.CONTEXT7_API_URL || process.env.CONTEXT7_MCP_URL
+  if (!base) return [] as any[]
+  const apiKey = process.env.CONTEXT7_API_KEY
+  try {
+    const url = new URL((base.endsWith('/') ? base.slice(0, -1) : base) + '/search')
+    url.searchParams.set('q', query)
+    url.searchParams.set('type', 'docs')
+    url.searchParams.set('limit', String(Math.min(10, Math.max(1, limit))))
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'ThesisFlow-AI/1.0',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    const data = await res.json().catch(() => null)
+    const items = Array.isArray(data?.items) ? data.items : Array.isArray(data?.results) ? data.results : []
+    return items.map((it: any) => ({
+      title: it.title || it.name || it.url,
+      url: it.url || it.link || '',
+      snippet: it.snippet || it.summary || it.description || '',
+      source: 'context7',
+      kind: 'docs' as const,
+    }))
+  } catch {
+    return []
+  }
+}
+
+// LangSearch: web / scholar / news (server-only; optional)
+const LANGSEARCH_BASE = process.env.LANGSEARCH_API_URL || 'https://api.langsearch.io/v1'
+
+async function langSearch(query: string, endpoint: 'web' | 'scholar' | 'news', limit = 10) {
+  const key = process.env.LANGSEARCH_API_KEY
+  if (!key) return [] as any[]
+  try {
+    const res = await fetch(`${LANGSEARCH_BASE}/${endpoint}/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ query, limit: Math.min(10, Math.max(1, limit)) }),
+    })
+    if (!res.ok) return []
+    const data = await res.json().catch(() => null)
+    const items = Array.isArray(data?.results) ? data.results : []
+    return items.map((it: any) => ({
+      title: it.title || it.url,
+      url: it.url,
+      snippet: it.snippet || it.description || '',
+      source: 'langsearch',
+      kind: endpoint === 'scholar' ? ('scholar' as const) : endpoint === 'news' ? ('news' as const) : ('web' as const),
+    }))
+  } catch {
+    return []
+  }
+}
+
+// GNews fallback (optional)
+async function gnewsSearch(query: string, limit = 10) {
+  const key = process.env.GNEWS_API_KEY
+  if (!key) return [] as any[]
+  try {
+    const url = new URL('https://gnews.io/api/v4/search')
+    url.searchParams.set('q', query)
+    url.searchParams.set('lang', 'en')
+    url.searchParams.set('max', String(Math.min(10, Math.max(1, limit))))
+    url.searchParams.set('apikey', key)
+    const res = await fetch(url.toString(), { headers: { 'User-Agent': 'ThesisFlow-AI/1.0' } })
+    if (!res.ok) return []
+    const data = await res.json().catch(() => null)
+    const articles = Array.isArray(data?.articles) ? data.articles : []
+    return articles.map((it: any) => ({
+      title: it.title || it.url,
+      url: it.url,
+      snippet: it.description || '',
+      source: 'gnews',
+      kind: 'news' as const,
+    }))
+  } catch {
+    return []
+  }
+}
+
 function createSSEStream(
   signal: AbortSignal,
   handler: (send: (data: any) => void, close: () => void, signal: AbortSignal) => Promise<void>
@@ -125,9 +214,9 @@ export async function GET(request: NextRequest) {
 
       // Deduplication across all sources
       const seen = new Set<string>()
-      const results: Array<{ title: string; url: string; snippet?: string; source: string; score?: number; kind?: 'web' | 'scholar' }> = []
+      const results: Array<{ title: string; url: string; snippet?: string; source: string; score?: number; kind?: 'web' | 'scholar' | 'docs' | 'news' }> = []
 
-      const addResult = (r: { title?: string; url?: string; snippet?: string; source: string; kind?: 'web' | 'scholar' }) => {
+      const addResult = (r: { title?: string; url?: string; snippet?: string; source: string; kind?: 'web' | 'scholar' | 'docs' | 'news' }) => {
         const url = (r.url || '').trim()
         const title = (r.title || '').trim()
         if (!url && !title) return
@@ -187,14 +276,114 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Launch in parallel and wait (bounded time)
-      await Promise.allSettled([scholarly(), webGoogle(), webDDG(), webTavily()])
+      const docsContext7 = async () => {
+        try {
+          const items = await context7Docs(q, Math.min(10, limit))
+          for (const it of items) addResult({ ...it, kind: 'docs' })
+        } catch (e) {
+          send({ type: 'warn', source: 'context7', error: e instanceof Error ? e.message : String(e) })
+        }
+      }
 
-      // Basic ranking: prefer scholarly, then web; within each, by presence of snippet length
-      const scored = results.map((r) => ({
-        ...r,
-        score: (r.kind === 'scholar' ? 2 : 1) + Math.min(1, (r.snippet?.length || 0) / 300)
-      }))
+      const webLangSearch = async () => {
+        try {
+          const items = await langSearch(q, 'web', Math.min(10, limit))
+          for (const it of items) addResult({ ...it, kind: 'web' })
+        } catch (e) {
+          send({ type: 'warn', source: 'langsearch-web', error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+
+      const scholarLangSearch = async () => {
+        try {
+          const items = await langSearch(q, 'scholar', Math.min(10, limit))
+          for (const it of items) addResult({ ...it, kind: 'scholar' })
+        } catch (e) {
+          send({ type: 'warn', source: 'langsearch-scholar', error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+
+      const newsLangSearch = async () => {
+        try {
+          const items = await langSearch(q, 'news', Math.min(10, limit))
+          for (const it of items) addResult({ ...it, kind: 'news' })
+        } catch (e) {
+          send({ type: 'warn', source: 'langsearch-news', error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+
+      const newsGNews = async () => {
+        try {
+          const items = await gnewsSearch(q, Math.min(10, limit))
+          for (const it of items) addResult({ ...it, kind: 'news' })
+        } catch (e) {
+          send({ type: 'warn', source: 'gnews', error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+
+      // Launch in parallel and wait (bounded time)
+      await Promise.allSettled([
+        scholarly(),
+        webGoogle(),
+        webDDG(),
+        webTavily(),
+        docsContext7(),
+        webLangSearch(),
+        scholarLangSearch(),
+        newsLangSearch(),
+        newsGNews(),
+      ])
+
+      // Improved ranking: per-kind weights + domain authority + title/snippet quality
+      const kindWeight = (k?: 'web' | 'scholar' | 'docs' | 'news') =>
+        k === 'scholar' ? 3 : k === 'docs' ? 2.5 : k === 'web' ? 1.5 : 1
+
+      const domainAuthority: Record<string, number> = {
+        'arxiv.org': 1.0,
+        'nature.com': 0.95,
+        'science.org': 0.95,
+        'sciencedirect.com': 0.95,
+        'ieee.org': 0.95,
+        'dl.acm.org': 0.95,
+        'springer.com': 0.9,
+        'link.springer.com': 0.9,
+        'nih.gov': 0.95,
+        'nasa.gov': 0.9,
+        'stanford.edu': 0.95,
+        'mit.edu': 0.95,
+        'harvard.edu': 0.95,
+        'ox.ac.uk': 0.9,
+        'cam.ac.uk': 0.9,
+        'developer.mozilla.org': 0.95,
+        'mdn.mozilla.org': 0.95,
+        'docs.microsoft.com': 0.9,
+        'readthedocs.io': 0.8,
+        'wikipedia.org': 0.6,
+        'github.com': 0.7,
+        'gitlab.com': 0.6,
+      }
+
+      const getDomain = (u?: string) => {
+        if (!u) return ''
+        try { return new URL(u).hostname.replace(/^www\./, '') } catch { return '' }
+      }
+
+      const queryTokens = q.toLowerCase().split(/\s+/).filter(t => t.length > 2)
+      const titleMatchScore = (title?: string) => {
+        if (!title || queryTokens.length === 0) return 0
+        const t = title.toLowerCase()
+        const matches = queryTokens.reduce((acc, tok) => acc + (t.includes(tok) ? 1 : 0), 0)
+        return Math.min(1, matches / Math.min(5, queryTokens.length))
+      }
+
+      const scored = results.map((r) => {
+        const base = kindWeight(r.kind)
+        const dom = domainAuthority[getDomain(r.url)] || 0.2
+        const snippetScore = Math.min(1, (r.snippet?.length || 0) / 400)
+        const titleScore = titleMatchScore(r.title)
+        const score = base + 0.8 * dom + 0.7 * snippetScore + 0.5 * titleScore
+        return { ...r, score }
+      })
       scored.sort((a, b) => (b.score || 0) - (a.score || 0))
 
       send({ type: 'progress', message: 'Search complete, preparing summary', total: scored.length })
