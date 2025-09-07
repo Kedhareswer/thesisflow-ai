@@ -55,7 +55,7 @@ export function SearchInput({
   }
 
   return (
-    <div className={cn("flex w-full items-center gap-2", className)}>
+    <div className={cn("flex w-full items-stretch gap-2 flex-col sm:flex-row", className)}>
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <Input
@@ -79,7 +79,7 @@ export function SearchInput({
         )}
       </div>
       {showButton && (
-        <Button onClick={handleSearch} disabled={!query.trim()} type="button">
+        <Button onClick={handleSearch} disabled={!query.trim()} type="button" className="w-full sm:w-auto">
           <Search className="mr-2 h-4 w-4" />
           {buttonText}
         </Button>

@@ -256,8 +256,15 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
 
       const result: SearchResult = await response.json();
 
+      // Ensure newest-first ordering by year when available
+      const sorted = [...(result.papers || [])].sort((a: Paper, b: Paper) => {
+        const ya = parseInt((a.year || '').toString().slice(0, 4)) || 0
+        const yb = parseInt((b.year || '').toString().slice(0, 4)) || 0
+        return yb - ya
+      })
+
       setState({
-        results: result.papers || [],
+        results: sorted,
         isLoading: false,
         error: null,
         searchTime: result.searchTime || 0,
@@ -412,13 +419,21 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
           sseFallbackTimerRef.current = null;
         }
         const payload = (() => { try { return JSON.parse(ev.data); } catch { return {}; } })() as any;
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: null,
-          searchTime: typeof payload?.processingTime === 'number' ? payload.processingTime : prev.searchTime,
-          source: payload?.mode === 'search' ? 'stream' : (prev.source || 'stream'),
-        }));
+        setState(prev => {
+          const sorted = [...prev.results].sort((a: Paper, b: Paper) => {
+            const ya = parseInt((a.year || '').toString().slice(0, 4)) || 0
+            const yb = parseInt((b.year || '').toString().slice(0, 4)) || 0
+            return yb - ya
+          })
+          return {
+            ...prev,
+            isLoading: false,
+            error: null,
+            searchTime: typeof payload?.processingTime === 'number' ? payload.processingTime : prev.searchTime,
+            source: payload?.mode === 'search' ? 'stream' : (prev.source || 'stream'),
+            results: sorted,
+          }
+        });
         setCurrentQuery(query);
         try { es.close(); } catch {}
         eventSourceRef.current = null;

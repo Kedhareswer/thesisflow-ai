@@ -1376,6 +1376,9 @@ SENTIMENT: [positive/neutral/negative]`
       const total = text.length
       let emitted = 0
 
+      // Dynamic chunk size for faster, smoother streaming
+      const chunkSize = total >= 5000 ? 12 : total >= 2000 ? 8 : 4
+
       while (emitted < total) {
         if (options.abortSignal?.aborted) {
           options.onProgress?.({
@@ -1385,17 +1388,18 @@ SENTIMENT: [positive/neutral/negative]`
           return true
         }
 
-        const token = text.charAt(emitted)
-        if (token) {
-          options.onToken?.(token)
+        const next = text.slice(emitted, Math.min(emitted + chunkSize, total))
+        if (next) {
+          options.onToken?.(next)
         }
-        emitted += 1
+        emitted += next.length
 
-        if (emitted % 12 === 0 || emitted === total) {
+        // Emit progress frequently for responsive UI
+        if (emitted % (chunkSize * 3) === 0 || emitted === total) {
           options.onProgress?.({ percentage: Math.round((emitted / Math.max(total, 1)) * 100) })
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 20))
+        await new Promise((resolve) => setTimeout(resolve, 8))
       }
 
       options.onProgress?.({ message: "Streaming complete", percentage: 100 })

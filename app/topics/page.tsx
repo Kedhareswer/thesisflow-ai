@@ -282,15 +282,28 @@ Strict Requirements:
 - Absolutely no hallucinations. If evidence is insufficient, state limitations explicitly.
 - Preferred length: ${wordsTarget} words.
 - Use clear headings and subheadings.
-- Include multiple visual summaries using Markdown only (no external scripts):
+- Include multiple visual summaries using Markdown only (no external scripts). These MUST be contextually meaningful and derived strictly from the sources:
   1) Evidence Summary Table with columns: ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation.
-  2) Key Metrics Table with columns: Metric | Value/Range | Citation.
+  2) Key Metrics Table with columns: Metric | Value/Range | Population/Scope | Citation.
   3) Regional Comparison Table with columns: Region | Trend/Direction | Notable Study [n].
   4) Timeline Table with columns: Period | Milestones | Citations.
-  5) One ASCII bar chart of Key Trends inside a fenced code block labeled "text" (no mermaid), e.g.:
+  5) ASCII Bar Chart of Key Trends inside a fenced code block labeled "text" (no mermaid), e.g.:
      \`\`\`text
      Trend A |██████████ 85%
      Trend B |███████    55%
+     \`\`\`
+  6) ASCII Line Chart (time series if years are available), labeled "text", e.g.:
+     \`\`\`text
+     2019 ▏▏▏
+     2020 ▏▏▏▏▏
+     2021 ▏▏▏▏▏▏▏
+     2022 ▏▏▏▏▏▏▏▏
+     \`\`\`
+  7) Geographic Summary Map (textual/ASCII). List regions/countries with an intensity bar using blocks (▁▃▅▇), e.g.:
+     \`\`\`text
+     North America  ▇▇▇▇  High activity [3,7]
+     Europe         ▇▇▇   Moderate [2,5]
+     Asia           ▇▇▇▇▇ Very High [1,4,6]
      \`\`\`
 - Where data is insufficient, write "Data not available" rather than guessing.
 
@@ -526,48 +539,7 @@ Sources:\n${sourceLines}`
                 </div>
               )}
             </div>
-
-            {/* Complete Scholarly Report (exclusive to Topics page) */}
-            <div className="mt-10">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Complete Scholarly Report</h3>
-              {reportLoading && (
-                <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Generating report…
-                </div>
-              )}
-              {reportError && (
-                <div className="text-sm text-red-600 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> {reportError}
-                </div>
-              )}
-              {!reportLoading && !report && (
-                <div className="text-sm text-gray-500">A rigorous, well-cited report will appear here once sources are analyzed.</div>
-              )}
-              {report && (
-                <div className="rounded-lg border border-gray-200 bg-white p-4">
-                  <AIDisplayResponse className="prose max-w-none">
-                    {report}
-                  </AIDisplayResponse>
-                </div>
-              )}
-            </div>
-
-            {/* Extracted Topics */}
-            <div className="mt-10">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Extracted Topics</h3>
-              {topicsLoading && <div className="text-sm text-gray-600 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Analyzing sources…</div>}
-              {topicsError && <div className="text-sm text-red-600 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {topicsError}</div>}
-              {!topicsLoading && topics.length === 0 && (
-                <div className="text-sm text-gray-500">Topics will appear here once sources are analyzed.</div>
-              )}
-              {topics.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {topics.map((t, i) => (
-                    <span key={i} className="px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-700 text-sm">{t}</span>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* duplicate sections removed */}
           </div>
         </div>
       </div>
