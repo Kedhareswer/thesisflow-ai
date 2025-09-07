@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown, ExternalLink, AlertTriangle, Zap } from "lucide-react"
 import Link from "next/link"
@@ -38,10 +38,20 @@ export default function FindTopicsPage() {
   const [topicsLoading, setTopicsLoading] = useState(false)
   const [topicsError, setTopicsError] = useState<string | null>(null)
 
-  // Scholarly Complete Report (exclusive to Topics page)
+  // Scholarly Report (exclusive to Topics page)
   const [report, setReport] = useState<string>('')
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState<string | null>(null)
+  const reportAbortRef = useRef<AbortController | null>(null)
+  const reportTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [reportStartAt, setReportStartAt] = useState<number | null>(null)
+  const [reportElapsedSec, setReportElapsedSec] = useState(0)
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0')
+    const s = Math.floor(sec % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
 
   const topicSuggestions: TopicSuggestion[] = [
     {
@@ -222,27 +232,37 @@ export default function FindTopicsPage() {
     }
   }, [literature.results, topicsLoading, topics.length])
 
-  // Generate Scholarly Complete Report using only fetched sources (exclusive to Topics page)
-  useEffect(() => {
-    const papers = literature.results || []
-    // Trigger once per query when we have a reasonable set of papers
-    if (papers.length > 0 && !report && !reportLoading) {
-      ;(async () => {
-        try {
-          setReportLoading(true)
-          setReportError(null)
-          const wordsTarget = qualityMode === 'Standard' ? '800-1200' : '1200-1800'
-          // Build enumerated sources for strict citation
-          const sourceLines = papers.map((p, idx) => {
-            const authors = (p.authors || []).join(', ')
-            const year = p.year || 'n.d.'
-            const journal = p.journal || ''
-            const doi = (p as any).doi || ''
-            const locator = doi ? `doi:${doi}` : (p.url || '')
-            return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
-          }).join('\n')
+  // Manual streaming report generation
+  const generateReport = useCallback(async () => {
+    try {
+      const papers = literature.results || []
+      if (papers.length === 0) {
+        setReportError('Run a search first to fetch sources.')
+        return
+      }
+      setReport('')
+      setReportError(null)
+      setReportLoading(true)
+      const started = Date.now()
+      setReportStartAt(started)
+      setReportElapsedSec(0)
+      if (reportTimerRef.current) clearInterval(reportTimerRef.current)
+      reportTimerRef.current = setInterval(() => {
+        setReportElapsedSec(Math.floor((Date.now() - started) / 1000))
+      }, 1000)
 
-          const prompt = `Write a scholarly academic review on the topic: "${searchQuery}".
+      // Build enumerated sources for strict citation
+      const sourceLines = papers.map((p, idx) => {
+        const authors = (p.authors || []).join(', ')
+        const year = p.year || 'n.d.'
+        const journal = p.journal || ''
+        const doi = (p as any).doi || ''
+        const locator = doi ? `doi:${doi}` : (p.url || '')
+        return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
+      }).join('\n')
+
+      const wordsTarget = qualityMode === 'Standard' ? '800-1200' : '1200-1800'
+      const prompt = `Write a scholarly academic review on the topic: "${searchQuery}".
 
 Use ONLY the numbered sources below. Do not invent citations or data. Cite inline with bracketed numbers [1], [2] that match the exact numbering provided. After the body, include a "References" section listing the same numbered items in order.
 
@@ -254,21 +274,38 @@ Constraints:
 
 Sources:\n${sourceLines}`
 
-          const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-          const resp = await enhancedAIService.generateText({ prompt, temperature: 0.2, maxTokens: 2000 })
-          if (resp.success && resp.content) {
-            setReport(resp.content)
-          } else {
-            setReportError(resp.error || 'Failed to generate report')
-          }
-        } catch (e) {
-          setReportError('Report generation unavailable. Configure an AI provider to enable this feature.')
-        } finally {
-          setReportLoading(false)
-        }
-      })()
+      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
+
+      const controller = new AbortController()
+      reportAbortRef.current = controller
+      await enhancedAIService.generateTextStream({
+        prompt,
+        temperature: 0.2,
+        maxTokens: 2000,
+        onToken: (t) => setReport((prev) => prev + t),
+        onProgress: () => {},
+        onError: (err) => setReportError(err || 'Streaming failed'),
+        abortSignal: controller.signal,
+      })
+    } catch (e) {
+      setReportError(e instanceof Error ? e.message : 'Failed to generate report')
+    } finally {
+      setReportLoading(false)
+      if (reportTimerRef.current) {
+        clearInterval(reportTimerRef.current)
+        reportTimerRef.current = null
+      }
     }
-  }, [literature.results, report, reportLoading, qualityMode, searchQuery])
+  }, [literature.results, qualityMode, searchQuery])
+
+  useEffect(() => {
+    return () => {
+      if (reportTimerRef.current) clearInterval(reportTimerRef.current)
+      if (reportAbortRef.current) reportAbortRef.current.abort()
+    }
+  }, [])
+
+  // Manual-only report: no auto-generation
 
   if (searchMode === 'results') {
     return (
@@ -326,35 +363,82 @@ Sources:\n${sourceLines}`
                 { literature.isLoading ? 'Searching…' : `Done${literature.results.length ? ` • ${literature.results.length} results` : ''}` }
               </div>
 
-              {/* Progress Steps */}
-              <div className="space-y-3">
-                {searchProgress.map((step, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    {step.status === 'completed' && (
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <Check className="w-3 h-3 text-white" />
-                      </div>
-                    )}
-                    {step.status === 'current' && (
-                      <div className="w-5 h-5 flex items-center justify-center">
-                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                      </div>
-                    )}
-                    {step.status === 'pending' && (
-                      <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
-                    )}
-                    <span className={`text-sm ${
-                      step.status === 'completed' ? 'text-gray-900' : 
-                      step.status === 'current' ? 'text-gray-900' : 'text-gray-400'
-                    }`}>
-                      {step.step}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {/* Progress Steps - hide when report is finished */}
+              {(!report || reportLoading) && (
+                <div className="space-y-3">
+                  {searchProgress.map((step, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      {step.status === 'completed' && (
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                      {step.status === 'current' && (
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                        </div>
+                      )}
+                      {step.status === 'pending' && (
+                        <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
+                      )}
+                      <span className={`text-sm ${
+                        step.status === 'completed' ? 'text-gray-900' : 
+                        step.status === 'current' ? 'text-gray-900' : 'text-gray-400'
+                      }`}>
+                        {step.step}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
-            {/* Results Section */}
+            {/* Extracted Topics - now first */}
+            <div className="mt-10">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Extracted Topics</h3>
+              {topicsLoading && <div className="text-sm text-gray-600 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Analyzing sources…</div>}
+              {topicsError && <div className="text-sm text-red-600 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {topicsError}</div>}
+              {!topicsLoading && topics.length === 0 && (
+                <div className="text-sm text-gray-500">Topics will appear here once sources are analyzed.</div>
+              )}
+              {topics.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {topics.map((t, i) => (
+                    <span key={i} className="px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-700 text-sm">{t}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Report - streaming with manual trigger */}
+            <div className="mt-10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">Report</h3>
+                <div className="flex items-center gap-3 text-sm">
+                  {reportStartAt && (
+                    <span className="text-gray-600">⏱ {formatDuration(reportElapsedSec)}</span>
+                  )}
+                  {!reportLoading && (
+                    <button onClick={generateReport} className="px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50">Generate Report</button>
+                  )}
+                </div>
+              </div>
+              {reportLoading && (
+                <div className="text-sm text-gray-600 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Generating report…</div>
+              )}
+              {reportError && (
+                <div className="text-sm text-red-600 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {reportError}</div>
+              )}
+              {report && (
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <AIDisplayResponse className="prose max-w-none">
+                    {report}
+                  </AIDisplayResponse>
+                </div>
+              )}
+            </div>
+
+            {/* Sources - moved to bottom */}
             <div className="mt-10">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-gray-900">Sources</h3>
