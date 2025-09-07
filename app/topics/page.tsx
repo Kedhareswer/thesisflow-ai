@@ -1,8 +1,11 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown } from "lucide-react"
+import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown, ExternalLink, AlertTriangle, Zap } from "lucide-react"
+import Link from "next/link"
+import { useLiteratureSearch, type Paper } from "@/hooks/use-literature-search"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface TopicSuggestion {
   id: string
@@ -24,6 +27,14 @@ export default function FindTopicsPage() {
   const [searchMode, setSearchMode] = useState<'search' | 'results'>('search')
   const [qualityMode, setQualityMode] = useState<'Standard' | 'High Quality'>('Standard')
   const [timeLeft, setTimeLeft] = useState(6)
+
+  // Real results via literature search (streams over SSE)
+  const literature = useLiteratureSearch({ defaultLimit: 20, useSSE: true })
+
+  // AI-extracted topics from the returned papers
+  const [topics, setTopics] = useState<string[]>([])
+  const [topicsLoading, setTopicsLoading] = useState(false)
+  const [topicsError, setTopicsError] = useState<string | null>(null)
 
   const topicSuggestions: TopicSuggestion[] = [
     {
@@ -87,11 +98,55 @@ export default function FindTopicsPage() {
         return prev - 1
       })
     }, 1000)
+
+    // Kick off real streaming search
+    try {
+      literature.clearResults()
+      literature.search(query, 20)
+    } catch (e) {
+      // noop
+    }
   }
 
   const handleSuggestionClick = (suggestion: TopicSuggestion) => {
     handleSearch(suggestion.text)
   }
+
+  // When search results finish streaming or at least a handful loaded, compute topics via AI (best-effort)
+  useEffect(() => {
+    const papers = literature.results || []
+    if (papers.length >= 6 && !topicsLoading && topics.length === 0) {
+      ;(async () => {
+        setTopicsLoading(true)
+        setTopicsError(null)
+        try {
+          const titles = papers.slice(0, 30).map(p => `- ${p.title}`).join('\n')
+          const abstracts = papers.slice(0, 12).map(p => `- ${p.abstract?.slice(0, 300) || ''}`).join('\n')
+          const prompt = `You are an expert research analyst. Given the following paper titles and short abstracts, extract 10-15 concise research topics/themes. Respond ONLY as a JSON array of short strings.\n\nTITLES:\n${titles}\n\nABSTRACT SNIPPETS:\n${abstracts}\n\nReturn format example: ["Topic A", "Topic B", ...]`
+          const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
+          const resp = await enhancedAIService.generateText({ prompt, temperature: 0.3, maxTokens: 600 })
+          if (resp.success) {
+            try {
+              const arr = JSON.parse(resp.content || '[]') as string[]
+              if (Array.isArray(arr) && arr.length) {
+                setTopics(arr.slice(0, 15))
+              }
+            } catch {
+              // Fallback: split by lines
+              const raw = (resp.content || '').split('\n').map(s => s.replace(/^[-•]\s*/, '').trim()).filter(Boolean)
+              setTopics(raw.slice(0, 15))
+            }
+          } else {
+            setTopicsError(resp.error || 'Failed to extract topics')
+          }
+        } catch (e) {
+          setTopicsError('AI extraction unavailable. Configure an AI provider in Settings to enable topic extraction.')
+        } finally {
+          setTopicsLoading(false)
+        }
+      })()
+    }
+  }, [literature.results, topicsLoading, topics.length])
 
   if (searchMode === 'results') {
     return (
@@ -141,12 +196,12 @@ export default function FindTopicsPage() {
           {/* Main Content */}
           <div className="px-6 py-8">
             <div className="max-w-2xl">
-              <p className="text-gray-700 mb-4">
-                Getting topics and sources for '{searchQuery}'. Please wait.
+              <p className="text-gray-700 mb-2">
+                Getting topics and sources for '{searchQuery}'.
               </p>
-              
-              <div className="text-sm text-gray-600 mb-6">
-                Time left: {timeLeft} secs
+              <div className="text-sm text-gray-600 mb-6 flex items-center gap-2">
+                { (isSearching || literature.isLoading) && <Loader2 className="w-4 h-4 animate-spin" /> }
+                { literature.isLoading ? 'Searching…' : `Done${literature.results.length ? ` • ${literature.results.length} results` : ''}` }
               </div>
 
               {/* Progress Steps */}
@@ -175,6 +230,65 @@ export default function FindTopicsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+            
+            {/* Results Section */}
+            <div className="mt-10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">Sources</h3>
+                <div className="flex items-center gap-2">
+                  <Link href={`/explorer?deep=1&query=${encodeURIComponent(searchQuery)}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                    <Zap className="w-4 h-4" /> Deep Research in Explorer
+                  </Link>
+                </div>
+              </div>
+              {literature.error && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mb-3"><AlertTriangle className="w-4 h-4" /> {literature.error}</div>
+              )}
+              {literature.results.length === 0 && !literature.isLoading ? (
+                <div className="text-gray-500 text-sm">No sources found. Try another query.</div>
+              ) : (
+                <div className="grid gap-4">
+                  {literature.results.map((p: Paper) => (
+                    <Card key={`${p.id}-${p.url}`}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">
+                          <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 flex items-start gap-2">
+                            {p.title}
+                            <ExternalLink className="w-4 h-4 mt-1 text-gray-400" />
+                          </a>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0 text-sm text-gray-600">
+                        {p.abstract && <p className="line-clamp-3 mb-2">{p.abstract}</p>}
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                          {p.journal && <span>{p.journal}</span>}
+                          {p.year && <span>{p.year}</span>}
+                          {p.authors?.length ? <span>{p.authors.slice(0,3).join(', ')}{p.authors.length>3?' et al.':''}</span> : null}
+                          {p.source && <span className="uppercase">{p.source}</span>}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Extracted Topics */}
+            <div className="mt-10">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Extracted Topics</h3>
+              {topicsLoading && <div className="text-sm text-gray-600 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Analyzing sources…</div>}
+              {topicsError && <div className="text-sm text-red-600 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {topicsError}</div>}
+              {!topicsLoading && topics.length === 0 && (
+                <div className="text-sm text-gray-500">Topics will appear here once sources are analyzed.</div>
+              )}
+              {topics.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {topics.map((t, i) => (
+                    <span key={i} className="px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-700 text-sm">{t}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
