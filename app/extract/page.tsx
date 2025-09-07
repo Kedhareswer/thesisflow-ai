@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -15,7 +15,7 @@ import Link from 'next/link'
 import Sidebar from '@/app/ai-agents/components/Sidebar'
 import { Search, Sparkles, ChevronDown, MoreHorizontal, Send } from 'lucide-react'
 import type { RecentExtraction } from '@/lib/services/extractions-store'
-import { fetchRecentExtractions, fetchExtractionWithChats, saveChatMessage } from '@/lib/services/extractions-store'
+import { fetchRecentExtractions, fetchExtractionWithChats, saveChatMessage, deleteExtraction, clearAllExtractions } from '@/lib/services/extractions-store'
 
 interface ChatMessage {
   id: string
@@ -154,6 +154,35 @@ export default function ExtractPage() {
     a.remove()
     URL.revokeObjectURL(url)
   }, [])
+
+  const handleDeleteRecent = useCallback(async (id: string) => {
+    try {
+      const res = await deleteExtraction(id)
+      if (res?.success) {
+        toast({ title: 'Deleted', description: 'File removed from recent.' })
+        // Optimistically update list without reloading
+        setRecentExtractions((prev) => prev.filter((r) => r.id !== id))
+      } else {
+        toast({ title: 'Delete failed', description: 'Could not delete this item', variant: 'destructive' })
+      }
+    } catch (e) {
+      toast({ title: 'Delete failed', description: 'Unexpected error', variant: 'destructive' })
+    }
+  }, [toast])
+
+  const handleClearAll = useCallback(async () => {
+    try {
+      const res = await clearAllExtractions()
+      if (res?.success) {
+        toast({ title: 'Cleared', description: 'All recent files cleared.' })
+        setRecentExtractions([])
+      } else {
+        toast({ title: 'Clear failed', description: res?.error ? String(res.error) : 'Could not clear', variant: 'destructive' })
+      }
+    } catch (e) {
+      toast({ title: 'Clear failed', description: 'Unexpected error', variant: 'destructive' })
+    }
+  }, [toast])
 
   const exportTablesAsCSV = useCallback((tables: Array<{ headers: string[]; rows: string[][] }>) => {
     if (!tables || tables.length === 0) return
@@ -1335,17 +1364,21 @@ export default function ExtractPage() {
                 <div className="mt-8">
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900">Recent Files</h3>
-                    <button onClick={loadRecent} className="text-xs text-gray-500 hover:text-gray-700">Refresh</button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={loadRecent} className="text-xs text-gray-500 hover:text-gray-700">Refresh</button>
+                      <button onClick={handleClearAll} className="text-xs text-gray-500 hover:text-gray-700">Clear all</button>
+                    </div>
                   </div>
                   {recentExtractions.length === 0 ? (
                     <div className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">No recent files yet.</div>
                   ) : (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {recentExtractions.map((r) => (
-                        <button
+                        <div
                           key={r.id}
+                          className="relative rounded-md border border-gray-200 bg-white p-3 hover:bg-gray-50"
+                          role="button"
                           onClick={() => openExtraction(r.id)}
-                          className="rounded-md border border-gray-200 bg-white p-3 text-left hover:bg-gray-50"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2">
@@ -1355,12 +1388,22 @@ export default function ExtractPage() {
                                 <div className="text-xs text-gray-500">{(r.file_type || 'file')} • {formatFileSize(r.file_size)}</div>
                               </div>
                             </div>
-                            <div className="text-[11px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-[11px] text-gray-400">{new Date(r.created_at).toLocaleDateString()}</div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteRecent(r.id) }}
+                                className="text-gray-400 hover:text-red-600"
+                                title="Delete"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                           {r.summary && (
                             <p className="mt-2 line-clamp-3 text-xs text-gray-700">{r.summary}</p>
                           )}
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}

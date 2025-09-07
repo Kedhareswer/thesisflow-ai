@@ -67,3 +67,46 @@ export async function saveChatMessage(extractionId: string, role: 'user' | 'assi
   }
   return { success: true }
 }
+
+// Delete a single extraction (and its chats via cascade)
+export async function deleteExtraction(id: string) {
+  if (!supabaseUtils.isConfigured()) return { success: false }
+  try {
+    const { error } = await supabase
+      .from('extractions' as any)
+      .delete()
+      .eq('id', id)
+    if (error) {
+      supabaseUtils.logError('deleteExtraction', error)
+      return { success: false, error }
+    }
+    return { success: true }
+  } catch (error) {
+    supabaseUtils.logError('deleteExtraction/catch', error)
+    return { success: false, error }
+  }
+}
+
+// Clear all extractions for current user
+export async function clearAllExtractions() {
+  if (!supabaseUtils.isConfigured()) return { success: false, error: 'Not configured' }
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    if (!userId) {
+      return { success: false, error: 'No active session' }
+    }
+    const { error } = await supabase
+      .from('extractions' as any)
+      .delete()
+      .eq('user_id', userId)
+    if (error) {
+      supabaseUtils.logError('clearAllExtractions', error)
+      return { success: false, error }
+    }
+    return { success: true }
+  } catch (error) {
+    supabaseUtils.logError('clearAllExtractions/catch', error)
+    return { success: false, error }
+  }
+}

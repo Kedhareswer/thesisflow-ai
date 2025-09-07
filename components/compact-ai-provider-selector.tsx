@@ -14,6 +14,7 @@ interface CompactAIProviderSelectorProps {
   onProviderChange: (provider: AIProvider) => void
   selectedModel?: string
   onModelChange?: (model: string) => void
+  variant?: 'card' | 'compact'
 }
 
 export default function CompactAIProviderSelector({
@@ -21,6 +22,7 @@ export default function CompactAIProviderSelector({
   onProviderChange,
   selectedModel,
   onModelChange,
+  variant = 'card',
 }: CompactAIProviderSelectorProps) {
   const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
   const [loading, setLoading] = useState(true)
@@ -115,6 +117,14 @@ export default function CompactAIProviderSelector({
   }
 
   if (loading) {
+    if (variant === 'compact') {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-600 py-1">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>Loading providers…</span>
+        </div>
+      )
+    }
     return (
       <Card className="border-gray-200 shadow-sm bg-white/50 text-gray-800">
         <CardHeader className="border-b border-gray-100 pb-4">
@@ -127,6 +137,66 @@ export default function CompactAIProviderSelector({
           </div>
         </CardContent>
       </Card>
+    )
+  }
+
+  if (variant === 'compact') {
+    return (
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="provider-select" className="text-xs font-medium text-gray-700">
+            Provider
+          </Label>
+          <Select value={selectedProvider || ""} onValueChange={onProviderChange}>
+            <SelectTrigger
+              id="provider-select"
+              className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-8 bg-white min-w-[220px]"
+            >
+              <SelectValue placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent className="bg-white border-gray-200">
+              {Object.entries(AI_PROVIDERS).map(([key, config]) => (
+                <SelectItem
+                  key={key}
+                  value={key}
+                  disabled={!availableProviders.includes(key as AIProvider)}
+                  className="hover:bg-gray-50"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-medium">{config.name}</span>
+                    <Badge variant="outline" className={`ml-2 text-[10px] ${getProviderStatusColor(key as AIProvider)}`}>
+                      {getProviderStatus(key as AIProvider)}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedProvider && onModelChange && (
+          <div className="space-y-1">
+            <Label htmlFor="model-select" className="text-xs font-medium text-gray-700">
+              Model
+            </Label>
+            <Select value={selectedModel} onValueChange={onModelChange}>
+              <SelectTrigger
+                id="model-select"
+                className="border-gray-200 focus:border-black focus:ring-1 focus:ring-black h-8 bg-white min-w-[220px]"
+              >
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200">
+                {AI_PROVIDERS[selectedProvider].models.map((model) => (
+                  <SelectItem key={model} value={model} className="hover:bg-gray-50">
+                    <span className="font-medium">{model}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
     )
   }
 

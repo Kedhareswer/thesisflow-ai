@@ -39,8 +39,7 @@ export default function ParaphraserPage() {
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
 
-  const tabs = ['Academic', 'Fluent', 'Formal', 'Creative']
-  const morePresets = ['Casual', 'Technical', 'Simple']
+  const morePresets = ['Academic', 'Fluent', 'Formal', 'Creative', 'Casual', 'Technical', 'Simple']
 
   const TAB_TO_MODE: Record<string, 'academic' | 'casual' | 'formal' | 'creative' | 'technical' | 'simple' | 'fluent'> = {
     Academic: 'academic',
@@ -307,9 +306,10 @@ export default function ParaphraserPage() {
             <p className="text-sm text-gray-600">Rewrite text clearly and originally.</p>
           </div>
 
-          {/* Provider / Model selector */}
-          <div className="mb-4">
+          {/* Provider / Model selector (compact) */}
+          <div className="mb-2">
             <CompactAIProviderSelector
+              variant="compact"
               selectedProvider={selectedProvider}
               onProviderChange={(provider) => setSelectedProvider(provider)}
               selectedModel={selectedModel}
@@ -319,24 +319,8 @@ export default function ParaphraserPage() {
 
           {/* Content Container */}
           <div className="mx-auto w-full max-w-5xl rounded-lg border border-gray-200 bg-white">
-            {/* Top row: Mode + minimal controls */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 px-4 sm:px-6">
-              <div className="flex items-center overflow-x-auto">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 sm:px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab
-                        ? 'border-gray-900 text-gray-900'
-                        : 'border-transparent text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
+            {/* Controls row */}
+            <div className="border-b border-gray-200 px-4 sm:px-6">
               <div className="flex items-center gap-4 py-3">
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -435,7 +419,7 @@ export default function ParaphraserPage() {
               </div>
             </div>
 
-            {/* More tone presets */}
+            {/* Tone presets (moved all into More) */}
             <div className="flex items-center gap-2 border-b border-gray-200 px-4 sm:px-6 py-2">
               <span className="text-xs font-medium uppercase tracking-wide text-gray-500">More</span>
               <div className="flex flex-wrap items-center gap-2">
