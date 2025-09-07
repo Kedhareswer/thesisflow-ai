@@ -28,8 +28,9 @@ export default function FindTopicsPage() {
   const [qualityMode, setQualityMode] = useState<'Standard' | 'High Quality'>('Standard')
   const [timeLeft, setTimeLeft] = useState(6)
 
-  // Real results via literature search (streams over SSE)
-  const literature = useLiteratureSearch({ defaultLimit: 20, useSSE: true })
+  // Real results via literature search. Use aggregateWindowMs to minimize API calls and avoid 429s.
+  // With aggregateWindowMs > 0, the hook uses the fetch path (cache-first + aggregation) instead of SSE.
+  const literature = useLiteratureSearch({ defaultLimit: 20, useSSE: true, aggregateWindowMs: 120000 })
 
   // AI-extracted topics from the returned papers
   const [topics, setTopics] = useState<string[]>([])
@@ -82,8 +83,29 @@ export default function FindTopicsPage() {
     { step: 'Preparing final results', status: 'pending' }
   ]
 
+  const [retryInSec, setRetryInSec] = useState<number | null>(null)
+
+  // Track rate-limit reset countdown
+  useEffect(() => {
+    if (!literature.rateLimitInfo?.resetTime) {
+      setRetryInSec(null)
+      return
+    }
+    const update = () => {
+      const diff = Math.ceil((new Date(literature.rateLimitInfo!.resetTime).getTime() - Date.now()) / 1000)
+      setRetryInSec(diff > 0 ? diff : 0)
+    }
+    update()
+    const t = setInterval(update, 1000)
+    return () => clearInterval(t)
+  }, [literature.rateLimitInfo?.resetTime])
+
   const handleSearch = (query: string) => {
     setSearchQuery(query)
+    // Prevent spamming the same query while it is still loading or within cooldown
+    if (literature.isLoading || (literature.currentQuery && literature.currentQuery.toLowerCase() === query.trim().toLowerCase())) {
+      return
+    }
     setIsSearching(true)
     setSearchMode('results')
     
@@ -99,11 +121,24 @@ export default function FindTopicsPage() {
       })
     }, 1000)
 
-    // Kick off real streaming search
+    // Kick off real search; include userId when available so limit applies to the user rather than IP
     try {
       literature.clearResults()
-      literature.search(query, 20)
-    } catch (e) {
+      ;(async () => {
+        try {
+          const { supabase } = await import("@/integrations/supabase/client")
+          const { data } = await supabase.auth.getUser()
+          const uid = data?.user?.id
+          if (uid) {
+            literature.search(query, 20, uid)
+          } else {
+            literature.search(query, 20)
+          }
+        } catch {
+          literature.search(query, 20)
+        }
+      })()
+    } catch {
       // noop
     }
   }
@@ -243,7 +278,22 @@ export default function FindTopicsPage() {
                 </div>
               </div>
               {literature.error && (
-                <div className="flex items-center gap-2 text-red-600 text-sm mb-3"><AlertTriangle className="w-4 h-4" /> {literature.error}</div>
+                <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
+                  <AlertTriangle className="w-4 h-4" />
+                  {literature.error}
+                  {literature.isRateLimited && (
+                    <>
+                      <span className="text-gray-500">{retryInSec !== null ? `(retry in ${retryInSec}s)` : ''}</span>
+                      <button
+                        className="ml-2 text-blue-600 hover:underline disabled:text-gray-400"
+                        onClick={() => literature.retry()}
+                        disabled={retryInSec !== null && retryInSec > 0}
+                      >
+                        Retry
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
               {literature.results.length === 0 && !literature.isLoading ? (
                 <div className="text-gray-500 text-sm">No sources found. Try another query.</div>
