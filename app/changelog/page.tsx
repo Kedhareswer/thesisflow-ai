@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Changelog1 } from "@/components/ui/changelog-1";
+import { Changelog1, type ChangelogEntry } from "@/components/ui/changelog-1";
+import changelogData from "@/data/changelog.json";
 
 export default function ChangelogPage() {
   return (
@@ -116,7 +117,11 @@ export default function ChangelogPage() {
 
       {/* Changelog Section */}
       <div id="updates" className="mt-12">
-        <Changelog1 />
+        <Changelog1
+          title="ThesisFlow-AI Changelog"
+          description="Real, ongoing updates to ThesisFlow-AI across AI chat, research tools, extraction, models, and UX."
+          entries={changelogData as ChangelogEntry[]}
+        />
       </div>
     </div>
   );
