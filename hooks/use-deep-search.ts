@@ -10,6 +10,7 @@ export interface DeepSearchItem {
   source: string
   kind?: 'web' | 'scholar' | 'docs' | 'news'
   score?: number
+  publishedDate?: string
 }
 
 export interface DeepSearchProgress {
