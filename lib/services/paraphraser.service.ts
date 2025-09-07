@@ -1,11 +1,18 @@
 import { HfInference } from '@huggingface/inference';
+import type { AIProvider } from '@/lib/ai-providers';
+import { paraphrase as paraphraseLLM } from '@/lib/services/paraphrase.service';
 
-export type ParaphraseMode = 'academic' | 'casual' | 'formal' | 'creative' | 'technical' | 'simple';
+export type ParaphraseMode = 'academic' | 'casual' | 'formal' | 'creative' | 'technical' | 'simple' | 'fluent';
 
 export interface ParaphraseOptions {
   mode: ParaphraseMode;
   preserveLength?: boolean;
-  variations?: number;
+  variations?: number; // number of alternatives requested
+  // New advanced options
+  variationLevel?: 'low' | 'medium' | 'high'; // rewrite intensity
+  provider?: AIProvider;
+  model?: string;
+  userId?: string;
 }
 
 export interface ParaphraseResult {
@@ -28,7 +35,8 @@ export class ParaphraserService {
     formal: 'Vamsi/T5_Paraphrase_Paws',
     creative: 'ramsrigouthamg/t5-large-paraphraser-diverse-high-quality',
     technical: 'tuner007/pegasus_paraphrase',
-    simple: 'humarin/chatgpt_paraphraser_on_T5_base'
+    simple: 'humarin/chatgpt_paraphraser_on_T5_base',
+    fluent: 'tuner007/pegasus_paraphrase'
   };
 
   private modePrompts = {
@@ -37,7 +45,8 @@ export class ParaphraserService {
     formal: 'Paraphrase this text in a formal, professional manner: ',
     creative: 'Creatively rewrite this text with varied vocabulary: ',
     technical: 'Paraphrase this text maintaining technical accuracy: ',
-    simple: 'Simplify and rewrite this text in plain language: '
+    simple: 'Simplify and rewrite this text in plain language: ',
+    fluent: 'Paraphrase this text to be smooth, coherent, and easy to read: '
   };
 
   constructor() {
@@ -52,52 +61,111 @@ export class ParaphraserService {
       throw new Error('Text is required for paraphrasing');
     }
 
-    if (!this.hf) {
-      // Fallback to OpenAI if available
-      return this.paraphraseWithOpenAI(text, options);
-    }
-
+    // 1) Primary path: use enhanced AI provider service (supports multiple vendors + fallbacks)
     try {
-      const model = this.modelMap[options.mode];
-      const prompt = this.modePrompts[options.mode];
-      const input = `${prompt}${text}`;
+      const variationLevel = options.variationLevel || 'medium';
+      const preserveLength = !!options.preserveLength;
 
-      // Generate main paraphrase
-      const result = await this.hf.textGeneration({
-        model,
-        inputs: input,
-        parameters: {
-          max_new_tokens: options.preserveLength ? text.split(' ').length * 2 : 500,
-          temperature: options.mode === 'creative' ? 0.9 : 0.7,
-          top_p: 0.95,
-          do_sample: true,
-        }
-      });
+      const llmRes = await paraphraseLLM({
+        text,
+        tone: (options.mode as any) === 'fluent' ? 'fluent' : (options.mode as any),
+        variation: variationLevel,
+        preserveLength,
+        provider: options.provider,
+        model: options.model,
+        userId: options.userId,
+      } as any);
 
-      const paraphrased = this.cleanGeneratedText(result.generated_text, text);
-      
+      const main = llmRes.output?.trim() || text;
+
       // Generate alternatives if requested
-      let alternatives: string[] = [];
-      if (options.variations && options.variations > 1) {
-        alternatives = await this.generateAlternatives(text, options);
+      const alternatives: string[] = [];
+      const requested = Math.min(options.variations || 1, 5);
+      for (let i = 1; i < requested; i++) {
+        const level = i === 1 ? 'low' : i === 2 ? 'medium' : 'high';
+        try {
+          const alt = await paraphraseLLM({
+            text,
+            tone: (options.mode as any) === 'fluent' ? 'fluent' : (options.mode as any),
+            variation: level as any,
+            preserveLength,
+            provider: options.provider,
+            model: options.model,
+            userId: options.userId,
+          } as any);
+          const altText = alt.output?.trim();
+          if (altText && altText !== main && !alternatives.includes(altText)) {
+            alternatives.push(altText);
+          }
+          await new Promise(r => setTimeout(r, 200));
+        } catch (e) {
+          // ignore alt generation error
+        }
       }
 
       return {
         original: text,
-        paraphrased,
+        paraphrased: main,
         mode: options.mode,
-        similarity: this.calculateSimilarity(text, paraphrased),
+        similarity: this.calculateSimilarity(text, main),
         wordCount: {
           original: text.split(/\s+/).length,
-          paraphrased: paraphrased.split(/\s+/).length
+          paraphrased: main.split(/\s+/).length
         },
         alternatives
       };
-    } catch (error) {
-      console.error('HuggingFace paraphrase error:', error);
-      // Fallback to OpenAI
-      return this.paraphraseWithOpenAI(text, options);
+    } catch (primaryError) {
+      console.error('Enhanced paraphrase error, falling back:', primaryError);
     }
+
+    // 2) Fallback: HuggingFace Inference if configured
+    if (this.hf) {
+      try {
+        const model = this.modelMap[options.mode];
+        const prompt = this.modePrompts[options.mode];
+        const input = `${prompt}${text}`;
+
+        const result = await this.hf.textGeneration({
+          model,
+          inputs: input,
+          parameters: {
+            max_new_tokens: options.preserveLength ? text.split(' ').length * 2 : 500,
+            temperature: options.mode === 'creative' ? 0.9 : 0.7,
+            top_p: 0.95,
+            do_sample: true,
+          }
+        });
+
+        const paraphrased = this.cleanGeneratedText(result.generated_text, text);
+        let alternatives: string[] = [];
+        if (options.variations && options.variations > 1) {
+          alternatives = await this.generateAlternatives(text, options);
+        }
+        return {
+          original: text,
+          paraphrased,
+          mode: options.mode,
+          similarity: this.calculateSimilarity(text, paraphrased),
+          wordCount: {
+            original: text.split(/\s+/).length,
+            paraphrased: paraphrased.split(/\s+/).length
+          },
+          alternatives
+        };
+      } catch (error) {
+        console.error('HuggingFace paraphrase error:', error);
+      }
+    }
+
+    // 3) Fallback: OpenAI direct
+    try {
+      return await this.paraphraseWithOpenAI(text, options);
+    } catch (error) {
+      console.error('OpenAI paraphrase error:', error);
+    }
+
+    // 4) Final fallback: rule-based
+    return this.ruleBasedParaphrase(text, options);
   }
 
   private async generateAlternatives(text: string, options: ParaphraseOptions): Promise<string[]> {

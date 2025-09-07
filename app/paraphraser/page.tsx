@@ -3,6 +3,8 @@
 import React, { useState, useCallback } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { FileText, Copy } from "lucide-react"
+import type { AIProvider } from "@/lib/ai-providers"
+import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
 
 // Minimal paraphraser page – clean UI focused on input → output
 
@@ -11,7 +13,8 @@ export default function ParaphraserPage() {
   const [inputText, setInputText] = useState('')
   const [activeTab, setActiveTab] = useState('Academic')
   const [preserveLength, setPreserveLength] = useState(true)
-  const [variationValue, setVariationValue] = useState(3)
+  const [variationLevel, setVariationLevel] = useState<'low' | 'medium' | 'high'>('medium')
+  const [altCount, setAltCount] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [resultText, setResultText] = useState('')
@@ -20,12 +23,16 @@ export default function ParaphraserPage() {
   const [variantIndex, setVariantIndex] = useState(0) // 0 = main, 1..N = alternatives
   const [highlightChanges, setHighlightChanges] = useState(false)
 
+  // Provider / Model selection (optional)
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
+
   const tabs = ['Academic', 'Fluent', 'Formal', 'Creative']
   const morePresets = ['Casual', 'Technical', 'Simple']
 
-  const TAB_TO_MODE: Record<string, 'academic' | 'casual' | 'formal' | 'creative' | 'technical' | 'simple'> = {
+  const TAB_TO_MODE: Record<string, 'academic' | 'casual' | 'formal' | 'creative' | 'technical' | 'simple' | 'fluent'> = {
     Academic: 'academic',
-    Fluent: 'casual',
+    Fluent: 'fluent',
     Formal: 'formal',
     Creative: 'creative',
     Casual: 'casual',
@@ -58,7 +65,10 @@ export default function ParaphraserPage() {
           text: inputText,
           mode,
           preserveLength,
-          variations: variationValue,
+          variationLevel,
+          variations: altCount,
+          provider: selectedProvider,
+          model: selectedModel,
         }),
       })
       const data = await res.json()
@@ -71,7 +81,7 @@ export default function ParaphraserPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [inputText, activeTab, preserveLength, variationValue])
+  }, [inputText, activeTab, preserveLength, variationLevel, altCount, selectedProvider, selectedModel])
 
   const trySampleText = () => {
     const sampleText = "The rapid advancement of artificial intelligence has transformed various industries and continues to shape the future of technology. Machine learning algorithms and neural networks have enabled computers to perform complex tasks that were once thought to be exclusively human capabilities."
@@ -150,6 +160,16 @@ export default function ParaphraserPage() {
             <p className="text-sm text-gray-600">Rewrite text clearly and originally.</p>
           </div>
 
+          {/* Provider / Model selector */}
+          <div className="mb-4">
+            <CompactAIProviderSelector
+              selectedProvider={selectedProvider}
+              onProviderChange={(provider) => setSelectedProvider(provider)}
+              selectedModel={selectedModel}
+              onModelChange={(model) => setSelectedModel(model)}
+            />
+          </div>
+
           {/* Content Container */}
           <div className="mx-auto w-full max-w-5xl rounded-lg border border-gray-200 bg-white">
             {/* Top row: Mode + minimal controls */}
@@ -184,14 +204,29 @@ export default function ParaphraserPage() {
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <span>Variation</span>
                   <select
-                    value={variationValue}
-                    onChange={(e) => setVariationValue(Number(e.target.value))}
+                    value={variationLevel}
+                    onChange={(e) => setVariationLevel(e.target.value as 'low' | 'medium' | 'high')}
                     className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
                     aria-label="Variation"
                   >
-                    <option value={1}>Low</option>
-                    <option value={3}>Medium</option>
-                    <option value={5}>High</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <span>Alternatives</span>
+                  <select
+                    value={altCount}
+                    onChange={(e) => setAltCount(Number(e.target.value))}
+                    className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+                    aria-label="Number of alternatives"
+                  >
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                    <option value={5}>5</option>
                   </select>
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-700">

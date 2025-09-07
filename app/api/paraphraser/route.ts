@@ -32,14 +32,26 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting
     if (!checkRateLimit(ip)) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
-        { status: 429 }
-      );
+      const resetSec = Math.ceil((rateLimit.get(ip)?.resetTime || Date.now()) - Date.now()) / 1000;
+      return new NextResponse(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+        status: 429,
+        headers: {
+          'Retry-After': Math.max(1, Math.floor(resetSec)).toString(),
+          'Content-Type': 'application/json',
+        },
+      });
     }
 
     const body = await request.json();
-    const { text, mode = 'academic', preserveLength = false, variations = 1 } = body;
+    const {
+      text,
+      mode = 'academic',
+      preserveLength = false,
+      variations = 1,
+      variationLevel = 'medium',
+      provider,
+      model,
+    } = body;
 
     // Validate input
     if (!text || typeof text !== 'string') {
@@ -56,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validModes = ['academic', 'casual', 'formal', 'creative', 'technical', 'simple'];
+    const validModes = ['academic', 'casual', 'formal', 'creative', 'technical', 'simple', 'fluent'];
     if (!validModes.includes(mode)) {
       return NextResponse.json(
         { error: 'Invalid mode. Choose from: ' + validModes.join(', ') },
@@ -68,7 +80,10 @@ export async function POST(request: NextRequest) {
     const result = await paraphraserService.paraphrase(text, {
       mode,
       preserveLength,
-      variations: Math.min(variations, 5) // Max 5 variations
+      variations: Math.min(variations, 5), // Max 5 variations
+      variationLevel,
+      provider,
+      model,
     });
 
     // Log usage (optional - for analytics)
