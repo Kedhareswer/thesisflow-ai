@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown, ExternalLink, AlertTriangle, Zap } from "lucide-react"
 import Link from "next/link"
@@ -81,13 +81,39 @@ export default function FindTopicsPage() {
     }
   ]
 
-  const searchProgress: SearchProgress[] = [
-    { step: 'Finding relevant papers', status: 'completed' },
-    { step: 'Finding topics in papers', status: 'completed' },
-    { step: 'Finding topics from external sources', status: 'current' },
-    { step: 'Extracting unique topics', status: 'pending' },
-    { step: 'Preparing final results', status: 'pending' }
-  ]
+  const searchProgress: SearchProgress[] = useMemo(() => {
+    const steps: SearchProgress[] = []
+    // Step 1 & 2: completed as soon as the flow starts (UX consistency)
+    steps.push({ step: 'Finding relevant papers', status: 'completed' })
+    steps.push({ step: 'Finding topics in papers', status: 'completed' })
+
+    // Step 3: depends on literature loading state
+    if (literature.isLoading) {
+      steps.push({ step: 'Finding topics from external sources', status: 'current' })
+    } else {
+      steps.push({ step: 'Finding topics from external sources', status: 'completed' })
+    }
+
+    // Step 4: topics extraction
+    if (topicsLoading) {
+      steps.push({ step: 'Extracting unique topics', status: 'current' })
+    } else if (topics.length > 0) {
+      steps.push({ step: 'Extracting unique topics', status: 'completed' })
+    } else {
+      steps.push({ step: 'Extracting unique topics', status: literature.isLoading ? 'pending' : 'current' })
+    }
+
+    // Step 5: report generation
+    if (reportLoading) {
+      steps.push({ step: 'Preparing final results', status: 'current' })
+    } else if (report) {
+      steps.push({ step: 'Preparing final results', status: 'completed' })
+    } else {
+      steps.push({ step: 'Preparing final results', status: 'pending' })
+    }
+
+    return steps
+  }, [literature.isLoading, topicsLoading, topics.length, reportLoading, report])
 
   const [retryInSec, setRetryInSec] = useState<number | null>(null)
 
