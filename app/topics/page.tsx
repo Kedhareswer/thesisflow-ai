@@ -151,8 +151,20 @@ export default function FindTopicsPage() {
     // Reset derived sections for new query
     setTopics([])
     setTopicsError(null)
+    // Reset report state and timer/stream on new search
     setReport('')
     setReportError(null)
+    setReportLoading(false)
+    setReportStartAt(null)
+    setReportElapsedSec(0)
+    if (reportTimerRef.current) {
+      clearInterval(reportTimerRef.current)
+      reportTimerRef.current = null
+    }
+    if (reportAbortRef.current) {
+      try { reportAbortRef.current.abort() } catch {}
+      reportAbortRef.current = null
+    }
     setIsSearching(true)
     setSearchMode('results')
     
@@ -261,16 +273,36 @@ export default function FindTopicsPage() {
         return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
       }).join('\n')
 
-      const wordsTarget = qualityMode === 'Standard' ? '800-1200' : '1200-1800'
+      const wordsTarget = qualityMode === 'Standard' ? '1000-1500' : '1500-2200'
       const prompt = `Write a scholarly academic review on the topic: "${searchQuery}".
 
 Use ONLY the numbered sources below. Do not invent citations or data. Cite inline with bracketed numbers [1], [2] that match the exact numbering provided. After the body, include a "References" section listing the same numbered items in order.
 
-Constraints:
-- Be rigorous, well-cited, and concise.
+Strict Requirements:
 - Absolutely no hallucinations. If evidence is insufficient, state limitations explicitly.
 - Preferred length: ${wordsTarget} words.
-- Structure with clear headings, subheadings, and where useful, short bullet lists.
+- Use clear headings and subheadings.
+- Include multiple visual summaries using Markdown only (no external scripts):
+  1) Evidence Summary Table with columns: ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation.
+  2) Key Metrics Table with columns: Metric | Value/Range | Citation.
+  3) Regional Comparison Table with columns: Region | Trend/Direction | Notable Study [n].
+  4) Timeline Table with columns: Period | Milestones | Citations.
+  5) One ASCII bar chart of Key Trends inside a fenced code block labeled "text" (no mermaid), e.g.:
+     \`\`\`text
+     Trend A |██████████ 85%
+     Trend B |███████    55%
+     \`\`\`
+- Where data is insufficient, write "Data not available" rather than guessing.
+
+Recommended Structure:
+- Title
+- Abstract
+- Background
+- Methods (how evidence was synthesized)
+- Findings (grouped logically)
+- Visual Summaries (tables and ASCII chart as specified)
+- Limitations and Future Work
+- References
 
 Sources:\n${sourceLines}`
 
