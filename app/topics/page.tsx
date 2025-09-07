@@ -6,6 +6,7 @@ import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown, Exte
 import Link from "next/link"
 import { useLiteratureSearch, type Paper } from "@/hooks/use-literature-search"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Response as AIDisplayResponse } from "@/src/components/ai-elements/response"
 
 interface TopicSuggestion {
   id: string
@@ -25,7 +26,7 @@ export default function FindTopicsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [searchMode, setSearchMode] = useState<'search' | 'results'>('search')
-  const [qualityMode, setQualityMode] = useState<'Standard' | 'High Quality'>('Standard')
+  const [qualityMode, setQualityMode] = useState<'Standard' | 'Enhanced'>('Standard')
   const [timeLeft, setTimeLeft] = useState(6)
 
   // Real results via literature search. Use aggregateWindowMs to minimize API calls and avoid 429s.
@@ -36,6 +37,11 @@ export default function FindTopicsPage() {
   const [topics, setTopics] = useState<string[]>([])
   const [topicsLoading, setTopicsLoading] = useState(false)
   const [topicsError, setTopicsError] = useState<string | null>(null)
+
+  // Scholarly Complete Report (exclusive to Topics page)
+  const [report, setReport] = useState<string>('')
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
   const topicSuggestions: TopicSuggestion[] = [
     {
@@ -106,6 +112,11 @@ export default function FindTopicsPage() {
     if (literature.isLoading || (literature.currentQuery && literature.currentQuery.toLowerCase() === query.trim().toLowerCase())) {
       return
     }
+    // Reset derived sections for new query
+    setTopics([])
+    setTopicsError(null)
+    setReport('')
+    setReportError(null)
     setIsSearching(true)
     setSearchMode('results')
     
@@ -129,13 +140,15 @@ export default function FindTopicsPage() {
           const { supabase } = await import("@/integrations/supabase/client")
           const { data } = await supabase.auth.getUser()
           const uid = data?.user?.id
+          const limit = qualityMode === 'Standard' ? 10 : 20
           if (uid) {
-            literature.search(query, 20, uid)
+            literature.search(query, limit, uid)
           } else {
-            literature.search(query, 20)
+            literature.search(query, limit)
           }
         } catch {
-          literature.search(query, 20)
+          const limit = qualityMode === 'Standard' ? 10 : 20
+          literature.search(query, limit)
         }
       })()
     } catch {
@@ -147,7 +160,7 @@ export default function FindTopicsPage() {
     handleSearch(suggestion.text)
   }
 
-  // When search results finish streaming or at least a handful loaded, compute topics via AI (best-effort)
+  // When results are available, compute topics via AI (best-effort)
   useEffect(() => {
     const papers = literature.results || []
     if (papers.length >= 6 && !topicsLoading && topics.length === 0) {
@@ -183,6 +196,54 @@ export default function FindTopicsPage() {
     }
   }, [literature.results, topicsLoading, topics.length])
 
+  // Generate Scholarly Complete Report using only fetched sources (exclusive to Topics page)
+  useEffect(() => {
+    const papers = literature.results || []
+    // Trigger once per query when we have a reasonable set of papers
+    if (papers.length > 0 && !report && !reportLoading) {
+      ;(async () => {
+        try {
+          setReportLoading(true)
+          setReportError(null)
+          const wordsTarget = qualityMode === 'Standard' ? '800-1200' : '1200-1800'
+          // Build enumerated sources for strict citation
+          const sourceLines = papers.map((p, idx) => {
+            const authors = (p.authors || []).join(', ')
+            const year = p.year || 'n.d.'
+            const journal = p.journal || ''
+            const doi = (p as any).doi || ''
+            const locator = doi ? `doi:${doi}` : (p.url || '')
+            return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
+          }).join('\n')
+
+          const prompt = `Write a scholarly academic review on the topic: "${searchQuery}".
+
+Use ONLY the numbered sources below. Do not invent citations or data. Cite inline with bracketed numbers [1], [2] that match the exact numbering provided. After the body, include a "References" section listing the same numbered items in order.
+
+Constraints:
+- Be rigorous, well-cited, and concise.
+- Absolutely no hallucinations. If evidence is insufficient, state limitations explicitly.
+- Preferred length: ${wordsTarget} words.
+- Structure with clear headings, subheadings, and where useful, short bullet lists.
+
+Sources:\n${sourceLines}`
+
+          const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
+          const resp = await enhancedAIService.generateText({ prompt, temperature: 0.2, maxTokens: 2000 })
+          if (resp.success && resp.content) {
+            setReport(resp.content)
+          } else {
+            setReportError(resp.error || 'Failed to generate report')
+          }
+        } catch (e) {
+          setReportError('Report generation unavailable. Configure an AI provider to enable this feature.')
+        } finally {
+          setReportLoading(false)
+        }
+      })()
+    }
+  }, [literature.results, report, reportLoading, qualityMode, searchQuery])
+
   if (searchMode === 'results') {
     return (
       <div className="flex min-h-screen bg-white">
@@ -210,14 +271,14 @@ export default function FindTopicsPage() {
                     Standard
                   </button>
                   <button
-                    onClick={() => setQualityMode('High Quality')}
+                    onClick={() => setQualityMode('Enhanced')}
                     className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                      qualityMode === 'High Quality' 
+                      qualityMode === 'Enhanced' 
                         ? 'bg-white text-gray-900 shadow-sm' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    High Quality
+                    Enhanced
                   </button>
                 </div>
                 <div className="flex items-center space-x-1 text-sm text-gray-600">
@@ -320,6 +381,31 @@ export default function FindTopicsPage() {
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Complete Scholarly Report (exclusive to Topics page) */}
+            <div className="mt-10">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Complete Scholarly Report</h3>
+              {reportLoading && (
+                <div className="text-sm text-gray-600 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Generating report…
+                </div>
+              )}
+              {reportError && (
+                <div className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> {reportError}
+                </div>
+              )}
+              {!reportLoading && !report && (
+                <div className="text-sm text-gray-500">A rigorous, well-cited report will appear here once sources are analyzed.</div>
+              )}
+              {report && (
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <AIDisplayResponse className="prose max-w-none">
+                    {report}
+                  </AIDisplayResponse>
                 </div>
               )}
             </div>
