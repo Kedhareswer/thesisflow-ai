@@ -513,9 +513,27 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
 
             {/* Summary */}
             {summary && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 overflow-x-hidden">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 overflow-x-auto">
                 <h4 className="font-medium text-blue-900 mb-2">Research Summary</h4>
-                <AIDisplayResponse className="prose prose-sm max-w-none text-blue-800">
+                <AIDisplayResponse
+                  className="size-full whitespace-pre-wrap break-words text-gray-800 leading-relaxed
+                    [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
+                    [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:mb-3 [&_h1]:text-gray-900
+                    [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-gray-900
+                    [&_h3]:text-lg [&_h3]:font-medium [&_h3]:mt-3 [&_h3]:mb-2 [&_h3]:text-gray-800
+                    [&_p]:mb-2 [&_p]:text-gray-800
+                    [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6
+                    [&_li]:mb-1
+                    [&_a]:text-blue-600 hover:[&_a]:underline [&_a]:underline-offset-2 [&_a]:break-words
+                    [&_blockquote]:border-l-4 [&_blockquote]:border-blue-200 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-gray-700
+                    [&_hr]:my-4 [&_hr]:border-gray-200
+                    [&_pre]:bg-gray-100 [&_pre]:p-3 [&_pre]:rounded-md [&_pre]:overflow-x-auto
+                    [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm
+                    [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-gray-300
+                    [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold
+                    [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2
+                    [&_tr:nth-child(even)]:bg-gray-50"
+                >
                   {summary}
                 </AIDisplayResponse>
               </div>
