@@ -21,6 +21,7 @@ import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ui/reasoning"
+import { Response as AIDisplayResponse } from "@/src/components/ai-elements/response"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
@@ -472,7 +473,7 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
 
       {/* Deep Research Results */}
       {showDeepResearch && (
-        <Card className="mt-6">
+        <Card className="mt-6 max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5" />
@@ -492,7 +493,7 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
               </div>
             )}
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 overflow-x-hidden">
             {/* Warnings */}
             {warnings.length > 0 && (
               <Alert className="border-amber-200 bg-amber-50">
@@ -512,11 +513,11 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
 
             {/* Summary */}
             {summary && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 overflow-x-hidden">
                 <h4 className="font-medium text-blue-900 mb-2">Research Summary</h4>
-                <div className="prose prose-sm max-w-none text-blue-800">
-                  <ContentFormatter content={summary} />
-                </div>
+                <AIDisplayResponse className="prose prose-sm max-w-none text-blue-800">
+                  {summary}
+                </AIDisplayResponse>
               </div>
             )}
 
@@ -529,13 +530,13 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
                   </h4>
                 </div>
                 
-                <div className="grid gap-4">
+                <div className="grid gap-4 grid-cols-1 overflow-x-hidden">
                   {results.map((result: DeepSearchItem, i: number) => {
                     const KindIcon = getKindIcon(result.kind || 'web')
                     const kindColor = getKindColor(result.kind || 'web')
                     
                     return (
-                      <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 hover:bg-gray-50">
+                      <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 hover:bg-gray-50 overflow-hidden break-words">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
@@ -550,13 +551,13 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
                               )}
                             </div>
                             
-                            <h5 className="font-medium text-gray-900 mb-1">
+                            <h5 className="font-medium text-gray-900 mb-1 break-words">
                               {isValidUrl(result.url) ? (
                                 <a 
                                   href={result.url as string}
                                   target="_blank" 
                                   rel="noopener noreferrer" 
-                                  className="hover:text-blue-600"
+                                  className="hover:text-blue-600 break-words line-clamp-2"
                                 >
                                   {result.title}
                                 </a>
@@ -568,12 +569,12 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
                             </h5>
                             
                             {result.snippet && (
-                              <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                              <p className="text-sm text-gray-600 mb-2 line-clamp-2 break-words">
                                 {result.snippet}
                               </p>
                             )}
                             
-                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <div className="flex items-center gap-4 text-xs text-gray-500 overflow-hidden">
                               <span>{getHostname(result.url) || 'unknown'}</span>
                               {result.publishedDate && (
                                 <span>{new Date(result.publishedDate).toLocaleDateString()}</span>
