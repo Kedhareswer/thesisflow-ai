@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { RouteGuard } from "@/components/route-guard"
 import type { AIProvider } from "@/lib/ai-providers"
 import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
+import { WebPage, Product, HowTo } from "@/components/schema/microdata-schema"
 
 const containerStyle = "container mx-auto p-8 max-w-4xl"
 const sectionTitleStyle = "text-2xl font-semibold text-gray-900 mb-4"
@@ -193,7 +194,56 @@ export default function ResearchAssistant() {
 
   return (
     <RouteGuard requireAuth={true}>
-      <div className="min-h-screen bg-white text-gray-900">
+      <WebPage
+        name="AI Research Assistant - ThesisFlow-AI"
+        description="Generate innovative research concepts with AI assistance. Input your research topic and get comprehensive research ideas with methodology, impact analysis, and challenges."
+        url="https://thesisflow-ai.com/research-assistant"
+        dateModified={new Date().toISOString().split('T')[0]}
+        author={{
+          name: "ThesisFlow-AI",
+          type: "Organization"
+        }}
+        breadcrumb={[
+          { name: "Home", url: "https://thesisflow-ai.com" },
+          { name: "Research Assistant", url: "https://thesisflow-ai.com/research-assistant" }
+        ]}
+      >
+        <Product
+          name="AI Research Assistant"
+          description="AI-powered tool for generating innovative research ideas with comprehensive analysis including methodology, impact assessment, and challenge identification."
+          category="Research Tool"
+          brand="ThesisFlow-AI"
+          manufacturer="ThesisFlow-AI"
+          url="https://thesisflow-ai.com/research-assistant"
+        >
+          <HowTo
+            name="How to Generate Research Ideas with AI"
+            description="Step-by-step guide to using our AI Research Assistant to generate innovative research concepts."
+            totalTime="PT5M"
+            steps={[
+              {
+                name: "Enter Research Topic",
+                text: "Input your research topic in the provided field. Be specific about your area of interest."
+              },
+              {
+                name: "Add Context (Optional)",
+                text: "Provide additional context, constraints, or specific focus areas to refine the AI suggestions."
+              },
+              {
+                name: "Select AI Model",
+                text: "Choose your preferred AI provider and model for generating research ideas."
+              },
+              {
+                name: "Generate Ideas",
+                text: "Click 'Generate Research Ideas' to receive AI-powered research suggestions with detailed analysis."
+              },
+              {
+                name: "Save Ideas",
+                text: "Review generated ideas and save the most promising ones to your research collection."
+              }
+            ]}
+          >
+            <div className="min-h-screen bg-white text-gray-900">
         <div className={containerStyle}>
           {/* Header */}
           <header className="mb-8">
@@ -478,7 +528,10 @@ export default function ResearchAssistant() {
             </TabsContent>
           </Tabs>
         </div>
-      </div>
+            </div>
+          </HowTo>
+        </Product>
+      </WebPage>
     </RouteGuard>
   )
 }

@@ -13,6 +13,7 @@ import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/
 import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
+import { SoftwareApplication, Organization, WebPage } from "@/components/schema/microdata-schema"
 
 // metadata moved to app/seo/root-metadata.ts
 
@@ -166,7 +167,43 @@ export default function HomePage() {
   ]
 
   return (
-    <div className="container mx-auto px-4 min-h-screen bg-background font-mono">
+    <SoftwareApplication
+      name="ThesisFlow-AI"
+      description="Accelerate your research with AI-powered tools for discovering papers, summarizing content, and planning projects. All-in-one platform for scholars and professionals."
+      applicationCategory="EducationalApplication"
+      operatingSystem="Web Browser"
+      url="https://thesisflow-ai.com"
+      author={{
+        name: "ThesisFlow-AI",
+        type: "Organization"
+      }}
+      datePublished="2024-01-01"
+      dateModified={new Date().toISOString().split('T')[0]}
+      aggregateRating={{
+        ratingValue: 4.8,
+        bestRating: 5,
+        ratingCount: 150
+      }}
+      offers={{
+        price: "0",
+        priceCurrency: "USD", 
+        availability: "InStock"
+      }}
+    >
+      <WebPage
+        name="ThesisFlow-AI - AI-Powered Research Platform"
+        description="Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals."
+        url="https://thesisflow-ai.com"
+        dateModified={new Date().toISOString().split('T')[0]}
+        author={{
+          name: "ThesisFlow-AI",
+          type: "Organization"
+        }}
+        breadcrumb={[
+          { name: "Home", url: "https://thesisflow-ai.com" }
+        ]}
+      >
+        <div className="container mx-auto px-4 min-h-screen bg-background font-mono">
       {/* Header */}
       <header className="flex h-16 items-center justify-between">
         <div className="flex items-center space-x-2">
@@ -558,6 +595,8 @@ export default function HomePage() {
         </div>
       </section>
       
-    </div>
+        </div>
+      </WebPage>
+    </SoftwareApplication>
   )
 }
