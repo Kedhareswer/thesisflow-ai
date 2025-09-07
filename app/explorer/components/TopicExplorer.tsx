@@ -292,6 +292,25 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
     }
   }
 
+  // Safe URL helpers to avoid runtime errors when result URLs are missing/invalid
+  const isValidUrl = (u?: string) => {
+    try {
+      if (!u) return false
+      const parsed = new URL(u)
+      return /^https?:/i.test(parsed.protocol)
+    } catch {
+      return false
+    }
+  }
+
+  const getHostname = (u?: string) => {
+    try {
+      return u ? new URL(u).hostname : ''
+    } catch {
+      return ''
+    }
+  }
+
   return (
     <div className={className}>
       {/* Research Context Status */}
@@ -532,14 +551,20 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
                             </div>
                             
                             <h5 className="font-medium text-gray-900 mb-1">
-                              <a 
-                                href={result.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="hover:text-blue-600"
-                              >
-                                {result.title}
-                              </a>
+                              {isValidUrl(result.url) ? (
+                                <a 
+                                  href={result.url as string}
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="hover:text-blue-600"
+                                >
+                                  {result.title}
+                                </a>
+                              ) : (
+                                <span className="text-gray-800" title="No valid URL">
+                                  {result.title}
+                                </span>
+                              )}
                             </h5>
                             
                             {result.snippet && (
@@ -549,7 +574,7 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
                             )}
                             
                             <div className="flex items-center gap-4 text-xs text-gray-500">
-                              <span>{new URL(result.url).hostname}</span>
+                              <span>{getHostname(result.url) || 'unknown'}</span>
                               {result.publishedDate && (
                                 <span>{new Date(result.publishedDate).toLocaleDateString()}</span>
                               )}
