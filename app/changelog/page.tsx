@@ -8,8 +8,15 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Changelog1, type ChangelogEntry } from "@/components/ui/changelog-1";
 import changelogData from "@/data/changelog.json";
+import { useState, useMemo } from "react";
 
 export default function ChangelogPage() {
+  const allEntries = changelogData as ChangelogEntry[];
+  const PAGE_SIZE = 4;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visibleEntries = useMemo(() => allEntries.slice(0, visibleCount), [allEntries, visibleCount]);
+  const hasMore = visibleCount < allEntries.length;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -120,8 +127,21 @@ export default function ChangelogPage() {
         <Changelog1
           title="ThesisFlow-AI Changelog"
           description="Real, ongoing updates to ThesisFlow-AI across AI chat, research tools, extraction, models, and UX."
-          entries={changelogData as ChangelogEntry[]}
+          entries={visibleEntries}
         />
+        {hasMore && (
+          <div className="container mx-auto px-4 -mt-12 mb-16 flex justify-center">
+            <button
+              onClick={() => setVisibleCount((c) => Math.min(c + PAGE_SIZE, allEntries.length))}
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "rounded-none font-mono bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
+              )}
+            >
+              Load more
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
