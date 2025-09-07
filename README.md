@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-MIT-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai/blob/unified/LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/thesisflow-ai?style=flat-square&color=FF6B2C)](https://github.com/Kedhareswer/thesisflow-ai)
 [![Production](https://img.shields.io/badge/Status-Production_Ready-28a745?style=flat-square)](https://thesisflow-ai.vercel.app)
-[![Version](https://img.shields.io/badge/Version-2.0.0-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai)
+[![Version](https://img.shields.io/badge/Version-1.0.9-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai)
 
 ## 🎯 Core Features
 
@@ -58,6 +58,20 @@ pnpm dev
 
 ---
 
+## 📣 Changelog
+
+Stay up to date with the latest releases and improvements:
+
+- Web: https://thesisflow-ai.vercel.app/changelog
+- RSS: https://thesisflow-ai.vercel.app/changelog/rss.xml
+- Atom: https://thesisflow-ai.vercel.app/changelog/atom.xml
+
+Direct links to specific versions also work, for example:
+
+- https://thesisflow-ai.vercel.app/changelog#v1.0.9
+
+---
+
 ## 📚 Table of Contents
 
 - [🎯 Features](#-features)
@@ -65,6 +79,7 @@ pnpm dev
 - [⚙️ Setup Guide](#️-setup-guide)
 - [🔌 API Reference](#-api-reference)
 - [📊 Performance](#-performance)
+- [📣 Changelog](#-changelog)
 - [🤝 Contributing](#-contributing)
 
 ---
@@ -447,6 +462,6 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 [🌐 Live Demo](https://thesisflow-ai.vercel.app) • [📖 Documentation](https://github.com/Kedhareswer/thesisflow-ai/wiki) • [🐛 Report Issues](https://github.com/Kedhareswer/thesisflow-ai/issues)
 
-**Status:** ✅ Production Ready • **Version:** 2.0.0 • **Updated:** January 2025
+**Status:** ✅ Production Ready • **Version:** 1.0.9 • **Updated:** September 2025
 
 </div>

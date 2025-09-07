@@ -104,6 +104,7 @@ export const Changelog1 = ({
           {entries.map((entry, index) => (
             <div
               key={index}
+              id={entry.version}
               className="relative flex flex-col gap-4 md:flex-row md:gap-16"
             >
               <div className="top-8 flex h-min w-64 shrink-0 items-center gap-4 md:sticky">
