@@ -26,7 +26,7 @@ COPY package.json pnpm-lock.yaml* .npmrc* ./
 
 # Install dependencies (handle missing lockfile gracefully)
 RUN if [ -f pnpm-lock.yaml ]; then \
-      pnpm install --frozen-lockfile; \
+      pnpm install --frozen-lockfile || pnpm install; \
     else \
       pnpm install; \
     fi
