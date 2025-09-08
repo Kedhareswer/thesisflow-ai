@@ -91,42 +91,69 @@ export async function GET(request: NextRequest) {
     }
     unreadCount = countRes.count || 0
 
-    // Enrich notifications with user and team data
+    // Enrich notifications with user and team data using efficient joins
     const enrichedNotifications = await Promise.all(
       (notifications || []).map(async (n: any) => {
-        const enrichedData = { ...n.data }
+        let enrichedData = { ...n.data }
 
-        // Get sender/user info if sender_id exists
-        if (n.data?.sender_id) {
-          const { data: sender } = await supabaseAdmin.auth.admin.getUserById(n.data.sender_id)
-          if (sender?.user) {
-            enrichedData.user_name = sender.user.user_metadata?.full_name || sender.user.user_metadata?.name || sender.user.email?.split('@')[0]
-            enrichedData.user_avatar = sender.user.user_metadata?.avatar_url
+        // Extract user and team IDs from various sources
+        const potentialSenderId = n.data?.sender_id || n.related_id
+        const potentialTeamId = n.data?.team_id
+        const potentialUserId = n.data?.user_id
+
+        // Get sender/user info from user_profiles if we have an ID
+        if (potentialSenderId || potentialUserId) {
+          const targetUserId = potentialSenderId || potentialUserId
+          const { data: userProfile } = await supabaseAdmin
+            .from('user_profiles')
+            .select('full_name, display_name, email, avatar_url')
+            .eq('id', targetUserId)
+            .single()
+          
+          if (userProfile) {
+            enrichedData.user_name = userProfile.display_name || userProfile.full_name || userProfile.email?.split('@')[0] || 'Someone'
+            enrichedData.user_avatar = userProfile.avatar_url
+            enrichedData.sender_name = enrichedData.user_name  // For backward compatibility
+            enrichedData.sender_avatar = enrichedData.user_avatar
+          }
+        }
+
+        // If we still don't have user info, try to extract from message content
+        if (!enrichedData.user_name && n.message && n.message.includes(':')) {
+          const extractedName = n.message.split(':')[0].trim()
+          if (extractedName && extractedName !== 'Someone') {
+            enrichedData.user_name = extractedName
+            enrichedData.sender_name = extractedName
           }
         }
 
         // Get team info if team_id exists
-        if (n.data?.team_id) {
+        if (potentialTeamId) {
           const { data: team } = await supabaseAdmin
             .from('teams')
             .select('name, description')
-            .eq('id', n.data.team_id)
+            .eq('id', potentialTeamId)
             .single()
+          
           if (team) {
             enrichedData.team_name = team.name
+            enrichedData.project_name = team.name  // For backward compatibility
           }
         }
 
-        // Get project info if project_id exists  
-        if (n.data?.project_id) {
-          const { data: project } = await supabaseAdmin
-            .from('projects')
-            .select('name, title')
-            .eq('id', n.data.project_id)
-            .single()
-          if (project) {
-            enrichedData.project_name = project.name || project.title
+        // If we still don't have team info, try to extract from title
+        if (!enrichedData.team_name && n.title && n.title.includes('message in ')) {
+          const extractedTeam = n.title.split('message in ')[1]?.trim()
+          if (extractedTeam) {
+            enrichedData.team_name = extractedTeam
+            enrichedData.project_name = extractedTeam
           }
+        }
+
+        // Ensure we have fallback values
+        if (!enrichedData.user_name) {
+          enrichedData.user_name = 'Someone'
+          enrichedData.sender_name = 'Someone'
         }
 
         return {
