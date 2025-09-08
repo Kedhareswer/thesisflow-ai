@@ -28,6 +28,11 @@ export interface StreamingCallbacks {
   onDone?: (metadata: { totalTokens: number; processingTime: number }) => void
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
 export interface StreamingController {
   abort: () => void
 }
@@ -202,7 +207,7 @@ export class AIProviderService {
   }
 
   static async streamChat(
-    message: string,
+    message: string | ChatMessage[],
     provider: AIProvider,
     model: string,
     callbacks: StreamingCallbacks,
@@ -225,12 +230,19 @@ export class AIProviderService {
 
       // Build URL with query parameters
       const params = new URLSearchParams({
-        message,
         provider,
         model,
         temperature: (options.temperature || 0.7).toString(),
         maxTokens: (options.maxTokens || 2000).toString(),
       })
+
+      // Handle conversation history or single message
+      if (typeof message === 'string') {
+        params.set('message', message)
+      } else {
+        // Send conversation history as JSON string
+        params.set('messages', JSON.stringify(message))
+      }
 
       if (options.systemPrompt) {
         params.set('systemPrompt', options.systemPrompt)

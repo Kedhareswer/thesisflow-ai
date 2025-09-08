@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController } from "@/lib/ai-providers"
+import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController, type ChatMessage } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
@@ -480,9 +480,20 @@ Use this research context to provide more relevant and targeted responses. Refer
         }
       }
 
-      // Start streaming
+      // Build conversation history for context
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+      // Add the new user message to the conversation
+      conversationHistory.push({
+        role: 'user',
+        content: userMessageContent
+      })
+
+      // Start streaming with full conversation history
       const controller = await AIProviderService.streamChat(
-        userMessageContent,
+        conversationHistory,
         selectedProvider,
         selectedModel,
         streamingCallbacks,

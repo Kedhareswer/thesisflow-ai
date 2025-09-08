@@ -33,19 +33,36 @@ export async function GET(request: NextRequest) {
     // Parse query parameters
     const { searchParams } = new URL(request.url);
     const message = searchParams.get('message')?.trim() || '';
+    const messagesParam = searchParams.get('messages');
     const provider = searchParams.get('provider') as AIProvider;
     const model = searchParams.get('model') || '';
     const systemPrompt = searchParams.get('systemPrompt') || '';
     const temperature = parseFloat(searchParams.get('temperature') || '0.7');
     const maxTokens = parseInt(searchParams.get('maxTokens') || '2000');
     
-    // Validate required fields
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return new Response('Message is required', { status: 400 });
+    // Handle conversation history or single message
+    let conversationHistory: Array<{ role: string; content: string }> = [];
+    
+    if (messagesParam) {
+      try {
+        conversationHistory = JSON.parse(messagesParam);
+        if (!Array.isArray(conversationHistory)) {
+          return new Response('Invalid messages format', { status: 400 });
+        }
+      } catch (error) {
+        return new Response('Invalid messages JSON', { status: 400 });
+      }
+    } else if (message) {
+      // Single message mode for backward compatibility
+      conversationHistory = [{ role: 'user', content: message }];
+    } else {
+      return new Response('Message or messages required', { status: 400 });
     }
     
-    if (message.trim().length > 10000) {
-      return new Response('Message too long (max 10,000 characters)', { status: 400 });
+    // Validate conversation length
+    const totalLength = conversationHistory.reduce((sum, msg) => sum + msg.content.length, 0);
+    if (totalLength > 50000) {
+      return new Response('Conversation too long (max 50,000 characters total)', { status: 400 });
     }
 
     // Check rate limit
@@ -108,10 +125,29 @@ export async function GET(request: NextRequest) {
         // Start streaming AI generation
         const run = async () => {
           try {
-            // Build the prompt with system context if provided
-            const fullPrompt = systemPrompt 
-              ? `${systemPrompt}\n\nUser: ${message.trim()}\nAssistant:`
-              : message.trim();
+            // Build the conversation context with full history
+            let fullPrompt = '';
+            
+            if (systemPrompt) {
+              fullPrompt += `${systemPrompt}\n\n`;
+            }
+            
+            // Build conversation context from history
+            if (conversationHistory.length > 0) {
+              fullPrompt += 'Conversation History:\n';
+              
+              // Include all messages in context for better continuity
+              conversationHistory.forEach((msg, index) => {
+                const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
+                fullPrompt += `${roleLabel}: ${msg.content}\n`;
+              });
+              
+              // Add continuation prompt for the assistant
+              fullPrompt += '\nAssistant: ';
+            } else {
+              // Fallback for empty conversation
+              fullPrompt += 'User: Hello\nAssistant: ';
+            }
 
             // Stream the AI response with fallback handling
             try {
