@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Changelog1, type ChangelogEntry } from "@/components/ui/changelog-1";
 import changelogData from "@/data/changelog.json";
 import { useState, useMemo } from "react";
+import BannerUI from "@/components/ui/banner-ui";
 
 export default function ChangelogPage() {
   const allEntries = changelogData as ChangelogEntry[];
@@ -120,6 +121,16 @@ export default function ChangelogPage() {
             description="We communicate what's next and why it matters to your workflow."
           />
         </div>
+      </section>
+
+      {/* Call to Action Banner */}
+      <section className="container mx-auto px-4 py-16">
+        <BannerUI
+          title="Ready to Experience the Latest Features?"
+          subtitle="Join thousands of researchers already using ThesisFlow-AI to accelerate their work with cutting-edge AI tools."
+          buttonText="Try ThesisFlow-AI"
+          onButtonClick={() => window.location.href = '/explorer'}
+        />
       </section>
 
       {/* Changelog Section */}
