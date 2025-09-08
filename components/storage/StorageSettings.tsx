@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { storageManager } from '@/lib/storage/storage-manager'
+import { supabaseStorageManager } from '@/lib/storage/supabase-storage-manager'
 import { StorageProvider } from '@/lib/storage/types'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -60,6 +61,12 @@ export function StorageSettings() {
   const loadProviders = () => {
     try {
       const connected = storageManager.getConnectedProviders()
+      
+      // Add Google Drive if connected via supabaseStorageManager
+      if (supabaseStorageManager.isGoogleDriveConnected() && !connected.includes('google-drive')) {
+        connected.push('google-drive')
+      }
+      
       setProviders(connected)
     } catch (error) {
       console.error('Failed to load providers:', error)

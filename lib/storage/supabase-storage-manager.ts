@@ -120,6 +120,13 @@ export class SupabaseStorageManager {
     return provider
   }
   
+  // Ensure Google Drive provider is loaded
+  async ensureGoogleDriveProvider(): Promise<GoogleDriveProvider> {
+    // Make sure providers are loaded
+    await this.loadUserProviders()
+    return this.getGoogleDriveProvider()
+  }
+  
   // Check if Google Drive is connected
   isGoogleDriveConnected(): boolean {
     return this.providers.has('google-drive')
@@ -159,7 +166,7 @@ export class SupabaseStorageManager {
     file: File, 
     options?: UploadOptions & { teamId?: string }
   ): Promise<StorageFile> {
-    const provider = this.getGoogleDriveProvider()
+    const provider = await this.ensureGoogleDriveProvider()
     
     // Refresh token if needed
     await this.refreshTokenIfNeeded(provider)
@@ -181,7 +188,7 @@ export class SupabaseStorageManager {
   
   // List files from Google Drive
   async listGoogleDriveFiles(folderId?: string): Promise<StorageFile[]> {
-    const provider = this.getGoogleDriveProvider()
+    const provider = await this.ensureGoogleDriveProvider()
     
     // Refresh token if needed
     await this.refreshTokenIfNeeded(provider)
@@ -197,7 +204,7 @@ export class SupabaseStorageManager {
   
   // Download file from Google Drive
   async downloadGoogleDriveFile(fileId: string): Promise<Blob> {
-    const provider = this.getGoogleDriveProvider()
+    const provider = await this.ensureGoogleDriveProvider()
     
     // Refresh token if needed
     await this.refreshTokenIfNeeded(provider)
@@ -212,7 +219,7 @@ export class SupabaseStorageManager {
   
   // Share file with team member
   async shareGoogleDriveFile(fileId: string, email: string, permission: 'view' | 'edit'): Promise<void> {
-    const provider = this.getGoogleDriveProvider()
+    const provider = await this.ensureGoogleDriveProvider()
     
     // Refresh token if needed
     await this.refreshTokenIfNeeded(provider)
@@ -227,8 +234,18 @@ export class SupabaseStorageManager {
   
   // Private helper methods
   private async refreshTokenIfNeeded(provider: GoogleDriveProvider): Promise<void> {
+    // Ensure the provider has auth data
+    if (!(provider as any).auth) {
+      // Try to reload providers to get auth data
+      await this.loadUserProviders()
+      // If still no auth, throw error
+      if (!(provider as any).auth) {
+        throw new Error('Google Drive not properly authenticated. Please reconnect.')
+      }
+    }
+    
     const auth = (provider as any).auth
-    if (!auth || !auth.expiresAt) return
+    if (!auth.expiresAt) return
     
     const now = new Date()
     const expiresAt = new Date(auth.expiresAt)
