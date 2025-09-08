@@ -22,8 +22,12 @@ RUN npm install -g pm2 concurrently
 # Copy only package manifest first for better caching
 COPY package.json pnpm-lock.yaml* .npmrc* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (handle missing lockfile gracefully)
+RUN if [ -f pnpm-lock.yaml ]; then \
+      pnpm install --frozen-lockfile; \
+    else \
+      pnpm install; \
+    fi
 
 # Copy the rest of the application code
 COPY . .
