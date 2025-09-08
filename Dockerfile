@@ -16,8 +16,10 @@ RUN apt-get update && apt-get install -y \
 # Enable corepack and use pnpm
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Install PM2 globally for process management
-RUN npm install -g pm2 concurrently
+# Install global tools needed during install/postinstall
+# - pm2, concurrently for process management
+# - patch-package so dependency postinstall scripts (e.g., citation-js) can find it
+RUN npm install -g pm2 concurrently patch-package
 
 # Copy only package manifest first for better caching
 COPY package.json pnpm-lock.yaml* .npmrc* ./
@@ -42,7 +44,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Install PM2 for process management
-RUN npm install -g pm2 concurrently
+RUN npm install -g pm2 concurrently patch-package
 
 # Enable corepack + pnpm for runtime scripts
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
