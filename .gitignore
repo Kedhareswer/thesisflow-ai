@@ -27,7 +27,10 @@ yarn-error.log*
 
 # local env files
 .env
-.env*.local
+.env.local
+.env.*        # ignore all other env variants (e.g., .env.production)
+!.env.example
+!env.template
 
 # vercel
 .vercel
@@ -43,3 +46,36 @@ next-env.d.ts
 .cursorrules/
 .cursor/
 .kombai/
+.idea/
+.fleet/
+
+# caches and build artifacts
+.eslintcache
+.cache/
+.turbo/
+.parcel-cache
+.nyc_output
+
+# logs and pids
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# OS-specific
+Thumbs.db
+
+# Python (for files in python/ and general safety)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+env/
+.envs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
