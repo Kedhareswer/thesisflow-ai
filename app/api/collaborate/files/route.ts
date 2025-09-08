@@ -173,10 +173,11 @@ export async function GET(request: NextRequest) {
         }
       }) || []
 
-      // Merge and deduplicate by file url
-      const allFilesMap = new Map()
+      // Merge and deduplicate. Prefer URL as key; fall back to id if URL is missing
+      const allFilesMap = new Map<string, any>()
       for (const f of [...formattedFiles, ...formattedDocFiles]) {
-        if (f.url) allFilesMap.set(f.url, f)
+        const key = f.url || f.id
+        if (key && !allFilesMap.has(key)) allFilesMap.set(key, f)
       }
       allFiles = [...allFilesMap.values()]
     }
@@ -325,7 +326,7 @@ export async function POST(request: NextRequest) {
           file_name: name,
           file_type: fileType || 'application/octet-stream',
           file_size: fileSize || 0,
-          file_url: url || '', // In real implementation, this would be the uploaded file URL
+          file_url: url || '',
           description: description || '',
           tags: tags || [],
           is_public: isPublic || false

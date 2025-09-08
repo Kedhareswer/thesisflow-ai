@@ -22,7 +22,7 @@ export class GoogleDriveProvider extends BaseStorageProvider {
       provider: 'google-drive',
       clientId: config?.clientId || process.env.NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID || '',
       clientSecret: config?.clientSecret || process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
-      redirectUri: config?.redirectUri || `${window.location.origin}/api/auth/callback/google-drive`,
+      redirectUri: config?.redirectUri || (typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/google-drive` : ''),
       scopes: config?.scopes || [
         'https://www.googleapis.com/auth/drive.file',
         'https://www.googleapis.com/auth/drive.metadata.readonly',
@@ -160,10 +160,11 @@ export class GoogleDriveProvider extends BaseStorageProvider {
     )
     
     const data = await response.json()
-    
+    // Guard for empty or unexpected responses
+    const filesArray = Array.isArray(data?.files) ? data.files : []
     return {
-      files: data.files.map(this.mapGoogleFileToStorageFile),
-      nextPageToken: data.nextPageToken
+      files: filesArray.map(this.mapGoogleFileToStorageFile),
+      nextPageToken: data?.nextPageToken
     }
   }
   

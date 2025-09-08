@@ -1,14 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+// Use the shared Supabase client so we have the same auth/session storage
+import { supabase as sharedSupabase } from '@/lib/supabase'
 import { GoogleDriveProvider } from './providers/google-drive'
 import { StorageProvider, StorageProviderAuth, StorageFile, UploadOptions } from './types'
 
 export class SupabaseStorageManager {
   private providers: Map<StorageProvider, GoogleDriveProvider> = new Map()
   private activeProvider: StorageProvider | null = null
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  private supabase = sharedSupabase
   
   constructor() {
     this.loadUserProviders()
@@ -64,9 +62,13 @@ export class SupabaseStorageManager {
   // Initialize OAuth flow for Google Drive
   async initGoogleDriveAuth(): Promise<string> {
     try {
+      const { data: { session } } = await this.supabase.auth.getSession()
       const response = await fetch('/api/auth/google-drive', { 
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        }
       })
       
       const data = await response.json()
@@ -84,10 +86,14 @@ export class SupabaseStorageManager {
   // Complete OAuth flow after callback
   async completeGoogleDriveAuth(code: string): Promise<void> {
     try {
+      const { data: { session } } = await this.supabase.auth.getSession()
       const response = await fetch('/api/auth/google-drive/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        },
         body: JSON.stringify({ code })
       })
       
@@ -122,9 +128,13 @@ export class SupabaseStorageManager {
   // Disconnect Google Drive
   async disconnectGoogleDrive(): Promise<void> {
     try {
+      const { data: { session } } = await this.supabase.auth.getSession()
       const response = await fetch('/api/auth/google-drive', { 
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        }
       })
       
       const data = await response.json()
@@ -259,29 +269,39 @@ export class SupabaseStorageManager {
   
   private async saveTeamFile(file: StorageFile, teamId: string): Promise<void> {
     try {
-      const { data: { user } } = await this.supabase.auth.getUser()
-      if (!user) return
-      
-      await this.supabase
-        .from('team_files')
-        .insert({
-          team_id: teamId,
-          uploader_id: user.id,
-          name: file.name,
+      const { data: { session } } = await this.supabase.auth.getSession()
+      // Use our API with service role to avoid client-side RLS issues
+      const resp = await fetch('/api/collaborate/files', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        },
+        body: JSON.stringify({
+          teamId,
           type: 'file',
-          mime_type: file.mimeType,
-          size: file.size,
-          cloud_storage_id: file.id,
-          cloud_storage_provider: 'google-drive',
-          cloud_storage_url: file.webViewUrl,
-          is_public: false,
-          tags: [],
-          description: `Uploaded from Google Drive`
+          name: file.name,
+          url: file.webViewUrl,
+          description: 'Uploaded from Google Drive',
+          tags: ['google-drive'],
+          isPublic: false,
+          fileType: file.mimeType,
+          fileSize: file.size
         })
-        
+      })
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }))
+        throw new Error(err.error || `Failed to insert team file (HTTP ${resp.status})`)
+      }
+      const data = await resp.json().catch(() => null)
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to insert team file')
+      }
     } catch (error) {
       console.error('Failed to save team file record:', error)
       // Don't throw - file upload succeeded, just database record failed
+      throw error
     }
   }
 }
@@ -319,11 +339,14 @@ export class GoogleDriveOAuthHandler {
         }
         
         // Listen for messages from popup
+        let completed = false
         const handleMessage = async (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return
+          // Be permissive about origin in dev; validate payload instead
+          if (!event?.data || event.data.provider !== 'google-drive') return
           
           if (event.data.type === 'auth-callback' && event.data.provider === 'google-drive') {
             window.removeEventListener('message', handleMessage)
+            completed = true
             
             if (event.data.error) {
               reject(new Error(event.data.error))
@@ -348,7 +371,9 @@ export class GoogleDriveOAuthHandler {
           if (this.popup?.closed) {
             clearInterval(checkClosed)
             window.removeEventListener('message', handleMessage)
-            reject(new Error('Authentication cancelled'))
+            if (!completed) {
+              reject(new Error('Authentication cancelled'))
+            }
           }
         }, 1000)
         

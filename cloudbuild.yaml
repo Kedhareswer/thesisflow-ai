@@ -1,0 +1,67 @@
+# Cloud Build config for building and deploying Next.js app to Cloud Run
+# Substitutions you can override per-trigger:
+# _SERVICE: Cloud Run service name
+# _REGION: Cloud Run region (e.g., us-central1)
+# _REPO: Artifact Registry repo (format: LOCATION-docker.pkg.dev/PROJECT/REPO)
+# _IMAGE: Image name (defaults to $_REPO/thesisflow-ai)
+
+substitutions:
+  _SERVICE: thesisflow
+  _REGION: us-central1
+  _REPO: us-central1-docker.pkg.dev/$PROJECT_ID/thesisflow
+  _IMAGE: $_REPO/thesisflow-ai
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  # Build and push container image
+  - name: gcr.io/cloud-builders/docker
+    id: build-image
+    args:
+      - build
+      - -t
+      - $_IMAGE:$SHORT_SHA
+      - -t
+      - $_IMAGE:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-image
+    args:
+      - push
+      - --all-tags
+      - $_IMAGE
+
+  # Deploy to Cloud Run
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: deploy-cloud-run
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE
+      - --image
+      - $_IMAGE:$SHORT_SHA
+      - --region
+      - $_REGION
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --port
+      - "8080"
+      - --max-instances
+      - "4"
+      - --cpu
+      - "1"
+      - --memory
+      - "1Gi"
+      - --set-env-vars
+      - NEXT_TELEMETRY_DISABLED=1
+
+images:
+  - $_IMAGE:$SHORT_SHA
+  - $_IMAGE:latest
+
+# Optionally set a default Cloud Run service account for runtime via flags or console

@@ -158,6 +158,7 @@ export default function CollaboratePage() {
   const novaAI = NovaAIService.getInstance()
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [currentMentions, setCurrentMentions] = useState<MentionData[]>([])
+  const [teamFileMentions, setTeamFileMentions] = useState<MentionData[]>([])
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const lastScrollTimeRef = useRef<number>(0)
@@ -210,6 +211,86 @@ export default function CollaboratePage() {
 
     return response.json()
   }, [session])
+
+  // Load team files for @mentions in composer
+  const loadTeamFilesForMentions = useCallback(async () => {
+    if (!selectedTeamId) return
+    try {
+      const data = await apiCall(`/api/collaborate/files?teamId=${selectedTeamId}&limit=50`)
+      if (data?.success && Array.isArray(data.files)) {
+        const mapped: MentionData[] = data.files.map((file: any) => ({
+          id: file.id,
+          type: 'file' as const,
+          name: file.name,
+          fileType: file.mime_type,
+          fileSize: (file.size ?? file.file_size ?? 0).toString(),
+          fileUrl: file.url || file.file_url,
+        }))
+        setTeamFileMentions(mapped)
+      } else {
+        setTeamFileMentions([])
+      }
+    } catch {
+      setTeamFileMentions([])
+    }
+  }, [apiCall, selectedTeamId])
+
+  useEffect(() => {
+    loadTeamFilesForMentions()
+  }, [loadTeamFilesForMentions])
+
+  // Attach from cloud: Google Drive picker → save to team → insert mention
+  const handleAttachFromCloud = useCallback(async () => {
+    try {
+      const { supabaseStorageManager, GoogleDriveOAuthHandler } = await import('@/lib/storage/supabase-storage-manager')
+      // Ensure Drive connected
+      if (!supabaseStorageManager.isGoogleDriveConnected()) {
+        const oauth = GoogleDriveOAuthHandler.getInstance()
+        await oauth.authenticate()
+        await supabaseStorageManager.loadUserProviders()
+      }
+      // List files
+      const driveFiles = await supabaseStorageManager.listGoogleDriveFiles()
+      if (!driveFiles || driveFiles.length === 0) {
+        toast({ title: 'No Drive files', description: 'Your Google Drive appears empty.' })
+        return
+      }
+      // Simple numeric prompt for now (keeps UI light)
+      const options = driveFiles.slice(0, 10).map((f, i) => `${i + 1}. ${f.name}`).join('\n')
+      const pick = window.prompt(`Pick a file to attach by number:\n${options}`, '1')
+      const index = Math.max(1, Math.min(10, parseInt(pick || '1', 10))) - 1
+      const chosen = driveFiles[index]
+      if (!chosen || !selectedTeamId) return
+      // Create a team_files record
+      const result = await apiCall('/api/collaborate/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: selectedTeamId,
+          type: 'file',
+          name: chosen.name,
+          url: chosen.webViewUrl,
+          description: 'Shared from Google Drive',
+          tags: ['google-drive'],
+          isPublic: false,
+          fileType: chosen.mimeType,
+          fileSize: chosen.size,
+        }),
+      })
+      if (!result?.success || !result.file) return
+      // Insert an @mention token for the new file
+      const mentionToken = `@[${result.file.name}](${result.file.id})`
+      setNewMessage(prev => (prev ? `${prev} ${mentionToken}` : mentionToken))
+      setCurrentMentions(prev => ([
+        ...prev,
+        { id: result.file.id, type: 'file', name: result.file.name, fileType: result.file.mime_type, fileSize: String(result.file.size || result.file.file_size || 0), fileUrl: result.file.url }
+      ]))
+      // Refresh mentions list for future suggestions
+      await loadTeamFilesForMentions()
+    } catch (e) {
+      console.error('Attach from cloud failed:', e)
+      toast({ title: 'Attach failed', description: e instanceof Error ? e.message : 'Could not attach from cloud', variant: 'destructive' })
+    }
+  }, [apiCall, selectedTeamId, loadTeamFilesForMentions, toast])
 
   // Load teams (prefer websocket request-response, fallback to REST once)
   const loadTeams = useCallback(async () => {
@@ -1867,10 +1948,7 @@ export default function CollaboratePage() {
                                     }
                                   }}
                             onSend={handleSendMessage}
-                            onAttach={() => {
-                              // TODO: Implement file attachment
-                              console.log('Attach file clicked')
-                            }}
+                            onAttach={handleAttachFromCloud}
                             onAIAssist={handleAIAssistance}
                             disabled={isSendingMessage || isProcessingAI}
                             placeholder="Type a message... Use @ to mention team members or @nova for AI assistance"
@@ -1881,7 +1959,7 @@ export default function CollaboratePage() {
                                     email: m.email,
                                     avatar: m.avatar,
                                   }))}
-                                  files={[]}
+                                  files={teamFileMentions}
                             currentUser={user ? {
                               id: user.id,
                               name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me',
@@ -2041,7 +2119,7 @@ export default function CollaboratePage() {
                       </TabsContent>
 
                       <TabsContent value="files" className="mt-0 p-6">
-                        <TeamFiles teamId={selectedTeam.id} currentUserRole={currentUserRole} />
+                        <TeamFiles teamId={selectedTeam.id} currentUserRole={currentUserRole} apiCall={apiCall} />
                       </TabsContent>
 
                       <TabsContent value="integrations" className="mt-0 p-6">

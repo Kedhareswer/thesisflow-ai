@@ -122,9 +122,9 @@ export function TeamSidebar(props: TeamSidebarProps) {
                 >
                   <DropdownMenuLabel>Team Actions</DropdownMenuLabel>
                   <DropdownMenuItem
-                    onSelect={(e)=>{
+                    onClick={() => {
                       const disabled = !canUseTeamMembers || Boolean(planLoading)
-                      if (disabled) { e.preventDefault(); return }
+                      if (disabled) return
                       onCreateTeam()
                     }}
                     className={`${(!canUseTeamMembers || Boolean(planLoading)) ? "opacity-50 cursor-not-allowed" : ""}`}
@@ -134,9 +134,9 @@ export function TeamSidebar(props: TeamSidebarProps) {
                     {!canUseTeamMembers && <Crown className="ml-auto h-4 w-4" />}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={(e)=>{
+                    onClick={() => {
                       const disabled = !hasSelection || !canUseTeamMembers || Boolean(planLoading)
-                      if (disabled) { e.preventDefault(); return }
+                      if (disabled) return
                       onInviteMember()
                     }}
                     className={`${(!hasSelection || !canUseTeamMembers || Boolean(planLoading)) ? "opacity-50 cursor-not-allowed" : ""}`}
