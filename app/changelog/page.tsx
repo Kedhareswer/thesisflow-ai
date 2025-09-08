@@ -63,7 +63,7 @@ export default function ChangelogPage() {
             transition={{ duration: 0.5 }}
             className="font-mono text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl text-white"
           >
-            Product Changelog
+            ThesisFlow Changelog
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 8 }}
@@ -108,14 +108,16 @@ export default function ChangelogPage() {
 
 
       {/* Changelog Section */}
-      <div id="updates" className="mt-12">
-        <Changelog1
-          title="ThesisFlow-AI Changelog"
-          description="Real, ongoing updates to ThesisFlow-AI across AI chat, research tools, extraction, models, and UX."
-          entries={visibleEntries}
-        />
+      <div id="updates" className="container mx-auto px-4 mt-12">
+        <div className="mx-auto max-w-5xl w-full">
+          <Changelog1
+            title="ThesisFlow-AI Changelog"
+            description="Real, ongoing updates to ThesisFlow-AI across AI chat, research tools, extraction, models, and UX."
+            entries={visibleEntries}
+          />
+        </div>
         {hasMore && (
-          <div className="container mx-auto px-4 -mt-12 mb-16 flex justify-center">
+          <div className="-mt-12 mb-16 flex justify-center">
             <button
               onClick={() => setVisibleCount((c) => Math.min(c + PAGE_SIZE, allEntries.length))}
               className={cn(
