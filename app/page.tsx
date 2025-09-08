@@ -14,12 +14,15 @@ import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, Organization, WebPage } from "@/components/schema/microdata-schema"
+import { PixelTrail } from "@/components/ui/pixel-trail"
+import { useScreenSize } from "@/components/hooks/use-screen-size"
 
 // metadata moved to app/seo/root-metadata.ts
 
 export default function HomePage() {
   const { user } = useSupabaseAuth()
   const router = useRouter()
+  const screenSize = useScreenSize()
 
   const handleProtectedAction = (href: string) => {
     if (!user) {
@@ -311,7 +314,19 @@ export default function HomePage() {
         </div>
       </header>
       {/* Hero Section */}
-      <main className="flex flex-col items-center text-center py-24">
+      <main className="relative flex flex-col items-center text-center py-24 min-h-[600px]">
+        {/* PixelTrail Background */}
+        <div className="absolute inset-0 z-0">
+          <PixelTrail
+            pixelSize={screenSize.lessThan('md') ? 32 : 48}
+            fadeDuration={800}
+            delay={200}
+            pixelClassName="rounded-full bg-[#FF6B2C] opacity-60"
+          />
+        </div>
+        
+        {/* Hero Content */}
+        <div className="relative z-10 w-full">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -403,6 +418,7 @@ export default function HomePage() {
             <Link href="/signup">Create Account</Link>
           </Button>
         </motion.div>
+        </div>
       </main>
 
       {/* Features Section */}
