@@ -106,23 +106,6 @@ export default function ChangelogPage() {
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="container mx-auto px-4">
-        <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
-          <FeatureCard
-            title="Speed of delivery"
-            description="We ship iteratively and often. Expect frequent meaningful updates."
-          />
-          <FeatureCard
-            title="Quality first"
-            description="Thoughtful improvements with strong attention to UX and stability."
-          />
-          <FeatureCard
-            title="Clear roadmaps"
-            description="We communicate what's next and why it matters to your workflow."
-          />
-        </div>
-      </section>
 
       {/* Changelog Section */}
       <div id="updates" className="mt-12">
