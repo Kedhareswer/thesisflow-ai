@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { enhancedAIService } from '@/lib/enhanced-ai-service';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { type AIProvider } from '@/lib/ai-providers';
 
 // Ensure Node.js runtime for service-role usage and stable SSE behavior
@@ -9,16 +9,11 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Helper to lazily create Supabase client only at runtime
-function getServiceSupabase(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    // Missing at build-time or not configured: return null and soft-fail downstream
-    return null;
-  }
-  return createClient(url, key);
-}
+// Supabase client (service role for server-side ops like rate limiting)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 const aiService = enhancedAIService;
 
@@ -70,10 +65,9 @@ export async function GET(request: NextRequest) {
       return new Response('Conversation too long (max 50,000 characters total)', { status: 400 });
     }
 
-    // Check rate limit (soft-fail if Supabase not configured)
+    // Check rate limit
     const clientIP = getClientIP(request);
-    const serviceSupabase = getServiceSupabase();
-    const rateLimit = await checkRateLimit(user.id, clientIP, serviceSupabase);
+    const rateLimit = await checkRateLimit(user.id, clientIP);
     if (!rateLimit.allowed) {
       const retryAfterSec = Math.max(1, Math.ceil((new Date(rateLimit.reset_time).getTime() - Date.now()) / 1000));
       return new Response('Rate limit exceeded. Try later.', {
@@ -417,16 +411,8 @@ function getClientIP(request: NextRequest): string {
   return '127.0.0.1';
 }
 
-async function checkRateLimit(userId: string, ipAddress: string, supabase: SupabaseClient | null): Promise<RateLimitResult> {
+async function checkRateLimit(userId: string, ipAddress: string): Promise<RateLimitResult> {
   try {
-    if (!supabase) {
-      // Not configured; allow request and avoid throwing during build
-      return {
-        allowed: true,
-        current_count: 0,
-        reset_time: new Date(Date.now() + 3600000).toISOString(),
-      };
-    }
     const { data, error } = await supabase.rpc('check_literature_search_rate_limit', {
       p_user_id: userId,
       p_ip_address: ipAddress,
