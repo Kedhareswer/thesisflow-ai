@@ -73,6 +73,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { RouteGuard } from "@/components/route-guard"
 import { TeamSettings } from "./components/team-settings"
+import TeamSidebar from "./components/team-sidebar"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
 import { InvitationsDialog } from "./components/invitations-dialog"
@@ -1485,159 +1486,26 @@ export default function CollaboratePage() {
           <div className="flex-1 bg-background overflow-hidden">
         {/* Modern Header */}
         {/* Removed duplicate header here */}
-        <div className="container mx-auto px-6 pt-4 pb-0 max-w-7xl h-full">
+        <div className="px-4 md:px-6 pt-0 pb-0 h-full w-full">
           {/* Upgrade Banner for Free Users */}
-          <div className="mb-6">
+          <div className="mb-3">
             <TeamLimitBanner currentUsage={teams.length} />
           </div>
-          <div className="grid gap-8 lg:grid-cols-12">
+          <div className="grid gap-6 lg:gap-8 lg:grid-cols-12">
             {/* Sidebar */}
             <div className="lg:col-span-4 xl:col-span-3 animate-fade-in">
-              <div className="space-y-6">
-                {/* Quick Actions */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
-                      Quick Actions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      onClick={() => setIsCreateTeamOpen(true)}
-                      className="w-full justify-start gap-3 h-12"
-                      variant="outline"
-                      disabled={!canUseFeature('team_members') || planLoading}
-                      title={!canUseFeature('team_members') ? "Upgrade to Pro plan to create teams" : ""}
-                    >
-                      <Plus className="h-4 w-4" />
-                      {planLoading ? 'Loading...' : 'Create Team'}
-                      {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
-                    </Button>
-                    <Button
-                      onClick={() => setIsInviteDialogOpen(true)}
-                      className="w-full justify-start gap-3 h-12"
-                      variant="outline"
-                      disabled={!selectedTeam || !canUseFeature('team_members') || planLoading}
-                      title={!canUseFeature('team_members') ? "Upgrade to Pro plan to invite team members" : ""}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      {planLoading ? 'Loading...' : 'Invite Member'}
-                      {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
-                    </Button>
-                    <Button
-                      className="w-full justify-start gap-3 h-12"
-                      variant="outline"
-                      disabled={!selectedTeam}
-                    >
-                      <Video className="h-4 w-4" />
-                      Video Call
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Search */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="pt-6">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search teams..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 border-none bg-muted/50 focus:bg-muted/80 transition-colors"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Invitations */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="pt-6">
-                    <Button
-                      onClick={() => setIsInvitationsDialogOpen(true)}
-                      className="w-full justify-between gap-3 h-12"
-                      variant="outline"
-                    >
-                      <div className="flex items-center gap-3">
-                        <UserPlus className="h-4 w-4" />
-                        Invitations
-                      </div>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Teams List */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Your Teams</CardTitle>
-                      <Badge variant="secondary" className="font-normal">
-                        {teams.length}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {filteredTeams.map((team) => (
-                        <div
-                          key={team.id}
-                          className={`group p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
-                            selectedTeamId === team.id
-                              ? "bg-primary/10 border-2 border-primary/20"
-                              : "bg-muted/30 hover:bg-muted/50 border-2 border-transparent"
-                          }`}
-                          onClick={() => setSelectedTeamId(team.id)}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className={`p-1.5 rounded-md ${selectedTeamId === team.id ? 'bg-primary/20' : 'bg-muted'}`}>
-                                <Users className="h-3 w-3" />
-                              </div>
-                              <h4 className="font-medium text-sm">{team.name}</h4>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {team.isPublic && <Globe className="h-3 w-3 text-muted-foreground" />}
-                              <Badge variant="outline" className="text-xs font-normal">
-                                {team.category}
-                              </Badge>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{team.description}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                {team.members.length} members
-                              </span>
-                            </div>
-                            <div className="flex -space-x-1">
-                              {team.members.slice(0, 3).map((member) => (
-                                <div key={member.id} className="relative">
-                                  <Avatar className="h-5 w-5 border border-white">
-                                    <AvatarImage src={member.avatar || ""} />
-                                    <AvatarFallback className="text-xs">{member.name?.charAt(0) || 'U'}</AvatarFallback>
-                                  </Avatar>
-                                  <div
-                                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {filteredTeams.length === 0 && (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <Users className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                          <p className="text-sm">{searchTerm ? "No teams found" : "No teams yet"}</p>
-                          <p className="text-xs mt-1">Create your first team to get started</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <TeamSidebar
+                teams={teams as any}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedTeamId={selectedTeamId}
+                setSelectedTeamId={(id)=>setSelectedTeamId(id)}
+                canUseTeamMembers={canUseFeature('team_members')}
+                planLoading={planLoading}
+                onCreateTeam={() => setIsCreateTeamOpen(true)}
+                onInviteMember={() => setIsInviteDialogOpen(true)}
+                onOpenInvitations={() => setIsInvitationsDialogOpen(true)}
+              />
             </div>
 
             {/* Main Content */}
@@ -1689,7 +1557,7 @@ export default function CollaboratePage() {
                       </TabsList>
 
                       <TabsContent value="chat" className="mt-0 p-0">
-                        <div className="h-[85vh] md:h-[90vh] lg:h-[95vh] relative flex flex-col bg-background">
+                        <div className="h-[80vh] md:h-[85vh] lg:h-[90vh] relative flex flex-col bg-background">
                           {/* Enhanced Productivity Chat Header */}
                           <EnhancedChatHeader
                             title={selectedTeam.name}
@@ -1711,7 +1579,7 @@ export default function CollaboratePage() {
                           />
 
                           {/* Enhanced Messages Area */}
-                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-background">
+                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-background pb-0">
                             {teamMessages.length === 0 ? (
                               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
                                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full flex items-center justify-center mb-6">

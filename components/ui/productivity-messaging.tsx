@@ -588,7 +588,7 @@ export function ProductivityMessageInput({
   ]
 
   return (
-    <div className="border-t bg-background">
+    <div className="border-t bg-background sticky bottom-0 z-20 shadow-sm pb-[env(safe-area-inset-bottom)]">
       {/* Enhanced Reply Preview */}
       {replyingTo && (
         <div className="mx-4 mt-4 mb-2">
@@ -620,10 +620,10 @@ export function ProductivityMessageInput({
         </div>
       )}
       
-      <div className="p-4">
-        <div className="flex items-start gap-3">
+      <div className="px-3 md:px-4 p-2.5">
+        <div className="flex items-start gap-2.5">
           {/* User Avatar */}
-          <Avatar className="h-8 w-8 mt-1">
+          <Avatar className="h-6 w-6 mt-0.5">
             <AvatarImage src={currentUser?.avatar} />
             <AvatarFallback className="text-xs">
               {currentUser?.name?.substring(0, 2).toUpperCase() || 'ME'}
@@ -633,7 +633,7 @@ export function ProductivityMessageInput({
           {/* Input Area */}
           <div className="flex-1">
             <div className={cn(
-              "border rounded-lg p-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all",
+              "border rounded-lg p-1.5 focus-within:ring-2 focus-within:ring-primary/20 transition-all",
               "hover:border-primary/30",
               disabled && "opacity-50 cursor-not-allowed"
             )}>
@@ -642,7 +642,7 @@ export function ProductivityMessageInput({
                 onChange={onChange}
                 placeholder={placeholder}
                 disabled={disabled}
-                className="min-h-[40px] max-h-32 resize-none border-0 p-0 focus-visible:ring-0 text-sm bg-transparent"
+                className="min-h-[28px] max-h-24 leading-[1.15] resize-none border-0 p-0 focus-visible:ring-0 text-[13px] bg-transparent"
                 users={enhancedUsers}
                 files={files}
                 onKeyDown={handleKeyDown}
@@ -650,12 +650,12 @@ export function ProductivityMessageInput({
             </div>
 
             {/* Action Bar */}
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center justify-between mt-1">
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className="h-6 w-6 p-0"
                   onClick={() => setIsExpanded(!isExpanded)}
                 >
                   <Plus className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-45")} />
@@ -663,7 +663,7 @@ export function ProductivityMessageInput({
                 
                 <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                       <Smile className="h-3 w-3" />
                     </Button>
                   </PopoverTrigger>
@@ -672,14 +672,14 @@ export function ProductivityMessageInput({
                   </PopoverContent>
                 </Popover>
                 
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onAttach}>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onAttach}>
                   <Paperclip className="h-3 w-3" />
                 </Button>
                 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   onClick={handleAIAssist}
                   disabled={!value.trim()}
                 >
@@ -697,7 +697,7 @@ export function ProductivityMessageInput({
                   onClick={handleSend}
                   disabled={disabled || !value.trim()}
                   className={cn(
-                    "h-8 px-3",
+                    "h-6 px-2",
                     replyingTo && "bg-blue-600 hover:bg-blue-700"
                   )}
                 >

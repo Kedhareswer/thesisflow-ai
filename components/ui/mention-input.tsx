@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { User, Bot, FileText, File, Image, X } from 'lucide-react'
+import { User, Bot, FileText, File, Image, X, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface MentionData {
@@ -53,6 +53,7 @@ export function MentionInput({
   const [suggestions, setSuggestions] = useState<MentionData[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const editorRef = useRef<HTMLDivElement>(null)
+  const [isOverflowing, setIsOverflowing] = useState(false)
 
   // Simplified logs removed for production
 
@@ -114,6 +115,8 @@ export function MentionInput({
     if (el.innerText !== value) {
       el.innerHTML = renderHighlighted(value)
     }
+    // Check overflow on external updates
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
   }, [value])
 
   // Handle contenteditable input
@@ -136,6 +139,7 @@ export function MentionInput({
     el.innerHTML = renderHighlighted(parsed.text)
     placeCaretAtEnd(el)
     onChange(parsed.text, parsed.mentions)
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
   }
 
   // Handle key down events
@@ -237,17 +241,36 @@ export function MentionInput({
         onKeyDown={handleKeyDown}
         data-placeholder={placeholder}
         className={cn(
-          "min-h-[42px] px-4 py-2 rounded-lg border bg-background outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all",
+          "min-h-[42px] px-4 py-2 rounded-lg border bg-background outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all w-full overflow-y-auto",
           "placeholder:text-muted-foreground",
           disabled && "opacity-50 cursor-not-allowed",
           className
         )}
         style={{
           whiteSpace: 'pre-wrap',
-          wordWrap: 'break-word',
-          overflowWrap: 'break-word'
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word'
         }}
       />
+
+      {isOverflowing && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 rounded-b-lg bg-gradient-to-t from-background to-transparent" />
+      )}
+
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => {
+            const el = editorRef.current
+            if (el) el.scrollTop = el.scrollHeight
+          }}
+          className="absolute bottom-1 right-1 h-6 w-6 grid place-items-center rounded-md border bg-background hover:bg-muted text-muted-foreground"
+          aria-label="Scroll to bottom"
+          title="Scroll"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      )}
       
       {/* Suggestions dropdown anchored to input */}
       {showSuggestions && (
