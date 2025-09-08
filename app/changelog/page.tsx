@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { Changelog1, type ChangelogEntry } from "@/components/ui/changelog-1";
 import changelogData from "@/data/changelog.json";
 import { useState, useMemo } from "react";
-import BannerUI from "@/components/ui/banner-ui";
 
 export default function ChangelogPage() {
   const allEntries = changelogData as ChangelogEntry[];
@@ -56,12 +55,13 @@ export default function ChangelogPage() {
 
       {/* Hero */}
       <section className="container mx-auto px-4 py-24">
+        <div className="mx-auto max-w-5xl w-full rounded-2xl bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop')] bg-cover bg-center bg-no-repeat py-20 md:py-24">
         <div className="mx-auto max-w-3xl flex flex-col items-center text-center">
           <motion.h1
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="font-mono text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl"
+            className="font-mono text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl text-white"
           >
             Product Changelog
           </motion.h1>
@@ -69,7 +69,7 @@ export default function ChangelogPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.5 }}
-            className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg"
+            className="mt-4 max-w-2xl text-base leading-relaxed text-white md:text-lg"
           >
             Follow the latest updates, improvements, and fixes across releases.
             We keep this page fresh so you can see what shipped recently.
@@ -81,9 +81,9 @@ export default function ChangelogPage() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="mt-8 flex flex-wrap items-center justify-center gap-6"
           >
-            <FeatureLabel icon={<Sparkles className="h-4 w-4" />} label="Rapid shipping" />
-            <FeatureLabel icon={<History className="h-4 w-4" />} label="Versioned releases" />
-            <FeatureLabel icon={<Megaphone className="h-4 w-4" />} label="Transparent changes" />
+            <FeatureLabelWhite icon={<Sparkles className="h-4 w-4" />} label="Rapid shipping" />
+            <FeatureLabelWhite icon={<History className="h-4 w-4" />} label="Versioned releases" />
+            <FeatureLabelWhite icon={<Megaphone className="h-4 w-4" />} label="Transparent changes" />
           </motion.div>
 
           <motion.div
@@ -96,12 +96,13 @@ export default function ChangelogPage() {
               href="#updates"
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "rounded-none font-mono bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
+                "rounded-none font-mono bg-white hover:bg-white/90 text-black"
               )}
             >
               See latest updates <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </motion.div>
+        </div>
         </div>
       </section>
 
@@ -121,16 +122,6 @@ export default function ChangelogPage() {
             description="We communicate what's next and why it matters to your workflow."
           />
         </div>
-      </section>
-
-      {/* Call to Action Banner */}
-      <section className="container mx-auto px-4 py-16">
-        <BannerUI
-          title="Ready to Experience the Latest Features?"
-          subtitle="Join thousands of researchers already using ThesisFlow-AI to accelerate their work with cutting-edge AI tools."
-          buttonText="Try ThesisFlow-AI"
-          onButtonClick={() => window.location.href = '/explorer'}
-        />
       </section>
 
       {/* Changelog Section */}
@@ -161,6 +152,15 @@ export default function ChangelogPage() {
 function FeatureLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-full bg-[#FF6B2C]/10 px-3 py-1 font-mono text-xs text-[#FF6B2C]">
+      {icon}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function FeatureLabelWhite({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 font-mono text-xs text-white backdrop-blur-sm">
       {icon}
       <span>{label}</span>
     </div>
