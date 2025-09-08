@@ -38,30 +38,8 @@ export async function GET(request: NextRequest) {
       notifications = res.data || []
       error = res.error
     } else {
-      // Try unread filter with fallback: is_read -> read -> read_at IS NULL
-      const tryIsRead = async () => {
-        const q = type ? baseQuery().eq('type', type).eq('is_read', false) : baseQuery().eq('is_read', false)
-        const res = await q
-        return res
-      }
-      const tryRead = async () => {
-        const q = type ? baseQuery().eq('type', type).eq('read', false) : baseQuery().eq('read', false)
-        const res = await q
-        return res
-      }
-      const tryReadAt = async () => {
-        const q = type ? baseQuery().eq('type', type).is('read_at', null) : baseQuery().is('read_at', null)
-        const res = await q
-        return res
-      }
-
-      let res = await tryIsRead()
-      if (res.error) {
-        res = await tryRead()
-        if (res.error) {
-          res = await tryReadAt()
-        }
-      }
+      // Filter for unread notifications using the correct field name
+      const res = await (type ? baseQuery().eq('type', type).eq('read', false) : baseQuery().eq('read', false))
       notifications = res.data || []
       error = res.error
     }
@@ -74,22 +52,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get unread count with fallback
-    let unreadCount = 0
-    const countBase = () =>
-      supabaseAdmin
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+    // Get unread count using the correct field name
+    const { count: unreadCount, error: countError } = await supabaseAdmin
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false)
 
-    let countRes = await countBase().eq('is_read', false)
-    if (countRes.error) {
-      countRes = await countBase().eq('read', false)
-      if (countRes.error) {
-        countRes = await countBase().is('read_at', null)
-      }
+    if (countError) {
+      console.error('Error counting unread notifications:', countError)
     }
-    unreadCount = countRes.count || 0
 
     // Enrich notifications with user and team data using efficient joins
     const enrichedNotifications = await Promise.all(
@@ -159,7 +131,7 @@ export async function GET(request: NextRequest) {
         return {
           ...n,
           data: enrichedData,
-          read: typeof n.is_read === 'boolean' ? n.is_read : (typeof n.read === 'boolean' ? n.read : Boolean(n.read_at)),
+          read: n.read, // Use the actual field name from the database
         }
       })
     )
@@ -208,44 +180,22 @@ export async function PUT(request: NextRequest) {
     }
 
     if (markAllAsRead) {
-      // Mark all notifications as read with unconditional fallbacks
-      const attempt1 = await supabaseAdmin
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-
-      if (!attempt1.error) {
-        return NextResponse.json({ success: true, message: "All notifications marked as read" })
-      }
-
-      const attempt2 = await supabaseAdmin
+      // Mark all notifications as read using the correct field name
+      const { error: updateError } = await supabaseAdmin
         .from('notifications')
         .update({ read: true })
         .eq('user_id', user.id)
         .eq('read', false)
-      if (!attempt2.error) {
-        return NextResponse.json({ success: true, message: "All notifications marked as read" })
+
+      if (updateError) {
+        console.error('Error marking all notifications as read:', updateError)
+        return NextResponse.json(
+          { error: `Failed to mark notifications as read: ${updateError.message}` },
+          { status: 500 }
+        )
       }
 
-      const attempt3 = await supabaseAdmin
-        .from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .is('read_at', null)
-      if (!attempt3.error) {
-        return NextResponse.json({ success: true, message: "All notifications marked as read" })
-      }
-
-      console.error('Error marking all notifications as read:', {
-        attempt1: attempt1.error?.message,
-        attempt2: attempt2.error?.message,
-        attempt3: attempt3.error?.message,
-      })
-      return NextResponse.json(
-        { error: `Failed to mark notifications as read: ${attempt3.error?.message || attempt2.error?.message || attempt1.error?.message || 'Unknown error'}` },
-        { status: 500 }
-      )
+      return NextResponse.json({ success: true, message: "All notifications marked as read" })
 
     } else if (notificationId) {
       if (!isValidUuid(notificationId)) {
@@ -275,49 +225,28 @@ export async function PUT(request: NextRequest) {
         )
       }
 
-      // Try update with fallbacks: is_read -> read -> read_at
-      const attempt1 = await supabaseAdmin
-        .from('notifications')
-        .update({ is_read: markAsRead === true })
-        .eq('id', notificationId)
-        .eq('user_id', user.id)
-        .select('id')
-
-      if (!attempt1.error && attempt1.data && attempt1.data.length > 0) {
-        return NextResponse.json({ success: true, message: `Notification marked as ${markAsRead ? 'read' : 'unread'}` })
-      }
-
-      const attempt2 = await supabaseAdmin
+      // Update notification read status using the correct field name
+      const { data: updatedNotification, error: updateError } = await supabaseAdmin
         .from('notifications')
         .update({ read: markAsRead === true })
         .eq('id', notificationId)
         .eq('user_id', user.id)
         .select('id')
 
-      if (!attempt2.error && attempt2.data && attempt2.data.length > 0) {
-        return NextResponse.json({ success: true, message: `Notification marked as ${markAsRead ? 'read' : 'unread'}` })
+      if (updateError) {
+        console.error('Error updating notification:', updateError)
+        return NextResponse.json(
+          { error: `Failed to update notification: ${updateError.message}` },
+          { status: 500 }
+        )
       }
 
-      const attempt3 = await supabaseAdmin
-        .from('notifications')
-        .update({ read_at: markAsRead ? new Date().toISOString() : null })
-        .eq('id', notificationId)
-        .eq('user_id', user.id)
-        .select('id')
-
-      if (!attempt3.error && attempt3.data && attempt3.data.length > 0) {
-        return NextResponse.json({ success: true, message: `Notification marked as ${markAsRead ? 'read' : 'unread'}` })
+      if (!updatedNotification || updatedNotification.length === 0) {
+        return NextResponse.json(
+          { error: "Notification not found or no changes made" },
+          { status: 404 }
+        )
       }
-
-      console.error('Error updating notification with all fallbacks:', {
-        attempt1: attempt1.error?.message,
-        attempt2: attempt2.error?.message,
-        attempt3: attempt3.error?.message,
-      })
-      return NextResponse.json(
-        { error: `Failed to update notification: ${attempt3.error?.message || attempt2.error?.message || attempt1.error?.message || 'Unknown error'}` },
-        { status: 500 }
-      )
 
       return NextResponse.json({
         success: true,
@@ -359,44 +288,22 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (deleteAll) {
-      // Delete all read notifications with unconditional fallbacks
-      const attempt1 = await supabaseAdmin
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('is_read', true)
-
-      if (!attempt1.error) {
-        return NextResponse.json({ success: true, message: "All read notifications deleted" })
-      }
-
-      const attempt2 = await supabaseAdmin
+      // Delete all read notifications using the correct field name
+      const { error: deleteError } = await supabaseAdmin
         .from('notifications')
         .delete()
         .eq('user_id', user.id)
         .eq('read', true)
-      if (!attempt2.error) {
-        return NextResponse.json({ success: true, message: "All read notifications deleted" })
+
+      if (deleteError) {
+        console.error('Error deleting all read notifications:', deleteError)
+        return NextResponse.json(
+          { error: `Failed to delete notifications: ${deleteError.message}` },
+          { status: 500 }
+        )
       }
 
-      const attempt3 = await supabaseAdmin
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id)
-        .not('read_at', 'is', null)
-      if (!attempt3.error) {
-        return NextResponse.json({ success: true, message: "All read notifications deleted" })
-      }
-
-      console.error('Error deleting notifications with all fallbacks:', {
-        attempt1: attempt1.error?.message,
-        attempt2: attempt2.error?.message,
-        attempt3: attempt3.error?.message,
-      })
-      return NextResponse.json(
-        { error: `Failed to delete notifications: ${attempt3.error?.message || attempt2.error?.message || attempt1.error?.message || 'Unknown error'}` },
-        { status: 500 }
-      )
+      return NextResponse.json({ success: true, message: "All read notifications deleted" })
 
     } else if (notificationId) {
       // Delete specific notification
