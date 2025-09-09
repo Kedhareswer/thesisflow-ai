@@ -16,6 +16,7 @@ import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, Organization, WebPage } from "@/components/schema/microdata-schema"
 import { PixelTrail } from "@/components/ui/pixel-trail"
 import { useScreenSize } from "@/components/hooks/use-screen-size"
+import { HomeLoader } from "@/components/ui/home-loader"
 
 // metadata moved to app/seo/root-metadata.ts
 
@@ -206,6 +207,7 @@ export default function HomePage() {
           { name: "Home", url: "https://thesisflow-ai.com" }
         ]}
       >
+        <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
         <div className="container mx-auto px-4 min-h-screen bg-background font-mono">
       {/* Header */}
       <header className="flex h-16 items-center justify-between">
