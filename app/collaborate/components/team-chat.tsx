@@ -270,16 +270,24 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     if (!socket || !team?.id) return
 
     const handleNewMessage = (data: any) => {
-      if (data.teamId === team.id) {
+      // Handle both server format (from database) and client format
+      const teamId = data.teamId || data.team_id
+      const senderId = data.senderId || data.sender_id
+      const senderName = data.senderName || data.sender?.full_name || 'Unknown User'
+      const senderAvatar = data.senderAvatar || data.sender?.avatar_url
+      const timestamp = data.timestamp || data.created_at
+      const messageType = data.type || data.message_type || 'text'
+      
+      if (teamId === team.id) {
         const newMessage: ChatMessage = {
           id: data.id,
-          senderId: data.senderId,
-          senderName: data.senderName,
-          senderAvatar: data.senderAvatar,
+          senderId,
+          senderName,
+          senderAvatar,
           content: data.content,
-          timestamp: data.timestamp,
-          teamId: data.teamId,
-          type: data.type || "text",
+          timestamp,
+          teamId,
+          type: messageType,
           mentions: data.mentions || [],
         }
         setMessages(prev => [...prev, newMessage])
@@ -312,22 +320,28 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
 
     const handleMemberUpdate = () => {}
 
-    // Join team room
+    // Join team room - use both event names for compatibility
     socket.emit(SocketEvent.JOIN_TEAM, { teamId: team.id, userId: user?.id })
+    socket.emit('team:join', { teamId: team.id, userId: user?.id })
 
     // Subscribe to events
     socket.on(SocketEvent.NEW_MESSAGE, handleNewMessage)
+    socket.on('team:message_new', handleNewMessage) // Also listen for server's team:message_new event
     socket.on(SocketEvent.TYPING, handleTyping)
+    socket.on('team:user_typing', handleTyping) // Also listen for server's team:user_typing event
     socket.on('member-joined', handleMemberUpdate)
     socket.on('member-left', handleMemberUpdate)
 
     return () => {
-      // Leave team room
+      // Leave team room - use both event names for compatibility
       socket.emit(SocketEvent.LEAVE_TEAM, { teamId: team.id, userId: user?.id })
+      socket.emit('team:leave', { teamId: team.id, userId: user?.id })
       
       // Unsubscribe from events
       socket.off(SocketEvent.NEW_MESSAGE, handleNewMessage)
+      socket.off('team:message_new', handleNewMessage) // Clean up server event too
       socket.off(SocketEvent.TYPING, handleTyping)
+      socket.off('team:user_typing', handleTyping) // Clean up server event too
       socket.off('member-joined', handleMemberUpdate)
       socket.off('member-left', handleMemberUpdate)
       
@@ -352,20 +366,24 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       
       // Send typing indicator (stopped typing)
       if (socket) {
-        socket.emit(SocketEvent.STOP_TYPING, {
+        const typingData = {
           teamId: team.id,
           userId: user.id,
-        })
+        }
+        socket.emit(SocketEvent.STOP_TYPING, typingData)
+        socket.emit('team:typing_stop', typingData)
       }
       
-      // Send message via socket
+      // Send message via socket - use both event names for compatibility
       if (socket) {
-        socket.emit(SocketEvent.NEW_MESSAGE, {
+        const messageData = {
           teamId: team.id,
           content: newMessage.trim(),
           type: 'text',
           mentions: currentMentions.map(m => m.id),
-        })
+        }
+        socket.emit(SocketEvent.NEW_MESSAGE, messageData)
+        socket.emit('team:message', messageData)
         setNewMessage('')
         setCurrentMentions([])
       }
@@ -385,10 +403,12 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const handleTypingIndicator = () => {
     if (!user || !team?.id || !socket) return
     
-    socket.emit(SocketEvent.TYPING, {
+    const typingData = {
       teamId: team.id,
       userId: user.id,
-    })
+    }
+    socket.emit(SocketEvent.TYPING, typingData)
+    socket.emit('team:typing_start', typingData)
   }
   
   // Handle mention input changes

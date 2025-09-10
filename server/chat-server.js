@@ -592,8 +592,16 @@ class ChatServer {
   }
 
   setupTeamHandlers(socket) {
-    // Join team room
+    // Join team room - handle both namespaced and simple events
     socket.on('team:join', async (data) => {
+      await this.handleTeamJoin(socket, data);
+    });
+    socket.on('join_team', async (data) => {
+      await this.handleTeamJoin(socket, data);
+    });
+  }
+  
+  async handleTeamJoin(socket, data) {
       try {
         const { teamId } = data;
         
@@ -628,10 +636,17 @@ class ChatServer {
         console.error('Error joining team:', error);
         socket.emit('team:error', { error: 'Failed to join team' });
       }
-    });
 
-    // Leave team room
+    // Leave team room - handle both namespaced and simple events
     socket.on('team:leave', (data) => {
+      this.handleTeamLeave(socket, data);
+    });
+    socket.on('leave_team', (data) => {
+      this.handleTeamLeave(socket, data);
+    });
+  }
+  
+  handleTeamLeave(socket, data) {
       const { teamId } = data;
       socket.leave(`team_${teamId}`);
       
@@ -645,54 +660,74 @@ class ChatServer {
         teamId,
         timestamp: new Date().toISOString()
       });
-    });
 
-    // Send team message
+    // Send team message - handle both namespaced and simple events
     socket.on('team:message', async (data) => {
-      try {
-        const { teamId, content, messageType = 'text' } = data;
-        
-        // Verify team membership
-        const { data: member } = await this.supabase
-          .from('team_members')
-          .select('*')
-          .eq('team_id', teamId)
-          .eq('user_id', socket.userId)
-          .single();
-
-        if (!member) {
-          socket.emit('team:error', { error: 'Not authorized to send messages to this team' });
-          return;
-        }
-
-        // Insert message into chat_messages (existing team chat table)
-        const { data: message, error } = await this.supabase
-          .from('chat_messages')
-          .insert({
-            team_id: teamId,
-            sender_id: socket.userId,
-            content,
-            message_type: messageType
-          })
-          .select(`
-            *,
-            sender:user_profiles!sender_id(*)
-          `)
-          .single();
-
-        if (error) {
-          socket.emit('team:error', { error: 'Failed to send message' });
-          return;
-        }
-
-        // Broadcast to team
-        this.io.to(`team_${teamId}`).emit('team:message_new', message);
-
-      } catch (error) {
-        console.error('Error sending team message:', error);
-        socket.emit('team:error', { error: 'Failed to send message' });
-      }
+      await this.handleTeamMessage(socket, data);
     });
+    socket.on('new_message', async (data) => {
+      await this.handleTeamMessage(socket, data);
+    });
+  }
+  
+  async handleTeamMessage(socket, data) {
+    try {
+      const { teamId, content, messageType = 'text' } = data;
+      
+      // Verify team membership
+      const { data: member } = await this.supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId)
+        .eq('user_id', socket.userId)
+        .single();
+
+      if (!member) {
+        socket.emit('team:error', { error: 'Not authorized to send messages to this team' });
+        return;
+      }
+
+      // Insert message into chat_messages (existing team chat table)
+      const { data: message, error } = await this.supabase
+        .from('chat_messages')
+        .insert({
+          team_id: teamId,
+          sender_id: socket.userId,
+          content,
+          message_type: messageType
+        })
+        .select(`
+          *,
+          sender:user_profiles!sender_id(*)
+        `)
+        .single();
+
+      if (error) {
+        socket.emit('team:error', { error: 'Failed to send message' });
+        return;
+      }
+      
+      // Format message for broadcast
+      const formattedMessage = {
+        id: message.id,
+        senderId: message.sender_id,
+        senderName: message.sender?.full_name || 'Unknown User',
+        senderAvatar: message.sender?.avatar_url,
+        content: message.content,
+        timestamp: message.created_at,
+        teamId: message.team_id,
+        type: message.message_type || 'text',
+        mentions: message.mentions || [],
+      };
+
+      // Broadcast to team with both event names for compatibility
+      this.io.to(`team_${teamId}`).emit('team:message_new', formattedMessage);
+      this.io.to(`team_${teamId}`).emit('new_message', formattedMessage);
+
+    } catch (error) {
+      socket.emit('team:error', { error: 'Failed to send message' });
+    }
+  }
 
     // Get team messages
     socket.on('team:get_messages', async (data) => {
