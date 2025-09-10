@@ -320,30 +320,24 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
 
     const handleMemberUpdate = () => {}
 
-    // Join team room - use both event names for compatibility
-    socket.emit(SocketEvent.JOIN_TEAM, { teamId: team.id, userId: user?.id })
-    socket.emit('team:join', { teamId: team.id, userId: user?.id })
+    // Join team room
+    socket.emit('join_team', { teamId: team.id })
 
-    // Subscribe to events
-    socket.on(SocketEvent.NEW_MESSAGE, handleNewMessage)
-    socket.on('team:message_new', handleNewMessage) // Also listen for server's team:message_new event
-    socket.on(SocketEvent.TYPING, handleTyping)
-    socket.on('team:user_typing', handleTyping) // Also listen for server's team:user_typing event
-    socket.on('member-joined', handleMemberUpdate)
-    socket.on('member-left', handleMemberUpdate)
+    // Subscribe to events - websocket server uses these event names
+    socket.on('new_message', handleNewMessage)
+    socket.on('typing', handleTyping)
+    socket.on('user-joined', handleMemberUpdate)
+    socket.on('user-left', handleMemberUpdate)
 
     return () => {
-      // Leave team room - use both event names for compatibility
-      socket.emit(SocketEvent.LEAVE_TEAM, { teamId: team.id, userId: user?.id })
-      socket.emit('team:leave', { teamId: team.id, userId: user?.id })
+      // Leave team room
+      socket.emit('leave_team', { teamId: team.id })
       
       // Unsubscribe from events
-      socket.off(SocketEvent.NEW_MESSAGE, handleNewMessage)
-      socket.off('team:message_new', handleNewMessage) // Clean up server event too
-      socket.off(SocketEvent.TYPING, handleTyping)
-      socket.off('team:user_typing', handleTyping) // Clean up server event too
-      socket.off('member-joined', handleMemberUpdate)
-      socket.off('member-left', handleMemberUpdate)
+      socket.off('new_message', handleNewMessage)
+      socket.off('typing', handleTyping)
+      socket.off('user-joined', handleMemberUpdate)
+      socket.off('user-left', handleMemberUpdate)
       
       // Clear all typing timeouts
       Object.values(typingTimeoutsRef.current).forEach(timeout => clearTimeout(timeout))
@@ -366,24 +360,19 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       
       // Send typing indicator (stopped typing)
       if (socket) {
-        const typingData = {
+        socket.emit('stop_typing', {
           teamId: team.id,
-          userId: user.id,
-        }
-        socket.emit(SocketEvent.STOP_TYPING, typingData)
-        socket.emit('team:typing_stop', typingData)
+        })
       }
       
-      // Send message via socket - use both event names for compatibility
+      // Send message via socket
       if (socket) {
-        const messageData = {
+        socket.emit('new_message', {
           teamId: team.id,
           content: newMessage.trim(),
           type: 'text',
           mentions: currentMentions.map(m => m.id),
-        }
-        socket.emit(SocketEvent.NEW_MESSAGE, messageData)
-        socket.emit('team:message', messageData)
+        })
         setNewMessage('')
         setCurrentMentions([])
       }
@@ -403,12 +392,9 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const handleTypingIndicator = () => {
     if (!user || !team?.id || !socket) return
     
-    const typingData = {
+    socket.emit('typing', {
       teamId: team.id,
-      userId: user.id,
-    }
-    socket.emit(SocketEvent.TYPING, typingData)
-    socket.emit('team:typing_start', typingData)
+    })
   }
   
   // Handle mention input changes
