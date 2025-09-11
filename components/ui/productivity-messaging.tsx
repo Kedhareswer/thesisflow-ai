@@ -25,7 +25,6 @@ import {
   Settings,
   Search,
   Users,
-  Phone,
   Video,
   Pin,
   CheckCheck,
@@ -280,7 +279,7 @@ export function ProductivityMessage({
                 "font-semibold text-sm",
                 isAI && "text-blue-600 dark:text-blue-400"
               )}>
-                {isAI ? 'Nova AI Assistant' : user.name}
+                {isAI ? 'Nova Assistant' : user.name}
               </span>
               
               {/* Mention indicator */}
@@ -434,7 +433,7 @@ export function ProductivityMessage({
                 size="sm"
                 className="h-8 w-8 p-0"
                 onClick={() => onAIAssist?.(message.id, message.content)}
-                title="Ask Nova AI"
+                title="Ask Nova"
               >
                 <Brain className="h-3 w-3 text-blue-500" />
               </Button>
@@ -576,12 +575,12 @@ export function ProductivityMessageInput({
     textareaRef.current?.focus()
   }
 
-  // Enhanced users list with Nova AI
+  // Enhanced users list with Nova
   const enhancedUsers = [
     {
       id: 'nova-ai',
       type: 'ai' as const,
-      name: 'Nova AI',
+      name: 'Nova',
       avatar: '/assistant-avatar.svg'
     },
     ...users
@@ -598,7 +597,7 @@ export function ProductivityMessageInput({
                 <div className="flex items-center gap-2 mb-1">
                   <Reply className="w-3 h-3 text-muted-foreground" />
                   <span className="text-xs font-medium text-muted-foreground">
-                    Replying to {replyingTo.senderName || (replyingTo.senderId === 'nova-ai' ? 'Nova AI' : 'Someone')}
+                    Replying to {replyingTo.senderName || (replyingTo.senderId === 'nova-ai' ? 'Nova' : 'Someone')}
                   </span>
                 </div>
                 <div className="text-sm text-foreground/80 truncate max-w-[280px]">
@@ -719,7 +718,6 @@ interface ProductivityChatHeaderProps {
   subtitle?: string
   members?: ProductivityUser[]
   onSearchClick?: () => void
-  onCallClick?: () => void
   onVideoClick?: () => void
   onSettingsClick?: () => void
   onClose?: () => void
@@ -727,17 +725,13 @@ interface ProductivityChatHeaderProps {
 
 export function ProductivityChatHeader({
   title,
-  subtitle,
-  members = [],
+  subtitle: _subtitle,
+  members: _members = [],
   onSearchClick,
-  onCallClick,
   onVideoClick,
   onSettingsClick,
   onClose
 }: ProductivityChatHeaderProps) {
-  const onlineCount = members.filter(m => m.status === 'online').length
-  const activeCount = members.filter(m => ['online', 'away'].includes(m.status)).length
-
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur">
       <div className="flex items-center gap-3">
@@ -752,26 +746,12 @@ export function ProductivityChatHeader({
             {title}
             <Zap className="w-4 h-4 text-blue-500" />
           </h3>
-          <div className="text-sm text-muted-foreground flex items-center gap-4">
-            <span>{onlineCount} online, {activeCount} active</span>
-            <span>•</span>
-            <span>{members.length} members</span>
-            {subtitle && (
-              <>
-                <span>•</span>
-                <span>{subtitle}</span>
-              </>
-            )}
-          </div>
         </div>
       </div>
 
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" onClick={onSearchClick}>
           <Search className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onCallClick}>
-          <Phone className="h-4 w-4" />
         </Button>
         <Button variant="ghost" size="sm" onClick={onVideoClick}>
           <Video className="h-4 w-4" />

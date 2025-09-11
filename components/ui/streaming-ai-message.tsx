@@ -140,7 +140,7 @@ export function StreamingAIMessage({
           {/* Header */}
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
-              Nova AI Assistant
+              Nova Assistant
             </span>
             <Sparkles className="w-3 h-3 text-blue-500" />
             <Badge variant="outline" className="text-xs px-1.5 py-0 text-blue-600 border-blue-300">
@@ -202,7 +202,7 @@ export function StreamingAIMessage({
                 size="sm"
                 className="h-8 w-8 p-0"
                 onClick={() => onAIAssist?.(messageId, content)}
-                title="Ask Nova AI about this"
+                title="Ask Nova about this"
               >
                 <Brain className="h-3 w-3 text-blue-500" />
               </Button>

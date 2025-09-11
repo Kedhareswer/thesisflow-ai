@@ -287,7 +287,7 @@ io.on('connection', async (socket) => {
         id: message.id,
         content: message.content,
         // Preserve AI responses as ai_response type for consistent UI rendering
-        type: message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova AI Response:**')
+        type: message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova Response:**')
           ? 'ai_response'
           : message.message_type,
         timestamp: message.created_at,

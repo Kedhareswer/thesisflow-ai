@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -65,6 +65,40 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
   
+  // Build a catalog of mentionable entities (AI, members, files)
+  const allMentionables = useMemo<MentionData[]>(() => {
+    const ai: MentionData = {
+      id: 'nova-ai',
+      name: 'Nova',
+      avatar: '/anthropic-icon.png',
+      type: 'ai',
+    }
+    const members: MentionData[] = (team?.members || []).map((member) => ({
+      id: member.id,
+      type: 'user' as const,
+      name: member.name,
+      email: member.email,
+      avatar: member.avatar,
+    }))
+    return [ai, ...members, ...(teamFiles || [])]
+  }, [team?.members, teamFiles])
+
+  // Helper to resolve mention references coming from server (ids or full objects)
+  const resolveMentionRefs = useCallback((raw: any): MentionData[] => {
+    if (!raw) return []
+    if (Array.isArray(raw) && raw.length > 0) {
+      if (typeof raw[0] === 'object' && 'id' in raw[0]) {
+        // Already full objects
+        return raw as MentionData[]
+      }
+      // Assume array of ids
+      return (raw as string[])
+        .map((id) => allMentionables.find((m) => m.id === id))
+        .filter(Boolean) as MentionData[]
+    }
+    return []
+  }, [allMentionables])
+  
   // API helper function
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {
@@ -112,7 +146,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     return groupedMessages
   }
 
-  // Determine if a message is from Nova AI Assistant
+  // Determine if a message is from Nova Assistant
   const isAIMessage = (message: ChatMessage) => {
     const name = (message.senderName || '').toLowerCase()
     const id = (message.senderId || '').toLowerCase()
@@ -120,7 +154,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     return (
       (message as any).type === 'ai' ||
       id === 'nova-ai' || id === 'nova_ui' || id === 'assistant' ||
-      name.includes('nova ai') || name.includes('nova ai assistant') || name === 'assistant' || name.includes('nova')
+      name.includes('Nova') || name.includes('Nova assistant') || name === 'assistant' || name.includes('nova')
     )
   }
 
@@ -204,7 +238,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
             timestamp: msg.timestamp,
             teamId: msg.teamId,
             type: msg.type || 'text',
-            mentions: Array.isArray(msg.mentions) ? msg.mentions : [],
+            mentions: resolveMentionRefs(msg.mentions),
           }))
           setMessages(formattedMessages)
           socket.off('messages', handler)
@@ -264,6 +298,29 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       loadTeamFiles()
     }
   }, [team?.id, loadMessages, loadTeamFiles])
+
+  // Backfill mentions for already-loaded messages once mentionables (files/members) are ready
+  useEffect(() => {
+    if (!messages.length || !allMentionables.length) return
+    const findMentionsInText = (text: string): MentionData[] => {
+      const found: MentionData[] = []
+      // Sort by longer names first to avoid partial overlaps
+      const sorted = [...allMentionables].sort((a, b) => b.name.length - a.name.length)
+      for (const m of sorted) {
+        const re = new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s,.:;!?()\\[\\]{}<>])`, 'i')
+        if (re.test(text)) {
+          found.push(m)
+        }
+      }
+      return found
+    }
+    setMessages(prev => prev.map(msg => {
+      if (msg.mentions && msg.mentions.length > 0) return msg
+      const inferred = findMentionsInText(msg.content || '')
+      if (inferred.length === 0) return msg
+      return { ...msg, mentions: inferred }
+    }))
+  }, [allMentionables, messages.length])
   
   // Socket event handlers
   useEffect(() => {
@@ -288,7 +345,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
           timestamp,
           teamId,
           type: messageType,
-          mentions: data.mentions || [],
+          mentions: resolveMentionRefs(data.mentions),
         }
         setMessages(prev => [...prev, newMessage])
         
@@ -590,6 +647,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                               <MessageWithMentions 
                                 content={message.content}
                                 mentions={message.mentions}
+                                currentUserId={user?.id}
                               />
                             </div>
                           )}

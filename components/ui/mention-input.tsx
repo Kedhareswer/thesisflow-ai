@@ -54,6 +54,7 @@ export function MentionInput({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const editorRef = useRef<HTMLDivElement>(null)
   const [isOverflowing, setIsOverflowing] = useState(false)
+  const pendingCaretRef = useRef<number | null>(null)
 
   // Simplified logs removed for production
 
@@ -88,12 +89,12 @@ export function MentionInput({
 
   // Filter suggestions based on query
   const filterSuggestions = (query: string): MentionData[] => {
-    if (!query) return getAllMentions()
-    
-    const lowercaseQuery = query.toLowerCase()
-    return getAllMentions().filter(item =>
-      item.name.toLowerCase().includes(lowercaseQuery) ||
-      item.email?.toLowerCase().includes(lowercaseQuery)
+    const all = getAllMentions()
+    if (!query) return all
+    const q = query.toLowerCase()
+    return all.filter(item =>
+      item.name.toLowerCase().includes(q) ||
+      (item.email ? item.email.toLowerCase().includes(q) : false)
     )
   }
 
@@ -104,7 +105,12 @@ export function MentionInput({
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/\n/g, '<br/>')
-    return escaped.replace(/@(\w+)/g, '<span class="bg-primary/10 text-primary px-1 rounded">@$1</span>')
+    // highlight @mentions with broader charset
+    return escaped.replace(
+      /@([A-Za-z0-9._-]+)/g,
+      // prettier pill styling inspired by shadcn badge
+      '<span class="inline-flex items-center px-1.5 py-[1px] rounded-full bg-primary/10 border border-primary/20 text-primary font-medium align-baseline">@$1</span>'
+    )
   }
 
   // Sync external value into editor
@@ -115,14 +121,57 @@ export function MentionInput({
     if (el.innerText !== value) {
       el.innerHTML = renderHighlighted(value)
     }
+    // If we have a pending caret position (e.g., after inserting a mention), restore it now
+    if (pendingCaretRef.current !== null) {
+      const pos = Math.min(pendingCaretRef.current, el.innerText.length)
+      try {
+        el.focus()
+        setCaretOffset(el, pos)
+      } finally {
+        pendingCaretRef.current = null
+      }
+    }
     // Check overflow on external updates
     setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
   }, [value])
 
   // Handle contenteditable input
+  const getCaretOffset = (el: HTMLElement) => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return el.innerText.length
+    const range = sel.getRangeAt(0)
+    const preRange = range.cloneRange()
+    preRange.selectNodeContents(el)
+    preRange.setEnd(range.endContainer, range.endOffset)
+    return preRange.toString().length
+  }
+
+  const setCaretOffset = (el: HTMLElement, offset: number) => {
+    el.focus()
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
+    let currentOffset = 0
+    let node: Node | null = null
+    while ((node = walker.nextNode())) {
+      const textLen = (node.nodeValue || '').length
+      if (currentOffset + textLen >= offset) {
+        const range = document.createRange()
+        range.setStart(node, Math.max(0, offset - currentOffset))
+        range.collapse(true)
+        const sel = window.getSelection()
+        sel?.removeAllRanges()
+        sel?.addRange(range)
+        return
+      }
+      currentOffset += textLen
+    }
+    // fallback to end
+    placeCaretAtEnd(el)
+  }
+
   const handleEditorInput = () => {
     const el = editorRef.current
     if (!el) return
+    const caretBefore = getCaretOffset(el)
     const text = el.innerText
     // Detect mention query near caret (simple: use end of text)
     const match = text.match(/@([^@\s]*)$/)
@@ -137,7 +186,7 @@ export function MentionInput({
     const parsed = parseContent(text)
     // Re-apply highlighting
     el.innerHTML = renderHighlighted(parsed.text)
-    placeCaretAtEnd(el)
+    setCaretOffset(el, Math.min(caretBefore, el.innerText.length))
     onChange(parsed.text, parsed.mentions)
     setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
   }
@@ -179,9 +228,21 @@ export function MentionInput({
     const afterWithoutQuery = after.substring(tokenLength)
     // Use proper mention format that parseContent expects
     const mentionText = `@[${mention.name}](${mention.id})`
-    const nextText = `${before}${mentionText} ${afterWithoutQuery}`
+    const insertion = `${mentionText} `
+    const nextText = `${before}${insertion}${afterWithoutQuery}`
     el.innerHTML = renderHighlighted(nextText)
-    placeCaretAtEnd(el)
+    // place caret just after what will be rendered ("@name ") not the token length
+    const displayInsertion = `@${mention.name} `
+    const caretPos = (before + displayInsertion).length
+    // Set caret immediately and schedule a restore after React state update
+    el.focus()
+    setCaretOffset(el, caretPos)
+    pendingCaretRef.current = caretPos
+    // In case React re-render happens after this tick, enforce caret again on next frame
+    requestAnimationFrame(() => {
+      const node = editorRef.current
+      if (node) setCaretOffset(node, Math.min(caretPos, node.innerText.length))
+    })
     const parsed = parseContent(nextText)
     onChange(parsed.text, parsed.mentions)
     setShowSuggestions(false)
@@ -281,8 +342,8 @@ export function MentionInput({
             🎯 Mention Someone!
           </div>
           
-          {/* Users */}
-          {users.map(user => (
+          {/* Filtered users first */}
+          {suggestions.filter(s => s.type !== 'file').map(user => (
             <div 
               key={user.id}
               className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer rounded transition-colors"
@@ -301,8 +362,8 @@ export function MentionInput({
             </div>
           ))}
           
-          {/* Files */}
-          {files.slice(0, 5).map(file => (
+          {/* Filtered files (limit 5) */}
+          {suggestions.filter(s => s.type === 'file').slice(0, 5).map(file => (
             <div 
               key={file.id}
               className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer rounded transition-colors"
@@ -316,6 +377,9 @@ export function MentionInput({
             </div>
           ))}
           
+          {suggestions.length === 0 && (
+            <div className="text-xs text-muted-foreground mt-1">No matches</div>
+          )}
           <div className="text-xs text-muted-foreground mt-2">
             Users: {users.length} | Files: {files.length}
           </div>
@@ -342,7 +406,36 @@ export function MessageWithMentions({
   // Parse content and render with mention chips
   const renderContent = () => {
     if (!mentions.length) {
-      return <span className={className}>{content}</span>
+      // Generic pillify for @handles even without metadata
+      // Require a non-word boundary before @ to avoid emails and code like object@property
+      const genericRegex = /(^|[^\w])@([A-Za-z0-9._-]+)/gi
+      const parts: React.ReactNode[] = []
+      let idx = 0
+      let m: RegExpExecArray | null
+      while ((m = genericRegex.exec(content)) !== null) {
+        const start = m.index
+        const end = start + m[0].length
+        if (start > idx) {
+          parts.push(<span key={`gt-${idx}`}>{content.substring(idx, start)}</span>)
+        }
+        // m[1] is the leading non-word or start, m[2] is the handle
+        if (m[1]) {
+          parts.push(<span key={`g-lead-${start}`}>{m[1]}</span>)
+        }
+        parts.push(
+          <span
+            key={`g-${start}`}
+            className="inline-flex items-center mx-0.5 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20"
+          >
+            @{m[2]}
+          </span>
+        )
+        idx = end
+      }
+      if (idx < content.length) {
+        parts.push(<span key={`gt-${idx}`}>{content.substring(idx)}</span>)
+      }
+      return <span className={className}>{parts}</span>
     }
 
     const parts = []
@@ -372,11 +465,11 @@ export function MessageWithMentions({
             key={`mention-${id}-${match.index}`}
             variant="secondary"
             className={cn(
-              "inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs",
+              "inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs rounded-full border",
               // Highlight mentions of the current user
               currentUserId && mentionData.id === currentUserId
-                ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                : "bg-primary/10 text-primary"
+                ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                : "bg-primary/10 text-primary border-primary/20"
             )}
           >
             {getMentionIcon(mentionData)}
@@ -386,7 +479,10 @@ export function MessageWithMentions({
       } else {
         // Fallback: just show the @name if mention data not found
         parts.push(
-          <span key={`mention-${id}-${match.index}`} className="text-muted-foreground">
+          <span
+            key={`mention-${id}-${match.index}`}
+            className="inline-flex items-center mx-0.5 px-2 py-0.5 text-xs rounded-full bg-muted text-foreground/80 border border-border"
+          >
             @{name}
           </span>
         )
@@ -404,6 +500,64 @@ export function MessageWithMentions({
       )
     }
     
+    // If we didn't find any token-based mentions, try highlighting plain @names
+    if (parts.length === 1 && parts[0]?.key?.toString().startsWith('text-')) {
+      const names = Array.from(
+        new Map(mentions.map(m => [m.name, m])).keys()
+      )
+      if (names.length) {
+        const escapedNames = names
+          .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .sort((a, b) => b.length - a.length) // longer first
+        // Match followed by end or whitespace/punctuation, case-insensitive
+        const re = new RegExp(`@(${escapedNames.join('|')})(?=$|[\\s,.:;!?()\\[\\]{}<>])`, 'gi')
+        const text = content
+        const plainParts: React.ReactNode[] = []
+        let idx = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const [full, name] = m
+          const start = m.index
+          const end = start + full.length
+          if (start > idx) {
+            plainParts.push(<span key={`pt-${idx}`}>{text.substring(idx, start)}</span>)
+          }
+          const md = mentions.find(mm => mm.name === name)
+          if (md) {
+            plainParts.push(
+              <Badge
+                key={`p-${start}-${md.id}`}
+                variant="secondary"
+                className={cn(
+                  "inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs rounded-full border",
+                  currentUserId && md.id === currentUserId
+                    ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                    : "bg-primary/10 text-primary border-primary/20"
+                )}
+              >
+                {getMentionIcon(md)}
+                <span>{name}</span>
+              </Badge>
+            )
+          } else {
+            plainParts.push(
+              <span
+                key={`pf-${start}`}
+                className="inline-flex items-center mx-0.5 px-2 py-0.5 text-xs rounded-full bg-muted text-foreground/80 border border-border"
+              >
+                @{name}
+              </span>
+            )
+          }
+          idx = end
+        }
+        if (idx < text.length) {
+          plainParts.push(<span key={`pt-${idx}`}>{text.substring(idx)}</span>)
+        }
+        return <span className={className}>{plainParts}</span>
+      }
+    }
+    
     return <span className={className}>{parts}</span>
   }
 
@@ -414,7 +568,7 @@ function getMentionIcon(mention: MentionData, currentUserId?: string) {
   switch (mention.type) {
     case 'user':
       return (
-        <Avatar className="h-3 w-3">
+        <Avatar className="h-4 w-4">
           <AvatarImage src={mention.avatar} />
           <AvatarFallback className="text-xs">
             {mention.name.substring(0, 1).toUpperCase()}
@@ -422,11 +576,11 @@ function getMentionIcon(mention: MentionData, currentUserId?: string) {
         </Avatar>
       )
     case 'ai':
-      return <Bot className="h-3 w-3 text-blue-500" />
+      return <Bot className="h-4 w-4 text-blue-500" />
     case 'file':
-      return <FileText className="h-3 w-3 text-green-500" />
+      return <FileText className="h-4 w-4 text-green-500" />
     default:
-      return <User className="h-3 w-3" />
+      return <User className="h-4 w-4" />
   }
 }
 
