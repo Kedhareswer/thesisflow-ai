@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowRight } from 'lucide-react';
 import BackgroundNoise from '@/components/ui/background-snippets-noise-effect11';
 
 type FooterProps = React.ComponentProps<'footer'> & {
@@ -11,24 +10,37 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
   return (
     <footer
       className={cn(
-        'relative isolate overflow-hidden border-t bg-transparent text-neutral-100 min-h-[320px]',
+        'relative isolate overflow-hidden border-t bg-transparent text-neutral-100 min-h-[100dvh]',
         className,
       )}
       {...props}
     >
-      {/* Confined background layer (covers footer only) and spans viewport width */}
+      {/* Full-bleed background confined to the footer */}
       <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-full z-0">
         <BackgroundNoise scoped />
       </div>
-      {/* Soft top fade for cleaner blend into page (full viewport width) */}
-      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-24 z-0 bg-gradient-to-b from-[#F8F9FA]/90 to-transparent" />
+      {/* Soft top fade for cleaner blend into page */}
+      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-24 z-0 bg-gradient-to-b from-[#F8F9FA]/95 to-transparent" />
 
-      <div className="relative z-10 mx-auto max-w-5xl px-4 font-mono">
-        <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">
-          {/* Column 1: Platform */}
-          <div>
-            <SocialCard title="Get Started" href="/signup" />
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-6 md:px-8 py-16 md:py-24 flex flex-col justify-center">
+        {/* Top subtle rule (blazity-like) */}
+        <div className="absolute left-1/2 top-6 h-[2px] w-[min(100vw,theme(maxWidth.7xl))] -translate-x-1/2 bg-white/20" />
+
+        <div className="relative grid grid-cols-1 gap-10 md:grid-cols-12">
+          {/* Intro / Tagline */}
+          <div className="md:col-span-3 pr-2">
+            <p className="text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.25em] text-white/85 mb-3">
+              We turn big ideas into
+            </p>
+            <h2 className="text-3xl md:text-4xl font-extrabold leading-tight text-white">
+              world‑class research products
+            </h2>
+          </div>
+
+          {/* Link columns */}
+          <div className="md:col-span-9 grid grid-cols-2 lg:grid-cols-4 gap-8">
             <LinksGroup
+              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-white/25"
               title="Platform"
               links={[
                 { title: 'Research Explorer', href: '/explorer' },
@@ -38,12 +50,8 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
                 { title: 'AI Research Assistant', href: '/research-assistant' },
               ]}
             />
-          </div>
-
-          {/* Column 2: Resources */}
-          <div>
-            <SocialCard title="Changelog" href="/changelog" />
             <LinksGroup
+              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-white/25"
               title="Resources"
               links={[
                 { title: 'Pricing', href: '#pricing' },
@@ -53,12 +61,8 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
                 { title: 'Blog', href: '/blog' },
               ]}
             />
-          </div>
-
-          {/* Column 3: Community */}
-          <div>
-            <SocialCard title="Community" href="/community" />
             <LinksGroup
+              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-white/25"
               title="Community"
               links={[
                 { title: 'Forum', href: '/community' },
@@ -68,12 +72,8 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
                 { title: 'Careers', href: '/careers' },
               ]}
             />
-          </div>
-
-          {/* Column 4: Company & Legal */}
-          <div>
-            <SocialCard title="Contact" href="/contact" />
             <LinksGroup
+              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-white/25"
               title="Legal"
               links={[
                 { title: 'Terms', href: '/terms' },
@@ -85,11 +85,21 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
             />
           </div>
         </div>
+
+        {/* Bottom rule + copyright */}
+        <div className="relative mt-16 border-t-2 border-white/20 pt-6 flex items-center justify-between">
+          <p className="text-[12px] md:text-[13px] tracking-wider font-bold text-white/80">
+            © {new Date().getFullYear()} ThesisFlow‑AI. ALL RIGHTS RESERVED
+          </p>
+        </div>
       </div>
-      <div className="relative flex justify-center border-t p-3">
-        <p className="text-neutral-400 text-xs">
-          © {new Date().getFullYear()} ThesisFlow-AI. All rights reserved.
-        </p>
+
+      {/* Watermark wordmark for elevated visual (stroke only) */}
+      <div
+        className="pointer-events-none select-none absolute bottom-[-1rem] left-1/2 -translate-x-1/2 z-0 text-[24vw] md:text-[20vw] font-extrabold uppercase tracking-tight text-transparent"
+        style={{ WebkitTextStroke: '1.25px rgba(255,107,44,0.28)' }}
+      >
+        thesisflow
       </div>
     </footer>
   );
@@ -98,19 +108,20 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
 interface LinksGroupProps {
   title: string;
   links: { title: string; href: string }[];
+  className?: string;
 }
-function LinksGroup({ title, links }: LinksGroupProps) {
+function LinksGroup({ title, links, className }: LinksGroupProps) {
   return (
-    <div className="p-2">
-      <h3 className="text-foreground/75 mt-2 mb-4 text-xs font-medium tracking-wider uppercase font-mono">
+    <div className={cn('p-2', className)}>
+      <h3 className="text-foreground/80 mt-2 mb-4 text-[11px] md:text-xs font-semibold tracking-[0.2em] uppercase">
         {title}
       </h3>
-      <ul>
+      <ul className="space-y-2">
         {links.map((link) => (
           <li key={link.title}>
             <a
               href={link.href}
-              className="text-muted-foreground hover:text-foreground text-xs font-mono"
+              className="text-white/85 hover:text-white text-[13px] md:text-[15px] font-medium"
             >
               {link.title}
             </a>
@@ -121,14 +132,3 @@ function LinksGroup({ title, links }: LinksGroupProps) {
   );
 }
 
-function SocialCard({ title, href }: { title: string; href: string }) {
-  return (
-    <a
-      href={href}
-      className="hover:bg-accent hover:text-accent-foreground flex items-center justify-between border-t border-b p-2 text-sm md:border-t-0 font-mono"
-    >
-      <span className="font-medium">{title}</span>
-      <ArrowRight className="h-4 w-4 transition-colors" />
-    </a>
-  );
-}
