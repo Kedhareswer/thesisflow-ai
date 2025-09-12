@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon, Columns3, Activity } from "lucide-react"
+import { CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, Activity } from "lucide-react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { FullScreenCalendar } from "@/components/ui/fullscreen-calendar"
-import { GanttChart } from "@/components/ui/gantt"
-import { Kanban } from "@/components/ui/kanban"
 import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
 import { AnalyticsService, AnalyticsData } from "@/lib/services/analytics.service"
@@ -591,7 +589,7 @@ export default function PlannerPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
@@ -599,14 +597,6 @@ export default function PlannerPage() {
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <CalendarIcon className="h-4 w-4" />
             Calendar
-          </TabsTrigger>
-          <TabsTrigger value="gantt" className="flex items-center gap-2">
-            <GanttChartIcon className="h-4 w-4" />
-            Gantt Chart
-          </TabsTrigger>
-          <TabsTrigger value="kanban" className="flex items-center gap-2">
-            <Columns3 className="h-4 w-4" />
-            Kanban
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -621,21 +611,7 @@ export default function PlannerPage() {
           <FullScreenCalendar data={calendarData} />
         </TabsContent>
 
-        <TabsContent value="gantt" className="space-y-6">
-          <GanttChart
-            projects={projects}
-            tasks={tasks}
-            onEditTask={openEditTask}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={openCreateTask}
-            onEditProject={openEditProject}
-            onDeleteProject={handleDeleteProject}
-          />
-        </TabsContent>
-
-        <TabsContent value="kanban" className="space-y-6">
-          <Kanban />
-        </TabsContent>
+        
 
         <TabsContent value="analytics" className="space-y-6">
           <div className="grid gap-6">

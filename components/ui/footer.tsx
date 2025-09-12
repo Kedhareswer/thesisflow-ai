@@ -19,7 +19,7 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
       {/* Scoped background (radial + grain) under the footer only */}
       <BackgroundNoise scoped />
 
-      <div className="relative mx-auto max-w-5xl px-4">
+      <div className="relative mx-auto max-w-5xl px-4 font-mono">
         <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">
           {/* Column 1: Platform */}
           <div>
@@ -98,7 +98,7 @@ interface LinksGroupProps {
 function LinksGroup({ title, links }: LinksGroupProps) {
   return (
     <div className="p-2">
-      <h3 className="text-foreground/75 mt-2 mb-4 text-xs font-medium tracking-wider uppercase">
+      <h3 className="text-foreground/75 mt-2 mb-4 text-xs font-medium tracking-wider uppercase font-mono">
         {title}
       </h3>
       <ul>
@@ -106,7 +106,7 @@ function LinksGroup({ title, links }: LinksGroupProps) {
           <li key={link.title}>
             <a
               href={link.href}
-              className="text-muted-foreground hover:text-foreground text-xs"
+              className="text-muted-foreground hover:text-foreground text-xs font-mono"
             >
               {link.title}
             </a>
@@ -121,7 +121,7 @@ function SocialCard({ title, href }: { title: string; href: string }) {
   return (
     <a
       href={href}
-      className="hover:bg-accent hover:text-accent-foreground flex items-center justify-between border-t border-b p-2 text-sm md:border-t-0"
+      className="hover:bg-accent hover:text-accent-foreground flex items-center justify-between border-t border-b p-2 text-sm md:border-t-0 font-mono"
     >
       <span className="font-medium">{title}</span>
       <ArrowRight className="h-4 w-4 transition-colors" />
