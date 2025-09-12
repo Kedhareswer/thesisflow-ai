@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
+import BackgroundNoise from '@/components/ui/background-snippets-noise-effect11';
 
 type FooterProps = React.ComponentProps<'footer'> & {
   children: React.ReactNode;
@@ -10,71 +11,80 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
   return (
     <footer
       className={cn(
-        'border-t bg-[radial-gradient(35%_128px_at_50%_0%,theme(backgroundColor.white/8%),transparent)]',
+        'relative overflow-hidden border-t bg-transparent text-neutral-100',
         className,
       )}
       {...props}
     >
+      {/* Scoped background (radial + grain) under the footer only */}
+      <BackgroundNoise scoped />
+
       <div className="relative mx-auto max-w-5xl px-4">
         <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">
+          {/* Column 1: Platform */}
           <div>
-            <SocialCard title="Facebook" href="#" />
+            <SocialCard title="Get Started" href="/signup" />
             <LinksGroup
-              title="About Us"
+              title="Platform"
               links={[
-                { title: 'Pricing', href: '#' },
-                { title: 'Testimonials', href: '#' },
-                { title: 'FAQs', href: '#' },
-                { title: 'Contact Us', href: '#' },
-                { title: 'Blog', href: '#' },
-              ]}
-            />
-          </div>
-          <div>
-            <SocialCard title="Youtube" href="#" />
-            <LinksGroup
-              title="Support"
-              links={[
-                { title: 'Help Center', href: '#' },
-                { title: 'Terms', href: '#' },
-                { title: 'Privacy', href: '#' },
-                { title: 'Security', href: '#' },
-                { title: 'Cookie Policy', href: '#' },
+                { title: 'Research Explorer', href: '/explorer' },
+                { title: 'Smart Summarizer', href: '/summarizer' },
+                { title: 'Project Planner', href: '/planner' },
+                { title: 'Collaboration Hub', href: '/collaborate' },
+                { title: 'AI Research Assistant', href: '/research-assistant' },
               ]}
             />
           </div>
 
+          {/* Column 2: Resources */}
           <div>
-            <SocialCard title="Twitter" href="#" />
+            <SocialCard title="Changelog" href="/changelog" />
             <LinksGroup
-              title="Community"
+              title="Resources"
               links={[
-                { title: 'Forum', href: '#' },
-                { title: 'Events', href: '#' },
-                { title: 'Partners', href: '#' },
-                { title: 'Affiliates', href: '#' },
-                { title: 'Career', href: '#' },
+                { title: 'Pricing', href: '#pricing' },
+                { title: 'FAQs', href: '#faq' },
+                { title: 'Docs', href: '/docs' },
+                { title: 'Guides', href: '/docs/guides' },
+                { title: 'Blog', href: '/blog' },
               ]}
             />
           </div>
+
+          {/* Column 3: Community */}
           <div>
-            <SocialCard title="Instagram" href="#" />
+            <SocialCard title="Community" href="/community" />
             <LinksGroup
-              title="Press"
+              title="Community"
               links={[
-                { title: 'Investors', href: '#' },
-                { title: 'Terms of Use', href: '#' },
-                { title: 'Privacy Policy', href: '#' },
-                { title: 'Cookie Policy', href: '#' },
-                { title: 'Legal', href: '#' },
+                { title: 'Forum', href: '/community' },
+                { title: 'Events', href: '/events' },
+                { title: 'Partners', href: '/partners' },
+                { title: 'Affiliates', href: '/affiliates' },
+                { title: 'Careers', href: '/careers' },
+              ]}
+            />
+          </div>
+
+          {/* Column 4: Company & Legal */}
+          <div>
+            <SocialCard title="Contact" href="/contact" />
+            <LinksGroup
+              title="Legal"
+              links={[
+                { title: 'Terms', href: '/terms' },
+                { title: 'Privacy', href: '/privacy' },
+                { title: 'Security', href: '/.well-known/security.txt' },
+                { title: 'Cookie Policy', href: '/privacy#cookies' },
+                { title: 'Legal', href: '/legal' },
               ]}
             />
           </div>
         </div>
       </div>
-      <div className="flex justify-center border-t p-3">
-        <p className="text-muted-foreground text-xs">
-          © {new Date().getFullYear()} Asme. All rights reserved.
+      <div className="relative flex justify-center border-t p-3">
+        <p className="text-neutral-400 text-xs">
+          © {new Date().getFullYear()} ThesisFlow-AI. All rights reserved.
         </p>
       </div>
     </footer>
