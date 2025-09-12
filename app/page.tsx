@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+// Removed unused Card imports
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target, Menu, Bird } from "lucide-react"
@@ -13,10 +13,11 @@ import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/
 import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
-import { SoftwareApplication, Organization, WebPage } from "@/components/schema/microdata-schema"
+import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
 import { PixelTrail } from "@/components/ui/pixel-trail"
 import { useScreenSize } from "@/components/hooks/use-screen-size"
 import { HomeLoader } from "@/components/ui/home-loader"
+import { Footer } from "@/components/ui/footer"
 
 // metadata moved to app/seo/root-metadata.ts
 
@@ -71,70 +72,70 @@ export default function HomePage() {
     },
   ]
 
-  // Testimonials data
+  // Testimonials data (updated for ThesisFlow-AI)
   const testimonials = [
     {
       text:
-        "This ERP revolutionized our operations, streamlining finance and inventory. The cloud-based platform keeps us productive, even remotely.",
+        "Deep Research helped me synthesize a complete literature review in a single day. The multi-source search and deduplication are spot on.",
       image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      name: "Briana Patton",
-      role: "Operations Manager",
+      name: "Dr. Elena Ruiz",
+      role: "Assistant Professor",
     },
     {
       text:
-        "Implementing this ERP was smooth and quick. The customizable, user-friendly interface made team training effortless.",
+        "Smart Summarizer creates structured abstracts, key claims, and limitations from PDFs in minutes—perfect for paper triage.",
       image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=200&auto=format&fit=crop",
-      name: "Bilal Ahmed",
-      role: "IT Manager",
+      name: "Marcus Lee",
+      role: "PhD Candidate",
     },
     {
       text:
-        "The support team is exceptional, guiding us through setup and providing ongoing assistance, ensuring our satisfaction.",
-      image: "https://images.unsplash.com/photo-1544005311-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      name: "Saman Malik",
-      role: "Customer Support Lead",
-    },
-    {
-      text:
-        "This ERP's seamless integration enhanced our business operations and efficiency. Highly recommend for its intuitive interface.",
+        "The Project Planner keeps experiments, tasks, and due dates together. No more juggling spreadsheets and sticky notes.",
       image: "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
-      name: "Omar Raza",
-      role: "CEO",
+      name: "Priya Nair",
+      role: "Research Manager",
     },
     {
       text:
-        "Its robust features and quick support have transformed our workflow, making us significantly more efficient.",
-      image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=200&auto=format&fit=crop",
-      name: "Zainab Hussain",
-      role: "Project Manager",
+        "Collaboration Hub replaced my chat + docs combo. Inline citations and previews keep everyone aligned without context switching.",
+      image: "https://images.unsplash.com/photo-1544005311-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+      name: "Ahmed Karim",
+      role: "Lab Coordinator",
     },
     {
       text:
-        "The smooth implementation exceeded expectations. It streamlined processes, improving overall business performance.",
+        "AI Research Assistant explains methods and statistics in plain language—and links to sources so I can verify quickly.",
       image: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?q=80&w=200&auto=format&fit=crop",
-      name: "Aliza Khan",
-      role: "Business Analyst",
+      name: "Sara Novak",
+      role: "Data Scientist",
     },
     {
       text:
-        "Our business functions improved with a user-friendly design and positive customer feedback.",
+        "Explorer with aggregation surfaced seminal papers I would've missed. Great balance of recall and precision.",
       image: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=200&auto=format&fit=crop",
-      name: "Farhan Siddiqui",
-      role: "Marketing Director",
+      name: "Tomás García",
+      role: "Postdoctoral Fellow",
     },
     {
       text:
-        "They delivered a solution that exceeded expectations, understanding our needs and enhancing our operations.",
-      image: "https://images.unsplash.com/photo-1544005316-04ce1f1a65a2?q=80&w=200&auto=format&fit=crop",
-      name: "Sana Sheikh",
-      role: "Sales Manager",
+        "Setup took minutes—imported PDFs and got clean summaries with one click. The UI is fast and intuitive.",
+      image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=200&auto=format&fit=crop",
+      name: "Jia Chen",
+      role: "Graduate Researcher",
     },
     {
       text:
-        "Using this ERP, our online presence and conversions significantly improved, boosting business performance.",
+        "Security and reliability give me confidence to use it for grant and manuscript work.",
       image: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=200&auto=format&fit=crop",
-      name: "Hassan Ali",
-      role: "E-commerce Manager",
+      name: "Rachel Moore",
+      role: "Principal Investigator",
+    },
+    {
+      text:
+        "ThesisFlow-AI removes tool fatigue—search, summarize, plan, and collaborate without leaving the page.",
+      image: "https://images.unsplash.com/photo-1544005316-04ce1f1a65a2?q=80&w=200&auto=format&fit=crop",
+      name: "Leo Martins",
+      role: "Engineer, R&D",
     },
   ]
 
@@ -438,30 +439,7 @@ export default function HomePage() {
               Comprehensive tools designed to streamline every aspect of your research workflow.
             </p>
           </motion.div>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {features.map((feature, index) => {
-              const Icon = feature.icon
-              return (
-                <motion.div
-                  key={feature.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                  className="bg-background border p-8 hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => handleProtectedAction(feature.href)}
-                >
-                  <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mb-4">
-                    <Icon className="h-6 w-6 text-[#FF6B2C]" />
-                  </div>
-                  <h3 className="text-xl font-bold font-mono mb-2 text-foreground">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground font-mono leading-relaxed">{feature.description}</p>
-                </motion.div>
-              )
-            })}
-          </div>
-          {/* Keep original hover effects component (not removed) */}
+          {/* Feature grid with hover effects (single source of truth) */}
           <div className="mt-12">
             <FeaturesSectionWithHoverEffects features={hoverFeatures} />
           </div>
@@ -612,6 +590,8 @@ export default function HomePage() {
           <AccordionComponent />
         </div>
       </section>
+      {/* Footer */}
+      <Footer />
       
         </div>
       </WebPage>
