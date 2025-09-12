@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import pdfParse from "pdf-parse";
 import { citationService } from "@/lib/services/citation.service";
 
-export const runtime = "nodejs"; // Ensure Node runtime for Buffer and pdf-parse
+// Ensure Node runtime and prevent Next from attempting to prerender/collect static data
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +19,9 @@ export async function POST(req: NextRequest) {
       formatted: any | null;
       error?: string;
     }> = [];
+
+    // Lazy-load pdf-parse only when this handler runs (avoid import-time side effects on Vercel build)
+    const { default: pdfParse } = await import("pdf-parse");
 
     for (const f of files) {
       if (!(f instanceof File)) continue;
