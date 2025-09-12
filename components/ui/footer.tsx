@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-// Background component removed per request
 
 type FooterProps = React.ComponentProps<'footer'> & {
   children: React.ReactNode;
@@ -24,11 +23,11 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
         <div className="relative grid grid-cols-1 gap-10 md:grid-cols-12">
           {/* Intro / Tagline */}
           <div className="md:col-span-3 pr-2">
-            <p className="text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.25em] text-foreground mb-3">
-              We turn big ideas into
+            <p className="text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.25em] text-black mb-3">
+              Make your Research
             </p>
-            <h2 className="text-4xl md:text-5xl font-extrabold leading-tight text-foreground">
-              world‑class research products
+            <h2 className="text-4xl md:text-5xl font-extrabold leading-tight text-black">
+              with minimal distractions
             </h2>
           </div>
 
@@ -80,13 +79,6 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
             />
           </div>
         </div>
-
-        {/* Bottom rule + copyright */}
-        <div className="relative mt-16 border-t-2 border-border pt-6 flex items-center justify-between">
-          <p className="text-[12px] md:text-[13px] tracking-wider font-bold text-muted-foreground">
-            © {new Date().getFullYear()} ThesisFlow‑AI. ALL RIGHTS RESERVED
-          </p>
-        </div>
       </div>
 
       {/* Watermark wordmark (ensure fully visible, centered, and responsive) */}
@@ -95,7 +87,7 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
           className="text-transparent uppercase tracking-tight leading-none text-center whitespace-nowrap font-extrabold"
           style={{ WebkitTextStroke: '1.25px rgba(255,107,44,0.28)' }}
         >
-          <span className="block leading-none text-[clamp(48px,8vw,120px)]">thesisflow</span>
+          <span className="block leading-none text-[clamp(48px,8vw,120px)]">@thesisflow</span>
         </div>
       </div>
     </footer>
@@ -110,7 +102,7 @@ interface LinksGroupProps {
 function LinksGroup({ title, links, className }: LinksGroupProps) {
   return (
     <div className={cn('p-2', className)}>
-      <h3 className="text-foreground mt-2 mb-4 text-xs md:text-sm font-semibold tracking-[0.22em] uppercase">
+      <h3 className="text-black mt-2 mb-4 text-xs md:text-sm font-semibold tracking-[0.22em] uppercase">
         {title}
       </h3>
       <ul className="space-y-2">
@@ -118,7 +110,7 @@ function LinksGroup({ title, links, className }: LinksGroupProps) {
           <li key={link.title}>
             <a
               href={link.href}
-              className="text-foreground hover:text-foreground hover:underline underline-offset-4 decoration-border/60 text-[15px] md:text-[17px] font-medium"
+              className="text-black hover:text-black hover:underline underline-offset-4 decoration-border/60 text-[15px] md:text-[17px] font-medium"
             >
               {link.title}
             </a>
