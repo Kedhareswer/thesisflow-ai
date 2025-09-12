@@ -11,15 +11,17 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
   return (
     <footer
       className={cn(
-        'relative isolate overflow-visible border-t bg-transparent text-neutral-100 min-h-[320px]',
+        'relative isolate overflow-hidden border-t bg-transparent text-neutral-100 min-h-[320px]',
         className,
       )}
       {...props}
     >
-      {/* Background layer that bleeds upward from the footer and fills ~full viewport height */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[120vh] z-0">
+      {/* Confined background layer (covers footer only) */}
+      <div className="pointer-events-none absolute inset-0 z-0">
         <BackgroundNoise scoped />
       </div>
+      {/* Soft top fade for cleaner blend into page */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 z-0 bg-gradient-to-b from-[#F8F9FA]/90 to-transparent" />
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 font-mono">
         <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">

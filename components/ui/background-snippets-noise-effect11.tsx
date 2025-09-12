@@ -84,10 +84,10 @@ const Noise: React.FC<NoiseProps> = ({
 export default function Component({ scoped = false }: { scoped?: boolean }) {
   return (
     <div className={`${scoped ? 'absolute' : 'fixed'} inset-0 z-0 pointer-events-none ${scoped ? 'bg-transparent' : 'bg-slate-950'}`}>
-      {/* Radial spotlight (brand orange) - larger radius and slightly higher opacity */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_960px_at_50%_0%,rgba(255,107,44,0.20),transparent)]" />
+      {/* Radial spotlight (brand orange) - stronger radius and opacity */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_1200px_at_50%_0%,rgba(255,107,44,0.26),transparent)]" />
       {/* Grain overlay */}
-      <Noise patternRefreshInterval={2} patternAlpha={22} coverViewport={!scoped} />
+      <Noise patternRefreshInterval={2} patternAlpha={26} coverViewport={!scoped} />
     </div>
   );
 }
