@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useRef, useEffect } from "react";
 
 /** Inline Noise overlay (no external imports). */
