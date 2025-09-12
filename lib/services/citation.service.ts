@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { DOMParser as XmldomParser } from 'xmldom';
 
 export interface Citation {
   type: 'article' | 'book' | 'website' | 'conference' | 'thesis' | 'report';
@@ -59,10 +60,12 @@ class CitationService {
       return null;
     }
 
+  }
+
   /**
    * Search CrossRef by title or bibliographic query and return best match
    */
-  async fetchByTitleOrQuery(query: string): Promise<Citation | null> {
+  fetchByTitleOrQuery = async (query: string): Promise<Citation | null> => {
     try {
       const q = encodeURIComponent(query.trim());
       const response = await axios.get(`${this.crossrefSearch}${q}`, { timeout: 8000 });
@@ -228,7 +231,7 @@ class CitationService {
         timeout: 8000
       });
       
-      const parser = new DOMParser();
+      const parser = new XmldomParser();
       const doc = parser.parseFromString(response.data, 'text/xml');
       const entry = doc.querySelector('entry');
       
@@ -261,7 +264,7 @@ class CitationService {
         { timeout: 8000 }
       );
 
-      const parser = new DOMParser();
+      const parser = new XmldomParser();
       const doc = parser.parseFromString(response.data, 'text/xml');
       
       const article = doc.querySelector('PubmedArticle');
