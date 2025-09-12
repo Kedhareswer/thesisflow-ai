@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import BackgroundNoise from '@/components/ui/background-snippets-noise-effect11';
+// Background component removed per request
 
 type FooterProps = React.ComponentProps<'footer'> & {
   children: React.ReactNode;
@@ -10,17 +10,11 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
   return (
     <footer
       className={cn(
-        'relative isolate overflow-hidden border-t bg-transparent text-neutral-100 min-h-[100dvh]',
+        'relative isolate overflow-visible border-t bg-transparent text-neutral-100 min-h-[100dvh]',
         className,
       )}
       {...props}
     >
-      {/* Full-bleed background confined to the footer */}
-      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-full z-0">
-        <BackgroundNoise scoped />
-      </div>
-      {/* Soft top fade for cleaner blend into page */}
-      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-24 z-0 bg-gradient-to-b from-[#F8F9FA]/95 to-transparent" />
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-6 md:px-8 py-16 md:py-24 flex flex-col justify-center">
         {/* Top subtle rule (blazity-like) */}
@@ -94,12 +88,14 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
         </div>
       </div>
 
-      {/* Watermark wordmark for elevated visual (stroke only) */}
-      <div
-        className="pointer-events-none select-none absolute bottom-[-1rem] left-1/2 -translate-x-1/2 z-0 text-[24vw] md:text-[20vw] font-extrabold uppercase tracking-tight text-transparent"
-        style={{ WebkitTextStroke: '1.25px rgba(255,107,44,0.28)' }}
-      >
-        thesisflow
+      {/* Watermark wordmark (ensure fully visible, centered, and responsive) */}
+      <div className="pointer-events-none select-none absolute inset-x-0 bottom-6 z-0 flex justify-center px-6">
+        <div
+          className="text-transparent uppercase tracking-tight leading-none text-center whitespace-nowrap font-extrabold"
+          style={{ WebkitTextStroke: '1.25px rgba(255,107,44,0.28)' }}
+        >
+          <span className="block leading-none text-[clamp(56px,10vw,160px)]">thesisflow</span>
+        </div>
       </div>
     </footer>
   );
