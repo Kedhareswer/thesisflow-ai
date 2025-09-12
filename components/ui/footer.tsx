@@ -16,12 +16,12 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
       )}
       {...props}
     >
-      {/* Confined background layer (covers footer only) */}
-      <div className="pointer-events-none absolute inset-0 z-0">
+      {/* Confined background layer (covers footer only) and spans viewport width */}
+      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-full z-0">
         <BackgroundNoise scoped />
       </div>
-      {/* Soft top fade for cleaner blend into page */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 z-0 bg-gradient-to-b from-[#F8F9FA]/90 to-transparent" />
+      {/* Soft top fade for cleaner blend into page (full viewport width) */}
+      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-24 z-0 bg-gradient-to-b from-[#F8F9FA]/90 to-transparent" />
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 font-mono">
         <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">
