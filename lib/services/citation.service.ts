@@ -35,6 +35,7 @@ export interface FormattedCitation {
 class CitationService {
   private readonly crossrefApi = 'https://api.crossref.org/works';
   private readonly openAlexApi = 'https://api.openalex.org/works';
+  private readonly crossrefSearch = 'https://api.crossref.org/works?rows=5&query.bibliographic=';
   
   /**
    * Parse DOI and fetch metadata
@@ -57,7 +58,67 @@ class CitationService {
       console.error('Error fetching DOI metadata:', error);
       return null;
     }
+
+  /**
+   * Search CrossRef by title or bibliographic query and return best match
+   */
+  async fetchByTitleOrQuery(query: string): Promise<Citation | null> {
+    try {
+      const q = encodeURIComponent(query.trim());
+      const response = await axios.get(`${this.crossrefSearch}${q}`, { timeout: 8000 });
+      const items = response.data?.message?.items || [];
+      if (!items.length) return null;
+      // Prefer items with DOI and title similarity
+      const best = items.find((it: any) => it.DOI && it.title?.[0]) || items[0];
+      const data = best;
+      return {
+        type: this.mapCrossRefType(data.type || 'article'),
+        title: data.title?.[0] || '',
+        authors: this.parseCrossRefAuthors(data.author),
+        year: data['published']?.['date-parts']?.[0]?.[0]?.toString() || data['issued']?.['date-parts']?.[0]?.[0]?.toString(),
+        journal: data['container-title']?.[0],
+        volume: data.volume,
+        issue: data.issue,
+        pages: data.page,
+        doi: data.DOI,
+        url: data.URL,
+        publisher: data.publisher,
+        issn: data.ISSN?.[0],
+      };
+    } catch (error) {
+      return null;
+    }
   }
+
+  /**
+   * Heuristic extraction from PDF text: DOI first, then title
+   */
+  async extractFromPdfText(text: string): Promise<Citation | null> {
+    try {
+      if (!text) return null;
+      // 1) DOI detection
+      const doiMatch = text.match(/10\.\d{4,9}\/[A-Z0-9._;()/:\-]+/i);
+      if (doiMatch) {
+        const c = await this.fetchFromDOI(doiMatch[0]);
+        if (c) return c;
+      }
+      // 2) Title heuristic from first ~40 lines
+      const firstLines = text.split(/\r?\n/).slice(0, 40).map(l => l.trim()).filter(Boolean);
+      const candidates = firstLines
+        .filter(l => l.length > 8 && l.length < 200)
+        .filter(l => !/abstract|introduction|author|copyright|doi|vol\.|issue|journal|www\.|http|\d{4}/i.test(l))
+        .slice(0, 5);
+      const guess = candidates.sort((a, b) => b.length - a.length)[0] || firstLines[0];
+      if (guess) {
+        const c2 = await this.fetchByTitleOrQuery(guess);
+        if (c2) return c2;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
 
   /**
    * Fetch from CrossRef API
@@ -240,6 +301,53 @@ class CitationService {
       vancouver: this.formatVancouver(citation),
       bibtex: this.formatBibTeX(citation)
     };
+  }
+
+  /** Convert to CSL-JSON (common schema for citation tools) */
+  toCSLJSON(c: Citation): any {
+    const authors = (c.authors || []).map((full) => {
+      const parts = full.trim().split(/\s+/);
+      const family = parts.pop() || '';
+      return { family, given: parts.join(' ') };
+    });
+    const itemType = c.type === 'article' ? 'article-journal' : c.type;
+    const issued = c.year ? { 'date-parts': [[Number(c.year)]] } : undefined;
+    const res: any = {
+      type: itemType,
+      title: c.title,
+      author: authors,
+      issued,
+      DOI: c.doi,
+      URL: c.url,
+      publisher: c.publisher,
+      'container-title': c.journal,
+      volume: c.volume,
+      issue: c.issue,
+      page: c.pages,
+      ISBN: c.isbn,
+      ISSN: c.issn,
+    };
+    return res;
+  }
+
+  /** Convert to RIS format */
+  toRIS(c: Citation): string {
+    const ty = c.type === 'article' ? 'JOUR' : c.type === 'book' ? 'BOOK' : 'GEN';
+    const lines: string[] = [
+      `TY  - ${ty}`,
+    ];
+    (c.authors || []).forEach(a => lines.push(`AU  - ${a}`));
+    if (c.title) lines.push(`TI  - ${c.title}`);
+    if (c.journal) lines.push(`JO  - ${c.journal}`);
+    if (c.year) lines.push(`PY  - ${c.year}`);
+    if (c.volume) lines.push(`VL  - ${c.volume}`);
+    if (c.issue) lines.push(`IS  - ${c.issue}`);
+    if (c.pages) lines.push(`SP  - ${c.pages}`);
+    if (c.publisher) lines.push(`PB  - ${c.publisher}`);
+    if (c.doi) lines.push(`DO  - ${c.doi}`);
+    if (c.url) lines.push(`UR  - ${c.url}`);
+    lines.push('ER  -');
+    return lines.join('\n');
   }
 
   /**

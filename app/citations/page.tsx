@@ -1,12 +1,15 @@
 "use client"
 
-import React, { useMemo, useState, useCallback } from "react"
+import React, { useMemo, useState, useCallback, useEffect } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { Search, Copy, Check, Download, Trash2, Plus, BookOpen, Upload, FolderPlus } from "lucide-react"
+import { Search, Copy, Check, Download, Trash2, Plus, BookOpen, Upload, FolderPlus, Edit3, CheckSquare, Square } from "lucide-react"
 import type { Citation, FormattedCitation } from "@/lib/services/citation.service"
 import { citationService } from "@/lib/services/citation.service"
 import { useToast } from "@/components/ui/use-toast"
 import { useDropzone } from "react-dropzone"
+import { bibliographyService } from "@/lib/services/bibliography.service"
+
+type ImportResult = { fileName: string; citation: Citation | null; formatted: FormattedCitation | null; error?: string }
 
 export default function CitationsPage() {
   const [collapsed, setCollapsed] = useState(false)
@@ -21,8 +24,15 @@ export default function CitationsPage() {
   const [formatted, setFormatted] = useState<FormattedCitation | null>(null)
   const [copied, setCopied] = useState(false)
   const [bibliography, setBibliography] = useState<
-    { citation: Citation; formatted: FormattedCitation }[]
+    { id?: string; citation: Citation; formatted: FormattedCitation }[]
   >([])
+  const [collections, setCollections] = useState<{ id: string; name: string }[]>([])
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null)
+  const [importResults, setImportResults] = useState<ImportResult[]>([])
+  const [isOverBib, setIsOverBib] = useState(false)
+  const [selectedImport, setSelectedImport] = useState<Record<number, boolean>>({})
+  const [selectedBib, setSelectedBib] = useState<Record<number, boolean>>({})
+  const [moveTarget, setMoveTarget] = useState<string | null>(null)
   const [manual, setManual] = useState<Citation>({
     type: "article",
     title: "",
@@ -40,17 +50,117 @@ export default function CitationsPage() {
 
   const { toast } = useToast()
 
-  // Simple PDF import placeholder using react-dropzone
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  // PDF import: send to API for metadata extraction
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!acceptedFiles?.length) return
-    // Placeholder UX: acknowledge upload; parsing can be added later
-    toast({ title: "Import received", description: `${acceptedFiles.length} file(s) uploaded. Metadata extraction coming soon.` })
+    try {
+      const fd = new FormData()
+      acceptedFiles.forEach((f) => fd.append("file", f))
+      const res = await fetch("/api/citation/from-pdf", { method: "POST", body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Import failed")
+      setImportResults(data.results || [])
+      toast({ title: "Import complete", description: `${(data.results || []).length} file(s) processed.` })
+    } catch (e: any) {
+      toast({ title: "Import error", description: e?.message || "Failed to import PDFs", variant: "destructive" })
+    }
   }, [toast])
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
     accept: { "application/pdf": [".pdf"] },
   })
+
+  // Load collections and bibliography from Supabase
+  useEffect(() => {
+    async function load() {
+      try {
+        const cols = await bibliographyService.listCollections()
+        setCollections(cols)
+      } catch {}
+      try {
+        const rows = await bibliographyService.listItems(selectedCollection)
+        const mapped = (rows as any[]).map((row) => {
+          const csl = row.csl_json || {}
+          const authors = Array.isArray(csl.author)
+            ? csl.author.map((a: any) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean)
+            : []
+          const c: Citation = {
+            type: (csl.type === 'article-journal' ? 'article' : csl.type) || 'article',
+            title: row.title || csl.title || '',
+            authors,
+            year: row.year || csl.issued?.['date-parts']?.[0]?.[0]?.toString(),
+            journal: row.journal || csl['container-title'],
+            volume: csl.volume,
+            issue: csl.issue,
+            pages: csl.page,
+            doi: row.doi,
+            url: row.url,
+            publisher: csl.publisher,
+            isbn: csl.ISBN,
+            issn: csl.ISSN,
+            accessDate: undefined,
+            conference: undefined,
+            edition: undefined,
+            editors: undefined,
+            chapter: undefined,
+            institution: undefined,
+          }
+          const f: FormattedCitation = row.styles || citationService.formatCitation(c)
+          return { id: row.id, citation: c, formatted: f }
+        })
+        setBibliography(mapped)
+      } catch {}
+    }
+    load()
+  }, [selectedCollection])
+
+  // Collections management
+  async function handleCreateCollection() {
+    const name = prompt("Collection name")?.trim()
+    if (!name) return
+    try {
+      const col = await bibliographyService.createCollection(name)
+      if (col) {
+        setCollections((prev) => [...prev, { id: col.id, name: col.name }])
+        setSelectedCollection(col.id)
+      }
+    } catch (e: any) {
+      toast({ title: "Create failed", description: e?.message || "Could not create collection", variant: "destructive" })
+    }
+  }
+
+  async function handleRenameCollection(id: string) {
+    const current = collections.find((c) => c.id === id)?.name || ""
+    const name = prompt("Rename collection", current)?.trim()
+    if (!name) return
+    try {
+      await bibliographyService.renameCollection(id, name)
+      setCollections((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)))
+    } catch (e: any) {
+      toast({ title: "Rename failed", description: e?.message || "Could not rename collection", variant: "destructive" })
+    }
+  }
+
+  async function handleDeleteCollection(id: string) {
+    if (!confirm("Delete this collection? Items will remain unassigned.")) return
+    try {
+      await bibliographyService.deleteCollection(id)
+      setCollections((prev) => prev.filter((c) => c.id !== id))
+      if (selectedCollection === id) setSelectedCollection(null)
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || "Could not delete collection", variant: "destructive" })
+    }
+  }
+
+  async function handleMoveSelected(targetId: string | null) {
+    const indices = Object.entries(selectedBib).filter(([, v]) => v).map(([k]) => Number(k))
+    await Promise.all(indices.map(async (i) => {
+      const item = bibliography[i]
+      if (item?.id) await bibliographyService.moveItem(item.id, targetId)
+    }))
+    toast({ title: "Moved", description: `${indices.length} item(s) moved.` })
+  }
 
   function getFormattedString(
     f: FormattedCitation,
@@ -75,6 +185,59 @@ export default function CitationsPage() {
         return f.apa
     }
   }
+
+  function exportCSLJSON() {
+    if (bibliography.length === 0) return
+    const items = bibliography.map((it) => citationService.toCSLJSON(it.citation))
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "bibliography.csl.json"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  function exportRIS() {
+    if (bibliography.length === 0) return
+    const content = bibliography.map((it) => citationService.toRIS(it.citation)).join("\n\n")
+    const blob = new Blob([content], { type: "application/x-research-info-systems" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "bibliography.ris"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  // Drag-and-drop to bibliography
+  function handleBibDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setIsOverBib(true)
+  }
+  function handleBibDragLeave() {
+    setIsOverBib(false)
+  }
+  function handleBibDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setIsOverBib(false)
+    const idxStr = e.dataTransfer.getData('text/plain')
+    const idx = Number(idxStr)
+    const r = importResults[idx]
+    if (!r?.citation || !r?.formatted) return
+    ;(async () => {
+      try {
+        const row = await bibliographyService.addItem(r.citation as any, r.formatted as any, selectedCollection)
+        setBibliography(prev=>[...prev, { id: row?.id, citation: r.citation as any, formatted: r.formatted as any }])
+        toast({ title: "Added to bibliography" })
+      } catch {}
+    })()
+  }
+
 
   const currentText = useMemo(() => {
     if (!formatted) return ""
@@ -142,19 +305,31 @@ export default function CitationsPage() {
 
   function addCurrentToBibliography() {
     if (!resultCitation || !formatted) return
-    setBibliography((prev) => {
-      const exists = prev.some(
-        (it) =>
-          (resultCitation.doi && it.citation.doi === resultCitation.doi) ||
-          (it.citation.title === resultCitation.title && it.citation.year === resultCitation.year),
-      )
-      if (exists) return prev
-      return [...prev, { citation: resultCitation, formatted }]
-    })
+    ;(async () => {
+      try {
+        const row = await bibliographyService.addItem(resultCitation, formatted, selectedCollection)
+        setBibliography((prev) => {
+          const exists = prev.some(
+            (it) =>
+              (resultCitation.doi && it.citation.doi === resultCitation.doi) ||
+              (it.citation.title === resultCitation.title && it.citation.year === resultCitation.year),
+          )
+          if (exists) return prev
+          return [...prev, { id: row?.id, citation: resultCitation, formatted }]
+        })
+        toast({ title: "Added to bibliography" })
+      } catch (e: any) {
+        toast({ title: "Save failed", description: e?.message || "Could not save to library", variant: "destructive" })
+      }
+    })()
   }
 
   function removeFromBibliography(index: number) {
+    const item = bibliography[index]
     setBibliography((prev) => prev.filter((_, i) => i !== index))
+    if (item?.id) {
+      bibliographyService.removeItem(item.id).catch(() => {})
+    }
   }
 
   function exportBibliographyAs(
@@ -220,10 +395,31 @@ export default function CitationsPage() {
                 </div>
                 <div className="text-gray-600">Recently Added</div>
                 <div className="text-gray-600">Favorites</div>
-                <div className="mt-3 border-t pt-3 text-gray-700 font-medium">Collections</div>
-                <button className="inline-flex items-center gap-2 text-[#ee691a] hover:underline">
-                  <FolderPlus className="h-4 w-4" /> Create collection
-                </button>
+                <div className="mt-3 border-t pt-3 text-gray-700 font-medium flex items-center justify-between">
+                  <span>Collections</span>
+                  <button onClick={handleCreateCollection} className="inline-flex items-center gap-1 text-[#ee691a] hover:underline text-xs">
+                    <FolderPlus className="h-4 w-4" /> New
+                  </button>
+                </div>
+                <ul className="space-y-1">
+                  {collections.map((c) => (
+                    <li key={c.id} className={`flex items-center justify-between rounded px-2 py-1 ${selectedCollection===c.id? 'bg-orange-50 text-[#ee691a]' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      <button onClick={() => setSelectedCollection(c.id)} className="flex-1 text-left truncate">{c.name}</button>
+                      <button onClick={() => handleRenameCollection(c.id)} className="ml-2 text-gray-500 hover:text-gray-700" title="Rename"><Edit3 className="h-4 w-4"/></button>
+                      <button onClick={() => handleDeleteCollection(c.id)} className="ml-1 text-gray-500 hover:text-red-600" title="Delete"><Trash2 className="h-4 w-4"/></button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3">
+                  <label className="text-xs text-gray-600">Move selected to</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <select value={moveTarget ?? ''} onChange={(e)=>setMoveTarget(e.target.value||null)} className="w-full rounded border border-gray-300 px-2 py-1 text-sm">
+                      <option value="">Unassigned</option>
+                      {collections.map(c=> (<option key={c.id} value={c.id}>{c.name}</option>))}
+                    </select>
+                    <button onClick={()=>handleMoveSelected(moveTarget)} className="rounded bg-gray-800 px-2 py-1 text-xs text-white">Move</button>
+                  </div>
+                </div>
               </nav>
             </aside>
 
@@ -485,16 +681,16 @@ export default function CitationsPage() {
               {resultCitation && (
                 <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-gray-600 sm:grid-cols-2">
                   <div>
-                    <span className="font-medium text-gray-700">Title:</span> {resultCitation.title || "—"}
+                    <span className="font-medium text-gray-700">Title:</span> {resultCitation?.title || "—"}
                   </div>
                   <div className="truncate">
-                    <span className="font-medium text-gray-700">Authors:</span> {(resultCitation.authors || []).join(", ") || "—"}
+                    <span className="font-medium text-gray-700">Authors:</span> {(resultCitation?.authors || []).join(", ") || "—"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700">Year:</span> {resultCitation.year || "—"}
+                    <span className="font-medium text-gray-700">Year:</span> {resultCitation?.year || "—"}
                   </div>
                   <div className="truncate">
-                    <span className="font-medium text-gray-700">Source:</span> {resultCitation.journal || resultCitation.publisher || resultCitation.url || "—"}
+                    <span className="font-medium text-gray-700">Source:</span> {resultCitation?.journal || resultCitation?.publisher || resultCitation?.url || "—"}
                   </div>
                 </div>
               )}
@@ -502,8 +698,72 @@ export default function CitationsPage() {
             </div>
           </div>
 
+          {/* Import Results & Batch add */}
+          {importResults.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm mt-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">Imported from PDFs</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setSelectedImport({})} className="text-xs text-gray-600 hover:underline">Clear Selection</button>
+                  <button
+                    onClick={async ()=>{
+                      const toAdd = importResults.map((r,idx)=>({r, idx})).filter(x=>selectedImport[x.idx] && x.r.citation && x.r.formatted)
+                      for (const {r} of toAdd) {
+                        try {
+                          const row = await bibliographyService.addItem(r.citation as any, r.formatted as any, selectedCollection)
+                          setBibliography(prev=>[...prev, { id: row?.id, citation: r.citation as any, formatted: r.formatted as any }])
+                        } catch {}
+                      }
+                      toast({ title: "Added", description: `${toAdd.length} item(s) added to bibliography.` })
+                    }}
+                    className="inline-flex items-center rounded bg-[#ee691a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#d85f18]"
+                  >Add Selected</button>
+                  <button
+                    onClick={async ()=>{
+                      const toAdd = importResults.filter(r=>r.citation && r.formatted)
+                      for (const r of toAdd) {
+                        try {
+                          const row = await bibliographyService.addItem(r.citation as any, r.formatted as any, selectedCollection)
+                          setBibliography(prev=>[...prev, { id: row?.id, citation: r.citation as any, formatted: r.formatted as any }])
+                        } catch {}
+                      }
+                      toast({ title: "Added", description: `${toAdd.length} item(s) added to bibliography.` })
+                    }}
+                    className="inline-flex items-center rounded border px-3 py-1.5 text-xs"
+                  >Add All</button>
+                </div>
+              </div>
+              <ul className="divide-y divide-gray-200">
+                {importResults.map((r, idx)=> (
+                  <li key={idx}
+                      draggable
+                      onDragStart={(e)=>{ e.dataTransfer.setData('text/plain', String(idx)); }}
+                      className="flex items-start gap-2 py-2">
+                    <button
+                      onClick={()=> setSelectedImport(prev=> ({...prev, [idx]: !prev[idx]}))}
+                      className="mt-0.5 text-gray-600 hover:text-gray-900">
+                      {selectedImport[idx] ? <CheckSquare className="h-4 w-4"/> : <Square className="h-4 w-4"/>}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-900 truncate">{r.citation?.title || r.fileName}</div>
+                      <div className="text-xs text-gray-600 truncate">{r.citation?.authors?.join(', ') || r.error || '—'}</div>
+                    </div>
+                    {r.citation?.doi && <span className="text-[10px] text-gray-500">{r.citation.doi}</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-gray-500">Tip: Drag an imported row into the Bibliography section to add it.</p>
+            </div>
+          )}
+
           {/* Bibliography */}
-          <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div
+            className={`mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm ${isOverBib ? 'ring-2 ring-[#ee691a]' : ''}`}
+            onDragOver={handleBibDragOver}
+            onDrop={handleBibDrop}
+            onDragLeave={handleBibDragLeave}
+            aria-label="Bibliography Dropzone"
+          >
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-gray-900">Bibliography</h2>
@@ -512,6 +772,20 @@ export default function CitationsPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={exportCSLJSON}
+                  disabled={bibliography.length === 0}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" /> Export CSL-JSON
+                </button>
+                <button
+                  onClick={exportRIS}
+                  disabled={bibliography.length === 0}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" /> Export RIS
+                </button>
                 <button
                   onClick={() => exportBibliographyAs(style === "bibtex" ? "apa" : style)}
                   disabled={bibliography.length === 0}
@@ -538,6 +812,11 @@ export default function CitationsPage() {
               <ul className="divide-y divide-gray-200">
                 {bibliography.map((item, idx) => (
                   <li key={idx} className="flex items-start justify-between gap-3 py-3">
+                    <button
+                      onClick={()=> setSelectedBib(prev=> ({...prev, [idx]: !prev[idx]}))}
+                      className="mt-0.5 text-gray-600 hover:text-gray-900">
+                      {selectedBib[idx] ? <CheckSquare className="h-4 w-4"/> : <Square className="h-4 w-4"/>}
+                    </button>
                     <div className="min-w-0 flex-1">
                       <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">
                         {getFormattedString(item.formatted, style === "bibtex" ? "apa" : style)}
