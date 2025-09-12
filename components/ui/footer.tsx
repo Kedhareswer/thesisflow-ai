@@ -11,13 +11,15 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
   return (
     <footer
       className={cn(
-        'relative isolate overflow-hidden border-t bg-transparent text-neutral-100 min-h-[320px]',
+        'relative isolate overflow-visible border-t bg-transparent text-neutral-100 min-h-[320px]',
         className,
       )}
       {...props}
     >
-      {/* Scoped background (radial + grain) under the footer only */}
-      <BackgroundNoise scoped />
+      {/* Background layer that bleeds upward from the footer and fills ~full viewport height */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[120vh] z-0">
+        <BackgroundNoise scoped />
+      </div>
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 font-mono">
         <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">
