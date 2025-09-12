@@ -25,7 +25,8 @@ export class NovaAIService {
   private nebiusApiKey: string
   
   constructor() {
-    this.nebiusApiKey = process.env.NEXT_PUBLIC_NEBIUS_API_KEY || ''
+    // Use server-side env var instead of client-side for security
+    this.nebiusApiKey = process.env.NEBIUS_API_KEY || process.env.NEXT_PUBLIC_NEBIUS_API_KEY || ''
   }
   
   public static getInstance(): NovaAIService {
@@ -36,7 +37,7 @@ export class NovaAIService {
   }
 
   /**
-   * Process a message with Nova AI using Nebius API
+   * Process a message with Nova using Nebius API
    */
   async processMessage(
     message: string,
@@ -62,11 +63,10 @@ export class NovaAIService {
           'Authorization': `Bearer ${this.nebiusApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
           max_tokens: 1000,
           temperature: 0.6,
           top_p: 0.9,
-          top_k: 50,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: message }
@@ -84,7 +84,7 @@ export class NovaAIService {
       const aiContent = data.choices?.[0]?.message?.content || 'No response generated'
       return this.parseAIResponse(aiContent, context)
     } catch (error) {
-      console.error('Nova AI error:', error)
+      console.error('Nova error:', error)
       return {
         content: "I'm having trouble connecting right now. Please check your Nebius API configuration and try again!",
         confidence: 0,
@@ -94,7 +94,7 @@ export class NovaAIService {
   }
 
   /**
-   * Process a message with Nova AI using streaming
+   * Process a message with Nova using streaming
    */
   async processMessageStream(
     message: string,
@@ -123,11 +123,10 @@ export class NovaAIService {
           'Authorization': `Bearer ${this.nebiusApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
           max_tokens: 1000,
           temperature: 0.6,
           top_p: 0.9,
-          top_k: 50,
           stream: true,
           messages: [
             { role: "system", content: systemPrompt },
@@ -190,7 +189,7 @@ export class NovaAIService {
       const finalResponse = this.parseAIResponse(fullContent, context)
       onComplete(finalResponse)
     } catch (error) {
-      console.error('Nova AI streaming error:', error)
+      console.error('Nova streaming error:', error)
       onError(error instanceof Error ? error : new Error('Unknown streaming error'))
     }
   }
@@ -266,11 +265,10 @@ Focus on:
           'Authorization': `Bearer ${this.nebiusApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
           max_tokens: 200,
           temperature: 0.8,
           top_p: 0.9,
-          top_k: 50,
           messages: [
             { 
               role: "system", 
@@ -328,7 +326,7 @@ Current user: ${context.currentUser.name}${mentionedUsersContext}${topicContext}
 
 User's message: "${userMessage}"
 
-Please provide a helpful, contextual response as Nova AI, a productivity-focused assistant.
+Please provide a helpful, contextual response as Nova, a productivity-focused assistant.
 `
   }
 
@@ -336,7 +334,7 @@ Please provide a helpful, contextual response as Nova AI, a productivity-focused
    * Get system prompt based on action type
    */
   private getSystemPrompt(actionType: NovaAIContext['actionType']): string {
-    const basePrompt = `You are Nova AI, a specialized research collaboration assistant for academic teams and research hubs.`
+    const basePrompt = `You are Nova, a specialized research collaboration assistant for academic teams and research hubs.`
 
     const actionPrompts = {
       general: `${basePrompt} Provide helpful, concise responses that advance the conversation productively.`,
@@ -367,7 +365,7 @@ Please provide a helpful, contextual response as Nova AI, a productivity-focused
       recentMessages: context.recentMessages?.slice(-3) // Show last 3 messages
     })
     
-    const basePrompt = `You are Nova AI, a specialized research collaboration assistant for academic teams and research hubs.
+    const basePrompt = `You are Nova, a specialized research collaboration assistant for academic teams and research hubs.
 
 Your role is to:
 - Assist with research-related questions, literature reviews, and academic writing
@@ -419,7 +417,7 @@ IMPORTANT:
   }
 
   /**
-   * Process a message with Nova AI
+   * Process a message with Nova
    */
   private parseAIResponse(content: string, context: NovaAIContext): NovaAIResponse {
     // Sanitize model output to remove any leaked internal context or boilerplate
@@ -477,9 +475,9 @@ IMPORTANT:
   private sanitizeModelOutput(text: string): string {
     if (!text) return ''
     let cleaned = text
-      // Remove leading Nova AI prefaces
+      // Remove leading Nova prefaces
       .replace(/^\s*🤖.*?\n+/i, '')
-      .replace(/^\s*\*\*?nova ai response:?\*\*?\s*/i, '')
+      .replace(/^\s*\*\*?Nova response:?\*\*?\s*/i, '')
     
     // Remove echoed context sections
     cleaned = cleaned.replace(/^[\s\S]*?(?:^\s*(?:Current context:|I have the following context:|Context:)\s*\n[\s\S]*?(?:\n\s*\n|$))/im, (m) => {
@@ -498,13 +496,13 @@ IMPORTANT:
   }
 
   /**
-   * Check if message mentions Nova AI
+   * Check if message mentions Nova
    */
   static isNovaAIMentioned(message: string): boolean {
     const novaPatterns = [
       /@nova/i,
       /@nova-ai/i,
-      /nova ai/i,
+      /Nova/i,
       /hey nova/i,
       /nova,/i,
       /nova:/i
@@ -514,7 +512,7 @@ IMPORTANT:
   }
 
   /**
-   * Extract Nova AI command from message
+   * Extract Nova command from message
    */
   static extractNovaCommand(message: string): {
     command: string

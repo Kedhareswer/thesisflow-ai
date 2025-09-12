@@ -257,7 +257,6 @@ class CollaborateService {
   // Subscribe to new messages for a team
   subscribeToMessages(teamId: string, callback: (message: any) => void, socket?: any): () => void {
     if (!socket) {
-      console.warn('No socket provided for message subscription');
       return () => {}; // Return empty cleanup function
     }
     

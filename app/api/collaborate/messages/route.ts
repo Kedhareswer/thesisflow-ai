@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       id: msg.id,
       content: msg.content,
       // Normalize AI messages to ai_response for consistent UI
-      type: (msg.message_type === 'text' && typeof msg.content === 'string' && msg.content.includes('🤖 **Nova AI Response:**'))
+      type: (msg.message_type === 'text' && typeof msg.content === 'string' && msg.content.includes('🤖 **nova Response:**'))
         ? 'ai_response'
         : msg.message_type,
       timestamp: msg.created_at,
@@ -271,18 +271,36 @@ export async function POST(request: NextRequest) {
         sender_id: user.id,
         sender_name: senderName,
         message_preview: content.length > 100 ? content.substring(0, 100) + '...' : content
-      };
+      } as const
 
       for (const mentionedUserId of validMentions) {
-        if (mentionedUserId !== user.id) { // Don't notify self
-          await supabaseAdmin.rpc('create_notification', {
+        if (mentionedUserId === user.id) continue // Don't notify self
+        try {
+          const { error: rpcError } = await supabaseAdmin.rpc('create_notification', {
             target_user_id: mentionedUserId,
             notification_type: 'message_mention',
             notification_title: `Mentioned in ${team.name}`,
             notification_message: `${senderName} mentioned you: "${notificationData.message_preview}"`,
             notification_data: notificationData,
             action_url: `/collaborate?team=${teamId}&message=${message.id}`
-          });
+          })
+
+          if (rpcError) {
+            console.warn('create_notification RPC failed for mention; falling back to direct insert:', rpcError)
+            // Fallback: direct insert to notifications table
+            await supabaseAdmin.from('notifications').insert({
+              user_id: mentionedUserId,
+              type: 'message_mention',
+              title: `Mentioned in ${team.name}`,
+              message: `${senderName} mentioned you: "${notificationData.message_preview}"`,
+              data: notificationData,
+              action_url: `/collaborate?team=${teamId}&message=${message.id}`,
+              read: false,
+              created_at: new Date().toISOString()
+            })
+          }
+        } catch (e) {
+          console.error('Failed to create mention notification (both RPC and fallback may have failed):', e)
         }
       }
     }
@@ -326,7 +344,7 @@ export async function POST(request: NextRequest) {
       id: message.id,
       content: message.content,
       // Normalize AI messages to ai_response for consistent UI
-      type: (message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova AI Response:**'))
+      type: (message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova Response:**'))
         ? 'ai_response'
         : message.message_type,
       timestamp: message.created_at,

@@ -84,6 +84,8 @@ import { PlanStatus } from "@/components/ui/plan-status"
 import { TeamLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import { collaborateService } from "@/lib/services/collaborate.service"
 import { cn } from "@/lib/utils"
+import { ChatSearch } from "@/components/ui/chat-search"
+import { ChatMessageSkeleton } from "@/components/ui/skeleton-loader"
 
 // Type definitions
 interface User {
@@ -146,6 +148,7 @@ export default function CollaboratePage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [isSwitchingTeam, setIsSwitchingTeam] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [newMessage, setNewMessage] = useState("")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -182,6 +185,8 @@ export default function CollaboratePage() {
   const [isInvitationsDialogOpen, setIsInvitationsDialogOpen] = useState(false)
   // global navigation sidebar collapse state
   const [collapsed, setCollapsed] = useState(false)
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   const { toast } = useToast()
   const { user, isLoading: authLoading, session } = useSupabaseAuth()
@@ -238,6 +243,23 @@ export default function CollaboratePage() {
   useEffect(() => {
     loadTeamFilesForMentions()
   }, [loadTeamFilesForMentions])
+
+  // Map mention ids from backend to MentionData objects for UI chips
+  const mapMentions = useCallback((ids: any): MentionData[] => {
+    const selectedTeam = teams.find(t => t.id === selectedTeamId)
+    const members = (selectedTeam?.members || []).map(m => ({
+      id: m.id,
+      type: 'user' as const,
+      name: m.name || m.email,
+      email: m.email,
+      avatar: m.avatar,
+    }))
+    const files = teamFileMentions
+    const idArray: string[] = Array.isArray(ids) ? ids : []
+    return idArray
+      .map(id => members.find(u => u.id === id) || files.find(f => f.id === id))
+      .filter(Boolean) as MentionData[]
+  }, [teams, selectedTeamId, teamFileMentions])
 
   // Attach from cloud: Google Drive picker → save to team → insert mention
   const handleAttachFromCloud = useCallback(async () => {
@@ -435,8 +457,8 @@ export default function CollaboratePage() {
                 timestamp: msg.timestamp,
                 teamId: msg.teamId,
                 type: msg.type || 'text',
-                // @ts-ignore - extended at runtime
-                mentions: Array.isArray(msg.mentions) ? msg.mentions : [],
+                // @ts-ignore - extended at runtime: map mention ids to data
+                mentions: mapMentions(Array.isArray(msg.mentions) ? msg.mentions : []),
                 // @ts-ignore - extended at runtime
                 replyTo: msg.replyTo || null,
               }))
@@ -470,7 +492,7 @@ export default function CollaboratePage() {
           teamId: msg.teamId,
           type: msg.type || 'text',
           // @ts-ignore - extended at runtime
-          mentions: msg.mentions || [],
+          mentions: mapMentions(msg.mentions || []),
           // @ts-ignore - extended at runtime
           replyTo: msg.replyTo || null,
         }))
@@ -592,7 +614,7 @@ export default function CollaboratePage() {
     setIsProcessingAI(true)
     
     try {
-      // First, persist the user's message that mentions Nova AI
+      // First, persist the user's message that mentions Nova
       let userMessageId: string | undefined;
       let userMessage: ChatMessage | undefined;
       
@@ -671,7 +693,7 @@ export default function CollaboratePage() {
       const aiMessage: ChatMessage = {
         id: aiMessageId,
         senderId: 'nova-ai',
-        senderName: 'Nova AI',
+        senderName: 'Nova',
         senderAvatar: '/assistant-avatar.svg',
         content: '', // Start with empty content for streaming
         timestamp: new Date().toISOString(),
@@ -707,7 +729,7 @@ export default function CollaboratePage() {
         },
         // onComplete - finalize the message
         async (response) => {
-          const finalContent = `🤖 **Nova AI Response:**\n\n${response.content}`
+          const finalContent = `🤖 **Nova Response:**\n\n${response.content}`
           
           // Update the local AI message with final content
           setMessages(prev => prev.map(msg => 
@@ -754,7 +776,7 @@ export default function CollaboratePage() {
         // onError - handle streaming errors
         (error) => {
           console.error('AI streaming error:', error)
-          const errorContent = `🤖 **Nova AI Response:**\n\nI'm having trouble connecting right now. Please try again in a moment.`
+          const errorContent = `🤖 **Nova Response:**\n\nI'm having trouble connecting right now. Please try again in a moment.`
           
           setMessages(prev => prev.map(msg => 
             msg.id === aiMessageId 
@@ -764,7 +786,7 @@ export default function CollaboratePage() {
           
           toast({
             title: "AI Assistant Error",
-            description: "Nova AI is temporarily unavailable",
+            description: "Nova is temporarily unavailable",
             variant: "destructive",
           })
         }
@@ -774,7 +796,7 @@ export default function CollaboratePage() {
       console.error('Error with AI assistance:', error)
       toast({
         title: "AI Assistant Error",
-        description: "Nova AI is temporarily unavailable",
+        description: "Nova is temporarily unavailable",
         variant: "destructive",
       })
     } finally {
@@ -1029,50 +1051,37 @@ export default function CollaboratePage() {
   // Enhanced team selection with presence loading and realtime presence subscriptions
   useEffect(() => {
     if (selectedTeamId) {
-      loadMessages(selectedTeamId)
-      loadTeamPresence(selectedTeamId)
+      setIsSwitchingTeam(true) // Trigger switching state on team selection
+      let cancelled = false
+      ;(async () => {
+        try {
+          await Promise.all([
+            loadMessages(selectedTeamId),
+            loadTeamPresence(selectedTeamId)
+          ])
+        } finally {
+          if (!cancelled) setIsSwitchingTeam(false)
+        }
+      })()
       updatePresence('online', 'Viewing team chat')
       
       // Subscribe to real-time messages for this team
       const unsubscribe = collaborateService.subscribeToMessages(
         selectedTeamId,
         (newMessage: ChatMessage) => {
+          // Map mentions for new realtime message
+          const mappedMentions = mapMentions((newMessage as any).mentions || [])
+          const enriched = { ...newMessage, mentions: mappedMentions } as any
           setMessages(prev => {
             // Check if message already exists to prevent duplicates
-            const exists = prev.some(msg => msg.id === newMessage.id)
+            const exists = prev.some(m => m.id === enriched.id)
             if (exists) return prev
-
-            // Replace optimistic by clientMessageId if present
-            const clientId = (newMessage as any).clientMessageId
-            let updated = prev
-            if (clientId) {
-              updated = prev.map(m => (m.id === clientId ? { ...newMessage } : m))
-              // if not found, append
-              if (!updated.some(m => m.id === newMessage.id)) {
-                updated = [...updated, newMessage]
-              }
-            } else {
-              updated = [...prev, newMessage]
-            }
-            
-            // Auto-scroll only if already at bottom or if it's the user's own message
-            setTimeout(() => {
-              if (isScrolledToBottom || newMessage.senderId === user?.id) {
-                scrollToBottom()
-              } else {
-                // Increment unread count if not at bottom and not user's own message
-                setUnreadCount(prev => prev + 1)
-                setHasNewMessages(true)
-              }
-            }, 10)
-            
-            return updated
+            return [...prev, enriched]
           })
-        },
-        socket // Pass the socket instance
+        }
       )
       
-      // Subscribe to realtime presence via socket
+      // Define handlers in scope so cleanup can access them
       const handleStatusChanged = (data: any) => {
         if (!data) return
         const { userId, status, teamId } = data
@@ -1112,44 +1121,43 @@ export default function CollaboratePage() {
           } as any,
         }))
       }
-      
+      const handleTyping = (data: { userId: string, teamId: string, isTyping: boolean }) => {
+        if (data.teamId === selectedTeamId && data.userId !== user?.id) {
+          setTypingUsers(prev => {
+            const newSet = new Set(prev)
+            if (data.isTyping) {
+              newSet.add(data.userId)
+            } else {
+              newSet.delete(data.userId)
+            }
+            return newSet
+          })
+        }
+      }
+
+      // Socket presence/typing events and join
       if (socket) {
         ;(socket as any).on('user-status-changed', handleStatusChanged)
         ;(socket as any).on('user-joined', handleUserJoined)
         ;(socket as any).on('user-left', handleUserLeft)
+        ;(socket as any).on('user-typing', handleTyping)
         // Request live presence snapshot on join (server should respond with 'team-presence')
         ;(socket as any).emit('join_team', { teamId: selectedTeamId })
       }
-      
+
       // Setup scroll listener
       if (messagesContainerRef.current) {
         messagesContainerRef.current.addEventListener('scroll', checkScrollPosition)
       }
-
-        // Setup typing listeners
-        const handleTyping = (data: { userId: string, teamId: string, isTyping: boolean }) => {
-          if (data.teamId === selectedTeamId && data.userId !== user?.id) {
-            setTypingUsers(prev => {
-              const newSet = new Set(prev)
-              if (data.isTyping) {
-                newSet.add(data.userId)
-              } else {
-                newSet.delete(data.userId)
-              }
-              return newSet
-            })
-          }
-        }
-
-        ;(socket as any).on('user-typing', handleTyping)
       
-      // Cleanup
       return () => {
+        cancelled = true
         unsubscribe()
         if (socket) {
           ;(socket as any).off('user-status-changed', handleStatusChanged)
           ;(socket as any).off('user-joined', handleUserJoined)
           ;(socket as any).off('user-left', handleUserLeft)
+          ;(socket as any).off('user-typing', handleTyping)
           ;(socket as any).emit('leave_team', { teamId: selectedTeamId })
         }
         if (messagesContainerRef.current) {
@@ -1232,6 +1240,24 @@ export default function CollaboratePage() {
     }
   }, [selectedTeamId, updatePresence]) // Removed lastActivity from dependencies
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not in an input field
+      const isInInput = (e.target as HTMLElement)?.tagName === 'INPUT' || 
+                       (e.target as HTMLElement)?.tagName === 'TEXTAREA' ||
+                       (e.target as HTMLElement)?.contentEditable === 'true'
+      
+      if (!isInInput && (e.ctrlKey || e.metaKey) && e.key === 'f' && selectedTeamId) {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedTeamId])
+
   // Handle invitation URL parameter
   useEffect(() => {
     const handleInvitation = async () => {
@@ -1280,6 +1306,42 @@ export default function CollaboratePage() {
       handleInvitation()
     }
   }, [user, session, apiCall, toast])
+
+  // Video call handler
+  const handleVideoCall = useCallback(() => {
+    // Open Google Meet in a new tab
+    window.open('https://meet.google.com/landing', '_blank')
+  }, [])
+
+  // Search handlers
+  const handleSearchOpen = useCallback(() => {
+    setIsSearchOpen(true)
+  }, [])
+
+  const handleSearchClose = useCallback(() => {
+    setIsSearchOpen(false)
+  }, [])
+
+  const handleMessageSelect = useCallback((messageId: string) => {
+    // Close search
+    setIsSearchOpen(false)
+    
+    // Scroll to the message
+    setTimeout(() => {
+      const messageElement = document.querySelector(`[data-message-id="${messageId}"]`)
+      if (messageElement) {
+        messageElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        })
+        // Highlight the message briefly
+        messageElement.classList.add('ring-2', 'ring-blue-400', 'bg-blue-50', 'dark:bg-blue-900/20', 'transition-all', 'duration-300')
+        setTimeout(() => {
+          messageElement.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50', 'dark:bg-blue-900/20')
+        }, 3000)
+      }
+    }, 100)
+  }, [])
 
   // Handlers
   const handleCreateTeam = async () => {
@@ -1580,7 +1642,14 @@ export default function CollaboratePage() {
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 selectedTeamId={selectedTeamId}
-                setSelectedTeamId={(id)=>setSelectedTeamId(id)}
+                setSelectedTeamId={(id)=>{
+                  if (id && id !== selectedTeamId) {
+                    setIsSwitchingTeam(true)
+                    // Optional: clear current messages for visual clarity during switch
+                    setMessages([])
+                  }
+                  setSelectedTeamId(id)
+                }}
                 canUseTeamMembers={canUseFeature('team_members')}
                 planLoading={planLoading}
                 onCreateTeam={() => setIsCreateTeamOpen(true)}
@@ -1653,22 +1722,27 @@ export default function CollaboratePage() {
                               lastSeen: m.lastActive,
                               role: m.role
                             }))}
-                            onSearchClick={() => {/* TODO: Implement search */}}
-                            onCallClick={() => {/* TODO: Implement call */}}
-                            onVideoClick={() => {/* TODO: Implement video */}}
+                            onSearchClick={handleSearchOpen}
+                            onVideoClick={handleVideoCall}
                             onSettingsClick={() => setIsSettingsOpen(true)}
                           />
 
                           {/* Enhanced Messages Area */}
                           <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-background pb-0">
-                            {teamMessages.length === 0 ? (
+                            {isSwitchingTeam ? (
+                              <div className="p-4 space-y-4">
+                                {[...Array(6)].map((_, i) => (
+                                  <ChatMessageSkeleton key={i} />
+                                ))}
+                              </div>
+                            ) : teamMessages.length === 0 ? (
                               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
                                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full flex items-center justify-center mb-6">
                                   <MessageSquare className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <h3 className="font-semibold text-lg mb-2 text-foreground">Welcome to your team chat!</h3>
                                 <p className="text-sm text-center max-w-sm mb-4">
-                                  Start the conversation with your team members. You can mention people with @, ask Nova AI for help, or share files.
+                                  Start the conversation with your team members. You can mention people with @, ask Nova for help, or share files.
                                 </p>
                                 <div className="flex flex-wrap gap-2 justify-center">
                                   <Badge variant="outline" className="text-xs">
@@ -1691,8 +1765,8 @@ export default function CollaboratePage() {
                                 const prevMessage = index > 0 ? teamMessages[index - 1] : null
                                 // Normalize AI messages to a stable sender id to avoid
                                 // treating AI responses as the current user after persistence
-                                const isAIMessage = message.content.includes('🤖 **Nova AI Response:**') || message.senderId === 'nova-ai'
-                                const prevIsAIMessage = Boolean(prevMessage && (prevMessage.content?.includes('🤖 **Nova AI Response:**') || prevMessage.senderId === 'nova-ai'))
+                                const isAIMessage = message.content.includes('🤖 **Nova Response:**') || message.senderId === 'nova-ai'
+                                const prevIsAIMessage = Boolean(prevMessage && (prevMessage.content?.includes('🤖 **Nova Response:**') || prevMessage.senderId === 'nova-ai'))
                                 const currentSenderForGrouping = isAIMessage ? 'nova-ai' : message.senderId
                                 const prevSenderForGrouping = prevMessage ? (prevIsAIMessage ? 'nova-ai' : prevMessage.senderId) : null
                                 const isConsecutive = Boolean(prevMessage && 
@@ -1715,13 +1789,13 @@ export default function CollaboratePage() {
                                 
                                 // For AI messages, use the enhanced ProductivityMessage component for consistent alignment
                                 if (isAIMessage) {
-                                  const displayContent = message.content.includes('🤖 **Nova AI Response:**') 
-                                    ? message.content.replace('🤖 **Nova AI Response:**\n\n', '')
+                                  const displayContent = message.content.includes('🤖 **Nova Response:**') 
+                                    ? message.content.replace('🤖 **Nova Response:**\n\n', '')
                                     : message.content
                                   
                                   return (
-                                    <EnhancedMessage
-                                      key={message.id}
+                                    <div key={message.id} data-message-id={message.id}>
+                                      <EnhancedMessage
                                       message={{
                                         id: message.id,
                                         senderId: 'nova-ai',
@@ -1736,7 +1810,7 @@ export default function CollaboratePage() {
                                       }}
                                       user={{
                                         id: 'nova-ai',
-                                        name: 'Nova AI Assistant',
+                                        name: 'Nova Assistant',
                                         email: '',
                                         avatar: '/assistant-avatar.svg',
                                         status: 'online',
@@ -1758,7 +1832,7 @@ export default function CollaboratePage() {
                                                 setReplyingTo({
                                                   id: replyMessage.id,
                                                   senderId: replyMessage.senderId,
-                                                  senderName: 'Nova AI',
+                                                  senderName: 'Nova',
                                                   content: replyMessage.content,
                                                   timestamp: replyMessage.timestamp,
                                                   type: replyMessage.type as any,
@@ -1774,7 +1848,8 @@ export default function CollaboratePage() {
                                       onAIAssist={(messageId, context) => {
                                         handleAIAssistance(`Help me understand this AI response: "${context}"`)
                                       }}
-                                    />
+                                      />
+                                    </div>
                                   )
                                 }
                                 
@@ -1792,8 +1867,8 @@ export default function CollaboratePage() {
                                 const userActivity = userPresence[senderUser.id]?.activity
                                 
                                 return (
-                                  <EnhancedMessage
-                                    key={message.id}
+                                  <div key={message.id} data-message-id={message.id}>
+                                    <EnhancedMessage
                                     message={{
                                       id: message.id,
                                       senderId: message.senderId,
@@ -1811,8 +1886,8 @@ export default function CollaboratePage() {
                                         const original = teamMessages.find(m => m.id === (message as any).replyTo)
                                         if (!original) return undefined
                                         const info = selectedTeam.members.find(m => m.id === original.senderId)
-                                        const isOriginalFromAI = original.content.includes('🤖 **Nova AI Response:**') || original.senderId === 'nova-ai';
-                                        return isOriginalFromAI ? 'Nova AI' : (info?.name || original.senderName)
+                                        const isOriginalFromAI = original.content.includes('🤖 **Nova Response:**') || original.senderId === 'nova-ai';
+                                        return isOriginalFromAI ? 'Nova' : (info?.name || original.senderName)
                                       })(),
                                       status: (message.id || '').startsWith('client-') ? 'sending' : 'sent',
                                       priority: 'normal',
@@ -1841,10 +1916,10 @@ export default function CollaboratePage() {
                                       const replyMessage = teamMessages.find(m => m.id === messageId)
                                       if (replyMessage) {
                                         // Find the sender's name
-                                        const isReplyFromAI = replyMessage.content.includes('🤖 **Nova AI Response:**') || replyMessage.senderId === 'nova-ai';
+                                        const isReplyFromAI = replyMessage.content.includes('🤖 **Nova Response:**') || replyMessage.senderId === 'nova-ai';
                                         const senderInfo = selectedTeam.members.find(m => m.id === replyMessage.senderId)
                                         const senderName = isReplyFromAI 
-                                          ? 'Nova AI' 
+                                          ? 'Nova' 
                                           : senderInfo?.name || replyMessage.senderName || 'Unknown User'
                                         
                                         setReplyingTo({
@@ -1867,7 +1942,8 @@ export default function CollaboratePage() {
                                     onAIAssist={(messageId, context) => {
                                       handleAIAssistance(`Help me understand this message: "${context}"`)
                                     }}
-                                  />
+                                    />
+                                  </div>
                                 )
                               })
                             )}
@@ -1969,6 +2045,14 @@ export default function CollaboratePage() {
                             } : undefined}
                             replyingTo={replyingTo || undefined}
                             onCancelReply={() => setReplyingTo(null)}
+                          />
+                          
+                          {/* Chat Search Overlay */}
+                          <ChatSearch
+                            messages={teamMessages}
+                            isOpen={isSearchOpen}
+                            onClose={handleSearchClose}
+                            onMessageSelect={handleMessageSelect}
                           />
                         </div>
                       </TabsContent>

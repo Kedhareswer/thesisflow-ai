@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -65,6 +65,40 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
   
+  // Build a catalog of mentionable entities (AI, members, files)
+  const allMentionables = useMemo<MentionData[]>(() => {
+    const ai: MentionData = {
+      id: 'nova-ai',
+      name: 'Nova',
+      avatar: '/anthropic-icon.png',
+      type: 'ai',
+    }
+    const members: MentionData[] = (team?.members || []).map((member) => ({
+      id: member.id,
+      type: 'user' as const,
+      name: member.name,
+      email: member.email,
+      avatar: member.avatar,
+    }))
+    return [ai, ...members, ...(teamFiles || [])]
+  }, [team?.members, teamFiles])
+
+  // Helper to resolve mention references coming from server (ids or full objects)
+  const resolveMentionRefs = useCallback((raw: any): MentionData[] => {
+    if (!raw) return []
+    if (Array.isArray(raw) && raw.length > 0) {
+      if (typeof raw[0] === 'object' && 'id' in raw[0]) {
+        // Already full objects
+        return raw as MentionData[]
+      }
+      // Assume array of ids
+      return (raw as string[])
+        .map((id) => allMentionables.find((m) => m.id === id))
+        .filter(Boolean) as MentionData[]
+    }
+    return []
+  }, [allMentionables])
+  
   // API helper function
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {
@@ -112,7 +146,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     return groupedMessages
   }
 
-  // Determine if a message is from Nova AI Assistant
+  // Determine if a message is from Nova Assistant
   const isAIMessage = (message: ChatMessage) => {
     const name = (message.senderName || '').toLowerCase()
     const id = (message.senderId || '').toLowerCase()
@@ -120,7 +154,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     return (
       (message as any).type === 'ai' ||
       id === 'nova-ai' || id === 'nova_ui' || id === 'assistant' ||
-      name.includes('nova ai') || name.includes('nova ai assistant') || name === 'assistant' || name.includes('nova')
+      name.includes('Nova') || name.includes('Nova assistant') || name === 'assistant' || name.includes('nova')
     )
   }
 
@@ -204,7 +238,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
             timestamp: msg.timestamp,
             teamId: msg.teamId,
             type: msg.type || 'text',
-            mentions: Array.isArray(msg.mentions) ? msg.mentions : [],
+            mentions: resolveMentionRefs(msg.mentions),
           }))
           setMessages(formattedMessages)
           socket.off('messages', handler)
@@ -264,23 +298,54 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       loadTeamFiles()
     }
   }, [team?.id, loadMessages, loadTeamFiles])
+
+  // Backfill mentions for already-loaded messages once mentionables (files/members) are ready
+  useEffect(() => {
+    if (!messages.length || !allMentionables.length) return
+    const findMentionsInText = (text: string): MentionData[] => {
+      const found: MentionData[] = []
+      // Sort by longer names first to avoid partial overlaps
+      const sorted = [...allMentionables].sort((a, b) => b.name.length - a.name.length)
+      for (const m of sorted) {
+        const re = new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s,.:;!?()\\[\\]{}<>])`, 'i')
+        if (re.test(text)) {
+          found.push(m)
+        }
+      }
+      return found
+    }
+    setMessages(prev => prev.map(msg => {
+      if (msg.mentions && msg.mentions.length > 0) return msg
+      const inferred = findMentionsInText(msg.content || '')
+      if (inferred.length === 0) return msg
+      return { ...msg, mentions: inferred }
+    }))
+  }, [allMentionables, messages.length])
   
   // Socket event handlers
   useEffect(() => {
     if (!socket || !team?.id) return
 
     const handleNewMessage = (data: any) => {
-      if (data.teamId === team.id) {
+      // Handle both server format (from database) and client format
+      const teamId = data.teamId || data.team_id
+      const senderId = data.senderId || data.sender_id
+      const senderName = data.senderName || data.sender?.full_name || 'Unknown User'
+      const senderAvatar = data.senderAvatar || data.sender?.avatar_url
+      const timestamp = data.timestamp || data.created_at
+      const messageType = data.type || data.message_type || 'text'
+      
+      if (teamId === team.id) {
         const newMessage: ChatMessage = {
           id: data.id,
-          senderId: data.senderId,
-          senderName: data.senderName,
-          senderAvatar: data.senderAvatar,
+          senderId,
+          senderName,
+          senderAvatar,
           content: data.content,
-          timestamp: data.timestamp,
-          teamId: data.teamId,
-          type: data.type || "text",
-          mentions: data.mentions || [],
+          timestamp,
+          teamId,
+          type: messageType,
+          mentions: resolveMentionRefs(data.mentions),
         }
         setMessages(prev => [...prev, newMessage])
         
@@ -313,23 +378,23 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     const handleMemberUpdate = () => {}
 
     // Join team room
-    socket.emit(SocketEvent.JOIN_TEAM, { teamId: team.id, userId: user?.id })
+    socket.emit('join_team', { teamId: team.id })
 
-    // Subscribe to events
-    socket.on(SocketEvent.NEW_MESSAGE, handleNewMessage)
-    socket.on(SocketEvent.TYPING, handleTyping)
-    socket.on('member-joined', handleMemberUpdate)
-    socket.on('member-left', handleMemberUpdate)
+    // Subscribe to events - websocket server uses these event names
+    socket.on('new_message', handleNewMessage)
+    socket.on('typing', handleTyping)
+    socket.on('user-joined', handleMemberUpdate)
+    socket.on('user-left', handleMemberUpdate)
 
     return () => {
       // Leave team room
-      socket.emit(SocketEvent.LEAVE_TEAM, { teamId: team.id, userId: user?.id })
+      socket.emit('leave_team', { teamId: team.id })
       
       // Unsubscribe from events
-      socket.off(SocketEvent.NEW_MESSAGE, handleNewMessage)
-      socket.off(SocketEvent.TYPING, handleTyping)
-      socket.off('member-joined', handleMemberUpdate)
-      socket.off('member-left', handleMemberUpdate)
+      socket.off('new_message', handleNewMessage)
+      socket.off('typing', handleTyping)
+      socket.off('user-joined', handleMemberUpdate)
+      socket.off('user-left', handleMemberUpdate)
       
       // Clear all typing timeouts
       Object.values(typingTimeoutsRef.current).forEach(timeout => clearTimeout(timeout))
@@ -352,15 +417,14 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       
       // Send typing indicator (stopped typing)
       if (socket) {
-        socket.emit(SocketEvent.STOP_TYPING, {
+        socket.emit('stop_typing', {
           teamId: team.id,
-          userId: user.id,
         })
       }
       
       // Send message via socket
       if (socket) {
-        socket.emit(SocketEvent.NEW_MESSAGE, {
+        socket.emit('new_message', {
           teamId: team.id,
           content: newMessage.trim(),
           type: 'text',
@@ -385,9 +449,8 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const handleTypingIndicator = () => {
     if (!user || !team?.id || !socket) return
     
-    socket.emit(SocketEvent.TYPING, {
+    socket.emit('typing', {
       teamId: team.id,
-      userId: user.id,
     })
   }
   
@@ -584,6 +647,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                               <MessageWithMentions 
                                 content={message.content}
                                 mentions={message.mentions}
+                                currentUserId={user?.id}
                               />
                             </div>
                           )}
