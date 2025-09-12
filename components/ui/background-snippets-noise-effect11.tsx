@@ -83,7 +83,7 @@ const Noise: React.FC<NoiseProps> = ({
 /** Gradient + Noise (applied to one of our previous dark radial variants). */
 export default function Component({ scoped = false }: { scoped?: boolean }) {
   return (
-    <div className={`${scoped ? 'absolute' : 'fixed'} inset-0 -z-10 bg-slate-950`}>
+    <div className={`${scoped ? 'absolute' : 'fixed'} inset-0 z-0 pointer-events-none bg-slate-950`}>
       {/* Radial spotlight (brand orange) */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_560px_at_50%_200px,#FF6B2C,transparent)]" />
       {/* Grain overlay */}

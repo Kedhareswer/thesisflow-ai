@@ -11,7 +11,7 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
   return (
     <footer
       className={cn(
-        'relative overflow-hidden border-t bg-transparent text-neutral-100',
+        'relative isolate overflow-hidden border-t bg-transparent text-neutral-100 min-h-[320px]',
         className,
       )}
       {...props}
@@ -19,7 +19,7 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
       {/* Scoped background (radial + grain) under the footer only */}
       <BackgroundNoise scoped />
 
-      <div className="relative mx-auto max-w-5xl px-4 font-mono">
+      <div className="relative z-10 mx-auto max-w-5xl px-4 font-mono">
         <div className="relative grid grid-cols-1 border-x md:grid-cols-4 md:divide-x">
           {/* Column 1: Platform */}
           <div>

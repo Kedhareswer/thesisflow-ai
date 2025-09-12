@@ -1,10 +1,12 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useMemo, useState, useCallback } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { Search, Copy, Check, Download, Trash2, Plus, BookOpen } from "lucide-react"
+import { Search, Copy, Check, Download, Trash2, Plus, BookOpen, Upload, FolderPlus } from "lucide-react"
 import type { Citation, FormattedCitation } from "@/lib/services/citation.service"
 import { citationService } from "@/lib/services/citation.service"
+import { useToast } from "@/components/ui/use-toast"
+import { useDropzone } from "react-dropzone"
 
 export default function CitationsPage() {
   const [collapsed, setCollapsed] = useState(false)
@@ -34,6 +36,20 @@ export default function CitationsPage() {
     url: undefined,
     publisher: undefined,
     accessDate: undefined,
+  })
+
+  const { toast } = useToast()
+
+  // Simple PDF import placeholder using react-dropzone
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (!acceptedFiles?.length) return
+    // Placeholder UX: acknowledge upload; parsing can be added later
+    toast({ title: "Import received", description: `${acceptedFiles.length} file(s) uploaded. Metadata extraction coming soon.` })
+  }, [toast])
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    multiple: true,
+    accept: { "application/pdf": [".pdf"] },
   })
 
   function getFormattedString(
@@ -178,9 +194,43 @@ export default function CitationsPage() {
           </div>
 
           {/* Content */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Left: Input Panel */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
+            {/* Library Sidebar (left) */}
+            <aside className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm h-fit">
+              <button className="mb-4 inline-flex items-center gap-2 rounded-md bg-[#ee691a] px-3 py-2 text-sm font-semibold text-white hover:bg-[#d85f18]">
+                <Plus className="h-4 w-4" /> Add references
+              </button>
+              <div
+                {...getRootProps({
+                  className: `mb-4 border-2 border-dashed rounded-md p-4 text-center cursor-pointer transition ${isDragActive ? 'border-[#ee691a] bg-orange-50' : 'border-gray-300 bg-gray-50/60 hover:border-[#ee691a]'} `,
+                })}
+                aria-label="Upload PDFs"
+              >
+                <input {...getInputProps()} />
+                <div className="flex flex-col items-center gap-2 text-gray-600">
+                  <Upload className="h-5 w-5" />
+                  <p className="text-xs">Drop PDFs here or click to upload</p>
+                </div>
+              </div>
+              <nav aria-label="Library Navigation" className="space-y-2 text-sm">
+                <div className="font-medium text-gray-700">All References</div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>Bibliography</span>
+                  <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-[#ee691a]">{bibliography.length}</span>
+                </div>
+                <div className="text-gray-600">Recently Added</div>
+                <div className="text-gray-600">Favorites</div>
+                <div className="mt-3 border-t pt-3 text-gray-700 font-medium">Collections</div>
+                <button className="inline-flex items-center gap-2 text-[#ee691a] hover:underline">
+                  <FolderPlus className="h-4 w-4" /> Create collection
+                </button>
+              </nav>
+            </aside>
+
+            {/* Workspace (right) */}
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              {/* Input Panel */}
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               {/* Mode Toggle */}
               <div className="mb-5 flex items-center gap-2">
                 <button
@@ -372,10 +422,10 @@ export default function CitationsPage() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
 
-            {/* Right: Result Panel */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              {/* Result Panel */}
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700">Style</label>
@@ -448,6 +498,7 @@ export default function CitationsPage() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
