@@ -165,6 +165,8 @@ export default function CollaboratePage() {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const lastScrollTimeRef = useRef<number>(0)
+  const loadMessagesRef = useRef<((teamId: string) => Promise<void>) | undefined>(undefined)
+  const mapMentionsRef = useRef<((ids: any) => MentionData[]) | undefined>(undefined)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
   const [isInviting, setIsInviting] = useState(false)
@@ -231,6 +233,7 @@ export default function CollaboratePage() {
           fileSize: (file.size ?? file.file_size ?? 0).toString(),
           fileUrl: file.url || file.file_url,
         }))
+        console.log('[Team Files Debug] Loaded team files for mentions:', mapped)
         setTeamFileMentions(mapped)
       } else {
         setTeamFileMentions([])
@@ -260,6 +263,9 @@ export default function CollaboratePage() {
       .map(id => members.find(u => u.id === id) || files.find(f => f.id === id))
       .filter(Boolean) as MentionData[]
   }, [teams, selectedTeamId, teamFileMentions])
+
+  // Store the latest mapMentions function in ref
+  mapMentionsRef.current = mapMentions
 
   // Attach from cloud: Google Drive picker → save to team → insert mention
   const handleAttachFromCloud = useCallback(async () => {
@@ -432,20 +438,16 @@ export default function CollaboratePage() {
   // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
     if (!teamId) return
-    console.log('[loadMessages] Loading messages for team:', teamId, 'Socket connected:', socket?.connected)
     try {
       if (socket && (socket as any).connected) {
-        console.log('[loadMessages] Using socket to load messages')
         try {
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
-              console.log('[loadMessages] Socket timeout, falling back to API')
               ;(socket as any).off('messages', handler)
               reject(new Error('Socket timeout'))
             }, 5000) // 5 second timeout
             
             const handler = (payload: any) => {
-              console.log('[loadMessages] Socket response:', payload)
               clearTimeout(timeout)
               if (!payload || payload.teamId !== teamId) return
               const formatted: ChatMessage[] = (payload.messages || []).map((msg: any) => ({
@@ -458,11 +460,10 @@ export default function CollaboratePage() {
                 teamId: msg.teamId,
                 type: msg.type || 'text',
                 // @ts-ignore - extended at runtime: map mention ids to data
-                mentions: mapMentions(Array.isArray(msg.mentions) ? msg.mentions : []),
+                mentions: mapMentionsRef.current?.(Array.isArray(msg.mentions) ? msg.mentions : []) || [],
                 // @ts-ignore - extended at runtime
                 replyTo: msg.replyTo || null,
               }))
-              console.log('[loadMessages] Formatted messages:', formatted)
               setMessages(formatted.reverse())
               ;(socket as any).off('messages', handler)
               resolve()
@@ -472,15 +473,12 @@ export default function CollaboratePage() {
           })
           return
         } catch (socketError) {
-          console.log('[loadMessages] Socket failed, using API fallback:', socketError)
           // Continue to API fallback
         }
       }
       
       // Fallback to API if socket unavailable or failed
-      console.log('[loadMessages] Using API fallback to load messages')
       const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
-      console.log('[loadMessages] API response:', data)
       if (data.success) {
         const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
           id: msg.id,
@@ -492,19 +490,21 @@ export default function CollaboratePage() {
           teamId: msg.teamId,
           type: msg.type || 'text',
           // @ts-ignore - extended at runtime
-          mentions: mapMentions(msg.mentions || []),
+          mentions: mapMentionsRef.current?.(msg.mentions || []) || [],
           // @ts-ignore - extended at runtime
           replyTo: msg.replyTo || null,
         }))
-        console.log('[loadMessages] API formatted messages:', formattedMessages)
         setMessages(formattedMessages.reverse())
       } else {
-        console.error('[loadMessages] API returned error:', data.error)
+        console.error('Failed to load messages:', data.error)
       }
     } catch (error) {
       console.error('Error loading messages:', error)
     }
   }, [apiCall, socket])
+
+  // Store the latest loadMessages function in ref
+  loadMessagesRef.current = loadMessages
 
   // Enhanced messaging functions
   
@@ -666,6 +666,41 @@ export default function CollaboratePage() {
       console.log('[AI Context] Recent messages count:', recentMessages.length)
       console.log('[AI Context] Recent messages:', recentMessages.slice(-5)) // Show last 5 for debugging
 
+      // Extract file mentions from current message and fetch their content
+      const fileMentions = (currentMentions || []).filter(m => m.type === 'file')
+      const fileContents: Array<{name: string, content: string, url?: string}> = []
+      
+      console.log('[File Mentions Debug] Current mentions:', currentMentions)
+      console.log('[File Mentions Debug] File mentions found:', fileMentions)
+      
+      for (const fileMention of fileMentions) {
+        try {
+          console.log('[File Mentions Debug] Processing file:', fileMention.name, 'URL:', fileMention.fileUrl)
+          // If the file mention has a URL, fetch the content
+          if (fileMention.fileUrl) {
+            const response = await fetch(fileMention.fileUrl)
+            console.log('[File Mentions Debug] Fetch response status:', response.status)
+            if (response.ok) {
+              const content = await response.text()
+              console.log('[File Mentions Debug] Fetched content length:', content.length)
+              fileContents.push({
+                name: fileMention.name,
+                content: content,
+                url: fileMention.fileUrl
+              })
+            } else {
+              console.error('[File Mentions Debug] Failed to fetch file:', response.status, response.statusText)
+            }
+          } else {
+            console.log('[File Mentions Debug] No fileUrl found for:', fileMention.name)
+          }
+        } catch (error) {
+          console.error(`Failed to fetch content for file ${fileMention.name}:`, error)
+        }
+      }
+      
+      console.log('[File Mentions Debug] Final file contents:', fileContents)
+
       const selectedTeam = teams.find(t => t.id === selectedTeamId)
       const teamMembers = selectedTeam?.members.map(m => ({
         id: m.id,
@@ -685,8 +720,15 @@ export default function CollaboratePage() {
           status: 'online' as const
         },
         mentionedUsers: teamMembers,
-        actionType: NovaAIService.extractNovaCommand(prompt)?.action || 'general' as const
+        actionType: NovaAIService.extractNovaCommand(prompt)?.action || 'general' as const,
+        fileContents: fileContents
       }
+      
+      console.log('[AI Context Debug] Final AI context being sent to Nova:', {
+        teamId: aiContext.teamId,
+        fileContentsCount: aiContext.fileContents.length,
+        fileContents: aiContext.fileContents.map(f => ({ name: f.name, contentLength: f.content.length, url: f.url }))
+      })
 
       // Create initial AI message for streaming
       const aiMessageId = `ai-${Date.now()}`
@@ -1056,7 +1098,7 @@ export default function CollaboratePage() {
       ;(async () => {
         try {
           await Promise.all([
-            loadMessages(selectedTeamId),
+            loadMessagesRef.current?.(selectedTeamId),
             loadTeamPresence(selectedTeamId)
           ])
         } finally {
@@ -1070,7 +1112,7 @@ export default function CollaboratePage() {
         selectedTeamId,
         (newMessage: ChatMessage) => {
           // Map mentions for new realtime message
-          const mappedMentions = mapMentions((newMessage as any).mentions || [])
+          const mappedMentions = mapMentionsRef.current?.((newMessage as any).mentions || []) || []
           const enriched = { ...newMessage, mentions: mappedMentions } as any
           setMessages(prev => {
             // Check if message already exists to prevent duplicates
@@ -1166,7 +1208,7 @@ export default function CollaboratePage() {
         ;(socket as any).off('user-typing')
       }
     }
-  }, [selectedTeamId, loadMessages, loadTeamPresence, checkScrollPosition, socket])
+  }, [selectedTeamId, loadTeamPresence, checkScrollPosition, socket])
   
   // Auto-scroll to bottom when messages first load or team changes
   useEffect(() => {
