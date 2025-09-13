@@ -9,6 +9,7 @@ export interface NovaAIContext {
   mentionedUsers: ProductivityUser[]
   conversationTopic?: string
   actionType: 'general' | 'summarize' | 'action_items' | 'clarify' | 'research' | 'decision' | 'literature_review' | 'methodology' | 'data_analysis' | 'writing_assistance' | 'citation_help'
+  fileContents?: Array<{name: string, content: string, url?: string}>
 }
 
 export interface NovaAIResponse {
@@ -362,7 +363,9 @@ Please provide a helpful, contextual response as Nova, a productivity-focused as
       teamId: context.teamId,
       recentMessagesCount: context.recentMessages?.length || 0,
       actionType: context.actionType,
-      recentMessages: context.recentMessages?.slice(-3) // Show last 3 messages
+      recentMessages: context.recentMessages?.slice(-3), // Show last 3 messages
+      fileContentsCount: context.fileContents?.length || 0,
+      fileContents: context.fileContents?.map(f => ({ name: f.name, contentLength: f.content.length }))
     })
     
     const basePrompt = `You are Nova, a specialized research collaboration assistant for academic teams and research hubs.
@@ -397,6 +400,19 @@ Current context:
 - Action type: ${context.actionType || 'general'}
 - Recent messages: ${context.recentMessages?.length || 0} messages
 - Team members: ${context.mentionedUsers?.length || 0} users mentioned
+- Referenced files: ${context.fileContents?.length || 0} files
+
+${context.fileContents && context.fileContents.length > 0 ? `
+REFERENCED FILE CONTENTS:
+${context.fileContents.map(file => `
+**File: ${file.name}**
+${file.url ? `URL: ${file.url}` : ''}
+Content:
+\`\`\`
+${file.content}
+\`\`\`
+`).join('\n')}
+` : ''}
 
 ${context.recentMessages && context.recentMessages.length > 0 ? `
 RECENT CONVERSATION HISTORY:
@@ -411,6 +427,9 @@ IMPORTANT:
 - Always format your response using proper GFM markdown as specified above.
 - When discussing research topics, maintain academic rigor and cite sources when possible.
 - Use the conversation history above to understand the context and provide relevant responses.
+- When files are referenced in the conversation, analyze their content and provide insights, summaries, or answers based on the file contents.
+- If asked about a specific file, provide detailed analysis of its content, structure, and key points.
+- For file summaries, highlight the main topics, key findings, methodology (if applicable), and conclusions.
 `
 
     return basePrompt

@@ -3,9 +3,9 @@ import type { Metadata } from 'next'
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
 
 export const metadata: Metadata = {
-  title: 'AI Research Platform — Discover & Collaborate | ThesisFlow-AI',
+  title: 'ThesisFlow-AI — AI Research Platform',
   description:
-    'Discover papers, summarize instantly, and plan projects with AI. All-in-one research platform for scholars.',
+    'Accelerate your research with AI. Discover papers, summarize instantly, plan projects, and collaborate seamlessly.',
   applicationName: 'ThesisFlow-AI',
   keywords: [
     'AI research platform',
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'ThesisFlow-AI — AI Research Platform',
     description:
-      'Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals.',
+      'Accelerate your research with AI. Discover papers, summarize instantly, plan projects, and collaborate seamlessly.',
     url: siteUrl + '/',
     siteName: 'ThesisFlow-AI',
     images: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'ThesisFlow-AI — AI Research Platform',
     description:
-      'Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals.',
+      'Accelerate your research with AI. Discover papers, summarize instantly, plan projects, and collaborate seamlessly.',
     images: [siteUrl + '/og-image-1200x630.png'],
     site: '@ThesisFlowAI',
     creator: '@ThesisFlowAI',

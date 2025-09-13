@@ -274,9 +274,9 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
           id: file.id,
           type: 'file' as const,
           name: file.name,
-          fileType: file.file_type,
-          fileSize: file.file_size?.toString(),
-          fileUrl: file.file_url,
+          fileType: file.mime_type,
+          fileSize: file.size?.toString(),
+          fileUrl: file.url,
         }))
         
         console.log('Team files loaded:', fileData.length, 'files')
