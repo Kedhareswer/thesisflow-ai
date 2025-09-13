@@ -435,6 +435,7 @@ export default function HomePage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl font-bold font-mono mb-4 text-foreground">Everything you need for research</h2>
+            <h4 className="text-lg font-semibold font-mono text-foreground mb-3">Complete Research Toolkit</h4>
             <p className="text-xl text-muted-foreground font-mono leading-relaxed">
               Comprehensive tools designed to streamline every aspect of your research workflow.
             </p>
@@ -476,6 +477,7 @@ export default function HomePage() {
                 <Clock className="w-6 h-6 text-[#FF6B2C]" />
               </div>
               <h3 className="text-xl font-bold font-mono text-foreground mb-3">Time Wasted</h3>
+              <h4 className="text-lg font-semibold font-mono text-foreground mb-2">Tool Switching</h4>
               <p className="text-muted-foreground font-mono leading-relaxed">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
             </motion.div>
             
@@ -490,6 +492,7 @@ export default function HomePage() {
                 <Target className="w-6 h-6 text-[#FF6B2C]" />
               </div>
               <h3 className="text-xl font-bold font-mono text-foreground mb-3">Lost Focus</h3>
+              <h4 className="text-lg font-semibold font-mono text-foreground mb-2">Context Switching</h4>
               <p className="text-muted-foreground font-mono leading-relaxed">Constant context switching breaks deep work and reduces research quality.</p>
             </motion.div>
             
@@ -504,6 +507,7 @@ export default function HomePage() {
                 <Users className="w-6 h-6 text-[#FF6B2C]" />
               </div>
               <h3 className="text-xl font-bold font-mono text-foreground mb-3">Team Chaos</h3>
+              <h4 className="text-lg font-semibold font-mono text-foreground mb-2">Communication Issues</h4>
               <p className="text-muted-foreground font-mono leading-relaxed">Fragmented communication and version control nightmares slow collaboration.</p>
             </motion.div>
           </div>
@@ -541,6 +545,7 @@ export default function HomePage() {
               <h2 className="text-4xl font-bold font-mono text-foreground max-w-xl text-center">
                 What our users say
               </h2>
+              <h4 className="text-lg font-semibold font-mono text-foreground mb-2">User Feedback</h4>
               <p className="text-xl leading-relaxed font-mono text-muted-foreground max-w-xl text-center">
                 See what our customers have to say about us.
               </p>
@@ -583,6 +588,7 @@ export default function HomePage() {
             className="text-center mb-12"
           >
             <h2 className="text-4xl font-bold font-mono text-foreground mb-4">Frequently Asked Questions</h2>
+            <h4 className="text-lg font-semibold font-mono text-foreground mb-2">Common Questions</h4>
             <p className="text-lg text-muted-foreground font-mono leading-relaxed">
               Answers to common questions about ThesisFlow-AI.
             </p>

@@ -3,9 +3,9 @@ import type { Metadata } from 'next'
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
 
 export const metadata: Metadata = {
-  title: 'ThesisFlow-AI — AI Research Platform for Discovery, Summarization, and Collaboration',
+  title: 'AI Research Platform — Discover & Collaborate | ThesisFlow-AI',
   description:
-    'Accelerate your research with ThesisFlow-AI. Discover papers, summarize instantly, plan projects, and collaborate with your team — all in one place.',
+    'Discover papers, summarize instantly, and plan projects with AI. All-in-one research platform for scholars.',
   applicationName: 'ThesisFlow-AI',
   keywords: [
     'AI research platform',
