@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # Build stage
 FROM node:20-slim AS builder
 
@@ -19,14 +20,16 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Note: Avoid global installs of pm2/concurrently/patch-package to reduce image size and surface area.
 # If patching is required during build, prefer adding patch-package to devDependencies or running via npx in scripts.
 
-# Copy only package manifest first for better caching
-COPY package.json pnpm-lock.yaml* .npmrc* ./
+# Copy only package manifest first for better caching (do not copy .npmrc)
+COPY package.json pnpm-lock.yaml* ./
 
 # Install dependencies (handle missing lockfile gracefully)
-RUN if [ -f pnpm-lock.yaml ]; then \
-      pnpm install --frozen-lockfile || pnpm install; \
+# Use BuildKit secret mount for .npmrc so credentials are not baked into layers.
+# Build with: docker build --secret id=npmrc,src=.npmrc .
+RUN --mount=type=secret,id=npmrc,target=/app/.npmrc if [ -f pnpm-lock.yaml ]; then \
+      pnpm install --frozen-lockfile --no-optional || pnpm install --no-optional; \
     else \
-      pnpm install; \
+      pnpm install --no-optional; \
     fi
 
 # Copy the rest of the application code
@@ -34,6 +37,8 @@ COPY . .
 
 # Build the app
 RUN pnpm run build
+## Prune devDependencies from node_modules so we can copy a production-only tree to the final image
+RUN pnpm prune --prod
 
 # Production image
 FROM node:20-slim AS runner
@@ -47,17 +52,12 @@ RUN groupadd -g 1001 nodejs \
 
 # No global pm2/concurrently/patch-package in runtime stage; start.sh manages processes with node/npm.
 
-# Enable corepack + pnpm for runtime scripts
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-
 # Copy manifest and lockfile, then install production-only deps
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml* ./
-RUN if [ -f pnpm-lock.yaml ]; then \
-      pnpm install --prod --frozen-lockfile || pnpm install --prod; \
-    else \
-      pnpm install --prod; \
-    fi
+
+# Copy production-only node_modules from builder (already pruned)
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built artifacts
 COPY --from=builder /app/.next ./.next
