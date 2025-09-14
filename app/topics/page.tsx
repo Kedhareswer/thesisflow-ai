@@ -570,7 +570,12 @@ Sources:\n${sourceLines}`
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && handleSearch(searchQuery)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    searchQuery.trim() && handleSearch(searchQuery)
+                  }
+                }}
                 placeholder="Search for topics across research papers."
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-700"
               />

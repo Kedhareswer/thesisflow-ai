@@ -7,12 +7,30 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT = 30; // 30 requests per hour
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 
+// Shared CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Credentials': 'true'
+};
+
 export async function POST(req: NextRequest) {
   try {
-    // Get IP for rate limiting
-    const ip = req.headers.get('x-forwarded-for') || 
-               req.headers.get('x-real-ip') || 
-               'unknown';
+    // Get IP for rate limiting - parse x-forwarded-for properly
+    let ip = 'unknown';
+    const forwardedFor = req.headers.get('x-forwarded-for');
+    const realIp = req.headers.get('x-real-ip');
+    
+    if (forwardedFor) {
+      // Split on commas, trim, and take first non-empty entry
+      const ips = forwardedFor.split(',').map(ip => ip.trim()).filter(ip => ip.length > 0);
+      if (ips.length > 0) {
+        ip = ips[0];
+      }
+    } else if (realIp) {
+      ip = realIp.trim();
+    }
 
     // Check rate limit
     const now = Date.now();
@@ -21,9 +39,16 @@ export async function POST(req: NextRequest) {
     if (userLimit) {
       if (now < userLimit.resetTime) {
         if (userLimit.count >= RATE_LIMIT) {
+          const retryAfterSeconds = Math.ceil((userLimit.resetTime - now) / 1000);
           return NextResponse.json(
             { error: 'Rate limit exceeded. Please try again later.' },
-            { status: 429 }
+            { 
+              status: 429,
+              headers: {
+                ...corsHeaders,
+                'Retry-After': retryAfterSeconds.toString()
+              }
+            }
           );
         }
         userLimit.count++;
@@ -43,14 +68,14 @@ export async function POST(req: NextRequest) {
     if (!text || typeof text !== 'string') {
       return NextResponse.json(
         { error: 'Invalid input. Text is required.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
     if (text.length > 50000) {
       return NextResponse.json(
         { error: 'Text too long. Maximum 50,000 characters allowed.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -105,11 +130,12 @@ export async function POST(req: NextRequest) {
         success: true,
         data: extractedData,
         formatted: formattedOutput
-      });
+      }, { headers: corsHeaders });
     } else {
       return new NextResponse(formattedOutput, {
         status: 200,
         headers: {
+          ...corsHeaders,
           'Content-Type': extractionOptions.format === 'csv' 
             ? 'text/csv' 
             : extractionOptions.format === 'markdown'
@@ -124,7 +150,7 @@ export async function POST(req: NextRequest) {
     console.error('Extraction error:', error);
     return NextResponse.json(
       { error: 'Failed to extract data. Please try again.' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -132,10 +158,6 @@ export async function POST(req: NextRequest) {
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
+    headers: corsHeaders
   });
 }

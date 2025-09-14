@@ -165,7 +165,8 @@
     "y-websocket": "latest",
     "yjs": "latest",
     "zod": "^3.25.76",
-    "zustand": "latest"
+    "zustand": "latest",
+    "isomorphic-dompurify": "latest"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

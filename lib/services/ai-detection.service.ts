@@ -59,7 +59,7 @@ export class AIDetectionService {
   /**
    * Detect if text is AI-generated using multiple heuristics
    */
-  async detectAI(text: string): Promise<AIDetectionResult> {
+  async detectAI(text: string, textType: 'scientific' | 'non-scientific' = 'scientific'): Promise<AIDetectionResult> {
     if (!this.isTextLongEnough(text)) {
       throw new Error('Text too short for meaningful analysis')
     }
@@ -69,7 +69,7 @@ export class AIDetectionService {
       const res = await fetch('/api/ai-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, type: textType })
       })
 
       if (!res.ok) {
@@ -82,7 +82,7 @@ export class AIDetectionService {
 
     // Server-side path: perform local heuristics and optional HF inference
     const chunks = this.splitTextIntoChunks(text)
-    const analysisResults = await this.analyzeChunks(chunks)
+    const analysisResults = await this.analyzeChunks(chunks, textType)
 
     // Configuration from environment
     const threshold = parseFloat(process.env.AI_DETECT_THRESHOLD || '0.5')
@@ -117,7 +117,7 @@ export class AIDetectionService {
       console.warn('HUGGINGFACE_API_KEY not set. Using heuristic-only detection.')
     }
 
-    return this.aggregateResults(analysisResults, text, modelPredictions, primaryModel, threshold)
+    return this.aggregateResults(analysisResults, text, modelPredictions, primaryModel, threshold, textType)
   }
 
   /**
@@ -140,8 +140,8 @@ export class AIDetectionService {
   /**
    * Analyze text chunks for AI patterns
    */
-  private async analyzeChunks(chunks: string[]): Promise<any[]> {
-    return chunks.map(chunk => this.analyzeChunk(chunk))
+  private async analyzeChunks(chunks: string[], textType: 'scientific' | 'non-scientific' = 'scientific'): Promise<any[]> {
+    return chunks.map(chunk => this.analyzeChunk(chunk, textType))
   }
 
   /**
@@ -280,35 +280,38 @@ export class AIDetectionService {
   /**
    * Analyze a single chunk for AI patterns
    */
-  private analyzeChunk(chunk: string): any {
+  private analyzeChunk(chunk: string, textType: 'scientific' | 'non-scientific' = 'scientific'): any {
     const sentences = this.extractSentences(chunk)
     const words = chunk.split(/\s+/)
     
     return {
-      perplexity: this.calculatePerplexity(chunk),
+      perplexity: this.calculatePerplexity(chunk, textType),
       burstiness: this.calculateBurstiness(sentences),
-      vocabulary: this.analyzeVocabulary(words),
+      vocabulary: this.analyzeVocabulary(words, textType),
       sentenceVariance: this.calculateSentenceVariance(sentences),
       repetition: this.calculateRepetition(words),
-      patternScore: this.detectAIPatterns(chunk)
+      patternScore: this.detectAIPatterns(chunk, textType)
     }
   }
 
   /**
    * Calculate perplexity (lower = more likely AI)
    */
-  private calculatePerplexity(text: string): number {
+  private calculatePerplexity(text: string, textType: 'scientific' | 'non-scientific' = 'scientific'): number {
     // Simulate perplexity calculation
     // Real implementation would use language model
     const words = text.split(/\s+/)
     const uniqueWords = new Set(words.map(w => w.toLowerCase()))
     const diversity = uniqueWords.size / words.length
     
-    // AI text tends to have moderate diversity (0.4-0.7)
-    if (diversity >= 0.4 && diversity <= 0.7) {
-      return 30 + Math.random() * 20 // Low perplexity (AI-like)
+    // Adjust thresholds based on text type
+    const diversityRange = textType === 'scientific' ? [0.3, 0.6] : [0.4, 0.7]
+    
+    // AI text tends to have moderate diversity within type-specific ranges
+    if (diversity >= diversityRange[0] && diversity <= diversityRange[1]) {
+      return textType === 'scientific' ? 25 + Math.random() * 15 : 30 + Math.random() * 20 // Lower perplexity for scientific AI
     }
-    return 70 + Math.random() * 30 // High perplexity (human-like)
+    return textType === 'scientific' ? 60 + Math.random() * 25 : 70 + Math.random() * 30 // Higher perplexity for human text
   }
 
   /**
@@ -330,15 +333,17 @@ export class AIDetectionService {
   /**
    * Analyze vocabulary complexity
    */
-  private analyzeVocabulary(words: string[]): number {
+  private analyzeVocabulary(words: string[], textType: 'scientific' | 'non-scientific' = 'scientific'): number {
     const uniqueWords = new Set(words.map(w => w.toLowerCase()))
     const avgWordLength = words.reduce((sum, w) => sum + w.length, 0) / words.length
     
-    // Complex vocabulary score (0-1)
+    // Complex vocabulary score (0-1) - adjust expectations for text type
     const diversity = uniqueWords.size / words.length
-    const lengthScore = Math.min(avgWordLength / 10, 1)
+    const lengthScore = Math.min(avgWordLength / (textType === 'scientific' ? 12 : 10), 1)
     
-    return (diversity + lengthScore) / 2
+    // Scientific text typically has higher vocabulary complexity
+    const typeWeight = textType === 'scientific' ? 1.2 : 1.0
+    return Math.min((diversity + lengthScore) / 2 * typeWeight, 1)
   }
 
   /**
@@ -377,12 +382,12 @@ export class AIDetectionService {
   /**
    * Detect common AI writing patterns
    */
-  private detectAIPatterns(text: string): number {
+  private detectAIPatterns(text: string, textType: 'scientific' | 'non-scientific' = 'scientific'): number {
     let score = 0
     const lowerText = text.toLowerCase()
     
-    // Common AI patterns
-    const aiPatterns = [
+    // Common AI patterns - different for scientific vs non-scientific text
+    const commonAIPatterns = [
       /\bhowever\b.*\bmoreover\b/,
       /\bfurthermore\b.*\badditionally\b/,
       /\bit['']s worth noting\b/,
@@ -393,10 +398,24 @@ export class AIDetectionService {
       /\bcomprehensive guide\b/,
       /\bseamlessly\b/,
       /\brobust solution\b/,
-      /\bleverage\b.*\bsynergy\b/,
-      /\bcutting-edge\b/,
-      /\bstate-of-the-art\b/
+      /\bleverage\b.*\bsynergy\b/
     ]
+    
+    const scientificAIPatterns = [
+      /\bcutting-edge\b/,
+      /\bstate-of-the-art\b/,
+      /\bnovel approach\b/,
+      /\bcomprehensive analysis\b/,
+      /\bsignificant implications\b/,
+      /\bfuture research\b.*\bdirections\b/,
+      /\bthis study demonstrates\b/,
+      /\bour findings suggest\b/,
+      /\bfurther investigation\b.*\brequired\b/
+    ]
+    
+    const aiPatterns = textType === 'scientific' 
+      ? [...commonAIPatterns, ...scientificAIPatterns]
+      : commonAIPatterns
     
     aiPatterns.forEach(pattern => {
       if (pattern.test(lowerText)) {
@@ -431,7 +450,8 @@ export class AIDetectionService {
     originalText: string, 
     modelPredictions: { model: string; probability: number; weight: number }[] = [],
     modelUsed: string = 'heuristics-only', 
-    threshold: number = 0.5
+    threshold: number = 0.5,
+    textType: 'scientific' | 'non-scientific' = 'scientific'
   ): AIDetectionResult {
     // Calculate weighted scores
     let totalPerplexity = 0
@@ -459,18 +479,21 @@ export class AIDetectionService {
     const avgPatterns = totalPatterns / count
     
     // Calculate heuristic AI probability based on multiple factors
+    // Adjust weights and thresholds based on text type
     let aiScore = 0
+    const perplexityThreshold = textType === 'scientific' ? 45 : 50
+    const vocabRange = textType === 'scientific' ? [0.4, 0.8] : [0.3, 0.7]
     
     // Low perplexity suggests AI (weight: 30%)
-    if (avgPerplexity < 50) {
+    if (avgPerplexity < perplexityThreshold) {
       aiScore += 0.3 * (1 - avgPerplexity / 100)
     }
     
     // Low burstiness suggests AI (weight: 25%)
     aiScore += 0.25 * (1 - avgBurstiness)
     
-    // Moderate vocabulary complexity suggests AI (weight: 15%)
-    if (avgVocabulary >= 0.3 && avgVocabulary <= 0.7) {
+    // Type-appropriate vocabulary complexity suggests AI (weight: 15%)
+    if (avgVocabulary >= vocabRange[0] && avgVocabulary <= vocabRange[1]) {
       aiScore += 0.15
     }
     
@@ -480,8 +503,9 @@ export class AIDetectionService {
     // High repetition suggests AI (weight: 10%)
     aiScore += 0.1 * avgRepetition
     
-    // Pattern detection (weight: 5%)
-    aiScore += 0.05 * avgPatterns
+    // Pattern detection with type-specific weight (weight: 5%)
+    const patternWeight = textType === 'scientific' ? 0.08 : 0.05
+    aiScore += patternWeight * avgPatterns
     
     // Calculate confidence based on text length and analysis depth
     const wordCount = this.getWordCount(originalText)

@@ -65,7 +65,10 @@ export default function AIDetectorPage() {
       const response = await fetch('/api/ai-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: inputText })
+        body: JSON.stringify({ 
+          text: inputText,
+          type: textType
+        })
       })
 
       if (!response.ok) {

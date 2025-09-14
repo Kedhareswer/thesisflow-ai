@@ -136,13 +136,44 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
     setTimeout(() => {
       const allCitations = [...papersToCitations(), ...manualCitations]
       const allPapers = [...getSelectedPapers(), ...manualCitations]
-      
-      // Use CSL engine for robust formatting
-      const formatted = cslEngine.formatCitations(allPapers, citationFormat)
-      setFormattedReferences(formatted)
-      
-      // Fallback to manual formatting if CSL fails
-      if (!formatted || formatted.trim().length === 0) {
+
+      let result = ""
+      try {
+        // Use CSL engine for robust formatting
+        const formatted = cslEngine.formatCitations(allPapers, citationFormat)
+        if (formatted && formatted.trim().length > 0) {
+          result = formatted
+        } else {
+          // Manual fallback formatting (empty or whitespace-only CSL result)
+          let fallbackFormatted = ""
+          if (citationFormat === "ieee") {
+            fallbackFormatted = allCitations
+              .map((citation, index) => {
+                const authors = citation.authors.join(", ")
+                return `[${index + 1}] ${authors}, "${citation.title}," ${citation.journal ? `in ${citation.journal}, ` : ""}${citation.volume ? `vol. ${citation.volume}, ` : ""}${citation.issue ? `no. ${citation.issue}, ` : ""}${citation.pages ? `pp. ${citation.pages}, ` : ""}${citation.year || ""}.${citation.doi ? ` doi: ${citation.doi}.` : ""}`
+              })
+              .join("\n\n")
+          } else if (citationFormat === "apa") {
+            fallbackFormatted = allCitations
+              .map((citation) => {
+                const lastAuthorIndex = citation.authors.length - 1
+                const authors =
+                  lastAuthorIndex > 0
+                    ? citation.authors.slice(0, lastAuthorIndex).join(", ") + ", & " + citation.authors[lastAuthorIndex]
+                    : citation.authors.join("")
+
+                return `${authors}. (${citation.year || "n.d."}). ${citation.title}. ${citation.journal || ""}${citation.volume ? `, ${citation.volume}` : ""}${citation.issue ? `(${citation.issue})` : ""}${citation.pages ? `, ${citation.pages}` : ""}.${citation.doi ? ` https://doi.org/${citation.doi}` : ""}`
+              })
+              .join("\n\n")
+          } else {
+            fallbackFormatted = allCitations
+              .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
+              .join("\n\n")
+          }
+          result = fallbackFormatted
+        }
+      } catch (error) {
+        // CSL threw an error; perform manual fallback
         let fallbackFormatted = ""
         if (citationFormat === "ieee") {
           fallbackFormatted = allCitations
@@ -168,11 +199,11 @@ export function CitationManager({ selectedTemplate, onTemplateChange, compact = 
             .map((citation) => `${citation.authors.join(", ")}. ${citation.title}. ${citation.year || "n.d."}.`)
             .join("\n\n")
         }
-        setFormattedReferences(fallbackFormatted)
-      } else {
-        setFormattedReferences(formatted)
+        result = fallbackFormatted
+      } finally {
+        setFormattedReferences(result)
+        setIsGenerating(false)
       }
-      setIsGenerating(false)
     }, 1000)
   }
 

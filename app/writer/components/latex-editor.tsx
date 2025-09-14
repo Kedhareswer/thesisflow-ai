@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
+import DOMPurify from 'isomorphic-dompurify'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
@@ -290,13 +291,23 @@ export function LaTeXEditor({
       html = html.replace(/\\end\{tabular\}/g, '</table>')
       html = html.replace(/\\hline\s*/g, '')
       
-      // Convert table rows and cells
-      html = html.replace(/([^\\]|^)&/g, '$1</td><td class="border border-gray-300 px-2 py-1">')
-      html = html.replace(/\\\\\s*/g, '</td></tr>\n<tr><td class="border border-gray-300 px-2 py-1">')
-      
-      // Wrap first row in proper table structure
-      html = html.replace(/(<table[^>]*>)\s*([^<\n]+)/g, '$1\n<tbody>\n<tr><td class="border border-gray-300 px-2 py-1 font-semibold bg-gray-50">$2')
-      html = html.replace(/(<\/table>)/g, '</td></tr>\n</tbody>\n$1')
+      // Transform only the content inside each <table>...</table> block to avoid corrupting non-table text
+      html = html.replace(/(<table[^>]*>)([\s\S]*?)(<\/table>)/g, (_m, open, inner, close) => {
+        // Remove any remaining \hline inside the table content
+        const cleaned = String(inner).replace(/\\hline\s*/g, '')
+        let transformed = cleaned.trim()
+
+        // Start tbody and header row/cell
+        transformed = '<tbody>\n<tr><td class="border border-gray-300 px-2 py-1 font-semibold bg-gray-50">' + transformed
+
+        // Convert cell separators (& not escaped) and row separators (\\)
+        transformed = transformed.replace(/([^\\]|^)&/g, '$1</td><td class="border border-gray-300 px-2 py-1">')
+        transformed = transformed.replace(/\\\\\s*/g, '</td></tr>\n<tr><td class="border border-gray-300 px-2 py-1">')
+
+        // Close last row and tbody
+        transformed += '</td></tr>\n</tbody>'
+        return open + transformed + close
+      })
       
       // Convert captions
       html = html.replace(/\\caption\{([^}]+)\}/g, '<div class="latex-caption text-center text-sm font-medium text-gray-700 mt-2 mb-4">$1</div>')
@@ -374,7 +385,7 @@ export function LaTeXEditor({
       // Close list items when another bibitem or end encountered (now looking for </ol> as end marker)
       html = html.replace(/\n(?=\\bibitem\{|<\/ol>)/g, '</li>\n')
       // Ensure last list item is closed before </ol>
-      html = html.replace(/(<li[^>]*>[^]*?)(<\/ol>)/g, (m, liPart, endTag) => liPart.endsWith('</li>') ? m : `${liPart}</li>${endTag}`)
+      html = html.replace(/(<li[^>]*>[\s\S]*?)(<\/ol>)/g, (m, liPart, endTag) => liPart.endsWith('</li>') ? m : `${liPart}</li>${endTag}`)
 
       // Equation environments
       html = html.replace(/\\begin\{equation\*?\}([\s\S]*?)\\end\{equation\*?\}/g, (match, math) => {
@@ -1031,7 +1042,7 @@ Cell 1 & Cell 2 & Cell 3 \\\\
                 ) : (
                   <div 
                     className="prose prose-lg max-w-none latex-preview"
-                    dangerouslySetInnerHTML={{ __html: compiledHTML || "<p><em>Start writing your LaTeX document...</em></p>" }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(compiledHTML || "<p><em>Start writing your LaTeX document...</em></p>") }}
                   />
                 )}
               </div>
@@ -1084,7 +1095,7 @@ Cell 1 & Cell 2 & Cell 3 \\\\
               ) : (
                 <div 
                   className="prose prose-lg max-w-none latex-preview"
-                  dangerouslySetInnerHTML={{ __html: compiledHTML || "<p><em>Start writing your LaTeX document...</em></p>" }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(compiledHTML || "<p><em>Start writing your LaTeX document...</em></p>") }}
                 />
               )}
             </div>

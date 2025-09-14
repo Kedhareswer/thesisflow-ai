@@ -661,7 +661,7 @@ export function AIWritingAssistant({
             <Input
               type="file"
               multiple
-              accept={FileProcessor.getSupportedTypes().join(",")}
+              accept={`${FileProcessor.getSupportedTypes().join(",")},.ppt,.pptx`}
               onChange={(e) => {
                 const files = e.target.files
                 if (!files) return
@@ -801,7 +801,8 @@ export function AIWritingAssistant({
             <Input
               type="file"
               multiple
-              accept={FileProcessor.getSupportedTypes().join(",")}
+              // Mirror main uploader's PPT filter: include extensions and MIME types
+              accept={`${FileProcessor.getSupportedTypes().join(",")},.ppt,.pptx`}
               onChange={(e) => {
                 const files = e.target.files
                 if (!files) return

@@ -111,7 +111,8 @@ export async function GET(request: NextRequest) {
           is_public: file.is_public,
           download_count: file.download_count,
           version: file.version,
-          team_id: teamId
+          team_id: teamId,
+          source: 'files'
         }
       }) || []
 
@@ -169,14 +170,15 @@ export async function GET(request: NextRequest) {
           is_public: file.is_public,
           download_count: 0,
           version: null,
-          team_id: file.team_id
+          team_id: file.team_id,
+          source: 'documents'
         }
       }) || []
 
-      // Merge and deduplicate. Prefer URL as key; fall back to id if URL is missing
+      // Merge and deduplicate. Prefer URL as key; fall back to source-namespaced id
       const allFilesMap = new Map<string, any>()
       for (const f of [...formattedFiles, ...formattedDocFiles]) {
-        const key = f.url || f.id
+        const key = f.url ? `url:${f.url}` : `source:${f.source || 'files'}:id:${f.id}`
         if (key && !allFilesMap.has(key)) allFilesMap.set(key, f)
       }
       allFiles = [...allFilesMap.values()]

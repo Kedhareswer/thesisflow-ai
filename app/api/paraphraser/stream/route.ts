@@ -105,7 +105,17 @@ export async function GET(request: NextRequest) {
             userId: user.id,
             onToken: (token) => send({ type: "token", token }),
             onProgress: (p) => send({ type: "progress", ...p }),
-            onError: (err) => send({ type: "error", error: err }),
+            onError: (err) => {
+              const errorPayload = err && typeof err === 'object'
+                ? {
+                    name: (err as any)?.name || 'Error',
+                    message: (err as any)?.message || String(err),
+                    stack: (err as any)?.stack || undefined,
+                  }
+                : { message: String(err) }
+
+              send({ type: "error", error: errorPayload })
+            },
             abortSignal: abortController.signal,
           })
           send({ type: "done" })

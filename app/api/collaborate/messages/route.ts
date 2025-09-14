@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       id: msg.id,
       content: msg.content,
       // Normalize AI messages to ai_response for consistent UI
-      type: (msg.message_type === 'text' && typeof msg.content === 'string' && msg.content.includes('🤖 **nova Response:**'))
+      type: (msg.message_type === 'text' && typeof msg.content === 'string' && msg.content.toLowerCase().includes('nova response'))
         ? 'ai_response'
         : msg.message_type,
       timestamp: msg.created_at,
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
       id: message.id,
       content: message.content,
       // Normalize AI messages to ai_response for consistent UI
-      type: (message.message_type === 'text' && typeof message.content === 'string' && message.content.includes('🤖 **Nova Response:**'))
+      type: (message.message_type === 'text' && typeof message.content === 'string' && message.content.toLowerCase().includes('nova response'))
         ? 'ai_response'
         : message.message_type,
       timestamp: message.created_at,

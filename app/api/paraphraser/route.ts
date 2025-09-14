@@ -32,11 +32,11 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting
     if (!checkRateLimit(ip)) {
-      const resetSec = Math.ceil((rateLimit.get(ip)?.resetTime || Date.now()) - Date.now()) / 1000;
+      const resetSec = Math.ceil(((rateLimit.get(ip)?.resetTime || Date.now()) - Date.now()) / 1000);
       return new NextResponse(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
         status: 429,
         headers: {
-          'Retry-After': Math.max(1, Math.floor(resetSec)).toString(),
+          'Retry-After': Math.max(1, resetSec).toString(),
           'Content-Type': 'application/json',
         },
       });

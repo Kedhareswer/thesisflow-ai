@@ -11,6 +11,11 @@ const supabase = createClient(
 // Initialize literature search service
 const literatureSearch = new LiteratureSearchService(supabase);
 
+// Maximum allowed aggregation window to prevent integer overflow and overly heavy queries.
+// Clamp user-provided values to this range; if out-of-range or invalid, fall back to 0.
+// Currently set to 24 hours in milliseconds.
+const MAX_AGGREGATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 interface RateLimitResult {
   allowed: boolean;
   current_count: number;
@@ -25,7 +30,18 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('query');
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
     const aggregateWindowMsRaw = searchParams.get('aggregateWindowMs');
-    const aggregateWindowMs = aggregateWindowMsRaw ? Math.max(0, parseInt(aggregateWindowMsRaw)) : 0;
+    let aggregateWindowMs = 0;
+    if (aggregateWindowMsRaw !== null) {
+      const rawNum = Number(aggregateWindowMsRaw);
+      if (Number.isFinite(rawNum)) {
+        const intVal = Math.trunc(rawNum);
+        const clamped = Math.min(MAX_AGGREGATE_WINDOW_MS, Math.max(0, intVal));
+        // If original value was outside the allowed range, fall back to 0 per policy
+        aggregateWindowMs = intVal === clamped ? clamped : 0;
+      } else {
+        aggregateWindowMs = 0;
+      }
+    }
     const userId = searchParams.get('userId'); // Optional for authenticated requests
     const mode = (searchParams.get('mode') || '').toLowerCase(); // forward | backward
     const seed = searchParams.get('seed') || '';
@@ -178,7 +194,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { query, limit = 10, userId, mode: rawMode, seed = '', aggregateWindowMs: bodyAggregateWindowMs } = body;
-    const aggregateWindowMs = bodyAggregateWindowMs ? Math.max(0, parseInt(String(bodyAggregateWindowMs))) : 0;
+    let aggregateWindowMs = 0;
+    if (bodyAggregateWindowMs !== undefined && bodyAggregateWindowMs !== null) {
+      const rawNum = Number(bodyAggregateWindowMs);
+      if (Number.isFinite(rawNum)) {
+        const intVal = Math.trunc(rawNum);
+        const clamped = Math.min(MAX_AGGREGATE_WINDOW_MS, Math.max(0, intVal));
+        aggregateWindowMs = intVal === clamped ? clamped : 0;
+      } else {
+        aggregateWindowMs = 0;
+      }
+    }
     const mode: string = (rawMode || '').toLowerCase();
     const isCitationMode = mode === 'forward' || mode === 'backward';
 

@@ -182,7 +182,7 @@ export default function ExtractPage() {
     } catch (e) {
       toast({ title: 'Clear failed', description: 'Unexpected error', variant: 'destructive' })
     }
-  }, [toast])
+  }, [toast, ocrEnabled])
 
   const exportTablesAsCSV = useCallback((tables: Array<{ headers: string[]; rows: string[][] }>) => {
     if (!tables || tables.length === 0) return
@@ -229,7 +229,8 @@ export default function ExtractPage() {
       try {
         const fd = new FormData()
         fd.append('file', file)
-        fd.append('enableOCR', 'false')
+        // Use current OCR toggle value rather than hardcoded false
+        fd.append('enableOCR', String(ocrEnabled))
         const res = await fetch('/api/extract-file', { method: 'POST', body: fd })
         const ct = res.headers.get('content-type') || ''
         const data = ct.includes('application/json') ? await res.json() : { text: '' }
@@ -291,7 +292,7 @@ export default function ExtractPage() {
       }
       simulateUpload(accepted)
     }
-  }, [toast])
+  }, [toast, ocrEnabled])
 
   const performExtraction = useCallback(async (file: File) => {
     setIsExtracting(true)
@@ -446,8 +447,23 @@ export default function ExtractPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: messageText, context })
       })
-      const data = await res.json()
-      const replyText = res.ok ? (data.response as string) : (data.error || 'Failed to get response')
+      // Robustly parse response: prefer JSON when available, otherwise fallback to text
+      const ct = res.headers.get('content-type') || ''
+      let replyText: string = ''
+      if (ct.includes('application/json')) {
+        try {
+          const data: any = await res.json()
+          replyText = res.ok
+            ? (typeof data?.response === 'string' ? data.response : (typeof data === 'string' ? data : ''))
+            : (typeof data?.error === 'string' ? data.error : (typeof data === 'string' ? data : 'Failed to get response'))
+        } catch {
+          const text = await res.text().catch(() => '')
+          replyText = text || (res.ok ? 'OK' : 'Failed to get response')
+        }
+      } else {
+        const text = await res.text().catch(() => '')
+        replyText = text || (res.ok ? 'OK' : 'Failed to get response')
+      }
 
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -724,9 +740,11 @@ export default function ExtractPage() {
     URL.revokeObjectURL(url)
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Trigger send on Enter (but allow Shift+Enter for new line)
+    if ((e.key === 'Enter' || (e as any).code === 'Enter') && !e.shiftKey) {
       e.preventDefault()
+      if (typeof e.stopPropagation === 'function') e.stopPropagation()
       sendMessage()
     }
   }
@@ -734,9 +752,29 @@ export default function ExtractPage() {
   const fetchSupportedExtensions = async () => {
     try {
       const response = await fetch('/api/extract')
-      const data = await response.json()
-      if (data.success && data.supportedExtensions) {
+      const ct = response.headers.get('content-type') || ''
+      let data: any = null
+      let textBody = ''
+
+      if (ct.includes('application/json')) {
+        try {
+          data = await response.json()
+        } catch (e) {
+          try { textBody = await response.text() } catch {}
+        }
+      } else {
+        try { textBody = await response.text() } catch {}
+      }
+
+      if (response.ok && data && data.success && Array.isArray(data.supportedExtensions)) {
         setSupportedExtensions(data.supportedExtensions)
+      } else {
+        // Gracefully handle non-OK or unparsable responses
+        if (!response.ok) {
+          console.warn('fetchSupportedExtensions: non-OK response', { status: response.status })
+        } else if (!data) {
+          console.warn('fetchSupportedExtensions: failed to parse response body')
+        }
       }
     } catch (error) {
       console.error('Failed to fetch supported extensions:', error)
@@ -1202,7 +1240,7 @@ export default function ExtractPage() {
                       ref={chatInputRef}
                       value={currentMessage}
                       onChange={(e) => setCurrentMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                      onKeyDown={handleKeyDown}
                       placeholder="Ask any question..."
                       className="min-h-[40px] flex-1 resize-none rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                       rows={1}
@@ -1378,7 +1416,17 @@ export default function ExtractPage() {
                           key={r.id}
                           className="relative rounded-md border border-gray-200 bg-white p-3 hover:bg-gray-50"
                           role="button"
+                          tabIndex={0}
                           onClick={() => openExtraction(r.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || (e as any).code === 'Enter') {
+                              e.preventDefault()
+                              openExtraction(r.id)
+                            } else if (e.key === ' ' || (e as any).code === 'Space') {
+                              e.preventDefault()
+                              openExtraction(r.id)
+                            }
+                          }}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2">

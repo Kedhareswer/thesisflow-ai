@@ -20,6 +20,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    // Enforce max upload size (10MB) before further processing
+    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+    if (typeof file.size === 'number' && file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum allowed size is 10MB.' },
+        { status: 413 }
+      );
+    }
+
     // Check if file type is supported
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (!extension || !simpleExtractor.getSupportedExtensions().includes(extension)) {
