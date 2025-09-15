@@ -9,18 +9,14 @@ const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim
 // Enhanced validation and error handling
 const validateSupabaseConfig = () => {
   if (!SUPABASE_URL || SUPABASE_URL === '') {
-    const error = 'NEXT_PUBLIC_SUPABASE_URL is missing or invalid';
-    console.error(error);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       console.warn('⚠️ Supabase client running in fallback mode. Database features will not work.');
     }
     return false;
   }
   
   if (!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY === '') {
-    const error = 'NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or invalid';
-    console.error(error);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       console.warn('⚠️ Supabase client running in fallback mode. Database features will not work.');
     }
     return false;
@@ -30,7 +26,9 @@ const validateSupabaseConfig = () => {
   try {
     new URL(SUPABASE_URL);
   } catch {
-    console.error('Invalid Supabase URL format');
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Invalid Supabase configuration');
+    }
     return false;
   }
 
@@ -46,10 +44,6 @@ try {
     throw new Error('Supabase environment variables missing or invalid');
   }
 
-  // Log success for debugging (hide sensitive data)
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('✅ Supabase client initialized with URL:', SUPABASE_URL.split('.')[0] + '.supabase.co');
-  }
   
   supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
@@ -102,9 +96,11 @@ export const supabaseUtils = {
     }
   },
 
-  // Enhanced error logging
+  // Enhanced error logging (production-safe)
   logError(context: string, error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`Supabase error in ${context}:`, errorMessage);
+    if (process.env.NODE_ENV === 'development') {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Supabase error in ${context}:`, errorMessage);
+    }
   }
 };
