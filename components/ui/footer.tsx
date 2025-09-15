@@ -91,7 +91,7 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
             width: '125%' // Make text 25% wider to ensure it spans full width when shifted
           }}
         >
-          <span className="block leading-none text-[clamp(48px,8vw,120px)]">@thesisflow</span>
+          <span className="block leading-none text-[clamp(120px,20vw,300px)]">@thesisflow</span>
         </div>
       </div>
     </footer>
