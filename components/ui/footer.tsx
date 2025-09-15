@@ -81,19 +81,17 @@ export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
         </div>
       </div>
 
-      {/* Giant faint watermark - spans full width with 4/5 visible, 1/5 hidden */}
-      <div className="pointer-events-none select-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute inset-0 flex items-center">
-          <div
-            className="whitespace-nowrap font-extrabold uppercase tracking-wider transform -translate-x-[10%]"
-            style={{
-              fontSize: 'clamp(120px, 20vw, 300px)',
-              color: 'rgba(255, 130, 100, 0.1)',
-              lineHeight: '1'
-            }}
-          >
-            @THESISFLOW
-          </div>
+      {/* Watermark wordmark (4/5 visible, 1/5 hidden) */}
+      <div className="pointer-events-none select-none absolute inset-x-0 bottom-8 z-0 overflow-hidden">
+        <div
+          className="text-transparent uppercase tracking-tight leading-none whitespace-nowrap font-extrabold"
+          style={{ 
+            WebkitTextStroke: '1.25px rgba(255,107,44,0.28)',
+            transform: 'translateX(-10%)', // Hide 1/5 (20%) by shifting left 10%
+            width: '125%' // Make text 25% wider to ensure it spans full width when shifted
+          }}
+        >
+          <span className="block leading-none text-[clamp(120px,20vw,300px)]">@thesisflow</span>
         </div>
       </div>
     </footer>
