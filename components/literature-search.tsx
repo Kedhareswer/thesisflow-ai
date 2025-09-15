@@ -16,6 +16,7 @@ interface LiteratureSearchProps {
   onPaperSelect?: (paper: Paper) => void;
   defaultQuery?: string;
   maxResults?: number;
+  sessionId?: string;
 }
 
 export function LiteratureSearch({
@@ -23,7 +24,8 @@ export function LiteratureSearch({
   className = '',
   onPaperSelect,
   defaultQuery = '',
-  maxResults = 10
+  maxResults = 10,
+  sessionId
 }: LiteratureSearchProps) {
   const [query, setQuery] = useState(defaultQuery);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
@@ -41,10 +43,16 @@ export function LiteratureSearch({
     searchWithDebounce,
     clearResults,
     retry,
-    isRateLimited
+    isRateLimited,
+    aggregateWindowMs
   } = useLiteratureSearch({
     defaultLimit: maxResults,
-    debounceMs: 800,
+    debounceMs: 1200,
+    aggregateWindowMs: 120000, // 2 minutes
+    ignoreWhileAggregating: true,
+    sessionId,
+    autoPreloadSession: true,
+    userIdForSession: userId,
     onSuccess: (result) => {
       console.log(`Literature search completed in ${result.searchTime}ms from ${result.source}`);
     },
@@ -88,6 +96,8 @@ export function LiteratureSearch({
       arxiv: { label: 'arXiv', color: 'bg-green-100 text-green-800' },
       crossref: { label: 'CrossRef', color: 'bg-purple-100 text-purple-800' },
       combined: { label: 'Multiple', color: 'bg-orange-100 text-orange-800' },
+      aggregate: { label: 'Multiple Sources', color: 'bg-orange-100 text-orange-800' },
+      'openalex-fast': { label: 'OpenAlex Fast', color: 'bg-blue-100 text-blue-800' },
       'openalex-fallback': { label: 'OpenAlex', color: 'bg-blue-100 text-blue-800' },
       'arxiv-fallback': { label: 'arXiv', color: 'bg-green-100 text-green-800' }
     };
@@ -164,6 +174,14 @@ export function LiteratureSearch({
             </Button>
           </div>
 
+          {/* Aggregation hint */}
+          {isLoading && aggregateWindowMs > 0 && (
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Aggregating results from multiple sources (up to {Math.round(aggregateWindowMs / 60000)} min)...
+            </div>
+          )}
+
           {/* Search Stats */}
           {(results.length > 0 || searchTime > 0) && (
             <div className="flex items-center justify-between text-sm text-gray-600">
@@ -208,7 +226,7 @@ export function LiteratureSearch({
         <Alert variant="destructive">
           <AlertDescription className="flex items-center justify-between">
             <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={retry}>
+            <Button variant="outline" size="sm" onClick={retry} disabled={isRateLimited}>
               Retry
             </Button>
           </AlertDescription>
@@ -327,7 +345,7 @@ export function LiteratureSearch({
             <p className="text-gray-600 mb-4">
               Try adjusting your search terms or using different keywords.
             </p>
-            <Button variant="outline" onClick={retry}>
+            <Button variant="outline" onClick={retry} disabled={isRateLimited}>
               Try Again
             </Button>
           </CardContent>

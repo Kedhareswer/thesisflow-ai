@@ -445,7 +445,14 @@ export default function NotificationBell() {
             )}
           </Button>
         }
-        className="w-80 right-0"
+        className="w-80"
+        side="right"
+        align="end"
+        sideOffset={8}
+        alignOffset={0}
+        openOnHover
+        hoverOpenDelay={75}
+        hoverCloseDelay={150}
       >
           <DropdownMenuLabel className="flex items-center justify-between">
             <span>Notifications</span>
@@ -547,28 +554,25 @@ export default function NotificationBell() {
                 // Special handling for team invitations
                 if (notification.type === 'team_invitation' && notification.data) {
                   const invitation = {
-                    id: notification.data.invitation_id,
-                    team: {
-                      id: notification.data.team_id,
-                      name: notification.data.team_name,
-                      description: notification.data.team_description
-                    },
-                    inviter: {
-                      id: notification.data.inviter_id || '',
-                      full_name: notification.data.inviter_name,
-                      avatar_url: notification.data.inviter_avatar_url
-                    },
-                    role: notification.data.role,
-                    personal_message: notification.data.personal_message,
-                    created_at: notification.created_at
+                    id: notification.data.invitation_id || notification.id,
+                    team_name: notification.data.team_name,
+                    role: notification.data.role || 'viewer',
+                    status: notification.data.status || 'pending',
+                    created_at: notification.created_at,
+                    inviter_name: notification.data.inviter_name,
+                    inviter_email: notification.data.inviter_email,
+                    inviter_avatar: notification.data.inviter_avatar_url,
+                    invitee_name: notification.data.invitee_name,
+                    invitee_email: notification.data.invitee_email,
+                    invitee_avatar: notification.data.invitee_avatar_url,
                   };
 
                   return (
                     <div key={notification.id} className="p-3">
                       <TeamInvitation
                         invitation={invitation}
-                        onAccept={(invitationId) => handleInvitationResponse(invitationId, 'accept')}
-                        onDecline={(invitationId) => handleInvitationResponse(invitationId, 'reject')}
+                        onAccept={(invitationId: string) => handleInvitationResponse(invitationId, 'accept')}
+                        onReject={(invitationId: string) => handleInvitationResponse(invitationId, 'reject')}
                         className="w-full"
                       />
                     </div>
@@ -579,7 +583,7 @@ export default function NotificationBell() {
                 return (
                   <DropdownMenuItem
                     key={notification.id}
-                    className={`p-0 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
+                    className={`group p-0 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="w-full p-3 flex items-start gap-3">

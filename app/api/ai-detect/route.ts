@@ -3,7 +3,7 @@ import { aiDetectionService, AIDetectionServiceError } from "@/lib/services/ai-d
 
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json()
+    const { text, type } = await req.json()
 
     // Validate input
     if (!text || typeof text !== "string") {
@@ -12,6 +12,9 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
+
+    // Validate type parameter (optional)
+    const textType = type && (type === 'scientific' || type === 'non-scientific') ? type : 'scientific'
 
     // Check minimum text length
     if (!aiDetectionService.isTextLongEnough(text)) {
@@ -46,7 +49,7 @@ export async function POST(req: Request) {
 
     try {
       const result = await Promise.race([
-        aiDetectionService.detectAI(text),
+        aiDetectionService.detectAI(text, textType),
         new Promise((_, reject) => {
           controller.signal.addEventListener('abort', () => {
             reject(new AIDetectionServiceError('Detection timeout', 408))

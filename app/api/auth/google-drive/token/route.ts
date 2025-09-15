@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseAdmin, getAuthUser } from '@/lib/auth-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,17 +9,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authorization code is required' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      console.error('[Google Drive OAuth] User not authenticated:', userError)
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
+    const user = await getAuthUser(request, 'google-drive-token')
+    if (!user) return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
 
     // Direct token exchange with Google (bypass provider class for now)
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -56,7 +47,9 @@ export async function POST(request: NextRequest) {
     const googleUser = await userInfoResponse.json()
 
     // Store or update the provider tokens in database
-    const { error: upsertError } = await supabase
+    const supabaseAdmin = createSupabaseAdmin()
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    const { error: upsertError } = await supabaseAdmin
       .from('user_storage_providers')
       .upsert({
         user_id: user.id,

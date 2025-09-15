@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Send, Users, Minimize2 } from "lucide-react"
@@ -10,6 +9,7 @@ import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from "@/hooks/use-toast"
 import { useSocket, SocketEvent } from '@/lib/services/socket.service'
 import { MentionInput, MentionData, MessageWithMentions } from '@/components/ui/mention-input'
+import { Response } from '@/src/components/ai-elements/response'
 
 interface User {
   id: string
@@ -65,6 +65,40 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
   
+  // Build a catalog of mentionable entities (AI, members, files)
+  const allMentionables = useMemo<MentionData[]>(() => {
+    const ai: MentionData = {
+      id: 'nova-ai',
+      name: 'Nova',
+      avatar: '/anthropic-icon.png',
+      type: 'ai',
+    }
+    const members: MentionData[] = (team?.members || []).map((member) => ({
+      id: member.id,
+      type: 'user' as const,
+      name: member.name,
+      email: member.email,
+      avatar: member.avatar,
+    }))
+    return [ai, ...members, ...(teamFiles || [])]
+  }, [team?.members, teamFiles])
+
+  // Helper to resolve mention references coming from server (ids or full objects)
+  const resolveMentionRefs = useCallback((raw: any): MentionData[] => {
+    if (!raw) return []
+    if (Array.isArray(raw) && raw.length > 0) {
+      if (typeof raw[0] === 'object' && 'id' in raw[0]) {
+        // Already full objects
+        return raw as MentionData[]
+      }
+      // Assume array of ids
+      return (raw as string[])
+        .map((id) => allMentionables.find((m) => m.id === id))
+        .filter(Boolean) as MentionData[]
+    }
+    return []
+  }, [allMentionables])
+  
   // API helper function
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {
@@ -80,45 +114,150 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       const error = await response.json().catch(() => ({ error: 'Network error' }))
       throw new Error(error.error || `HTTP ${response.status}`)
     }
-
     return response.json()
   }, [])
   
-  // Load chat messages
-  const loadMessages = useCallback(async () => {
-    if (!team?.id) return
+  // Format message date label for grouping
+  const formatDate = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp)
+      const now = new Date()
+      const isToday = date.toDateString() === now.toDateString()
+      const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString()
+      
+      if (isToday) return 'Today'
+      if (isYesterday) return 'Yesterday'
+      return date.toLocaleDateString()
+    } catch {
+      return 'Invalid date'
+    }
+  }
+
+  // Group messages by date
+  const groupMessagesByDate = (messages: ChatMessage[]) => {
+    const groupedMessages: Record<string, ChatMessage[]> = {}
+    messages.forEach((message) => {
+      const date = formatDate(message.timestamp)
+      if (!groupedMessages[date]) {
+        groupedMessages[date] = []
+      }
+      groupedMessages[date].push(message)
+    })
+    return groupedMessages
+  }
+
+  // Determine if a message is from Nova Assistant
+  const isAIMessage = (message: ChatMessage) => {
+    const name = (message.senderName || '').toLowerCase()
+    const id = (message.senderId || '').toLowerCase()
+    // Heuristics: explicit type, known id, or recognizable name
+    return (
+      (message as any).type === 'ai' ||
+      id === 'nova-ai' || id === 'nova_ui' || id === 'assistant' ||
+      name.includes('Nova') || name.includes('Nova assistant') || name === 'assistant' || name.includes('nova')
+    )
+  }
+
+  // Normalize AI output to fix common markdown formatting issues
+  const normalizeAIOutput = (text: string): string => {
+    if (!text) return text
     
+    let normalized = text
+    
+    // Fix inline pipe tables - detect lines with multiple pipes and convert to proper table format
+    const tableLineRegex = /^(.+\|.+\|.+)$/gm
+    const tableMatches = normalized.match(tableLineRegex)
+    
+    if (tableMatches && tableMatches.length >= 2) {
+      // This looks like an inline table, let's normalize it
+      const tableLines = tableMatches.map(line => line.trim())
+      
+      // Check if we need to add a separator row after the first line (header)
+      if (tableLines.length >= 1) {
+        const firstLine = tableLines[0]
+        const columnCount = (firstLine.match(/\|/g) || []).length + 1
+        
+        // Create separator row if it doesn't exist
+        const secondLine = tableLines[1] || ''
+        const isSeparatorRow = /^\s*\|\s*[-:]+\s*\|/.test(secondLine)
+        
+        if (!isSeparatorRow && columnCount >= 2) {
+          // Insert a proper separator row
+          const separator = '| ' + Array(columnCount - 1).fill('---').join(' | ') + ' |'
+          tableLines.splice(1, 0, separator)
+        }
+        
+        // Replace the original inline table with properly formatted one
+        let tableText = tableLines.join('\n')
+        
+        // Replace the original table matches in the text
+        tableMatches.forEach((match, index) => {
+          if (index === 0) {
+            // Replace first match with the entire normalized table
+            normalized = normalized.replace(match, '\n\n' + tableText + '\n\n')
+          } else {
+            // Remove other matches as they're now part of the table
+            normalized = normalized.replace(match, '')
+          }
+        })
+      }
+    }
+    
+    // Fix bullet points - convert various bullet formats to proper markdown
+    normalized = normalized.replace(/^\s*[•·▪▫‣⁃]\s+/gm, '- ')
+    normalized = normalized.replace(/^\s*[*]\s+(?![*])/gm, '- ') // Convert * bullets to - but preserve **bold**
+    
+    // Fix numbered lists - ensure proper spacing
+    normalized = normalized.replace(/^\s*(\d+)[.):]\s*/gm, '$1. ')
+    
+    // Ensure code blocks have proper spacing
+    normalized = normalized.replace(/```(\w+)?\n/g, '\n```$1\n')
+    normalized = normalized.replace(/\n```$/gm, '\n```\n')
+    
+    // Clean up excessive whitespace but preserve intentional formatting
+    normalized = normalized.replace(/\n{4,}/g, '\n\n\n') // Max 3 newlines
+    normalized = normalized.trim()
+    
+    return normalized
+  }
+
+  // Load chat messages via socket
+  const loadMessages = useCallback(async () => {
+    if (!team?.id || !socket) return
     try {
       setIsLoading(true)
-      
-      const data = await apiCall(`/api/collaborate/messages?teamId=${team.id}&limit=50`)
-      
-      if (data.success) {
-        const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
-          id: msg.id,
-          senderId: msg.sender_id,
-          senderName: msg.sender?.full_name || 'Unknown User',
-          senderAvatar: msg.sender?.avatar_url,
-          content: msg.content,
-          timestamp: msg.created_at,
-          teamId: msg.team_id,
-          type: msg.message_type || "text",
-          mentions: msg.mentions ? JSON.parse(msg.mentions) : [],
-        }))
-        
-        setMessages(formattedMessages)
-      }
+      await new Promise<void>((resolve) => {
+        const handler = (payload: any) => {
+          if (!payload || payload.teamId !== team.id) return
+          const formattedMessages: ChatMessage[] = (payload.messages || []).map((msg: any) => ({
+            id: msg.id,
+            senderId: msg.senderId,
+            senderName: msg.senderName || 'Unknown User',
+            senderAvatar: msg.senderAvatar,
+            content: msg.content,
+            timestamp: msg.timestamp,
+            teamId: msg.teamId,
+            type: msg.type || 'text',
+            mentions: resolveMentionRefs(msg.mentions),
+          }))
+          setMessages(formattedMessages)
+          socket.off('messages', handler)
+          resolve()
+        }
+        socket.on('messages', handler)
+        socket.emit('get_messages', { teamId: team.id, limit: 50 })
+      })
     } catch (error) {
-      console.error('Error loading messages:', error)
+      console.error('Error loading messages (socket):', error)
       toast({
-        title: "Error",
-        description: "Failed to load chat messages",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load chat messages',
+        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)
     }
-  }, [team?.id, apiCall, toast])
+  }, [team?.id, socket, toast])
   
   // Load team files for mentions
   const loadTeamFiles = useCallback(async () => {
@@ -135,9 +274,9 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
           id: file.id,
           type: 'file' as const,
           name: file.name,
-          fileType: file.file_type,
-          fileSize: file.file_size?.toString(),
-          fileUrl: file.file_url,
+          fileType: file.mime_type,
+          fileSize: file.size?.toString(),
+          fileUrl: file.url,
         }))
         
         console.log('Team files loaded:', fileData.length, 'files')
@@ -159,23 +298,54 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       loadTeamFiles()
     }
   }, [team?.id, loadMessages, loadTeamFiles])
+
+  // Backfill mentions for already-loaded messages once mentionables (files/members) are ready
+  useEffect(() => {
+    if (!messages.length || !allMentionables.length) return
+    const findMentionsInText = (text: string): MentionData[] => {
+      const found: MentionData[] = []
+      // Sort by longer names first to avoid partial overlaps
+      const sorted = [...allMentionables].sort((a, b) => b.name.length - a.name.length)
+      for (const m of sorted) {
+        const re = new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s,.:;!?()\\[\\]{}<>])`, 'i')
+        if (re.test(text)) {
+          found.push(m)
+        }
+      }
+      return found
+    }
+    setMessages(prev => prev.map(msg => {
+      if (msg.mentions && msg.mentions.length > 0) return msg
+      const inferred = findMentionsInText(msg.content || '')
+      if (inferred.length === 0) return msg
+      return { ...msg, mentions: inferred }
+    }))
+  }, [allMentionables, messages.length])
   
   // Socket event handlers
   useEffect(() => {
     if (!socket || !team?.id) return
 
     const handleNewMessage = (data: any) => {
-      if (data.teamId === team.id) {
+      // Handle both server format (from database) and client format
+      const teamId = data.teamId || data.team_id
+      const senderId = data.senderId || data.sender_id
+      const senderName = data.senderName || data.sender?.full_name || 'Unknown User'
+      const senderAvatar = data.senderAvatar || data.sender?.avatar_url
+      const timestamp = data.timestamp || data.created_at
+      const messageType = data.type || data.message_type || 'text'
+      
+      if (teamId === team.id) {
         const newMessage: ChatMessage = {
           id: data.id,
-          senderId: data.senderId,
-          senderName: data.senderName,
-          senderAvatar: data.senderAvatar,
+          senderId,
+          senderName,
+          senderAvatar,
           content: data.content,
-          timestamp: data.timestamp,
-          teamId: data.teamId,
-          type: data.type || "text",
-          mentions: data.mentions || [],
+          timestamp,
+          teamId,
+          type: messageType,
+          mentions: resolveMentionRefs(data.mentions),
         }
         setMessages(prev => [...prev, newMessage])
         
@@ -205,29 +375,26 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       }
     }
 
-    const handleMemberUpdate = () => {
-      // Refresh messages to get latest member info
-      loadMessages()
-    }
+    const handleMemberUpdate = () => {}
 
     // Join team room
-    socket.emit(SocketEvent.JOIN_TEAM, { teamId: team.id, userId: user?.id })
+    socket.emit('join_team', { teamId: team.id })
 
-    // Subscribe to events
-    socket.on(SocketEvent.NEW_MESSAGE, handleNewMessage)
-    socket.on(SocketEvent.TYPING, handleTyping)
-    socket.on('member-joined', handleMemberUpdate)
-    socket.on('member-left', handleMemberUpdate)
+    // Subscribe to events - websocket server uses these event names
+    socket.on('new_message', handleNewMessage)
+    socket.on('typing', handleTyping)
+    socket.on('user-joined', handleMemberUpdate)
+    socket.on('user-left', handleMemberUpdate)
 
     return () => {
       // Leave team room
-      socket.emit(SocketEvent.LEAVE_TEAM, { teamId: team.id, userId: user?.id })
+      socket.emit('leave_team', { teamId: team.id })
       
       // Unsubscribe from events
-      socket.off(SocketEvent.NEW_MESSAGE, handleNewMessage)
-      socket.off(SocketEvent.TYPING, handleTyping)
-      socket.off('member-joined', handleMemberUpdate)
-      socket.off('member-left', handleMemberUpdate)
+      socket.off('new_message', handleNewMessage)
+      socket.off('typing', handleTyping)
+      socket.off('user-joined', handleMemberUpdate)
+      socket.off('user-left', handleMemberUpdate)
       
       // Clear all typing timeouts
       Object.values(typingTimeoutsRef.current).forEach(timeout => clearTimeout(timeout))
@@ -250,27 +417,21 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       
       // Send typing indicator (stopped typing)
       if (socket) {
-        socket.emit(SocketEvent.STOP_TYPING, {
+        socket.emit('stop_typing', {
           teamId: team.id,
-          userId: user.id,
         })
       }
       
-      // Send message via API
-      const data = await apiCall('/api/collaborate/messages', {
-        method: 'POST',
-        body: JSON.stringify({
+      // Send message via socket
+      if (socket) {
+        socket.emit('new_message', {
           teamId: team.id,
           content: newMessage.trim(),
-          mentions: currentMentions,
           type: 'text',
-        }),
-      })
-      
-      if (data.success) {
+          mentions: currentMentions.map(m => m.id),
+        })
         setNewMessage('')
         setCurrentMentions([])
-        // Message will be added via socket event
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -288,9 +449,8 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   const handleTypingIndicator = () => {
     if (!user || !team?.id || !socket) return
     
-    socket.emit(SocketEvent.TYPING, {
+    socket.emit('typing', {
       teamId: team.id,
-      userId: user.id,
     })
   }
   
@@ -303,11 +463,14 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
   
   // Get team members as mention data
   const getTeamMentions = (): MentionData[] => {
-    if (!team?.members) {
-      console.log('No team members available for mentions')
-      return []
-    }
-    
+    const teamMentions: MentionData[] = [
+      {
+        id: 'nova-ai',
+        name: 'Nova',
+        avatar: '/anthropic-icon.png',
+        type: 'ai'
+      }
+    ]
     const mentions = team.members.map(member => ({
       id: member.id,
       type: 'user' as const,
@@ -373,36 +536,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
     }
   }
   
-  // Format message date
-  const formatDate = (timestamp: string) => {
-    try {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const isToday = date.toDateString() === now.toDateString()
-      const isYesterday = date.toDateString() === new Date(now.getTime() - 86400000).toDateString()
-      
-      if (isToday) return 'Today'
-      if (isYesterday) return 'Yesterday'
-      return date.toLocaleDateString()
-    } catch {
-      return 'Invalid date'
-    }
-  }
   
-  // Group messages by date
-  const groupMessagesByDate = (messages: ChatMessage[]) => {
-    const groups: { [key: string]: ChatMessage[] } = {}
-    
-    messages.forEach(message => {
-      const dateKey = formatDate(message.timestamp)
-      if (!groups[dateKey]) {
-        groups[dateKey] = []
-      }
-      groups[dateKey].push(message)
-    })
-    
-    return groups
-  }
   
   // Get status badge color
   const getStatusColor = (status: string) => {
@@ -450,7 +584,7 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       </div>
       
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -502,12 +636,21 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
                             <span className="font-medium text-sm">{message.senderName}</span>
                             <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
                           </div>
-                          <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                            <MessageWithMentions 
-                              content={message.content}
-                              mentions={message.mentions}
-                            />
-                          </div>
+                          {isAIMessage(message) ? (
+                            <div className="prose prose-sm max-w-none text-gray-900">
+                              <Response parseIncompleteMarkdown={true}>
+                                {normalizeAIOutput(message.content)}
+                              </Response>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                              <MessageWithMentions 
+                                content={message.content}
+                                mentions={message.mentions}
+                                currentUserId={user?.id}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -535,12 +678,12 @@ export function TeamChat({ team, onClose }: TeamChatProps) {
       </div>
       
       {/* Message input */}
-      <div className="p-4 border-t bg-gray-50 rounded-b-lg">
+      <div className="p-4 border-t bg-gray-50 rounded-b-lg shrink-0">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <MentionInput
             value={newMessage}
             onChange={handleMentionChange}
-            placeholder="Type your message... Use @ to mention team members, Nova AI, or files"
+            placeholder="Type your message... Use @ to mention team members, Nova, or files"
             disabled={isSending}
             className="flex-1"
             users={getTeamMentions()}

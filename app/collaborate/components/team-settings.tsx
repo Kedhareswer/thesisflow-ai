@@ -111,6 +111,16 @@ export function TeamSettings({
     setHasChanges(changed)
   }, [teamName, teamDescription, teamCategory, isPublic, team])
 
+  // Sync local form state whenever the provided team changes or dialog opens
+  // This ensures fields show the latest values for the selected team
+  useEffect(() => {
+    setTeamName(team.name)
+    setTeamDescription(team.description || "")
+    setTeamCategory(team.category)
+    setIsPublic(team.isPublic)
+    setHasChanges(false)
+  }, [team.id, isOpen])
+
   // Permissions based on role
   const canEditTeam = currentUserRole === 'owner' || currentUserRole === 'admin'
   const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin'

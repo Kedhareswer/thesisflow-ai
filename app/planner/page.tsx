@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, GanttChart as GanttChartIcon, Activity } from "lucide-react"
-import { ProjectCalendar } from "./components/project-calendar"
-import { GanttChart } from "./components/gantt-chart"
+import { CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, Activity } from "lucide-react"
+import Sidebar from "../ai-agents/components/Sidebar"
+import { FullScreenCalendar } from "@/components/ui/fullscreen-calendar"
 import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/services/project.service"
 import { AnalyticsService, AnalyticsData } from "@/lib/services/analytics.service"
@@ -31,11 +31,39 @@ import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { parseISO, parse, isValid, format } from "date-fns"
 
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const calendarData = useMemo(() => {
+    return tasks
+      .filter((task) => {
+        if (!task.due_date) return false
+        const date = task.due_date.includes("T")
+          ? parseISO(task.due_date)
+          : parse(task.due_date, "yyyy-MM-dd", new Date())
+        return isValid(date)
+      })
+      .map((task) => {
+        const date = task.due_date!.includes("T")
+          ? parseISO(task.due_date!)
+          : parse(task.due_date!, "yyyy-MM-dd", new Date())
+        const timeStr = task.due_date!.includes("T") ? format(date, "p") : ""
+        return {
+          day: date,
+          events: [
+            {
+              id: task.id,
+              name: task.title,
+              time: timeStr,
+              datetime: task.due_date!,
+            },
+          ],
+        }
+      })
+  }, [tasks])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const { toast } = useToast()
@@ -57,6 +85,8 @@ export default function PlannerPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d')
+   // Global navigation sidebar collapse state
+   const [collapsed, setCollapsed] = useState(false)
   const { user } = useSupabaseAuth()
 
   const userId = user?.id || ""
@@ -358,7 +388,7 @@ export default function PlannerPage() {
               <TrendingUp className="h-5 w-5 text-purple-600" />
               <div>
                 <p className="text-2xl font-bold text-gray-900">
-                  {Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length)}%
+                  {projects.length ? Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length) : 0}%
                 </p>
                 <p className="text-sm text-gray-600">Avg Progress</p>
               </div>
@@ -544,7 +574,10 @@ export default function PlannerPage() {
   if (error) return <div className="flex justify-center items-center h-96 text-red-500">{error}</div>
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="flex min-h-screen bg-[#F8F9FA]">
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v=>!v)} />
+      <div className="flex-1 bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Upgrade Banner for Free Users */}
       <div className="mb-6">
         <ProjectLimitBanner currentUsage={projects.length} />
@@ -556,50 +589,29 @@ export default function PlannerPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
           <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
+            <CalendarIcon className="h-4 w-4" />
             Calendar
-          </TabsTrigger>
-          <TabsTrigger value="gantt" className="flex items-center gap-2">
-            <GanttChartIcon className="h-4 w-4" />
-            Gantt Chart
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Analytics
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="overview" className="space-y-6">
           {renderOverview()}
         </TabsContent>
 
         <TabsContent value="calendar" className="space-y-6">
-          <ProjectCalendar
-            projects={projects}
-            tasks={tasks}
-            onEditTask={openEditTask}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={openCreateTask}
-          />
+          <FullScreenCalendar data={calendarData} />
         </TabsContent>
 
-        <TabsContent value="gantt" className="space-y-6">
-          <GanttChart
-            projects={projects}
-            tasks={tasks}
-            onEditTask={openEditTask}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={openCreateTask}
-            onEditProject={openEditProject}
-            onDeleteProject={handleDeleteProject}
-          />
-        </TabsContent>
+        
 
         <TabsContent value="analytics" className="space-y-6">
           <div className="grid gap-6">
@@ -610,7 +622,7 @@ export default function PlannerPage() {
                 <p className="text-gray-600">Comprehensive insights into your research productivity and project performance</p>
               </div>
               <div className="flex items-center gap-2">
-                <Select value={timeRange} onValueChange={(value: '7d' | '30d' | '90d') => setTimeRange(value)}>
+                <Select value={timeRange} onValueChange={(value: string) => setTimeRange(value as '7d' | '30d' | '90d')}>
                   <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>
@@ -920,7 +932,7 @@ export default function PlannerPage() {
 
       {/* Enhanced Task Creation/Edit Modal */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingTask && (editingTask as Task).id ? (
@@ -986,7 +998,7 @@ export default function PlannerPage() {
                       )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={taskForm.control}
                         name="due_date"
@@ -1046,7 +1058,7 @@ export default function PlannerPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={taskForm.control}
                         name="status"
@@ -1305,6 +1317,8 @@ export default function PlannerPage() {
           </div>
         </Card>
       ))}
+        </div>
+      </div>
     </div>
   )
 }

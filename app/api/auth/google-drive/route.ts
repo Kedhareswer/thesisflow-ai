@@ -1,24 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { GoogleDriveProvider } from '@/lib/storage/providers/google-drive'
+import { createSupabaseAdmin, getAuthUser } from '@/lib/auth-utils'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      console.error('[Google Drive OAuth] User not authenticated:', userError)
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
+    const user = await getAuthUser(request, 'google-drive-oauth-init')
+    if (!user) return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
 
-    // Initialize Google Drive provider
-    const provider = new GoogleDriveProvider()
-    
     // Generate OAuth URL
     const params = new URLSearchParams({
       client_id: process.env.NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID!,
@@ -47,19 +34,13 @@ export async function POST(request: NextRequest) {
 // Get user's storage provider status
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
+    const user = await getAuthUser(request, 'google-drive-status')
+    if (!user) return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
 
     // Check if user has Google Drive connected
-    const { data: providers, error: queryError } = await supabase
+    const supabaseAdmin = createSupabaseAdmin()
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    const { data: providers, error: queryError } = await supabaseAdmin
       .from('user_storage_providers')
       .select('*')
       .eq('user_id', user.id)
@@ -96,19 +77,13 @@ export async function GET(request: NextRequest) {
 // Disconnect Google Drive
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
+    const user = await getAuthUser(request, 'google-drive-disconnect')
+    if (!user) return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
 
     // Deactivate the provider
-    const { error: updateError } = await supabase
+    const supabaseAdmin = createSupabaseAdmin()
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    const { error: updateError } = await supabaseAdmin
       .from('user_storage_providers')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('user_id', user.id)

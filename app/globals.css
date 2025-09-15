@@ -2,9 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@source "../node_modules/streamdown/dist/index.js";
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Global brand background: #F8F9FA (approx hsl(210 17% 98%)) */
+    --background: 210 17% 98%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
@@ -57,6 +60,11 @@
     @apply bg-background text-foreground font-light;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Prevent scroll bounce/overscroll chaining */
+html, body {
+  overscroll-behavior: none;
 }
 
 @layer components {

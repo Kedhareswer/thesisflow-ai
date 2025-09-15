@@ -194,7 +194,7 @@ export function CloudIntegrations({ teamId, currentUserRole, apiCall: providedAp
         const { storageManager } = await import('@/lib/storage/storage-manager')
         
         try {
-          const auth = await storageManager.connectProvider(serviceType)
+          const auth = await storageManager.connectProvider(serviceType as any)
           
           if (auth) {
             setServices(prev => prev.map(service => 

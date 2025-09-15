@@ -233,6 +233,16 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
     }
   }, [loadData, toast, teamId])
 
+  // Initial lazy fetch only once when there's no cache yet
+  useEffect(() => {
+    if (!teamId) return
+    const cached = loadCachedFiles(teamId)
+    if (!cached || cached.length === 0) {
+      // Warm the list silently without repeating thereafter
+      loadData(true)
+    }
+  }, [teamId, loadData])
+
   // Load cached data immediately on mount
   useEffect(() => {
     if (teamId) {
@@ -240,14 +250,8 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
     }
   }, [teamId, loadCachedData])
 
-  // Load fresh data from API
-  useEffect(() => {
-    if (teamId) {
-      // If we have cached data, load API data in background without showing loading
-      const hasCache = hasLoadedFromCache && files.length > 0
-      loadData(!hasCache)
-    }
-  }, [teamId, loadData, hasLoadedFromCache, files.length])
+  // Do not auto-fetch; rely on explicit Refresh or post-actions
+  // Invitations modal behaves similarly; we follow the same pattern here.
 
   // Check Google Drive connection status
   useEffect(() => {
@@ -257,8 +261,7 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
   // Check Google Drive connection
   const checkGoogleDriveStatus = async () => {
     try {
-      const response = await fetch('/api/auth/google-drive', { credentials: 'include' })
-      const data = await response.json()
+      const data = await apiCall('/api/auth/google-drive')
       
       if (data.success && data.connected) {
         setIsGoogleDriveConnected(true)
@@ -319,50 +322,56 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // Handle regular file upload (local)
+  // Handle regular file upload (upload to Google Drive and record in team_files)
   const handleFileUpload = async () => {
     if (!selectedFile || !canUpload) return
 
     try {
       setUploadLoading(true)
-
-      // For now, we'll simulate file upload and store metadata
-      // In a real implementation, you'd upload to Supabase Storage first
-      const tags = fileTags.split(',').map(tag => tag.trim()).filter(tag => tag)
-
-      const data = await apiCall('/api/collaborate/files', {
-        method: 'POST',
-        body: JSON.stringify({
-          teamId,
-          type: 'file',
-          name: selectedFile.name,
-          url: '', // Would be the actual file URL from storage
-          description: fileDescription,
-          tags,
-          isPublic: isFilePublic,
-          fileType: selectedFile.type,
-          fileSize: selectedFile.size
-        }),
-      })
-
-      if (data.success) {
-        const updatedFiles = [data.file, ...files]
-        setFiles(updatedFiles)
-        // Update cache with new file
-        saveCachedFiles(teamId, updatedFiles)
-
-        // Reset form
-        setSelectedFile(null)
-        setFileDescription('')
-        setFileTags('')
-        setIsFilePublic(false)
-        setShowUploadDialog(false)
-
-        toast({
-          title: "File uploaded",
-          description: `${selectedFile.name} has been uploaded successfully`,
-        })
+      // Ensure Google Drive is connected; if not, connect now
+      if (!isGoogleDriveConnected || !supabaseStorageManager.isGoogleDriveConnected()) {
+        const oauthHandler = GoogleDriveOAuthHandler.getInstance()
+        await oauthHandler.authenticate()
+        await checkGoogleDriveStatus()
+        await supabaseStorageManager.loadUserProviders()
       }
+
+      // Upload to Drive and create team_files metadata
+      const uploaded = await supabaseStorageManager.uploadFileToGoogleDrive(selectedFile, { teamId })
+
+      // Add description/tags via metadata update to our DB record (best-effort)
+      const tags = fileTags.split(',').map(tag => tag.trim()).filter(tag => tag)
+      try {
+        await apiCall('/api/collaborate/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            teamId,
+            type: 'file',
+            name: uploaded.name,
+            url: uploaded.webViewUrl,
+            description: fileDescription,
+            tags,
+            isPublic: isFilePublic,
+            fileType: uploaded.mimeType,
+            fileSize: uploaded.size
+          })
+        })
+      } catch { /* ignore duplicate insert; Drive upload already created a row */ }
+
+      // Refresh list
+      await loadData(false)
+
+      // Reset form
+      setSelectedFile(null)
+      setFileDescription('')
+      setFileTags('')
+      setIsFilePublic(false)
+      setShowUploadDialog(false)
+
+      toast({
+        title: "File uploaded",
+        description: `${selectedFile.name} has been uploaded to Google Drive and shared with the team`,
+      })
     } catch (error) {
       console.error('Error uploading file:', error)
       toast({
@@ -466,9 +475,13 @@ export function TeamFiles({ teamId, currentUserRole, apiCall: providedApiCall }:
       })
 
       if (data.success) {
-        const updatedFiles = [data.file, ...files]
-        setFiles(updatedFiles)
-        saveCachedFiles(teamId, updatedFiles)
+        try {
+          await loadData(false)
+        } catch {
+          const updatedFiles = [data.file, ...files]
+          setFiles(updatedFiles)
+          saveCachedFiles(teamId, updatedFiles)
+        }
         setShowGoogleDrivePicker(false)
 
         toast({

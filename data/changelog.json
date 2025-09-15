@@ -1,0 +1,125 @@
+[
+  {
+    "version": "v1.0.9",
+    "date": "2025-09-07",
+    "title": "Deep Research Integrated into Topic Explorer",
+    "description": "Run live multi-source research directly in TopicExplorer with in-place results, real-time progress, and AI summaries—no navigation required.",
+    "items": [
+      "Unified topic field for both AI exploration and deep research",
+      "Real-time progress with stop control",
+      "Clear result badges for Scholar, Docs, News, Web with scores and dates",
+      "Intelligent deduplication across sources and graceful fallbacks",
+      "Optional AI-generated summary when configured"
+    ],
+    "button": { "url": "/explorer", "text": "Try Deep Research" }
+  },
+  {
+    "version": "v1.0.8",
+    "date": "2025-09-07",
+    "title": "End-to-end Streaming AI Chat with SSE",
+    "description": "Added real-time token-by-token streaming for AI chat with robust SSE route, provider service, and client integration. Includes heartbeat, named events, rate limiting, and error handling.",
+    "items": [
+      "Server-side streaming route with init/token/progress/done/error/ping events",
+      "Client: EventSource with named event listeners and fallback parser",
+      "Provider: Enhanced AI service simulating chunks with realistic delays",
+      "UI: ResearchAssistant integrates streaming with proper state and recovery"
+    ],
+    "button": { "url": "/explorer", "text": "Try streaming chat" }
+  },
+  {
+    "version": "v1.0.7",
+    "date": "2025-09-04",
+    "title": "Multi-format Document Extraction (Production-Ready)",
+    "description": "Built a comprehensive extraction system for PDF, DOCX, PPTX, CSV, images, and TXT with progress, metadata, OCR, and multiple output formats.",
+    "items": [
+      "APIs: Document extraction endpoints (full and simplified)",
+      "Extractors: pdf-parse, mammoth, papaparse, Tesseract.js, XML parsing",
+      "UI: /extract and /extraction-demo with progress and exports",
+      "Architecture: BaseExtractor, Orchestrator, AI-powered analysis hooks"
+    ],
+    "button": { "url": "/extract", "text": "Extract a document" }
+  },
+  {
+    "version": "v1.0.6",
+    "date": "2025-08-28",
+    "title": "Unified Multi-Source Search (Google, DDG, Tavily, Context7, LangSearch)",
+    "description": "Introduced a unified search service with weighted result merging, deduplication, fallbacks, and specialized methods for scholar/news/docs.",
+    "items": [
+      "Services: Google, DuckDuckGo, Tavily, Context7 MCP, LangSearch",
+      "Deep Research integrates all available sources",
+      "Robust error handling and intelligent result merging"
+    ]
+  },
+  {
+    "version": "v1.0.5",
+    "date": "2025-08-20",
+    "title": "Literature Search: 75% Faster TypeScript Implementation",
+    "description": "Replaced Python flow with parallel TS service calling OpenAlex, arXiv, CrossRef with caching, rate limits, dedupe, ranking, and retries.",
+    "items": [
+      "Literature search service with cache-first and Retry-After",
+      "Hook: useLiteratureSearch with debouncing, aggregation support",
+      "UI: Real-time search with analytics tracking and saved papers",
+      "Supabase: literature_cache, usage tables, RLS policies"
+    ],
+    "button": { "url": "/literature-review", "text": "Search papers" }
+  },
+  {
+    "version": "v1.0.4",
+    "date": "2025-08-12",
+    "title": "Writer: LaTeX Editor Upgrade",
+    "description": "Converted Writer from Markdown to LaTeX with real-time preview, KaTeX rendering, toolbar, shortcuts, and collaboration.",
+    "items": [
+      "Component: latex-editor with split/full views and status bar",
+      "AI prompts updated to output LaTeX fragments",
+      "Literature review produces LaTeX comparison tables"
+    ],
+    "button": { "url": "/writer", "text": "Open LaTeX Writer" }
+  },
+  {
+    "version": "v1.0.3",
+    "date": "2025-08-05",
+    "title": "Research Assistant: Sources, Reasoning, Tools, Tasks, Actions",
+    "description": "Integrated complete AI elements into per-message UI with faster streaming, better revert handling, and inline citations.",
+    "items": [
+      "Sources panel above responses with link extraction",
+      "Reasoning panel per message during streaming",
+      "Tool usage detection with I/O display and badges",
+      "Collapsible tasks and actionable items with copy"
+    ],
+    "button": { "url": "/explorer", "text": "Use Research Assistant" }
+  },
+  {
+    "version": "v1.0.2",
+    "date": "2025-07-30",
+    "title": "AI Models & Presets Updated",
+    "description": "Refreshed model lists across OpenAI, Anthropic, Gemini, Groq, Mistral; aligned presets and improved system prompts.",
+    "items": [
+      "Models: gpt-4o(-mini), o3(-mini), claude-3.5*, gemini 1.5/2.5, llama 3.1/3.3, mixtral, etc.",
+      "Presets tuned with sensible temps and add-ons",
+      "SSE client events aligned with server"
+    ]
+  },
+  {
+    "version": "v1.0.1",
+    "date": "2025-07-24",
+    "title": "Planner & Notifications Improvements",
+    "description": "Better calendar parsing and a new notifications preferences API with GET/PUT/POST support and sane fallbacks.",
+    "items": [
+      "Planner: robust due_date parsing via date-fns, UI cleanups",
+      "Notifications preferences endpoint with auth",
+      "Fallbacks for read status across mark-all/delete"
+    ],
+    "button": { "url": "/planner", "text": "Open Planner" }
+  },
+  {
+    "version": "v1.0.0",
+    "date": "2025-07-18",
+    "title": "Plan-and-Execute Streaming API",
+    "description": "New SSE route to plan tasks and stream execution progress with heartbeat and abort handling.",
+    "items": [
+      "Streaming plan-and-execute route with init/plan/progress/done/error/ping",
+      "Rate limiting via Supabase RPC",
+      "Tool selection and robust error handling"
+    ]
+  }
+]

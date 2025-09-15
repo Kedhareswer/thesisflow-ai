@@ -176,26 +176,46 @@ class CollaborateService {
     teamId: string,
     userId: string,
     content: string,
-    type: 'text' | 'system' = 'text'
-  ): Promise<{ success: boolean; message?: ChatMessage; error?: string }> {
+    type: 'text' | 'system' = 'text',
+    mentions?: string[],
+    socket?: any, // Accept socket instance from the page
+    clientMessageId?: string, // correlation id supplied by caller
+    metadata?: Record<string, any>
+  ): Promise<{ success: boolean; message?: ChatMessage; error?: string; clientMessageId?: string }> {
     try {
       // If socket connected, send via websocket only (server persists and broadcasts)
-      if (socketService.isConnected()) {
-        socketService.sendMessage(teamId, content, type);
-        return { success: true };
+      if (socket && socket.connected) {
+        const idToUse = clientMessageId || `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        socket.emit('new_message', {
+          teamId,
+          content,
+          type,
+          mentions,
+          clientMessageId: idToUse,
+          metadata: metadata || {},
+        });
+        return { success: true, message: { id: idToUse } as any, clientMessageId: idToUse };
       }
 
       // Fallback: send via API when offline
+      // Get the current session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        return { success: false, error: 'No authentication token available' };
+      }
+
       const response = await fetch('/api/collaborate/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           teamId,
-          userId,
           content,
           type,
+          mentions,
+          metadata: metadata || {},
         }),
       });
 
@@ -235,11 +255,13 @@ class CollaborateService {
   }
 
   // Subscribe to new messages for a team
-  subscribeToMessages(teamId: string, callback: (message: any) => void): () => void {
-    const socket = socketService.initialize('current-user');
+  subscribeToMessages(teamId: string, callback: (message: any) => void, socket?: any): () => void {
+    if (!socket) {
+      return () => {}; // Return empty cleanup function
+    }
     
     // Join the team room
-    socketService.joinTeam(teamId);
+    socket.emit('join_team', { teamId });
     
     // Listen for new messages
     const handleNewMessage = (data: any) => {
@@ -253,16 +275,19 @@ class CollaborateService {
           timestamp: data.timestamp,
           teamId: data.teamId,
           type: data.type,
+          mentions: Array.isArray(data.mentions) ? data.mentions : [],
+          // Preserve correlation id for optimistic replacement
+          clientMessageId: data.clientMessageId,
         });
       }
     };
     
-    socket.on(SocketEvent.NEW_MESSAGE, handleNewMessage);
+    socket.on('new_message', handleNewMessage);
     
     // Return unsubscribe function
     return () => {
-      socket.off(SocketEvent.NEW_MESSAGE, handleNewMessage);
-      socketService.leaveTeam(teamId);
+      socket.off('new_message', handleNewMessage);
+      socket.emit('leave_team', { teamId });
     };
   }
 

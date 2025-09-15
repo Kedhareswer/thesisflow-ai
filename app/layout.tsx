@@ -1,9 +1,10 @@
 import type React from "react"
 import "./globals.css"
 import type { Metadata } from "next"
+export { metadata } from "./seo/root-metadata"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
-import { MainNav } from "@/components/main-nav"
+// Navbar removed: MainNav no longer used
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import { AuthErrorBoundary } from "@/components/auth-error-boundary"
 import { ResearchSessionProvider } from "@/components/research-session-provider"
@@ -14,20 +15,7 @@ import { CookiePanel } from "@/components/ui/cookie-banner-1"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
-  title: "AI Research Platform — Discover, Summarize & Collaborate Smarter | Thesis Flow AI",
-  description: "Thesis Flow AI is an AI research hub where you can explore papers, generate instant summaries, organize projects, and collaborate with teams — all in one place.",
-  keywords: [
-    "AI research platform",
-    "academic summarizer",
-    "research collaboration tool",
-    "AI paper summarizer",
-    "thesis assistant",
-    "research assistant",
-    "research productivity software"
-  ],
-  generator: 'v0.dev'
-}
+// metadata is centralized in app/seo/root-metadata.ts and re-exported above
 
 export default function RootLayout({
   children,
@@ -42,7 +30,7 @@ export default function RootLayout({
             <SupabaseAuthProvider>
               <ResearchSessionProvider>
                 <div className="min-h-screen bg-gray-50">
-                  <MainNav />
+                  {/* Navbar removed */}
                   <main className="flex-1">{children}</main>
                 </div>
                 <Toaster />

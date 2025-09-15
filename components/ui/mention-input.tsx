@@ -1,13 +1,13 @@
 "use client"
 
-import React, { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react'
-import { Input } from '@/components/ui/input'
+import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { User, Bot, FileText, File, Image, X } from 'lucide-react'
+import { User, Bot, FileText, File, Image, X, ChevronDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export interface MentionData {
   id: string
@@ -28,7 +28,7 @@ export interface MentionInputProps {
   className?: string
   users?: MentionData[]
   files?: MentionData[]
-  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
+  onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void
 }
 
 interface ParsedContent {
@@ -36,13 +36,7 @@ interface ParsedContent {
   mentions: MentionData[]
 }
 
-// Nova AI default mention
-const NOVA_AI: MentionData = {
-  id: 'nova-ai',
-  type: 'ai',
-  name: 'Nova AI',
-  avatar: '/assistant-avatar.svg'
-}
+
 
 export function MentionInput({
   value,
@@ -56,19 +50,13 @@ export function MentionInput({
 }: MentionInputProps) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestionQuery, setSuggestionQuery] = useState("")
-  const [cursorPosition, setCursorPosition] = useState(0)
   const [suggestions, setSuggestions] = useState<MentionData[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const [isOverflowing, setIsOverflowing] = useState(false)
+  const pendingCaretRef = useRef<number | null>(null)
 
-  // DEBUG: Log props on mount and input changes
-  React.useEffect(() => {
-    console.log('MentionInput mounted with props:', { users, files, usersLength: users.length, filesLength: files.length })
-  }, [users, files])
-
-  React.useEffect(() => {
-    console.log('Value changed:', value, 'Contains @:', value.includes('@'))
-  }, [value])
+  // Simplified logs removed for production
 
   // Parse content to extract mentions and clean text
   const parseContent = (content: string): ParsedContent => {
@@ -83,11 +71,7 @@ export function MentionInput({
       // Find mention data
       let mentionData: MentionData | undefined
       
-      if (id === 'nova-ai') {
-        mentionData = NOVA_AI
-      } else {
-        mentionData = [...users, ...files].find(item => item.id === id)
-      }
+      mentionData = [...users, ...files].find(item => item.id === id)
       
       if (mentionData) {
         mentions.push(mentionData)
@@ -100,52 +84,115 @@ export function MentionInput({
 
   // Get all available mention options
   const getAllMentions = (): MentionData[] => {
-    return [NOVA_AI, ...users, ...files]
+    return [...users, ...files]
   }
 
   // Filter suggestions based on query
   const filterSuggestions = (query: string): MentionData[] => {
-    if (!query) return getAllMentions()
-    
-    const lowercaseQuery = query.toLowerCase()
-    return getAllMentions().filter(item =>
-      item.name.toLowerCase().includes(lowercaseQuery) ||
-      item.email?.toLowerCase().includes(lowercaseQuery)
+    const all = getAllMentions()
+    if (!query) return all
+    const q = query.toLowerCase()
+    return all.filter(item =>
+      item.name.toLowerCase().includes(q) ||
+      (item.email ? item.email.toLowerCase().includes(q) : false)
     )
   }
 
-  // Handle input change
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    const cursorPos = e.target.selectionStart || 0
-    
-    setCursorPosition(cursorPos)
-    
-    // Check if we're typing a mention
-    const beforeCursor = newValue.substring(0, cursorPos)
-    const mentionMatch = beforeCursor.match(/@([^@\s]*)$/)
-    
-    console.log('Input changed:', { newValue, beforeCursor, mentionMatch })
-    
-    if (mentionMatch) {
-      const query = mentionMatch[1]
-      const filteredSuggestions = filterSuggestions(query)
-      console.log('Mention detected:', { query, filteredSuggestions, allMentions: getAllMentions() })
-      
-      setSuggestionQuery(query)
-      setSuggestions(filteredSuggestions)
+  // Render highlighted content (@mentions colored)
+  const renderHighlighted = (text: string) => {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>')
+    // highlight @mentions with broader charset
+    return escaped.replace(
+      /@([A-Za-z0-9._-]+)/g,
+      // prettier pill styling inspired by shadcn badge
+      '<span class="inline-flex items-center px-1.5 py-[1px] rounded-full bg-primary/10 border border-primary/20 text-primary font-medium align-baseline">@$1</span>'
+    )
+  }
+
+  // Sync external value into editor
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el) return
+    // Avoid flicker: only update if text differs from innerText
+    if (el.innerText !== value) {
+      el.innerHTML = renderHighlighted(value)
+    }
+    // If we have a pending caret position (e.g., after inserting a mention), restore it now
+    if (pendingCaretRef.current !== null) {
+      const pos = Math.min(pendingCaretRef.current, el.innerText.length)
+      try {
+        el.focus()
+        setCaretOffset(el, pos)
+      } finally {
+        pendingCaretRef.current = null
+      }
+    }
+    // Check overflow on external updates
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
+  }, [value])
+
+  // Handle contenteditable input
+  const getCaretOffset = (el: HTMLElement) => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return el.innerText.length
+    const range = sel.getRangeAt(0)
+    const preRange = range.cloneRange()
+    preRange.selectNodeContents(el)
+    preRange.setEnd(range.endContainer, range.endOffset)
+    return preRange.toString().length
+  }
+
+  const setCaretOffset = (el: HTMLElement, offset: number) => {
+    el.focus()
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
+    let currentOffset = 0
+    let node: Node | null = null
+    while ((node = walker.nextNode())) {
+      const textLen = (node.nodeValue || '').length
+      if (currentOffset + textLen >= offset) {
+        const range = document.createRange()
+        range.setStart(node, Math.max(0, offset - currentOffset))
+        range.collapse(true)
+        const sel = window.getSelection()
+        sel?.removeAllRanges()
+        sel?.addRange(range)
+        return
+      }
+      currentOffset += textLen
+    }
+    // fallback to end
+    placeCaretAtEnd(el)
+  }
+
+  const handleEditorInput = () => {
+    const el = editorRef.current
+    if (!el) return
+    const caretBefore = getCaretOffset(el)
+    const text = el.innerText
+    // Detect mention query near caret (simple: use end of text)
+    const match = text.match(/@([^@\s]*)$/)
+    if (match) {
+      setSuggestionQuery(match[1])
+      setSuggestions(filterSuggestions(match[1]))
       setShowSuggestions(true)
       setSelectedIndex(0)
     } else {
       setShowSuggestions(false)
     }
-
-    const parsed = parseContent(newValue)
-    onChange(newValue, parsed.mentions)
+    const parsed = parseContent(text)
+    // Re-apply highlighting
+    el.innerHTML = renderHighlighted(parsed.text)
+    setCaretOffset(el, Math.min(caretBefore, el.innerText.length))
+    onChange(parsed.text, parsed.mentions)
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
   }
 
   // Handle key down events
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (showSuggestions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -169,31 +216,36 @@ export function MentionInput({
 
   // Insert mention at cursor position
   const insertMention = (mention: MentionData) => {
-    const input = inputRef.current
-    if (!input) return
-
-    const beforeCursor = value.substring(0, cursorPosition)
-    const afterCursor = value.substring(cursorPosition)
-    
-    // Find the @ symbol that started the mention
-    const mentionStart = beforeCursor.lastIndexOf('@')
-    if (mentionStart === -1) return
-
-    const beforeMention = value.substring(0, mentionStart)
+    const el = editorRef.current
+    if (!el) return
+    const text = el.innerText
+    const atIndex = text.lastIndexOf('@')
+    const before = atIndex >= 0 ? text.substring(0, atIndex) : text
+    let after = atIndex >= 0 ? text.substring(atIndex) : ''
+    // Remove the @partial token fully (from @ up to first whitespace or end)
+    const tokenMatch = after.match(/^@[^\s]*/)
+    const tokenLength = tokenMatch ? tokenMatch[0].length : 0
+    const afterWithoutQuery = after.substring(tokenLength)
+    // Use proper mention format that parseContent expects
     const mentionText = `@[${mention.name}](${mention.id})`
-    const newValue = beforeMention + mentionText + afterCursor
-
-    const parsed = parseContent(newValue)
-    onChange(newValue, parsed.mentions)
-    
+    const insertion = `${mentionText} `
+    const nextText = `${before}${insertion}${afterWithoutQuery}`
+    el.innerHTML = renderHighlighted(nextText)
+    // place caret just after what will be rendered ("@name ") not the token length
+    const displayInsertion = `@${mention.name} `
+    const caretPos = (before + displayInsertion).length
+    // Set caret immediately and schedule a restore after React state update
+    el.focus()
+    setCaretOffset(el, caretPos)
+    pendingCaretRef.current = caretPos
+    // In case React re-render happens after this tick, enforce caret again on next frame
+    requestAnimationFrame(() => {
+      const node = editorRef.current
+      if (node) setCaretOffset(node, Math.min(caretPos, node.innerText.length))
+    })
+    const parsed = parseContent(nextText)
+    onChange(parsed.text, parsed.mentions)
     setShowSuggestions(false)
-    
-    // Set cursor position after the mention
-    setTimeout(() => {
-      const newCursorPos = beforeMention.length + mentionText.length
-      input.setSelectionRange(newCursorPos, newCursorPos)
-      input.focus()
-    }, 0)
   }
 
   // Get file icon based on type
@@ -241,44 +293,60 @@ export function MentionInput({
 
   return (
     <div className="relative">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={handleInputChange}
+      <div
+        ref={editorRef}
+        role="textbox"
+        contentEditable={!disabled}
+        suppressContentEditableWarning
+        onInput={handleEditorInput}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={className}
+        data-placeholder={placeholder}
+        className={cn(
+          "min-h-[42px] px-4 py-2 rounded-lg border bg-background outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all w-full overflow-y-auto",
+          "placeholder:text-muted-foreground",
+          disabled && "opacity-50 cursor-not-allowed",
+          className
+        )}
+        style={{
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word'
+        }}
       />
-      
-      {/* Always show popup when typing @ */}
-      {value.includes('@') && (
-        <div 
-          className="fixed bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-[10000] min-w-[300px]"
-          style={{
-            bottom: '100px',
-            left: '50%',
-            transform: 'translateX(-50%)'
+
+      {isOverflowing && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 rounded-b-lg bg-gradient-to-t from-background to-transparent" />
+      )}
+
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => {
+            const el = editorRef.current
+            if (el) el.scrollTop = el.scrollHeight
           }}
+          className="absolute bottom-1 right-1 h-6 w-6 grid place-items-center rounded-md border bg-background hover:bg-muted text-muted-foreground"
+          aria-label="Scroll to bottom"
+          title="Scroll"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      )}
+      
+      {/* Suggestions dropdown anchored to input */}
+      {showSuggestions && (
+        <div 
+          className="absolute bottom-full mb-2 left-0 bg-background border border-border rounded-lg shadow-lg p-3 z-[1000] w-[320px]"
         >
           <div className="text-sm font-semibold mb-2 text-blue-600">
             🎯 Mention Someone!
           </div>
           
-          {/* Nova AI */}
-          <div 
-            className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer rounded"
-            onClick={() => insertMention(NOVA_AI)}
-          >
-            <Bot className="h-4 w-4 text-blue-500" />
-            <span>Nova AI - AI Assistant</span>
-          </div>
-          
-          {/* Users */}
-          {users.map(user => (
+          {/* Filtered users first */}
+          {suggestions.filter(s => s.type !== 'file').map(user => (
             <div 
               key={user.id}
-              className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer rounded"
+              className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer rounded transition-colors"
               onClick={() => insertMention(user)}
             >
               <Avatar className="h-4 w-4">
@@ -294,22 +362,25 @@ export function MentionInput({
             </div>
           ))}
           
-          {/* Files */}
-          {files.slice(0, 5).map(file => (
+          {/* Filtered files (limit 5) */}
+          {suggestions.filter(s => s.type === 'file').slice(0, 5).map(file => (
             <div 
               key={file.id}
-              className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer rounded"
+              className="flex items-center gap-2 p-2 hover:bg-muted cursor-pointer rounded transition-colors"
               onClick={() => insertMention(file)}
             >
               <FileText className="h-4 w-4 text-green-500" />
               <div>
                 <div className="text-sm">{file.name}</div>
-                <div className="text-xs text-gray-500">File</div>
+                <div className="text-xs text-muted-foreground">File</div>
               </div>
             </div>
           ))}
           
-          <div className="text-xs text-gray-400 mt-2">
+          {suggestions.length === 0 && (
+            <div className="text-xs text-muted-foreground mt-1">No matches</div>
+          )}
+          <div className="text-xs text-muted-foreground mt-2">
             Users: {users.length} | Files: {files.length}
           </div>
         </div>
@@ -323,17 +394,48 @@ export interface MessageWithMentionsProps {
   content: string
   mentions?: MentionData[]
   className?: string
+  currentUserId?: string
 }
 
 export function MessageWithMentions({ 
   content, 
   mentions = [], 
-  className = "" 
+  className = "", 
+  currentUserId 
 }: MessageWithMentionsProps) {
   // Parse content and render with mention chips
   const renderContent = () => {
     if (!mentions.length) {
-      return <span className={className}>{content}</span>
+      // Generic pillify for @handles even without metadata
+      // Require a non-word boundary before @ to avoid emails and code like object@property
+      const genericRegex = /(^|[^\w])@([A-Za-z0-9._-]+)/gi
+      const parts: React.ReactNode[] = []
+      let idx = 0
+      let m: RegExpExecArray | null
+      while ((m = genericRegex.exec(content)) !== null) {
+        const start = m.index
+        const end = start + m[0].length
+        if (start > idx) {
+          parts.push(<span key={`gt-${idx}`}>{content.substring(idx, start)}</span>)
+        }
+        // m[1] is the leading non-word or start, m[2] is the handle
+        if (m[1]) {
+          parts.push(<span key={`g-lead-${start}`}>{m[1]}</span>)
+        }
+        parts.push(
+          <span
+            key={`g-${start}`}
+            className="inline-flex items-center mx-0.5 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20"
+          >
+            @{m[2]}
+          </span>
+        )
+        idx = end
+      }
+      if (idx < content.length) {
+        parts.push(<span key={`gt-${idx}`}>{content.substring(idx)}</span>)
+      }
+      return <span className={className}>{parts}</span>
     }
 
     const parts = []
@@ -345,7 +447,7 @@ export function MessageWithMentions({
 
     while ((match = mentionRegex.exec(content)) !== null) {
       const [fullMatch, name, id] = match
-      const mentionData = mentions.find(m => m.id === id) || NOVA_AI
+      const mentionData = mentions.find(m => m.id === id)
       
       // Add text before mention
       if (match.index > lastIndex) {
@@ -356,17 +458,35 @@ export function MessageWithMentions({
         )
       }
       
-      // Add mention chip
-      parts.push(
-        <Badge
-          key={`mention-${id}-${match.index}`}
-          variant="secondary"
-          className="inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs"
-        >
-          {getMentionIcon(mentionData)}
-          <span>{name}</span>
-        </Badge>
-      )
+      // Add mention chip only if mentionData exists
+      if (mentionData) {
+        parts.push(
+          <Badge
+            key={`mention-${id}-${match.index}`}
+            variant="secondary"
+            className={cn(
+              "inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs rounded-full border",
+              // Highlight mentions of the current user
+              currentUserId && mentionData.id === currentUserId
+                ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                : "bg-primary/10 text-primary border-primary/20"
+            )}
+          >
+            {getMentionIcon(mentionData)}
+            <span>{name}</span>
+          </Badge>
+        )
+      } else {
+        // Fallback: just show the @name if mention data not found
+        parts.push(
+          <span
+            key={`mention-${id}-${match.index}`}
+            className="inline-flex items-center mx-0.5 px-2 py-0.5 text-xs rounded-full bg-muted text-foreground/80 border border-border"
+          >
+            @{name}
+          </span>
+        )
+      }
       
       lastIndex = match.index + fullMatch.length
     }
@@ -380,17 +500,75 @@ export function MessageWithMentions({
       )
     }
     
+    // If we didn't find any token-based mentions, try highlighting plain @names
+    if (parts.length === 1 && parts[0]?.key?.toString().startsWith('text-')) {
+      const names = Array.from(
+        new Map(mentions.map(m => [m.name, m])).keys()
+      )
+      if (names.length) {
+        const escapedNames = names
+          .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .sort((a, b) => b.length - a.length) // longer first
+        // Match followed by end or whitespace/punctuation, case-insensitive
+        const re = new RegExp(`@(${escapedNames.join('|')})(?=$|[\\s,.:;!?()\\[\\]{}<>])`, 'gi')
+        const text = content
+        const plainParts: React.ReactNode[] = []
+        let idx = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const [full, name] = m
+          const start = m.index
+          const end = start + full.length
+          if (start > idx) {
+            plainParts.push(<span key={`pt-${idx}`}>{text.substring(idx, start)}</span>)
+          }
+          const md = mentions.find(mm => mm.name === name)
+          if (md) {
+            plainParts.push(
+              <Badge
+                key={`p-${start}-${md.id}`}
+                variant="secondary"
+                className={cn(
+                  "inline-flex items-center gap-1 mx-0.5 px-2 py-0.5 text-xs rounded-full border",
+                  currentUserId && md.id === currentUserId
+                    ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                    : "bg-primary/10 text-primary border-primary/20"
+                )}
+              >
+                {getMentionIcon(md)}
+                <span>{name}</span>
+              </Badge>
+            )
+          } else {
+            plainParts.push(
+              <span
+                key={`pf-${start}`}
+                className="inline-flex items-center mx-0.5 px-2 py-0.5 text-xs rounded-full bg-muted text-foreground/80 border border-border"
+              >
+                @{name}
+              </span>
+            )
+          }
+          idx = end
+        }
+        if (idx < text.length) {
+          plainParts.push(<span key={`pt-${idx}`}>{text.substring(idx)}</span>)
+        }
+        return <span className={className}>{plainParts}</span>
+      }
+    }
+    
     return <span className={className}>{parts}</span>
   }
 
   return renderContent()
 }
 
-function getMentionIcon(mention: MentionData) {
+function getMentionIcon(mention: MentionData, currentUserId?: string) {
   switch (mention.type) {
     case 'user':
       return (
-        <Avatar className="h-3 w-3">
+        <Avatar className="h-4 w-4">
           <AvatarImage src={mention.avatar} />
           <AvatarFallback className="text-xs">
             {mention.name.substring(0, 1).toUpperCase()}
@@ -398,10 +576,22 @@ function getMentionIcon(mention: MentionData) {
         </Avatar>
       )
     case 'ai':
-      return <Bot className="h-3 w-3 text-blue-500" />
+      return <Bot className="h-4 w-4 text-blue-500" />
     case 'file':
-      return <FileText className="h-3 w-3 text-green-500" />
+      return <FileText className="h-4 w-4 text-green-500" />
     default:
-      return <User className="h-3 w-3" />
+      return <User className="h-4 w-4" />
   }
+}
+
+function placeCaretAtEnd(el: HTMLElement) {
+  try {
+    el.focus()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  } catch {}
 }

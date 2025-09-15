@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Brain, RefreshCw, User, Loader2, Zap, RotateCcw, X } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -10,12 +10,35 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { type AIProvider, AI_PROVIDERS, AIProviderService } from "@/lib/ai-providers"
+import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController, type ChatMessage } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResearchSession } from "@/components/research-session-provider"
+import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/src/components/ai-elements/conversation"
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/src/components/ai-elements/reasoning"
+import { Source, Sources, SourcesContent, SourcesTrigger } from "@/src/components/ai-elements/sources"
+import { Branch, BranchMessages, BranchSelector, BranchPrevious, BranchNext, BranchPage } from "@/src/components/ai-elements/branch"
+import { Task, TaskTrigger, TaskContent, TaskItem, TaskItemFile } from "@/src/components/ai-elements/task"
+import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from "@/src/components/ai-elements/tool"
+import { 
+  InlineCitation, 
+  InlineCitationText, 
+  InlineCitationCard, 
+  InlineCitationCardTrigger, 
+  InlineCitationCardBody,
+  InlineCitationCarousel,
+  InlineCitationCarouselContent,
+  InlineCitationCarouselItem,
+  InlineCitationCarouselHeader,
+  InlineCitationCarouselIndex,
+  InlineCitationCarouselPrev,
+  InlineCitationCarouselNext,
+  InlineCitationSource,
+  InlineCitationQuote
+} from "@/src/components/ai-elements/inline-citation"
 
 interface Message {
   id: string
@@ -41,6 +64,133 @@ interface ResearchAssistantProps {
   onPersonalityChange?: (personality: Personality) => void
 }
 
+// Extract URLs from plain text assistant messages to power the Sources UI
+// Includes common URL terminators in the exclusion set and properly escapes closing bracket
+const URL_REGEX = /https?:\/\/[^\s)\]\}"'<>]+/g
+function extractUrlsFromText(text: string): string[] {
+  if (!text) return []
+  const matches = text.match(URL_REGEX) ?? []
+  const cleaned = matches.map((u) => u.replace(/[.,;:)\]]+$/, ""))
+  // Deduplicate while preserving order
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const u of cleaned) {
+    if (!seen.has(u)) {
+      seen.add(u)
+      result.push(u)
+    }
+  }
+  return result
+}
+
+// Extract academic citations from text (e.g., [1], (Smith et al., 2023), etc.)
+function extractCitationsFromText(text: string): Array<{ text: string, sources: string[] }> {
+  if (!text) return []
+  
+  const citations: Array<{ text: string, sources: string[] }> = []
+  
+  // Pattern for numbered citations like [1], [2-4], etc.
+  const numberedCitations = text.match(/\[(\d+(?:-\d+)?(?:,\s*\d+(?:-\d+)?)*)\]/g) || []
+  numberedCitations.forEach(citation => {
+    citations.push({
+      text: citation,
+      sources: [`Citation ${citation}`]
+    })
+  })
+  
+  // Pattern for author-year citations like (Smith et al., 2023)
+  const authorYearCitations = text.match(/\([A-Z][a-z]+(?:\s+et\s+al\.)?(?:,\s+\d{4})?(?:;\s*[A-Z][a-z]+(?:\s+et\s+al\.)?(?:,\s+\d{4})?)*\)/g) || []
+  authorYearCitations.forEach(citation => {
+    citations.push({
+      text: citation,
+      sources: [`Academic source: ${citation}`]
+    })
+  })
+  
+  return citations
+}
+
+// Extract task-like content from text
+function extractTasksFromText(text: string): Array<{ title: string, items: string[] }> {
+  if (!text) return []
+  
+  const tasks: Array<{ title: string, items: string[] }> = []
+  
+  // Look for numbered lists or bullet points that might be tasks
+  const taskPatterns = [
+    /(?:^|\n)(?:\d+\.\s+|[-*]\s+)(.+)/gm,
+    /(?:^|\n)(?:TODO|Task|Action):\s*(.+)/gim,
+    /(?:^|\n)(?:Steps?|Instructions?):\s*\n((?:(?:\d+\.\s+|[-*]\s+).+\n?)+)/gim
+  ]
+  
+  taskPatterns.forEach(pattern => {
+    const matches = text.match(pattern)
+    if (matches && matches.length > 2) {
+      tasks.push({
+        title: "Extracted Tasks",
+        items: matches.slice(0, 5) // Limit to 5 items
+      })
+    }
+  })
+  
+  return tasks
+}
+
+// Extract tool usage mentions from text
+function extractToolsFromText(text: string): Array<{ name: `tool-${string}`, status: 'input-available' | 'output-available', input?: any, output?: string }> {
+  if (!text) return []
+  
+  const tools: Array<{ name: `tool-${string}`, status: 'input-available' | 'output-available', input?: any, output?: string }> = []
+  
+  // Look for tool usage patterns
+  const toolPatterns = [
+    /(?:using|used|calling|executed)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:tool|API|service)/gi,
+    /\b([A-Z][a-zA-Z]+API|[A-Z][a-zA-Z]+Service)\b/g,
+    /(?:searched|queried|analyzed)\s+(?:with|using)\s+([A-Z][a-zA-Z]+)/gi
+  ]
+  
+  toolPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)]
+    matches.forEach(match => {
+      if (match[1] && tools.length < 3) { // Limit to 3 tools
+        // Format the tool name to match expected pattern
+        const toolName = `tool-${match[1].toLowerCase().replace(/\s+/g, '-')}` as `tool-${string}`
+        tools.push({
+          name: toolName,
+          status: 'output-available',
+          output: `Successfully executed ${match[1]}`
+        })
+      }
+    })
+  })
+  
+  return tools
+}
+
+// Extract actionable items from text
+function extractActionsFromText(text: string): string[] {
+  if (!text) return []
+  
+  const actions: string[] = []
+  
+  // Look for action words and phrases
+  const actionPatterns = [
+    /(?:you (?:can|should|might|could)|try|consider|recommend)\s+([^.!?]+)/gi,
+    /(?:^|\n)(?:Action|Next step|Recommendation):\s*(.+)/gim
+  ]
+  
+  actionPatterns.forEach(pattern => {
+    const matches = [...text.matchAll(pattern)]
+    matches.forEach(match => {
+      if (match[1] && actions.length < 3) { // Limit to 3 actions
+        actions.push(match[1].trim())
+      }
+    })
+  })
+  
+  return actions
+}
+
 export function ResearchAssistant({ 
   personalities = [],
   selectedPersonality,
@@ -52,12 +202,12 @@ export function ResearchAssistant({
     buildResearchContext, 
     addChatMessage, 
     clearChatHistory,
+    setChatHistory,
     hasContext, 
     contextSummary 
   } = useResearchSession()
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
   
   // Chat state
   // Initialize messages from session chat history
@@ -72,7 +222,8 @@ export function ResearchAssistant({
     }))
   )
   const [isTyping, setIsTyping] = useState(false)
-  const [contextCollapsed, setContextCollapsed] = useState(false)
+  // Show research context card collapsed by default; user can expand
+  const [contextCollapsed, setContextCollapsed] = useState(true)
   
   // AI Provider state
   const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
@@ -81,6 +232,15 @@ export function ResearchAssistant({
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [streamingController, setStreamingController] = useState<StreamingController | null>(null)
+
+  // Reasoning panel text content and optional progress (shown within content)
+  const [reasoningLines, setReasoningLines] = useState<string[]>([])
+  const [reasoningProgress, setReasoningProgress] = useState<number | undefined>(undefined)
+
+  // Branch management for conversation alternatives
+  const [messageBranches, setMessageBranches] = useState<Record<string, Message[]>>({})
+  const [currentBranches, setCurrentBranches] = useState<Record<string, number>>({})
 
   // Map provider → local logo assets placed under /public
   const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
@@ -136,6 +296,22 @@ export function ResearchAssistant({
     textarea.style.height = `${newHeight}px`
   }, [])
 
+
+  const handleAbortStream = useCallback(() => {
+    if (streamingController) {
+      streamingController.abort()
+      setStreamingController(null)
+      setIsSending(false)
+      setIsTyping(false)
+      toast({
+        title: "Stream Cancelled",
+        description: "AI response generation was cancelled"
+      })
+      setReasoningLines([])
+      setReasoningProgress(undefined)
+    }
+  }, [streamingController, toast])
+
   // Load available providers on mount
   useEffect(() => {
     const loadProviders = async () => {
@@ -177,15 +353,7 @@ export function ResearchAssistant({
     }
   }, [selectedProvider, selectedModel])
 
-  // Auto-scroll to bottom when new messages are added
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  }, [messages])
+  // Auto-scroll handled by Conversation component
 
   const handleSendMessage = async () => {
     if (!value.trim() || isSending || !selectedProvider || !selectedModel) return
@@ -200,10 +368,27 @@ export function ResearchAssistant({
     }
 
     setMessages(prev => [...prev, userMessage])
+    const userMessageContent = value.trim()
     setValue("")
     adjustHeight()
     setIsSending(true)
     setIsTyping(true)
+    // reset reasoning panel for new stream; it will auto-open on first progress
+    setReasoningLines([])
+    setReasoningProgress(undefined)
+
+    // Create placeholder assistant message for streaming
+    const assistantMessageId = (Date.now() + 1).toString()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      provider: selectedProvider,
+      model: selectedModel
+    }
+    
+    setMessages(prev => [...prev, assistantMessage])
 
     try {
       // Build comprehensive system prompt with session context
@@ -221,52 +406,106 @@ ${researchContext}
 
 Use this research context to provide more relevant and targeted responses. Reference specific papers, topics, or ideas from the context when relevant.`
         : basePrompt
-      
-      // Prepare conversation history for context (compact transcript)
+
+      // Set up streaming callbacks
+      const streamingCallbacks: StreamingCallbacks = {
+        onToken: (token: string) => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: msg.content + token }
+              : msg
+          ))
+        },
+        onProgress: (progress) => {
+          // Update with progress messages/percentages
+          console.log('Streaming progress:', progress)
+          if (typeof progress?.percentage === 'number') {
+            setReasoningProgress(progress.percentage)
+          }
+          const msg = progress?.message
+          if (typeof msg === 'string' && msg.length > 0) {
+            setReasoningLines(prev => {
+              if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
+              return [...prev, msg]
+            })
+          }
+        },
+        onError: (error: string) => {
+          console.error("Streaming error:", error)
+          // Suppress destructive toast if this was a user-initiated abort
+          if (error !== 'Stream aborted by user') {
+            toast({
+              title: "Streaming Error",
+              description: error,
+              variant: "destructive"
+            })
+          }
+          setIsTyping(false)
+          setIsSending(false)
+          setStreamingController(null)
+          setReasoningLines([])
+          setReasoningProgress(undefined)
+        },
+        onDone: (metadata) => {
+          console.log('Streaming complete:', metadata)
+          setIsTyping(false)
+          setIsSending(false)
+          setStreamingController(null)
+          // Mark reasoning as complete and clear shortly after
+          setReasoningLines(prev => {
+            if (prev.length === 0 || prev[prev.length - 1] !== 'Response complete') {
+              return [...prev, 'Response complete']
+            }
+            return prev
+          })
+          setReasoningProgress(100)
+          setTimeout(() => {
+            setReasoningLines([])
+            setReasoningProgress(undefined)
+          }, 600)
+          
+          // Save messages to session
+          addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
+          
+          // Use a timeout to ensure state has updated, then save the assistant message
+          setTimeout(() => {
+            setMessages(currentMessages => {
+              const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
+              if (finalMessage?.content) {
+                addChatMessage('assistant', finalMessage.content, researchContext ? ['research_context'] : undefined)
+              }
+              return currentMessages
+            })
+          }, 100)
+        }
+      }
+
+      // Build conversation history for context
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content
       }))
+      // Add the new user message to the conversation
+      conversationHistory.push({
+        role: 'user',
+        content: userMessageContent
+      })
 
-      // Compose a single prompt including system context and concise chat history
-      const transcript = conversationHistory
-        .slice(-12) // keep recent turns to control token usage
-        .map(m => `${m.role.toUpperCase()}: ${m.content}`)
-        .join("\n")
-
-      const composedPrompt = `${systemPrompt}
-
-=== CONVERSATION SO FAR ===
-${transcript || "(no prior messages)"}
-
-USER: ${value.trim()}
-ASSISTANT:`
-
-      const apiResponse = await AIProviderService.generateResponse(
-        composedPrompt,
+      // Start streaming with full conversation history
+      const controller = await AIProviderService.streamChat(
+        conversationHistory,
         selectedProvider,
-        selectedModel
+        selectedModel,
+        streamingCallbacks,
+        {
+          systemPrompt,
+          temperature: 0.7,
+          maxTokens: 2000
+        }
       )
-
-      // Handle both AIResponse type and API response format
-      const content = typeof apiResponse === 'string' 
-        ? apiResponse 
-        : (apiResponse as any).response || apiResponse.content || 'No response received'
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content,
-        timestamp: new Date(),
-        provider: selectedProvider,
-        model: selectedModel
-      }
       
-      setMessages(prev => [...prev, assistantMessage])
-      
-      // Save both messages to session
-      addChatMessage('user', value.trim(), researchContext ? ['research_context'] : undefined)
-      addChatMessage('assistant', content, researchContext ? ['research_context'] : undefined)
+      setStreamingController(controller)
+
     } catch (error) {
       console.error("Error sending message:", error)
       toast({
@@ -274,7 +513,6 @@ ASSISTANT:`
         description: "Failed to get response from AI provider",
         variant: "destructive"
       })
-    } finally {
       setIsSending(false)
       setIsTyping(false)
     }
@@ -285,14 +523,6 @@ ASSISTANT:`
       e.preventDefault()
       handleSendMessage()
     }
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied",
-      description: "Message copied to clipboard"
-    })
   }
 
   const clearChat = () => {
@@ -306,9 +536,35 @@ ASSISTANT:`
     })
   }
 
+  // Revert to the state before a given user message
+  const handleRevertToMessage = (messageId: string) => {
+    const idx = messages.findIndex(m => m.id === messageId && m.role === 'user')
+    if (idx === -1) return
+    const target = messages[idx]
+    const trimmed = messages.slice(0, idx)
+
+    setIsTyping(false)
+    setIsSending(false)
+    setMessages(trimmed)
+    setValue(target.content)
+    // Persist trimmed history to session
+    const newHistory = trimmed.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp.toISOString()
+    }))
+    setChatHistory(newHistory)
+    adjustHeight()
+    textareaRef.current?.focus()
+    toast({
+      title: "Reverted",
+      description: "Chat reverted to before that prompt. You can edit and resend.",
+    })
+  }
+
 
   return (
-    <div className="flex flex-col h-[75vh] md:h-[80vh] lg:h-[85vh] bg-white rounded-lg border">
+    <div className="flex flex-col h-[85vh] md:h-[90vh] lg:h-[95vh] bg-white rounded-lg border">
       {/* Header */}
       <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
         <div className="flex items-center gap-2">
@@ -330,83 +586,81 @@ ASSISTANT:`
         </Button>
       </div>
 
+
       {/* Messages */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-8">
-        {messages.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            <Bot className="w-14 h-14 mx-auto mb-4 opacity-50" />
-            <p>Start a conversation with your AI research assistant</p>
-            <p className="text-sm mt-2">
-              Select a provider and model, then type your message below
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-3",
-                  message.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                {message.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-primary" />
-                  </div>
-                )}
-                                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-xl px-6 py-4",
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    )}
-                  >
-                    <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                    {message.role === "assistant" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2"
-                        onClick={() => copyToClipboard(message.content)}
+      <Conversation className="flex-1 p-4 md:p-6">
+        <ConversationContent>
+          {messages.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              <Bot className="w-14 h-14 mx-auto mb-4 opacity-50" />
+              <p>Start a conversation with your AI research assistant</p>
+              <p className="text-sm mt-2">
+                Select a provider and model, then type your message below
+              </p>
+            </div>
+          ) : (
+            <>
+              {messages.map((message, messageIndex) => {
+                // Check if this message has branches
+                const hasBranches = messageBranches[message.id] && messageBranches[message.id].length > 1
+                const currentBranch = currentBranches[message.id] || 0
+                const branches = messageBranches[message.id] || [message]
+                const displayMessage = branches[currentBranch] || message
+
+                return (
+                  <div key={message.id}>
+                    {hasBranches && (
+                      <Branch 
+                        defaultBranch={currentBranch}
+                        onBranchChange={(branchIndex) => {
+                          setCurrentBranches(prev => ({
+                            ...prev,
+                            [message.id]: branchIndex
+                          }))
+                        }}
                       >
-                        <Copy className="w-3 h-3" />
-                      </Button>
+                        <BranchMessages>
+                          {branches.map((branchMessage, branchIndex) => (
+                            <div key={`${message.id}-branch-${branchIndex}`}>
+                              <MessageContent 
+                                message={branchMessage} 
+                                messageIndex={messageIndex} 
+                                onRevert={handleRevertToMessage}
+                                isSending={isSending}
+                                reasoningProgress={reasoningProgress}
+                                reasoningLines={reasoningLines}
+                              />
+                            </div>
+                          ))}
+                        </BranchMessages>
+                        <BranchSelector from={message.role}>
+                          <BranchPrevious />
+                          <BranchPage />
+                          <BranchNext />
+                        </BranchSelector>
+                      </Branch>
+                    )}
+                    {!hasBranches && (
+                      <MessageContent 
+                        message={displayMessage} 
+                        messageIndex={messageIndex} 
+                        onRevert={handleRevertToMessage}
+                        isSending={isSending}
+                        reasoningProgress={reasoningProgress}
+                        reasoningLines={reasoningLines}
+                      />
                     )}
                   </div>
-                </div>
-                {message.role === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                )}
-              </div>
-            ))}
-            {isTyping && (
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-primary" />
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-2">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+                )
+              })}
+            </>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
       {/* Input Area */}
-      <div className="border-t bg-muted/30 px-6 py-6">
+      <div className="border-t bg-muted/30 px-4 py-4">
         {/* Research Context Display */}
         {hasContext && (
           contextCollapsed ? (
@@ -588,22 +842,240 @@ ASSISTANT:`
             }}
             onKeyDown={handleKeyDown}
             placeholder="Ask your research question..."
-            className="min-h-[110px] max-h-[320px] resize-none text-sm"
+            className="min-h-[80px] max-h-[200px] resize-none text-sm"
             disabled={isSending}
           />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!value.trim() || isSending || !selectedProvider || !selectedModel}
-            className="px-4"
-          >
-            {isSending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ArrowRight className="w-4 h-4" />
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={handleSendMessage}
+              disabled={!value.trim() || isSending || !selectedProvider || !selectedModel}
+              className="px-4"
+            >
+              {isSending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRight className="w-4 h-4" />
+              )}
+            </Button>
+            {streamingController && (
+              <Button
+                onClick={handleAbortStream}
+                variant="outline"
+                size="sm"
+                className="px-3"
+                title="Cancel streaming response"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Separate component for rendering individual messages to avoid duplication
+function MessageContent({ 
+  message, 
+  messageIndex, 
+  onRevert,
+  isSending,
+  reasoningProgress,
+  reasoningLines
+}: { 
+  message: Message, 
+  messageIndex: number,
+  onRevert: (messageId: string) => void,
+  isSending: boolean,
+  reasoningProgress: number | null | undefined,
+  reasoningLines: string[]
+}) {
+  const { toast } = useToast()
+ 
+  
+  return (
+    <div
+      className={cn(
+        "flex gap-3",
+        message.role === "user" ? "justify-end" : "justify-start"
+      )}
+    >
+      {message.role === "assistant" && (
+        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <Bot className="w-5 h-5 text-primary" />
+        </div>
+      )}
+      <div
+        className={cn(
+          "group relative max-w-[90%] rounded-xl px-6 py-4",
+          message.role === "user"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted"
+        )}
+      >
+        {message.role === "user" && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 size-7 shrink-0 rounded-full text-primary-foreground/80 hover:text-primary-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  aria-label="Revert to this prompt"
+                  disabled={isSending}
+                  onClick={() => onRevert(message.id)}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Revert to this prompt</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {message.role === "assistant" && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 size-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  aria-label="Copy response"
+                  onClick={() => {
+                    navigator.clipboard.writeText(message.content)
+                    toast({ title: "Copied", description: "Response copied to clipboard" })
+                  }}
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Copy response</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {message.role === "assistant" ? (
+          <>
+            {/* Sources Panel */}
+            {(() => {
+              const urls = extractUrlsFromText(message.content)
+              if (urls.length === 0) return null
+              return (
+                <div className="mb-2">
+                  <Sources>
+                    <SourcesTrigger count={urls.length} />
+                    <SourcesContent>
+                      {urls.map((u, i) => (
+                        <Source key={`${message.id}-src-${i}`} href={u} title={u} />
+                      ))}
+                    </SourcesContent>
+                  </Sources>
+                </div>
+              )
+            })()}
+
+            {/* Reasoning Panel - Only show for assistant messages during streaming */}
+            {message.role === "assistant" && isSending && (
+              <div className="mb-2">
+                <Reasoning className="w-full" isStreaming={isSending}>
+                  <ReasoningTrigger />
+                  <ReasoningContent>
+                    {[
+                      typeof reasoningProgress === 'number' ? `Progress: ${Math.round(reasoningProgress)}%` : undefined,
+                      reasoningLines.length === 0 ? 'Initializing...' : reasoningLines.join('\n')
+                    ].filter(Boolean).join('\n')}
+                  </ReasoningContent>
+                </Reasoning>
+              </div>
+            )}
+
+            {/* Tasks Panel */}
+            {(() => {
+              const tasks = extractTasksFromText(message.content)
+              if (tasks.length === 0) return null
+              return (
+                <div className="mb-2 space-y-2">
+                  {tasks.map((task, i) => (
+                    <Task key={`${message.id}-task-${i}`} defaultOpen={false}>
+                      <TaskTrigger title={task.title} />
+                      <TaskContent>
+                        {task.items.map((item, j) => (
+                          <TaskItem key={`${message.id}-task-${i}-item-${j}`}>
+                            {item}
+                          </TaskItem>
+                        ))}
+                      </TaskContent>
+                    </Task>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* Tools Panel */}
+            {(() => {
+              const tools = extractToolsFromText(message.content)
+              if (tools.length === 0) return null
+              return (
+                <div className="mb-2 space-y-2">
+                  {tools.map((tool, i) => (
+                    <Tool key={`${message.id}-tool-${i}`} defaultOpen={false}>
+                      <ToolHeader type={tool.name} state={tool.status} />
+                      <ToolContent>
+                        {tool.input && <ToolInput input={tool.input} />}
+                        {tool.output && <ToolOutput output={tool.output} errorText={undefined} />}
+                      </ToolContent>
+                    </Tool>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {/* Enhanced Response with Inline Citations */}
+            {(() => {
+              const citations = extractCitationsFromText(message.content)
+              let processedContent = message.content
+              
+              // Replace citations with InlineCitation components
+              citations.forEach((citation, i) => {
+                // For now, just render the original content with citations highlighted
+                // Full JSX replacement would require more complex parsing
+              })
+              
+              return (
+                <Response parseIncompleteMarkdown={true}>
+                  {processedContent}
+                </Response>
+              )
+            })()}
+
+            {/* Actions Panel (minimal list, no copy buttons) */}
+            {(() => {
+              const actions = extractActionsFromText(message.content)
+              if (actions.length === 0) return null
+              return (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <ul className="list-disc pl-5 space-y-1">
+                    {actions.slice(0, 5).map((a, i) => (
+                      <li key={`${message.id}-act-${i}`}>{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })()}
+          </>
+        ) : (
+          <div className="text-sm whitespace-pre-wrap leading-6">{message.content}</div>
+        )}
+      </div>
+      {message.role === "user" && (
+        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+          <User className="w-5 h-5 text-primary-foreground" />
+        </div>
+      )}
     </div>
   )
 }

@@ -12,6 +12,13 @@
     <priority>1.0</priority>
   </url>
 
+  <url>
+    <loc>https://thesisflow-ai.vercel.app/changelog</loc>
+    <lastmod>2025-09-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
   <!-- Core Features -->
   <url>
     <loc>https://thesisflow-ai.vercel.app/explorer</loc>

@@ -7,12 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall, Loader2, CreditCard, Settings } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Crown, Zap, Users, FileText, Search, Sparkles, CheckCircle, XCircle, ArrowRight, Star, PhoneCall, Loader2, CreditCard, Settings, BarChart3 } from "lucide-react"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { useToast } from "@/hooks/use-toast"
 import { RouteGuard } from "@/components/route-guard"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { loadStripe } from "@stripe/stripe-js"
+import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
+import ProjectAnalyticsChart from "@/components/ui/project-analytics-chart"
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
@@ -26,6 +29,7 @@ export default function PlanPage() {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const [processingCheckout, setProcessingCheckout] = useState(false)
   const [processingPortal, setProcessingPortal] = useState(false)
+  const [activeTab, setActiveTab] = useState("subscription")
 
   // Handle success/cancel returns from Stripe
   useEffect(() => {
@@ -266,16 +270,32 @@ Thank you!`)
   return (
     <RouteGuard>
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Your Plan</h1>
-            <p className="text-gray-600">Manage your subscription and usage</p>
+          <div className="mb-8">
+            <BackBreadcrumb className="mb-2" />
+            <div className="text-center">
+              <h1 className="text-3xl font-bold mb-2">Plan & Analytics</h1>
+              <p className="text-gray-600">Manage your subscription and view project insights</p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Current Plan */}
-            <Card>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="subscription" className="flex items-center gap-2">
+                <Crown className="h-4 w-4" />
+                Subscription
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="subscription" className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Current Plan */}
+                <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {config.icon}
@@ -336,10 +356,10 @@ Thank you!`)
                   </div>
                 )}
               </CardContent>
-            </Card>
+                </Card>
 
-            {/* Available Plans */}
-            <Card>
+                {/* Available Plans */}
+                <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="h-5 w-5" />
@@ -543,8 +563,18 @@ Thank you!`)
               </CardContent>
             </Card>
           </div>
-        </div>
-      </div>
-    </RouteGuard>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-semibold mb-2">Project Analytics</h2>
+            <p className="text-muted-foreground">Track your team's productivity and project progress over time</p>
+          </div>
+          <ProjectAnalyticsChart />
+        </TabsContent>
+      </Tabs>
+    </div>
+  </div>
+</RouteGuard>
   )
-} 
+}

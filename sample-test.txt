@@ -1,0 +1,26 @@
+Sample Document for Extraction Testing
+
+This is a test document that contains various types of content to validate the multi-format document extraction system.
+
+Key Features Being Tested:
+1. Text extraction and processing
+2. Summary generation capabilities
+3. Metadata extraction (word count, reading time)
+4. Key points identification
+5. Entity extraction and analysis
+
+Sample Data:
+The system should be able to extract structured information from this document including:
+- Document statistics
+- Main topics and themes
+- Important entities and keywords
+- Reading complexity metrics
+
+Technical Details:
+- File format: Plain text (.txt)
+- Processing method: Simple text extraction
+- Expected output: JSON with summary, key points, and metadata
+- Integration test: Validates the complete pipeline from file upload to processed results
+
+Conclusion:
+This sample document provides a baseline for testing the extraction system's core functionality across different file formats and extraction types.

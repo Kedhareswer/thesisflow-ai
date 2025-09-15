@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { storageManager } from '@/lib/storage/storage-manager'
+import { supabaseStorageManager } from '@/lib/storage/supabase-storage-manager'
 import { StorageFile } from '@/lib/storage/types'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -56,32 +57,41 @@ export function CloudFileUploader({
     }))
 
     try {
-      // Check if provider is connected
-      const providers = storageManager.getConnectedProviders()
-      if (providers.length === 0) {
-        throw new Error('No cloud storage provider connected. Please connect a provider first.')
-      }
+      // Check if Google Drive is connected and use the appropriate manager
+      let result: StorageFile;
+      
+      if (supabaseStorageManager.isGoogleDriveConnected()) {
+        // Upload to Google Drive using supabaseStorageManager
+        result = await supabaseStorageManager.uploadFileToGoogleDrive(file, {
+          parentId
+        });
+      } else {
+        // Check if provider is connected
+        const providers = storageManager.getConnectedProviders()
+        if (providers.length === 0) {
+          throw new Error('No cloud storage provider connected. Please connect a provider first.')
+        }
 
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setUploadingFiles(prev => {
-          const next = new Map(prev)
-          const current = next.get(fileId)
-          if (current && current.progress < 90) {
-            current.progress = Math.min(current.progress + 10, 90)
-            next.set(fileId, current)
-          }
-          return next
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+          setUploadingFiles(prev => {
+            const next = new Map(prev)
+            const current = next.get(fileId)
+            if (current && current.progress < 90) {
+              current.progress = Math.min(current.progress + 10, 90)
+              next.set(fileId, current)
+            }
+            return next
+          })
+        }, 200)
+
+        // Upload to cloud storage
+        result = await storageManager.uploadFile(file, {
+          parentId
         })
-      }, 200)
 
-      // Upload to cloud storage
-      const result = await storageManager.uploadFile(file, {
-        parentId,
-        cacheContent: true // Cache for offline access
-      })
-
-      clearInterval(progressInterval)
+        clearInterval(progressInterval)
+      }
 
       // Update to completed
       setUploadingFiles(prev => {

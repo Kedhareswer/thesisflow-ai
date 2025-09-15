@@ -14,6 +14,7 @@ Allow: /writer
 Allow: /collaborate
 Allow: /planner
 Allow: /ai-assistant
+Allow: /changelog
 
 # Marketing and information pages
 Allow: /pricing

@@ -111,7 +111,8 @@ export async function GET(request: NextRequest) {
           is_public: file.is_public,
           download_count: file.download_count,
           version: file.version,
-          team_id: teamId
+          team_id: teamId,
+          source: 'files'
         }
       }) || []
 
@@ -169,14 +170,16 @@ export async function GET(request: NextRequest) {
           is_public: file.is_public,
           download_count: 0,
           version: null,
-          team_id: file.team_id
+          team_id: file.team_id,
+          source: 'documents'
         }
       }) || []
 
-      // Merge and deduplicate by file url
-      const allFilesMap = new Map()
+      // Merge and deduplicate. Prefer URL as key; fall back to source-namespaced id
+      const allFilesMap = new Map<string, any>()
       for (const f of [...formattedFiles, ...formattedDocFiles]) {
-        if (f.url) allFilesMap.set(f.url, f)
+        const key = f.url ? `url:${f.url}` : `source:${f.source || 'files'}:id:${f.id}`
+        if (key && !allFilesMap.has(key)) allFilesMap.set(key, f)
       }
       allFiles = [...allFilesMap.values()]
     }
@@ -325,7 +328,7 @@ export async function POST(request: NextRequest) {
           file_name: name,
           file_type: fileType || 'application/octet-stream',
           file_size: fileSize || 0,
-          file_url: url || '', // In real implementation, this would be the uploaded file URL
+          file_url: url || '',
           description: description || '',
           tags: tags || [],
           is_public: isPublic || false

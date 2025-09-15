@@ -9,6 +9,8 @@ interface OpenAlexWork {
   doi: string
 }
 
+export type { OpenAlexWork };
+
 /**
  * Parse domain-specific queries to enhance search relevance for specialized fields
  * This improves results especially for multi-domain searches like "Deep Learning in combat"

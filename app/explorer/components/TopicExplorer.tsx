@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Search, Brain, Info } from "lucide-react"
-import { FormField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { SkeletonCard } from "@/components/common/SkeletonCard"
 import { ContentFormatter } from "./ContentFormatter"
@@ -19,7 +18,6 @@ import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ui/reasoning"
 
 // Enhanced research service that uses real AI
 class EnhancedResearchService {
@@ -127,7 +125,7 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
   const [additionalContext, setAdditionalContext] = useState("")
   const [localProvider, setLocalProvider] = useState<AIProvider | undefined>(selectedProvider)
   const [localModel, setLocalModel] = useState<string | undefined>(selectedModel)
-  const [reasoningText, setReasoningText] = useState("")
+  
 
   const topicExploration = useAsync<{
     content: string
@@ -150,6 +148,8 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
       }
     }
   }, [])
+
+  // Deep Research removed per requirements
 
   const handleTopicExploration = useCallback(() => {
     if (!topic.trim()) {
@@ -192,7 +192,6 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
 [Promising research paths]
 
 ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
-        setReasoningText(prompt)
         await topicExploration.execute(topic, depthNumber, additionalContext, localProvider, localModel)
 
         // Add topic to research session after successful execution
@@ -245,6 +244,24 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
       }
     }
     return ""
+  }
+
+  const isValidUrl = (u?: string) => {
+    try {
+      if (!u) return false
+      const parsed = new URL(u)
+      return /^https?:/i.test(parsed.protocol)
+    } catch {
+      return false
+    }
+  }
+
+  const getHostname = (u?: string) => {
+    try {
+      return u ? new URL(u).hostname : ''
+    } catch {
+      return ''
+    }
   }
 
   return (
@@ -327,24 +344,19 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
             />
           </div>
 
-          <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">
-            {topicExploration.loading ? (
-              <LoadingSpinner size="sm" text="Exploring..." />
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Explore Topic
-              </>
-            )}
-          </Button>
+          <div className="grid grid-cols-1 gap-4">
+            <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">
+              {topicExploration.loading ? (
+                <LoadingSpinner size="sm" text="Exploring..." />
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Explore Topic
+                </>
+              )}
+            </Button>
+          </div>
 
-          {/* Reasoning UI: shows the exact prompt sent to the AI and auto-expands while generating */}
-          <Reasoning isStreaming={topicExploration.loading} className="mt-2">
-            <ReasoningTrigger>Show reasoning</ReasoningTrigger>
-            <ReasoningContent className="ml-2 border-l-2 border-l-slate-200 px-2 pb-1 dark:border-l-slate-700">
-              {reasoningText}
-            </ReasoningContent>
-          </Reasoning>
 
           {topicExploration.error && (
             <div className="text-red-500 mt-2">
@@ -386,6 +398,8 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
           </CardContent>
         </Card>
       )}
+
+      {/* Deep Research functionality removed per requirements */}
     </div>
   )
 }

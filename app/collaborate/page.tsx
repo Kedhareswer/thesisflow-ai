@@ -1,9 +1,21 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import Sidebar from "../ai-agents/components/Sidebar"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { MentionInput, MessageWithMentions, type MentionData } from "@/components/ui/mention-input"
+import { 
+  ProductivityMessage as EnhancedMessage, 
+  ProductivityMessageInput as EnhancedMessageInput, 
+  ProductivityChatHeader as EnhancedChatHeader,
+  ProductivityUser as EnhancedUser,
+  ProductivityMessage as EnhancedMessageType
+} from '@/components/ui/productivity-messaging'
+import { StreamingAIMessage } from '@/components/ui/streaming-ai-message'
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
+import { NovaAIService } from '@/lib/services/nova-ai.service'
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -48,14 +60,20 @@ import {
   Eye,
   AlertCircle,
   Globe,
-  Lock
+  Lock,
+  Bot,
+  Copy,
+  Reply,
+  Brain,
+  Paperclip
 } from "lucide-react"
 
-import { useSocket } from "@/components/socket-provider"
+import { useSocket as useAppSocket } from "@/lib/services/socket.service"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { RouteGuard } from "@/components/route-guard"
 import { TeamSettings } from "./components/team-settings"
+import TeamSidebar from "./components/team-sidebar"
 import { TeamFiles } from "./components/team-files"
 import NotificationBell from "./components/notification-bell"
 import { InvitationsDialog } from "./components/invitations-dialog"
@@ -65,6 +83,9 @@ import { useUserPlan } from "@/hooks/use-user-plan"
 import { PlanStatus } from "@/components/ui/plan-status"
 import { TeamLimitBanner } from "@/components/ui/smart-upgrade-banner"
 import { collaborateService } from "@/lib/services/collaborate.service"
+import { cn } from "@/lib/utils"
+import { ChatSearch } from "@/components/ui/chat-search"
+import { ChatMessageSkeleton } from "@/components/ui/skeleton-loader"
 
 // Type definitions
 interface User {
@@ -127,11 +148,25 @@ export default function CollaboratePage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [isSwitchingTeam, setIsSwitchingTeam] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [newMessage, setNewMessage] = useState("")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  
+  // Enhanced productivity features
+  const [userPresence, setUserPresence] = useState<Record<string, EnhancedUser>>({})
+  const [replyingTo, setReplyingTo] = useState<EnhancedMessageType | null>(null)
+  const [isProcessingAI, setIsProcessingAI] = useState(false)
+  // Removed lastActivity state to prevent infinite loop - using local variable in useEffect instead
+  const novaAI = NovaAIService.getInstance()
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [currentMentions, setCurrentMentions] = useState<MentionData[]>([])
+  const [teamFileMentions, setTeamFileMentions] = useState<MentionData[]>([])
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
+  const lastScrollTimeRef = useRef<number>(0)
+  const loadMessagesRef = useRef<((teamId: string) => Promise<void>) | undefined>(undefined)
+  const mapMentionsRef = useRef<((ids: any) => MentionData[]) | undefined>(undefined)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"viewer" | "editor" | "admin">("viewer")
   const [isInviting, setIsInviting] = useState(false)
@@ -150,10 +185,15 @@ export default function CollaboratePage() {
     isPublic: false,
   })
   const [isInvitationsDialogOpen, setIsInvitationsDialogOpen] = useState(false)
+  // global navigation sidebar collapse state
+  const [collapsed, setCollapsed] = useState(false)
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   const { toast } = useToast()
-  const { socket } = useSocket()
   const { user, isLoading: authLoading, session } = useSupabaseAuth()
+  // Use authenticated socket from lib (attaches Supabase token)
+  const socket = useAppSocket(user?.id || null)
 
   // API helper functions
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -179,16 +219,157 @@ export default function CollaboratePage() {
     return response.json()
   }, [session])
 
-  // Load teams
+  // Load team files for @mentions in composer
+  const loadTeamFilesForMentions = useCallback(async () => {
+    if (!selectedTeamId) return
+    try {
+      const data = await apiCall(`/api/collaborate/files?teamId=${selectedTeamId}&limit=50`)
+      if (data?.success && Array.isArray(data.files)) {
+        const mapped: MentionData[] = data.files.map((file: any) => ({
+          id: file.id,
+          type: 'file' as const,
+          name: file.name,
+          fileType: file.mime_type,
+          fileSize: (file.size ?? file.file_size ?? 0).toString(),
+          fileUrl: file.url || file.file_url,
+        }))
+        console.log('[Team Files Debug] Loaded team files for mentions:', mapped)
+        setTeamFileMentions(mapped)
+      } else {
+        setTeamFileMentions([])
+      }
+    } catch {
+      setTeamFileMentions([])
+    }
+  }, [apiCall, selectedTeamId])
+
+  useEffect(() => {
+    loadTeamFilesForMentions()
+  }, [loadTeamFilesForMentions])
+
+  // Map mention ids from backend to MentionData objects for UI chips
+  const mapMentions = useCallback((ids: any): MentionData[] => {
+    const selectedTeam = teams.find(t => t.id === selectedTeamId)
+    const members = (selectedTeam?.members || []).map(m => ({
+      id: m.id,
+      type: 'user' as const,
+      name: m.name || m.email,
+      email: m.email,
+      avatar: m.avatar,
+    }))
+    const files = teamFileMentions
+    const idArray: string[] = Array.isArray(ids) ? ids : []
+    return idArray
+      .map(id => members.find(u => u.id === id) || files.find(f => f.id === id))
+      .filter(Boolean) as MentionData[]
+  }, [teams, selectedTeamId, teamFileMentions])
+
+  // Store the latest mapMentions function in ref
+  mapMentionsRef.current = mapMentions
+
+  // Attach from cloud: Google Drive picker → save to team → insert mention
+  const handleAttachFromCloud = useCallback(async () => {
+    try {
+      const { supabaseStorageManager, GoogleDriveOAuthHandler } = await import('@/lib/storage/supabase-storage-manager')
+      // Ensure Drive connected
+      if (!supabaseStorageManager.isGoogleDriveConnected()) {
+        const oauth = GoogleDriveOAuthHandler.getInstance()
+        await oauth.authenticate()
+        await supabaseStorageManager.loadUserProviders()
+      }
+      // List files
+      const driveFiles = await supabaseStorageManager.listGoogleDriveFiles()
+      if (!driveFiles || driveFiles.length === 0) {
+        toast({ title: 'No Drive files', description: 'Your Google Drive appears empty.' })
+        return
+      }
+      // Simple numeric prompt for now (keeps UI light)
+      const options = driveFiles.slice(0, 10).map((f, i) => `${i + 1}. ${f.name}`).join('\n')
+      const pick = window.prompt(`Pick a file to attach by number:\n${options}`, '1')
+      const index = Math.max(1, Math.min(10, parseInt(pick || '1', 10))) - 1
+      const chosen = driveFiles[index]
+      if (!chosen || !selectedTeamId) return
+      // Create a team_files record
+      const result = await apiCall('/api/collaborate/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: selectedTeamId,
+          type: 'file',
+          name: chosen.name,
+          url: chosen.webViewUrl,
+          description: 'Shared from Google Drive',
+          tags: ['google-drive'],
+          isPublic: false,
+          fileType: chosen.mimeType,
+          fileSize: chosen.size,
+        }),
+      })
+      if (!result?.success || !result.file) return
+      // Insert an @mention token for the new file
+      const mentionToken = `@[${result.file.name}](${result.file.id})`
+      setNewMessage(prev => (prev ? `${prev} ${mentionToken}` : mentionToken))
+      setCurrentMentions(prev => ([
+        ...prev,
+        { id: result.file.id, type: 'file', name: result.file.name, fileType: result.file.mime_type, fileSize: String(result.file.size || result.file.file_size || 0), fileUrl: result.file.url }
+      ]))
+      // Refresh mentions list for future suggestions
+      await loadTeamFilesForMentions()
+    } catch (e) {
+      console.error('Attach from cloud failed:', e)
+      toast({ title: 'Attach failed', description: e instanceof Error ? e.message : 'Could not attach from cloud', variant: 'destructive' })
+    }
+  }, [apiCall, selectedTeamId, loadTeamFilesForMentions, toast])
+
+  // Load teams (prefer websocket request-response, fallback to REST once)
   const loadTeams = useCallback(async () => {
     if (!user || !session) return
-    
     try {
       setIsLoading(true)
       setError(null)
-      
+
+      // Try sockets first for a single-shot fetch (no polling)
+      if (socket && (socket as any).connected) {
+        await new Promise<void>((resolve) => {
+          const handleTeams = (payload: any) => {
+            if (!payload) return
+            ;(socket as any).off('user-teams', handleTeams)
+            if (payload.success) {
+              const transformed = (payload.teams || []).map((team: any) => ({
+                id: team.id,
+                name: team.name,
+                description: team.description,
+                category: team.category,
+                isPublic: team.is_public,
+                createdAt: team.created_at,
+                owner: team.owner_id,
+                members: (team.members || []).map((member: any) => ({
+                  id: member.user_id,
+                  name: member.user_profile?.full_name || member.email || 'Unknown User',
+                  email: member.email || member.user_profile?.email || '',
+                  avatar: member.user_profile?.avatar_url,
+                  status: member.user_profile?.status || 'offline',
+                  role: member.role,
+                  joinedAt: member.joined_at,
+                  lastActive: member.user_profile?.last_active || member.joined_at,
+                })),
+              }))
+              setTeams(transformed)
+              if (!selectedTeamId && transformed.length > 0) {
+                setSelectedTeamId(transformed[0].id)
+              }
+            } else {
+              setError(payload.error || 'Failed to load teams')
+            }
+            resolve()
+          }
+          ;(socket as any).on('user-teams', handleTeams)
+          ;(socket as any).emit('get_user_teams')
+        })
+        return
+      }
+
+      // Fallback to REST once (no interval/polling)
       const data = await apiCall('/api/collaborate/teams')
-      
       if (data.success) {
         const transformedTeams = data.teams.map((team: any) => ({
           id: team.id,
@@ -209,9 +390,7 @@ export default function CollaboratePage() {
             lastActive: member.user_profile?.last_active || member.joined_at
           })) || []
         }))
-        
         setTeams(transformedTeams)
-        
         if (!selectedTeamId && transformedTeams?.length > 0) {
           setSelectedTeamId(transformedTeams[0].id)
         }
@@ -222,7 +401,7 @@ export default function CollaboratePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, apiCall])
+  }, [user, session, socket, apiCall])
 
   // Handle invitation responses
   const handleInvitationResponse = useCallback(async (invitationId: string, action: 'accept' | 'reject') => {
@@ -259,10 +438,47 @@ export default function CollaboratePage() {
   // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
     if (!teamId) return
-    
     try {
-      const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
+      if (socket && (socket as any).connected) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              ;(socket as any).off('messages', handler)
+              reject(new Error('Socket timeout'))
+            }, 5000) // 5 second timeout
+            
+            const handler = (payload: any) => {
+              clearTimeout(timeout)
+              if (!payload || payload.teamId !== teamId) return
+              const formatted: ChatMessage[] = (payload.messages || []).map((msg: any) => ({
+                id: msg.id,
+                senderId: msg.senderId,
+                senderName: msg.senderName || 'Unknown User',
+                senderAvatar: msg.senderAvatar,
+                content: msg.content,
+                timestamp: msg.timestamp,
+                teamId: msg.teamId,
+                type: msg.type || 'text',
+                // @ts-ignore - extended at runtime: map mention ids to data
+                mentions: mapMentionsRef.current?.(Array.isArray(msg.mentions) ? msg.mentions : []) || [],
+                // @ts-ignore - extended at runtime
+                replyTo: msg.replyTo || null,
+              }))
+              setMessages(formatted.reverse())
+              ;(socket as any).off('messages', handler)
+              resolve()
+            }
+            ;(socket as any).on('messages', handler)
+            ;(socket as any).emit('get_messages', { teamId, limit: 50 })
+          })
+          return
+        } catch (socketError) {
+          // Continue to API fallback
+        }
+      }
       
+      // Fallback to API if socket unavailable or failed
+      const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
       if (data.success) {
         const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
           id: msg.id,
@@ -272,16 +488,428 @@ export default function CollaboratePage() {
           content: msg.content,
           timestamp: msg.timestamp,
           teamId: msg.teamId,
-          type: msg.type || 'text'
+          type: msg.type || 'text',
+          // @ts-ignore - extended at runtime
+          mentions: mapMentionsRef.current?.(msg.mentions || []) || [],
+          // @ts-ignore - extended at runtime
+          replyTo: msg.replyTo || null,
         }))
-        
-        // Reverse messages so newest appears at bottom (WhatsApp style)
         setMessages(formattedMessages.reverse())
+      } else {
+        console.error('Failed to load messages:', data.error)
       }
     } catch (error) {
       console.error('Error loading messages:', error)
     }
-  }, [apiCall])
+  }, [apiCall, socket])
+
+  // Store the latest loadMessages function in ref
+  loadMessagesRef.current = loadMessages
+
+  // Enhanced messaging functions
+  
+  // Handle message reactions
+  const handleMessageReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!selectedTeamId) return
+    
+    try {
+      const response = await fetch('/api/collaborate/reactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messageId,
+          emoji,
+          action: 'add' // We'll determine add/remove based on current state
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Update messages with new reaction data
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, reactions: data.reactions }
+            : msg
+        ))
+      }
+    } catch (error) {
+      console.error('Error handling reaction:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add reaction",
+        variant: "destructive",
+      })
+    }
+  }, [selectedTeamId, toast])
+
+  // Update user presence (prefer websocket; fallback to API if needed)
+  const updatePresence = useCallback(async (status: 'online' | 'away' | 'offline', activity?: string) => {
+    try {
+      if (socket && (socket as any).connected) {
+        ;(socket as any).emit('update-status', status)
+        // Optimistically update current user's activity locally
+        if (user?.id) {
+          setUserPresence(prev => ({
+            ...prev,
+            [user.id]: {
+              ...(prev[user.id] || {
+                id: user.id,
+                name: user.user_metadata?.full_name || user.email || 'You',
+                email: user.email || '',
+                avatar: user.user_metadata?.avatar_url,
+                status: 'online' as const,
+              }),
+              status,
+              activity,
+              lastSeen: new Date().toISOString(),
+            } as any,
+          }))
+        }
+        return
+      }
+      // Socket-only approach - no API fallback
+      console.log('Socket not available for presence update')
+    } catch (error) {
+      console.error('Error updating presence:', error)
+    }
+  }, [apiCall, socket, user])
+
+  // Load team presence data via socket request-response (no REST polling)
+  const loadTeamPresence = useCallback(async (teamId: string) => {
+    if (!socket) return
+    try {
+      await new Promise<void>((resolve) => {
+        ;(socket as any).emit('get_team_presence', { teamId })
+        const handler = (payload: any) => {
+          if (!payload || payload.teamId !== teamId) return
+          const presenceMap: Record<string, EnhancedUser> = {}
+          ;(payload.members || []).forEach((p: any) => {
+            presenceMap[p.id] = {
+              id: p.id,
+              name: p.name,
+              email: p.email,
+              avatar: p.avatar,
+              status: (p.status || 'offline') as 'online' | 'offline' | 'away' | 'busy',
+              activity: p.activity,
+              lastSeen: p.lastSeen,
+            }
+          })
+          setUserPresence(presenceMap)
+          ;(socket as any).off('team-presence', handler)
+          resolve()
+        }
+        ;(socket as any).on('team-presence', handler)
+      })
+    } catch (error) {
+      console.error('Error loading team presence (socket):', error)
+    }
+  }, [socket])
+
+  // Handle AI assistance with streaming
+  const handleAIAssistance = useCallback(async (prompt: string, context?: string) => {
+    if (!selectedTeamId || !user) return
+    
+    setIsProcessingAI(true)
+    
+    try {
+      // First, persist the user's message that mentions Nova
+      let userMessageId: string | undefined;
+      let userMessage: ChatMessage | undefined;
+      
+      try {
+        const userMessageResult = await collaborateService.sendMessage(
+          selectedTeamId,
+          user.id,
+          prompt,
+          'text',
+          (currentMentions || []).map(m => m.id),
+          undefined // Use API to get message ID
+        )
+        
+        if (userMessageResult.success && userMessageResult.message) {
+          userMessageId = userMessageResult.message.id;
+          userMessage = {
+            id: userMessageResult.message.id,
+            senderId: user.id,
+            senderName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'You',
+            senderAvatar: user.user_metadata?.avatar_url,
+            content: prompt,
+            timestamp: (userMessageResult.message as any).timestamp || (userMessageResult.message as any).created_at || new Date().toISOString(),
+            teamId: selectedTeamId,
+            type: 'text'
+          };
+          
+          // Add user message to local state
+          setMessages(prev => [...prev, userMessage!]);
+        }
+      } catch (error) {
+        console.error('Error persisting user message:', error)
+        // Continue with AI processing even if user message fails to persist
+      }
+      
+      // Get recent messages for context (last 50 messages for better context)
+      const recentMessages = messages.slice(-100).map(msg => ({
+        id: msg.id,
+        senderId: msg.senderId,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        type: msg.type as any,
+        reactions: {},
+        status: 'sent' as const,
+        mentions: (msg as any).mentions || []
+      }))
+      
+      // Debug: Log recent messages to see what's being passed to AI
+      console.log('[AI Context] Total messages:', messages.length)
+      console.log('[AI Context] Recent messages count:', recentMessages.length)
+      console.log('[AI Context] Recent messages:', recentMessages.slice(-5)) // Show last 5 for debugging
+
+      // Extract file mentions from current message and fetch their content
+      const fileMentions = (currentMentions || []).filter(m => m.type === 'file')
+      const fileContents: Array<{name: string, content: string, url?: string}> = []
+      
+      console.log('[File Mentions Debug] Current mentions:', currentMentions)
+      console.log('[File Mentions Debug] File mentions found:', fileMentions)
+      
+      for (const fileMention of fileMentions) {
+        try {
+          console.log('[File Mentions Debug] Processing file:', fileMention.name, 'URL:', fileMention.fileUrl)
+          // If the file mention has a URL, fetch the content
+          if (fileMention.fileUrl) {
+            const response = await fetch(fileMention.fileUrl)
+            console.log('[File Mentions Debug] Fetch response status:', response.status)
+            if (response.ok) {
+              const content = await response.text()
+              console.log('[File Mentions Debug] Fetched content length:', content.length)
+              fileContents.push({
+                name: fileMention.name,
+                content: content,
+                url: fileMention.fileUrl
+              })
+            } else {
+              console.error('[File Mentions Debug] Failed to fetch file:', response.status, response.statusText)
+            }
+          } else {
+            console.log('[File Mentions Debug] No fileUrl found for:', fileMention.name)
+          }
+        } catch (error) {
+          console.error(`Failed to fetch content for file ${fileMention.name}:`, error)
+        }
+      }
+      
+      console.log('[File Mentions Debug] Final file contents:', fileContents)
+
+      const selectedTeam = teams.find(t => t.id === selectedTeamId)
+      const teamMembers = selectedTeam?.members.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        avatar: m.avatar,
+        status: userPresence[m.id]?.status || 'offline' as const
+      })) || []
+
+      const aiContext = {
+        teamId: selectedTeamId,
+        recentMessages,
+        currentUser: {
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          status: 'online' as const
+        },
+        mentionedUsers: teamMembers,
+        actionType: NovaAIService.extractNovaCommand(prompt)?.action || 'general' as const,
+        fileContents: fileContents
+      }
+      
+      console.log('[AI Context Debug] Final AI context being sent to Nova:', {
+        teamId: aiContext.teamId,
+        fileContentsCount: aiContext.fileContents.length,
+        fileContents: aiContext.fileContents.map(f => ({ name: f.name, contentLength: f.content.length, url: f.url }))
+      })
+
+      // Create initial AI message for streaming
+      const aiMessageId = `ai-${Date.now()}`
+      const aiMessage: ChatMessage = {
+        id: aiMessageId,
+        senderId: 'nova-ai',
+        senderName: 'Nova',
+        senderAvatar: '/assistant-avatar.svg',
+        content: '', // Start with empty content for streaming
+        timestamp: new Date().toISOString(),
+        teamId: selectedTeamId,
+        type: 'text'
+      }
+      
+      // Add AI message to local state immediately
+      setMessages(prev => [...prev, aiMessage])
+      
+      // Auto-scroll to show the new AI message
+      setTimeout(() => {
+        throttledScrollToBottom(true) // Use smooth scrolling
+      }, 100)
+      
+      // Start streaming AI response
+      let streamedContent = ''
+      
+      await novaAI.processMessageStream(
+        prompt,
+        aiContext,
+        // onChunk - update the message content as chunks arrive
+        (chunk: string) => {
+          streamedContent += chunk
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: streamedContent }
+              : msg
+          ))
+          
+          // Throttled auto-scroll to prevent glitching
+          throttledScrollToBottom(true)
+        },
+        // onComplete - finalize the message
+        async (response) => {
+          const finalContent = `🤖 **Nova Response:**\n\n${response.content}`
+          
+          // Update the local AI message with final content
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: finalContent, status: 'sent' }
+              : msg
+          ))
+          
+          // Final scroll to bottom when AI response is complete
+          setTimeout(() => {
+            throttledScrollToBottom(true) // Use smooth scrolling
+          }, 200)
+          
+          // Persist the final AI message
+          try {
+            const result = await collaborateService.sendMessage(
+              selectedTeamId,
+              user.id, // Send as current user for authentication
+              finalContent,
+              'text',
+              [], // No mentions for AI responses
+              undefined // Don't use socket for AI messages to get proper response
+            )
+            
+            if (result.success && result.message) {
+              // Update the local AI message with the persisted message data
+              setMessages(prev => prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? {
+                      ...msg,
+                      id: result.message!.id,
+                      content: result.message!.content,
+                      timestamp: (result.message as any).timestamp || (result.message as any).created_at || new Date().toISOString(),
+                      status: 'sent'
+                    }
+                  : msg
+              ))
+            }
+          } catch (error) {
+            console.error('Error persisting AI message:', error)
+            // Don't show error to user, message is still visible locally
+          }
+        },
+        // onError - handle streaming errors
+        (error) => {
+          console.error('AI streaming error:', error)
+          const errorContent = `🤖 **Nova Response:**\n\nI'm having trouble connecting right now. Please try again in a moment.`
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: errorContent, status: 'sent' }
+              : msg
+          ))
+          
+          toast({
+            title: "AI Assistant Error",
+            description: "Nova is temporarily unavailable",
+            variant: "destructive",
+          })
+        }
+      )
+      
+    } catch (error) {
+      console.error('Error with AI assistance:', error)
+      toast({
+        title: "AI Assistant Error",
+        description: "Nova is temporarily unavailable",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessingAI(false)
+    }
+  }, [selectedTeamId, user, messages, teams, userPresence, novaAI, toast])
+
+  // Enhanced message sending with AI detection
+  const handleSendMessage = useCallback(async () => {
+    if (!newMessage.trim() || !selectedTeamId || isSendingMessage) return
+
+    setIsSendingMessage(true)
+
+    try {
+      // Detect AI requests
+      const isAIRequest = NovaAIService.isNovaAIMentioned(newMessage)
+      if (isAIRequest) {
+        // Clear input immediately for better UX
+        const messageToSend = newMessage;
+        setNewMessage('')
+        setCurrentMentions([])
+        setReplyingTo(null)
+        
+        // Process AI request
+        await handleAIAssistance(messageToSend)
+        return
+      }
+
+      // Optimistic UI message
+      if (user) {
+        const tempId = `client-${Date.now()}`
+        const optimisticMessage: ChatMessage = {
+          id: tempId,
+          senderId: user.id,
+          senderName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'You',
+          senderAvatar: user.user_metadata?.avatar_url,
+          content: newMessage,
+          timestamp: new Date().toISOString(),
+          teamId: selectedTeamId,
+          type: 'text',
+        }
+        setMessages(prev => [...prev, { ...optimisticMessage, ...(replyingTo ? ({ replyTo: replyingTo.id } as any) : {}), ...(currentMentions?.length ? ({ mentions: currentMentions } as any) : {}) } as any])
+        // Immediately clear input and reply state
+        setNewMessage('')
+        setCurrentMentions([])
+        setReplyingTo(null)
+        // Keep presence fresh
+        updatePresence('online', 'Active in chat')
+
+        // Send via realtime service (socket preferred, include optimistic id for correlation)
+        await collaborateService.sendMessage(
+          selectedTeamId,
+          user.id,
+          optimisticMessage.content,
+          'text',
+          (currentMentions || []).map(m => m.id),
+          socket, // Pass the socket instance
+          tempId
+        )
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to send message',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }, [newMessage, selectedTeamId, isSendingMessage, currentMentions, replyingTo, handleAIAssistance, updatePresence, collaborateService, toast, user, socket])
 
   // Member management handlers
   const changeMemberRole = useCallback(async (teamId: string, memberId: string, newRole: 'viewer' | 'editor' | 'admin') => {
@@ -396,18 +1024,28 @@ export default function CollaboratePage() {
     setSelectedTeamId((prev) => prev || team.id)
   }, [user])
 
+  // Track if teams have been loaded to prevent multiple calls
+  const teamsLoadedRef = useRef(false)
+
   // Effects
   useEffect(() => {
-    if (!authLoading && session && user) {
+    if (!authLoading && session && user && !teamsLoadedRef.current) {
+      teamsLoadedRef.current = true
       loadTeams()
     }
   }, [authLoading, session, user, loadTeams])
+
+  // Reset teams loaded flag when user changes
+  useEffect(() => {
+    teamsLoadedRef.current = false
+  }, [user?.id])
 
   // Real-time message subscription
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
   
   // Check if scrolled to bottom
   const checkScrollPosition = useCallback(() => {
@@ -416,69 +1054,251 @@ export default function CollaboratePage() {
       const isBottom = scrollTop + clientHeight >= scrollHeight - 10
       setIsScrolledToBottom(isBottom)
       setShowScrollButton(!isBottom)
+      
+      // Clear unread count when user scrolls to bottom
+      if (isBottom && unreadCount > 0) {
+        setUnreadCount(0)
+        setHasNewMessages(false)
     }
-  }, [])
+    }
+  }, [unreadCount])
   
   // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((smooth = true) => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+      const container = messagesContainerRef.current
+      if (smooth) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        })
+      } else {
+        container.scrollTop = container.scrollHeight
+      }
       setShowScrollButton(false)
       setUnreadCount(0)
+      setHasNewMessages(false)
     }
   }, [])
 
+  // Throttled scroll function for streaming content
+  const throttledScrollToBottom = useCallback((smooth = true) => {
+    const now = Date.now()
+    if (now - lastScrollTimeRef.current > 100) { // Throttle to max once per 100ms
+      lastScrollTimeRef.current = now
+      scrollToBottom(smooth)
+    }
+  }, [scrollToBottom])
+
+  // Enhanced team selection with presence loading and realtime presence subscriptions
   useEffect(() => {
     if (selectedTeamId) {
-      loadMessages(selectedTeamId)
+      setIsSwitchingTeam(true) // Trigger switching state on team selection
+      let cancelled = false
+      ;(async () => {
+        try {
+          await Promise.all([
+            loadMessagesRef.current?.(selectedTeamId),
+            loadTeamPresence(selectedTeamId)
+          ])
+        } finally {
+          if (!cancelled) setIsSwitchingTeam(false)
+        }
+      })()
+      updatePresence('online', 'Viewing team chat')
       
       // Subscribe to real-time messages for this team
       const unsubscribe = collaborateService.subscribeToMessages(
         selectedTeamId,
         (newMessage: ChatMessage) => {
+          // Map mentions for new realtime message
+          const mappedMentions = mapMentionsRef.current?.((newMessage as any).mentions || []) || []
+          const enriched = { ...newMessage, mentions: mappedMentions } as any
           setMessages(prev => {
             // Check if message already exists to prevent duplicates
-            const exists = prev.some(msg => msg.id === newMessage.id)
+            const exists = prev.some(m => m.id === enriched.id)
             if (exists) return prev
-            
-            const updated = [...prev, newMessage]
-            
-            // Auto-scroll only if already at bottom
-            setTimeout(() => {
-              if (isScrolledToBottom) {
-                scrollToBottom()
-              } else {
-                // Increment unread count if not at bottom
-                setUnreadCount(prev => prev + 1)
-              }
-            }, 10)
-            
-            return updated
+            return [...prev, enriched]
           })
         }
       )
       
+      // Define handlers in scope so cleanup can access them
+      const handleStatusChanged = (data: any) => {
+        if (!data) return
+        const { userId, status, teamId } = data
+        if (teamId && teamId !== selectedTeamId) return
+        setUserPresence(prev => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {} as any),
+            status,
+            lastSeen: new Date().toISOString(),
+          } as any,
+        }))
+      }
+      const handleUserJoined = (data: any) => {
+        if (!data) return
+        const { userId, teamId } = data
+        if (teamId && teamId !== selectedTeamId) return
+        setUserPresence(prev => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {} as any),
+            status: 'online',
+            lastSeen: new Date().toISOString(),
+          } as any,
+        }))
+      }
+      const handleUserLeft = (data: any) => {
+        if (!data) return
+        const { userId, teamId } = data
+        if (teamId && teamId !== selectedTeamId) return
+        setUserPresence(prev => ({
+          ...prev,
+          [userId]: {
+            ...(prev[userId] || {} as any),
+            status: 'offline',
+            lastSeen: new Date().toISOString(),
+          } as any,
+        }))
+      }
+      const handleTyping = (data: { userId: string, teamId: string, isTyping: boolean }) => {
+        if (data.teamId === selectedTeamId && data.userId !== user?.id) {
+          setTypingUsers(prev => {
+            const newSet = new Set(prev)
+            if (data.isTyping) {
+              newSet.add(data.userId)
+            } else {
+              newSet.delete(data.userId)
+            }
+            return newSet
+          })
+        }
+      }
+
+      // Socket presence/typing events and join
+      if (socket) {
+        ;(socket as any).on('user-status-changed', handleStatusChanged)
+        ;(socket as any).on('user-joined', handleUserJoined)
+        ;(socket as any).on('user-left', handleUserLeft)
+        ;(socket as any).on('user-typing', handleTyping)
+        // Request live presence snapshot on join (server should respond with 'team-presence')
+        ;(socket as any).emit('join_team', { teamId: selectedTeamId })
+      }
+
       // Setup scroll listener
       if (messagesContainerRef.current) {
         messagesContainerRef.current.addEventListener('scroll', checkScrollPosition)
       }
       
-      // Cleanup
       return () => {
+        cancelled = true
         unsubscribe()
+        if (socket) {
+          ;(socket as any).off('user-status-changed', handleStatusChanged)
+          ;(socket as any).off('user-joined', handleUserJoined)
+          ;(socket as any).off('user-left', handleUserLeft)
+          ;(socket as any).off('user-typing', handleTyping)
+          ;(socket as any).emit('leave_team', { teamId: selectedTeamId })
+        }
         if (messagesContainerRef.current) {
           messagesContainerRef.current.removeEventListener('scroll', checkScrollPosition)
         }
+        ;(socket as any).off('user-typing')
       }
     }
-  }, [selectedTeamId, loadMessages, scrollToBottom, checkScrollPosition, isScrolledToBottom])
+  }, [selectedTeamId, loadTeamPresence, checkScrollPosition, socket])
   
-  // Auto-scroll to bottom when messages first load
+  // Auto-scroll to bottom when messages first load or team changes
   useEffect(() => {
     if (teamMessages.length > 0) {
-      scrollToBottom()
+      // Use immediate scroll (not smooth) for initial load
+      scrollToBottom(false)
     }
   }, [selectedTeamId, scrollToBottom])
+
+
+  // Activity tracking and auto-away
+  useEffect(() => {
+    let lastActivityTime = Date.now()
+    let presenceUpdateTimeout: NodeJS.Timeout | null = null
+
+    const throttledUpdatePresence = (status: 'online' | 'away' | 'offline', activity?: string) => {
+      if (presenceUpdateTimeout) {
+        clearTimeout(presenceUpdateTimeout)
+      }
+      
+      presenceUpdateTimeout = setTimeout(() => {
+        updatePresence(status, activity)
+      }, 2000) // Throttle presence updates to every 2 seconds
+    }
+
+    const handleActivity = () => {
+      lastActivityTime = Date.now()
+      // Remove setLastActivity to prevent infinite loop - we don't need to track this in state
+      
+      // Only update presence if we haven't updated recently
+      if (!presenceUpdateTimeout) {
+        throttledUpdatePresence('online', 'Active')
+      }
+    }
+
+    const handleInactivity = () => {
+      const timeSinceLastActivity = Date.now() - lastActivityTime
+      if (timeSinceLastActivity > 300000) { // 5 minutes
+        updatePresence('away', 'Away from keyboard')
+      }
+    }
+
+    // Only set up event listeners if we have a selected team
+    if (selectedTeamId) {
+      // Track user activity
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+      events.forEach(event => {
+        document.addEventListener(event, handleActivity, { passive: true })
+      })
+
+      // Check for inactivity every minute
+      const inactivityInterval = setInterval(handleInactivity, 60000)
+
+      // Set user as online when component mounts
+      updatePresence('online', 'Active in chat')
+
+      // Cleanup
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleActivity)
+        })
+        clearInterval(inactivityInterval)
+        
+        if (presenceUpdateTimeout) {
+          clearTimeout(presenceUpdateTimeout)
+        }
+        
+        // Set offline when leaving
+        updatePresence('offline')
+      }
+    }
+  }, [selectedTeamId, updatePresence]) // Removed lastActivity from dependencies
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not in an input field
+      const isInInput = (e.target as HTMLElement)?.tagName === 'INPUT' || 
+                       (e.target as HTMLElement)?.tagName === 'TEXTAREA' ||
+                       (e.target as HTMLElement)?.contentEditable === 'true'
+      
+      if (!isInInput && (e.ctrlKey || e.metaKey) && e.key === 'f' && selectedTeamId) {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedTeamId])
 
   // Handle invitation URL parameter
   useEffect(() => {
@@ -528,6 +1348,42 @@ export default function CollaboratePage() {
       handleInvitation()
     }
   }, [user, session, apiCall, toast])
+
+  // Video call handler
+  const handleVideoCall = useCallback(() => {
+    // Open Google Meet in a new tab
+    window.open('https://meet.google.com/landing', '_blank')
+  }, [])
+
+  // Search handlers
+  const handleSearchOpen = useCallback(() => {
+    setIsSearchOpen(true)
+  }, [])
+
+  const handleSearchClose = useCallback(() => {
+    setIsSearchOpen(false)
+  }, [])
+
+  const handleMessageSelect = useCallback((messageId: string) => {
+    // Close search
+    setIsSearchOpen(false)
+    
+    // Scroll to the message
+    setTimeout(() => {
+      const messageElement = document.querySelector(`[data-message-id="${messageId}"]`)
+      if (messageElement) {
+        messageElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        })
+        // Highlight the message briefly
+        messageElement.classList.add('ring-2', 'ring-blue-400', 'bg-blue-50', 'dark:bg-blue-900/20', 'transition-all', 'duration-300')
+        setTimeout(() => {
+          messageElement.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50', 'dark:bg-blue-900/20')
+        }, 3000)
+      }
+    }, 100)
+  }, [])
 
   // Handlers
   const handleCreateTeam = async () => {
@@ -589,6 +1445,7 @@ export default function CollaboratePage() {
         
         setNewTeam({ name: "", description: "", category: "Research", isPublic: false })
         setIsCreateTeamOpen(false)
+        teamsLoadedRef.current = false
         loadTeams()
       }
     } catch (error) {
@@ -602,35 +1459,7 @@ export default function CollaboratePage() {
     }
   }
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedTeamId) return
-
-    try {
-      setIsSendingMessage(true)
-      
-      const data = await apiCall('/api/collaborate/messages', {
-        method: 'POST',
-        body: JSON.stringify({
-          teamId: selectedTeamId,
-          content: newMessage.trim(),
-          type: 'text',
-        }),
-      })
-
-      if (data.success) {
-        setNewMessage("")
-        loadMessages(selectedTeamId)
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSendingMessage(false)
-    }
-  }
+  // Old handleSendMessage removed - using enhanced version with AI functionality
 
   const handleInviteMember = async () => {
     if (!inviteEmail.trim() || !selectedTeamId) return
@@ -670,6 +1499,7 @@ export default function CollaboratePage() {
         setInviteEmail("")
         setInviteRole("viewer")
         setIsInviteDialogOpen(false)
+        teamsLoadedRef.current = false
         loadTeams()
       }
     } catch (error) {
@@ -704,6 +1534,7 @@ export default function CollaboratePage() {
         })
         
         setInvitationDialog({ open: false })
+        teamsLoadedRef.current = false
         loadTeams() // Refresh teams to show the new team if accepted
       }
     } catch (error) {
@@ -725,7 +1556,31 @@ export default function CollaboratePage() {
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.description.toLowerCase().includes(searchTerm.toLowerCase()),
   )
-  const teamMessages = messages.filter((m) => m.teamId === selectedTeamId);
+  const teamMessages = useMemo(() => {
+    const list = messages.filter((m) => m.teamId === selectedTeamId)
+    const map = new Map<string, ChatMessage>()
+    for (const m of list) {
+      map.set(m.id, m)
+    }
+    if (map.size !== list.length) {
+      try {
+        console.warn('[CollaboratePage] Deduped duplicate message IDs', { duplicates: list.length - map.size })
+      } catch {}
+    }
+    const deduped = Array.from(map.values())
+    deduped.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    return deduped
+  }, [messages, selectedTeamId])
+
+  // Auto-scroll to bottom when chat is first opened
+  useEffect(() => {
+    if (selectedTeamId && teamMessages.length > 0) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        scrollToBottom(false)
+      }, 100)
+    }
+  }, [selectedTeamId, teamMessages.length, scrollToBottom])
 
   // Utility functions
   const getStatusColor = (status: User["status"]) => {
@@ -808,162 +1663,41 @@ export default function CollaboratePage() {
 
   return (
     <RouteGuard requireAuth={true}>
-      <div className="min-h-screen bg-background">
+      <div className="flex min-h-screen bg-[#F8F9FA] overflow-hidden">
+          {/* Global Navigation Sidebar */}
+          <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v=>!v)} />
+
+          {/* Collaborate workspace */}
+          <div className="flex-1 bg-background overflow-hidden">
         {/* Modern Header */}
         {/* Removed duplicate header here */}
-        <div className="container mx-auto px-6 py-8 max-w-7xl">
+        <div className="px-4 md:px-6 pt-0 pb-0 h-full w-full">
           {/* Upgrade Banner for Free Users */}
-          <div className="mb-6">
+          <div className="mb-3">
             <TeamLimitBanner currentUsage={teams.length} />
           </div>
-          <div className="grid gap-8 lg:grid-cols-12">
+          <div className="grid gap-6 lg:gap-8 lg:grid-cols-12">
             {/* Sidebar */}
             <div className="lg:col-span-4 xl:col-span-3 animate-fade-in">
-              <div className="space-y-6">
-                {/* Quick Actions */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
-                      Quick Actions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      onClick={() => setIsCreateTeamOpen(true)}
-                      className="w-full justify-start gap-3 h-12"
-                      variant="outline"
-                      disabled={!canUseFeature('team_members') || planLoading}
-                      title={!canUseFeature('team_members') ? "Upgrade to Pro plan to create teams" : ""}
-                    >
-                      <Plus className="h-4 w-4" />
-                      {planLoading ? 'Loading...' : 'Create Team'}
-                      {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
-                    </Button>
-                    <Button
-                      onClick={() => setIsInviteDialogOpen(true)}
-                      className="w-full justify-start gap-3 h-12"
-                      variant="outline"
-                      disabled={!selectedTeam || !canUseFeature('team_members') || planLoading}
-                      title={!canUseFeature('team_members') ? "Upgrade to Pro plan to invite team members" : ""}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      {planLoading ? 'Loading...' : 'Invite Member'}
-                      {!canUseFeature('team_members') && <Crown className="h-4 w-4 ml-auto" />}
-                    </Button>
-                    <Button
-                      className="w-full justify-start gap-3 h-12"
-                      variant="outline"
-                      disabled={!selectedTeam}
-                    >
-                      <Video className="h-4 w-4" />
-                      Video Call
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Search */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="pt-6">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search teams..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 border-none bg-muted/50 focus:bg-muted/80 transition-colors"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Invitations */}
-                <Card className="border-none shadow-sm">
-                  <CardContent className="pt-6">
-                    <Button
-                      onClick={() => setIsInvitationsDialogOpen(true)}
-                      className="w-full justify-between gap-3 h-12"
-                      variant="outline"
-                    >
-                      <div className="flex items-center gap-3">
-                        <UserPlus className="h-4 w-4" />
-                        Invitations
-                      </div>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Teams List */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Your Teams</CardTitle>
-                      <Badge variant="secondary" className="font-normal">
-                        {teams.length}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {filteredTeams.map((team) => (
-                        <div
-                          key={team.id}
-                          className={`group p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm ${
-                            selectedTeamId === team.id
-                              ? "bg-primary/10 border-2 border-primary/20"
-                              : "bg-muted/30 hover:bg-muted/50 border-2 border-transparent"
-                          }`}
-                          onClick={() => setSelectedTeamId(team.id)}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className={`p-1.5 rounded-md ${selectedTeamId === team.id ? 'bg-primary/20' : 'bg-muted'}`}>
-                                <Users className="h-3 w-3" />
-                              </div>
-                              <h4 className="font-medium text-sm">{team.name}</h4>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {team.isPublic && <Globe className="h-3 w-3 text-muted-foreground" />}
-                              <Badge variant="outline" className="text-xs font-normal">
-                                {team.category}
-                              </Badge>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{team.description}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                {team.members.length} members
-                              </span>
-                            </div>
-                            <div className="flex -space-x-1">
-                              {team.members.slice(0, 3).map((member) => (
-                                <div key={member.id} className="relative">
-                                  <Avatar className="h-5 w-5 border border-white">
-                                    <AvatarImage src={member.avatar || ""} />
-                                    <AvatarFallback className="text-xs">{member.name?.charAt(0) || 'U'}</AvatarFallback>
-                                  </Avatar>
-                                  <div
-                                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${getStatusColor(member.status)}`}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {filteredTeams.length === 0 && (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <Users className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                          <p className="text-sm">{searchTerm ? "No teams found" : "No teams yet"}</p>
-                          <p className="text-xs mt-1">Create your first team to get started</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <TeamSidebar
+                teams={teams as any}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedTeamId={selectedTeamId}
+                setSelectedTeamId={(id)=>{
+                  if (id && id !== selectedTeamId) {
+                    setIsSwitchingTeam(true)
+                    // Optional: clear current messages for visual clarity during switch
+                    setMessages([])
+                  }
+                  setSelectedTeamId(id)
+                }}
+                canUseTeamMembers={canUseFeature('team_members')}
+                planLoading={planLoading}
+                onCreateTeam={() => setIsCreateTeamOpen(true)}
+                onInviteMember={() => setIsInviteDialogOpen(true)}
+                onOpenInvitations={() => setIsInvitationsDialogOpen(true)}
+              />
             </div>
 
             {/* Main Content */}
@@ -1015,52 +1749,73 @@ export default function CollaboratePage() {
                       </TabsList>
 
                       <TabsContent value="chat" className="mt-0 p-0">
-                        <div className="h-[600px] flex flex-col bg-background">
-                          {/* Chat Header */}
-                          <div className="px-6 py-4 border-b bg-muted/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="relative">
-                                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                                  <Users className="w-5 h-5 text-primary" />
-                                </div>
-                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-sm">{selectedTeam.name}</h3>
-                                <p className="text-xs text-muted-foreground">{selectedTeam.members.length} members</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <Video className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => setIsSettingsOpen(true)}
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
+                        <div className="h-[80vh] md:h-[85vh] lg:h-[90vh] relative flex flex-col bg-background">
+                          {/* Enhanced Productivity Chat Header */}
+                          <EnhancedChatHeader
+                            title={selectedTeam.name}
+                            subtitle={selectedTeam.description || "Hyper-productive team collaboration"}
+                            members={selectedTeam.members.map((m) => ({
+                              id: m.id,
+                              name: m.name || m.email,
+                              email: m.email,
+                              avatar: m.avatar,
+                              status: userPresence[m.id]?.status || (m.status as "online" | "offline" | "away" | "busy"),
+                              activity: userPresence[m.id]?.activity,
+                              lastSeen: m.lastActive,
+                              role: m.role
+                            }))}
+                            onSearchClick={handleSearchOpen}
+                            onVideoClick={handleVideoCall}
+                            onSettingsClick={() => setIsSettingsOpen(true)}
+                          />
 
-                          {/* Messages Area */}
-                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-muted/5 relative">
-                            {teamMessages.length === 0 ? (
-                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                                  <MessageSquare className="w-8 h-8" />
+                          {/* Enhanced Messages Area */}
+                          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-background pb-0">
+                            {isSwitchingTeam ? (
+                              <div className="p-4 space-y-4">
+                                {[...Array(6)].map((_, i) => (
+                                  <ChatMessageSkeleton key={i} />
+                                ))}
+                              </div>
+                            ) : teamMessages.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full flex items-center justify-center mb-6">
+                                  <MessageSquare className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <h3 className="font-medium mb-1">No messages yet</h3>
-                                <p className="text-sm text-center max-w-xs">Start the conversation with your team members</p>
+                                <h3 className="font-semibold text-lg mb-2 text-foreground">Welcome to your team chat!</h3>
+                                <p className="text-sm text-center max-w-sm mb-4">
+                                  Start the conversation with your team members. You can mention people with @, ask Nova for help, or share files.
+                                </p>
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    <Bot className="w-3 h-3 mr-1" />
+                                    @nova for AI help
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    <Users className="w-3 h-3 mr-1" />
+                                    @username to mention
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    <Paperclip className="w-3 h-3 mr-1" />
+                                    Attach files
+                                  </Badge>
+                                </div>
                               </div>
                             ) : (
                               teamMessages.map((message, index) => {
-                                const isOwnMessage = message.senderId === user?.id
-                                const prevMessage = index > 0 ? teamMessages[index - 1] : null
-                                const showAvatar = !isOwnMessage && (!prevMessage || prevMessage.senderId !== message.senderId)
                                 const isSystemMessage = message.type === 'system'
+                                const prevMessage = index > 0 ? teamMessages[index - 1] : null
+                                // Normalize AI messages to a stable sender id to avoid
+                                // treating AI responses as the current user after persistence
+                                const isAIMessage = message.content.includes('🤖 **Nova Response:**') || message.senderId === 'nova-ai'
+                                const prevIsAIMessage = Boolean(prevMessage && (prevMessage.content?.includes('🤖 **Nova Response:**') || prevMessage.senderId === 'nova-ai'))
+                                const currentSenderForGrouping = isAIMessage ? 'nova-ai' : message.senderId
+                                const prevSenderForGrouping = prevMessage ? (prevIsAIMessage ? 'nova-ai' : prevMessage.senderId) : null
+                                const isConsecutive = Boolean(prevMessage && 
+                                  prevSenderForGrouping === currentSenderForGrouping &&
+                                  prevMessage.type !== 'system' && 
+                                  message.type !== 'system' &&
+                                  (new Date(message.timestamp).getTime() - new Date(prevMessage.timestamp).getTime()) < 300000) // 5 minutes
                                 
                                 if (isSystemMessage) {
                                   return (
@@ -1072,56 +1827,164 @@ export default function CollaboratePage() {
                                   )
                                 }
                                 
-                                return (
-                                  <div key={message.id} className={`flex items-end gap-2 animate-fade-in ${
-                                    isOwnMessage ? 'flex-row-reverse' : 'flex-row'
-                                  }`}>
-                                    {/* Avatar for received messages */}
-                                    {!isOwnMessage && (
-                                      <div className="flex-shrink-0 mb-1">
-                                        {showAvatar ? (
-                                          <Avatar className="w-7 h-7">
-                                            <AvatarImage src={message.senderAvatar || ''} />
-                                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                              {message.senderName?.charAt(0)?.toUpperCase() || 'U'}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        ) : (
-                                          <div className="w-7 h-7" />
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Message Bubble */}
-                                    <div className={`max-w-[70%] relative group ${
-                                      isOwnMessage ? 'ml-auto' : 'mr-auto'
-                                    }`}>
-                                      {/* Sender name for received messages */}
-                                      {!isOwnMessage && showAvatar && (
-                                        <div className="text-xs text-muted-foreground mb-1 px-3">
-                                          {message.senderName}
-                                        </div>
-                                      )}
-                                      
-                                      {/* Message content */}
-                                      <div className={`px-4 py-2 rounded-2xl shadow-sm ${
-                                        isOwnMessage 
-                                          ? 'bg-primary text-primary-foreground rounded-br-md' 
-                                          : 'bg-background border rounded-bl-md'
-                                      }`}>
-                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                                        
-                                        {/* Timestamp */}
-                                        <div className={`text-xs mt-1 opacity-70 ${
-                                          isOwnMessage ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground'
-                                        }`}>
-                                          {new Date(message.timestamp).toLocaleTimeString([], { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit' 
-                                          })}
-                                        </div>
-                                      </div>
+                                // isAIMessage already computed above
+                                
+                                // For AI messages, use the enhanced ProductivityMessage component for consistent alignment
+                                if (isAIMessage) {
+                                  const displayContent = message.content.includes('🤖 **Nova Response:**') 
+                                    ? message.content.replace('🤖 **Nova Response:**\n\n', '')
+                                    : message.content
+                                  
+                                  return (
+                                    <div key={message.id} data-message-id={message.id}>
+                                      <EnhancedMessage
+                                      message={{
+                                        id: message.id,
+                                        senderId: 'nova-ai',
+                                        content: displayContent,
+                                        timestamp: message.timestamp,
+                                        type: 'ai_response',
+                                        reactions: {},
+                                        mentions: [],
+                                        status: 'sent',
+                                        priority: 'normal',
+                                        category: 'discussion'
+                                      }}
+                                      user={{
+                                        id: 'nova-ai',
+                                        name: 'Nova Assistant',
+                                        email: '',
+                                        avatar: '/assistant-avatar.svg',
+                                        status: 'online',
+                                        activity: 'AI Assistant'
+                                      }}
+                                      currentUserId={user?.id || ''}
+                                      allUsers={selectedTeam.members.map(m => ({
+                                        id: m.id,
+                                        name: m.name,
+                                        email: m.email,
+                                        avatar: m.avatar,
+                                        status: userPresence[m.id]?.status || m.status as "online" | "offline" | "away" | "busy",
+                                        activity: userPresence[m.id]?.activity
+                                      }))}
+                                      isConsecutive={isConsecutive}
+                                      onReply={(messageId) => {
+                                        const replyMessage = teamMessages.find(m => m.id === messageId)
+                                              if (replyMessage) {
+                                                setReplyingTo({
+                                                  id: replyMessage.id,
+                                                  senderId: replyMessage.senderId,
+                                                  senderName: 'Nova',
+                                                  content: replyMessage.content,
+                                                  timestamp: replyMessage.timestamp,
+                                                  type: replyMessage.type as any,
+                                                  reactions: {},
+                                                  status: 'sent'
+                                                })
+                                              }
+                                            }}
+                                      onReact={() => {}}
+                                      onEdit={() => {}}
+                                      onDelete={() => {}}
+                                      onPin={() => {}}
+                                      onAIAssist={(messageId, context) => {
+                                        handleAIAssistance(`Help me understand this AI response: "${context}"`)
+                                      }}
+                                      />
                                     </div>
+                                  )
+                                }
+                                
+                                // Find sender user info with presence for non-AI messages
+                                const senderUser = selectedTeam.members.find(m => m.id === message.senderId) || {
+                                  id: message.senderId,
+                                  name: message.senderName || 'Unknown User',
+                                  email: '',
+                                  avatar: message.senderAvatar,
+                                  status: 'offline' as const
+                                }
+
+                                // Get user presence status
+                                const presenceStatus = userPresence[senderUser.id]?.status || senderUser.status as "online" | "offline" | "away" | "busy"
+                                const userActivity = userPresence[senderUser.id]?.activity
+                                
+                                return (
+                                  <div key={message.id} data-message-id={message.id}>
+                                    <EnhancedMessage
+                                    message={{
+                                      id: message.id,
+                                      senderId: message.senderId,
+                                      content: message.content,
+                                      timestamp: message.timestamp,
+                                      type: message.type as "text" | "image" | "file" | "audio" | "system",
+                                      reactions: (message as any).reactions || {},
+                                      mentions: (message as any).mentions || [],
+                                      replyTo: (message as any).replyTo || null,
+                                      replyToContent: (() => {
+                                        const original = teamMessages.find(m => m.id === (message as any).replyTo)
+                                        return original?.content
+                                      })(),
+                                      replyToSenderName: (() => {
+                                        const original = teamMessages.find(m => m.id === (message as any).replyTo)
+                                        if (!original) return undefined
+                                        const info = selectedTeam.members.find(m => m.id === original.senderId)
+                                        const isOriginalFromAI = original.content.includes('🤖 **Nova Response:**') || original.senderId === 'nova-ai';
+                                        return isOriginalFromAI ? 'Nova' : (info?.name || original.senderName)
+                                      })(),
+                                      status: (message.id || '').startsWith('client-') ? 'sending' : 'sent',
+                                      priority: 'normal',
+                                      category: 'discussion'
+                                    }}
+                                    user={{
+                                      id: senderUser.id,
+                                      name: senderUser.name || senderUser.email,
+                                      email: senderUser.email,
+                                      avatar: senderUser.avatar,
+                                      status: presenceStatus,
+                                      activity: userActivity,
+                                      lastSeen: userPresence[senderUser.id]?.lastSeen
+                                    }}
+                                    allUsers={selectedTeam.members.map(m => ({
+                                      id: m.id,
+                                      name: m.name || m.email,
+                                      email: m.email,
+                                      avatar: m.avatar,
+                                      status: userPresence[m.id]?.status || 'offline',
+                                      activity: userPresence[m.id]?.activity
+                                    }))}
+                                    currentUserId={user?.id || ''}
+                                    isConsecutive={isConsecutive}
+                                    onReply={(messageId) => {
+                                      const replyMessage = teamMessages.find(m => m.id === messageId)
+                                      if (replyMessage) {
+                                        // Find the sender's name
+                                        const isReplyFromAI = replyMessage.content.includes('🤖 **Nova Response:**') || replyMessage.senderId === 'nova-ai';
+                                        const senderInfo = selectedTeam.members.find(m => m.id === replyMessage.senderId)
+                                        const senderName = isReplyFromAI 
+                                          ? 'Nova' 
+                                          : senderInfo?.name || replyMessage.senderName || 'Unknown User'
+                                        
+                                        setReplyingTo({
+                                          id: replyMessage.id,
+                                          senderId: replyMessage.senderId,
+                                          senderName: senderName,
+                                          content: replyMessage.content,
+                                          timestamp: replyMessage.timestamp,
+                                          type: replyMessage.type as any,
+                                          reactions: {},
+                                          status: 'sent'
+                                        })
+                                      }
+                                    }}
+                                    onReact={handleMessageReaction}
+                                    onPin={(messageId) => {
+                                      // TODO: Implement pin functionality
+                                      console.log('Pin message:', messageId)
+                                    }}
+                                    onAIAssist={(messageId, context) => {
+                                      handleAIAssistance(`Help me understand this message: "${context}"`)
+                                    }}
+                                    />
                                   </div>
                                 )
                               })
@@ -1130,55 +1993,109 @@ export default function CollaboratePage() {
 
                           {/* Scroll to Bottom Button */}
                           {showScrollButton && (
-                            <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
+                            <div className="absolute bottom-24 right-6 z-10">
                               <Button
-                                onClick={scrollToBottom}
+                                onClick={() => scrollToBottom()}
                                 size="sm"
-                                className="rounded-full px-3 py-2 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all animate-bounce"
+                                className={cn(
+                                  "rounded-full px-3 py-2 shadow-lg transition-all",
+                                  hasNewMessages 
+                                    ? "bg-green-600 text-white hover:bg-green-700 animate-pulse" 
+                                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                                )}
                               >
                                 <div className="flex items-center gap-1">
-                                  <span className="text-xs">
-                                    {unreadCount > 0 ? `${unreadCount} new` : '↓'}
+                                  {hasNewMessages ? (
+                                    <>
+                                      <span className="text-xs font-medium">
+                                        {unreadCount > 0 ? `${unreadCount} new` : 'New message'}
                                   </span>
+                                      <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-xs">↓</span>
                                   <ChevronDown className="w-3 h-3" />
+                                    </>
+                                  )}
                                 </div>
                               </Button>
                             </div>
                           )}
 
-                          {/* Message Input */}
-                          <div className="px-4 py-3 border-t bg-background">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 relative">
-                                <Input
-                                  placeholder="Type a message..."
+                          {/* Typing Indicator */}
+                          {typingUsers.size > 0 && (
+                            <div className="px-4 py-2 bg-muted/30 border-t">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="flex space-x-1">
+                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                                <span>
+                                  {Array.from(typingUsers).map(userId => {
+                                    const user = selectedTeam.members.find(m => m.id === userId)
+                                    return user?.name || 'Someone'
+                                  }).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+
+                          {/* Enhanced Productivity Message Input */}
+                          <EnhancedMessageInput
                                   value={newMessage}
-                                  onChange={(e) => setNewMessage(e.target.value)}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                      e.preventDefault()
-                                      handleSendMessage()
+                                  onChange={(val, mentions) => {
+                                    setNewMessage(val)
+                                    setCurrentMentions(mentions)
+                                    
+                                    // Simple typing detection
+                                    if (val.trim() && selectedTeamId) {
+                                      // Emit typing event
+                                      if (socket) {
+                                        (socket as any).emit('typing', { teamId: selectedTeamId, isTyping: true })
+                                      }
+                                      
+                                      // Clear typing after 3 seconds
+                                      setTimeout(() => {
+                                        if (socket) {
+                                          (socket as any).emit('typing', { teamId: selectedTeamId, isTyping: false })
+                                        }
+                                      }, 3000)
                                     }
                                   }}
-                                  onFocus={scrollToBottom}
-                                  className="pr-12 rounded-full border-muted-foreground/20 focus:border-primary/50 transition-colors"
-                                  disabled={isSendingMessage}
-                                />
-                              </div>
-                              <Button
-                                onClick={handleSendMessage}
-                                disabled={!newMessage.trim() || isSendingMessage}
-                                size="sm"
-                                className="rounded-full w-10 h-10 p-0 shadow-md hover:shadow-lg transition-shadow"
-                              >
-                                {isSendingMessage ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Send className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </div>
+                            onSend={handleSendMessage}
+                            onAttach={handleAttachFromCloud}
+                            onAIAssist={handleAIAssistance}
+                            disabled={isSendingMessage || isProcessingAI}
+                            placeholder="Type a message... Use @ to mention team members or @nova for AI assistance"
+                                  users={(selectedTeam?.members || []).map((m) => ({
+                                    id: m.id,
+                                    type: 'user' as const,
+                                    name: m.name || m.email,
+                                    email: m.email,
+                                    avatar: m.avatar,
+                                  }))}
+                                  files={teamFileMentions}
+                            currentUser={user ? {
+                              id: user.id,
+                              name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me',
+                              email: user.email || '',
+                              avatar: user.user_metadata?.avatar_url,
+                              status: 'online'
+                            } : undefined}
+                            replyingTo={replyingTo || undefined}
+                            onCancelReply={() => setReplyingTo(null)}
+                          />
+                          
+                          {/* Chat Search Overlay */}
+                          <ChatSearch
+                            messages={teamMessages}
+                            isOpen={isSearchOpen}
+                            onClose={handleSearchClose}
+                            onMessageSelect={handleMessageSelect}
+                          />
                         </div>
                       </TabsContent>
 
@@ -1328,7 +2245,7 @@ export default function CollaboratePage() {
                       </TabsContent>
 
                       <TabsContent value="files" className="mt-0 p-6">
-                        <TeamFiles teamId={selectedTeam.id} currentUserRole={currentUserRole} />
+                        <TeamFiles teamId={selectedTeam.id} currentUserRole={currentUserRole} apiCall={apiCall} />
                       </TabsContent>
 
                       <TabsContent value="integrations" className="mt-0 p-6">
@@ -1426,6 +2343,7 @@ export default function CollaboratePage() {
             onLeaveTeam={() => {
               setTeams(prev => prev.filter(team => team.id !== selectedTeamId))
               setSelectedTeamId(null)
+              teamsLoadedRef.current = false
               loadTeams()
             }}
             apiCall={apiCall}
@@ -1696,6 +2614,7 @@ export default function CollaboratePage() {
             </Card>
           </div>
         )}
+      </div>
       </div>
     </RouteGuard>
   )

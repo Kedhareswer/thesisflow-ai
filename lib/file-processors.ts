@@ -146,7 +146,9 @@ export class FileProcessor {
       'text/plain',
       'application/pdf',
       'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-powerpoint'
     ]
   }
 
@@ -155,7 +157,9 @@ export class FileProcessor {
       'text/plain': 'Text File',
       'application/pdf': 'PDF Document',
       'application/msword': 'Word Document (legacy)',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word Document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word Document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint Presentation',
+      'application/vnd.ms-powerpoint': 'PowerPoint Presentation (legacy)'
     }
     return descriptions[type] || 'Unknown Format'
   }

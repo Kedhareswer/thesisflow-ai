@@ -10,26 +10,28 @@ export interface PromptBuilderOptions {
 export function getTaskPrompt(writingTask: string): string {
   switch (writingTask) {
     case 'continue':
-      return 'Continue writing the document from where it left off. Maintain the same style, tone, and academic rigor.';
+      return 'Continue writing the LaTeX document from where it left off. Maintain the same style, tone, and academic rigor. Use proper LaTeX formatting including \\section{}, \\subsection{}, \\textbf{}, \\textit{}, \\cite{}, and mathematical notation with $ $ for inline and $$ $$ for display equations.';
     case 'introduction':
-      return 'Write a compelling introduction for this research document. Include background context, research question, and significance.';
+      return 'Write a compelling introduction section in LaTeX format. Use \\section{Introduction} and include background context, research question, and significance. Use proper LaTeX commands for emphasis (\\textbf{}, \\textit{}), citations (\\cite{}), and any mathematical notation.';
     case 'abstract':
-      return 'Write a concise abstract (150-250 words) that summarizes the research problem, methodology, key findings, and conclusions.';
+      return 'Write a concise abstract (150-250 words) in LaTeX format that summarizes the research problem, methodology, key findings, and conclusions. Begin with \\begin{abstract} and end with \\end{abstract}. Use proper LaTeX formatting for any technical terms or mathematical expressions.';
     case 'literature_review':
-      return `Write a rigorous Literature Review that critically synthesizes the studies listed in the Research Context section below. Focus on the Selected Papers provided in the context - these are the primary sources you must analyze and include in your review.\n\nStructure your review with:\n1. An overview paragraph summarizing the research landscape\n2. Thematic analysis of the provided papers\n3. Identification of gaps and future directions\n\nCRITICAL: Include a \"Comparison of Recent Studies\" table using ONLY the papers listed in the \"Selected Papers\" section of the Research Context. Extract the following details for each paper:\n- Author/Year: Use the authors and year provided\n- Focus: Derive from the title and abstract\n- Method/Dataset: Extract methodology information from abstracts if available\n- Key Findings: Summarize main contributions from abstracts\n- Limitations/Relevance: Note any limitations mentioned or relevance to the research topic\n\nDo NOT write \"unknown\" - use the specific paper details provided in the Research Context. If a detail is not provided in the context, write \"not specified in source.\"`;
+      return `Write a rigorous Literature Review in LaTeX format. Use \\section{Literature Review} and appropriate \\subsection{} commands.\n\nStructure your review with:\n1. An overview paragraph summarizing the research landscape\n2. Thematic analysis with \\subsection{} for each theme\n3. Identification of gaps using \\subsection{Research Gaps and Future Directions}\n\nCRITICAL: Include a \"Comparison of Recent Studies\" table using LaTeX tabular environment:\n\\begin{table}[h]\n\\centering\n\\caption{Comparison of Recent Studies}\n\\begin{tabular}{|l|l|l|l|l|}\n\\hline\nAuthor/Year & Focus & Method & Key Findings & Limitations \\\\\n\\hline\n... (fill with papers from Research Context) ...\n\\hline\n\\end{tabular}\n\\end{table}\n\nUse \\cite{} for all references. Format equations with $ $ or $$ $$. Use \\textbf{} for emphasis.`;
     case 'analyze':
-      return 'Analyze the current document content for structure, clarity, academic tone, and coherence. Provide specific suggestions for improvement.';
+      return 'Analyze the current LaTeX document content for structure, clarity, academic tone, and coherence. Check for proper LaTeX syntax, sectioning, citations, and mathematical notation. Provide specific suggestions for improvement in LaTeX format.';
     default:
-      return 'Continue writing the document in a professional academic style.';
+      return 'Continue writing the document in LaTeX format with proper academic style. Use appropriate LaTeX commands for sections, emphasis, citations, and mathematical expressions.';
   }
 }
 
 export function buildWritingPrompt(opts: PromptBuilderOptions): string {
   const { templateStyle, researchContext, writingTask, ragEnabled, uploadedSourceCount, systemPromptAddon } = opts;
 
-  let systemPrompt = `You are a professional academic writer assisting with a research document in ${templateStyle}. ` +
-    'Write in a clear, academic style appropriate for publication. Focus on producing coherent, well-structured text that would be suitable for a scholarly publication. ' +
-    'Always maintain academic integrity and provide well-reasoned arguments.';
+  let systemPrompt = `You are a professional academic LaTeX writer assisting with a research document in ${templateStyle}. ` +
+    'Generate output in proper LaTeX format with appropriate commands for structure (\\section{}, \\subsection{}), formatting (\\textbf{}, \\textit{}, \\underline{}), ' +
+    'citations (\\cite{}, \\ref{}, \\label{}), mathematical expressions ($ $ for inline, $$ $$ for display), lists (\\begin{itemize}, \\begin{enumerate}), ' +
+    'and tables (\\begin{tabular}). Write in a clear, academic style appropriate for publication. ' +
+    'Always maintain academic integrity and provide well-reasoned arguments. Do NOT include \\documentclass or \\begin{document} unless specifically requested.';
 
   if (systemPromptAddon) {
     systemPrompt += ' ' + systemPromptAddon
@@ -41,6 +43,10 @@ export function buildWritingPrompt(opts: PromptBuilderOptions): string {
 
   if (ragEnabled) {
     systemPrompt += ' Use ONLY the provided Retrieved Context and Session Context for factual statements. If the context is insufficient, explicitly state "insufficient context" rather than inventing facts.';
+  }
+
+  if (uploadedSourceCount > 0) {
+    systemPrompt += ' The user has uploaded source files. Treat the "Retrieved Context from Uploaded Sources" as PRIMARY EVIDENCE. Ground all factual statements in these sources when relevant and include LaTeX citations using the form \\cite{srcN} that correspond to the numbered retrieved sources. Do NOT fabricate citations or refer to external sources not provided unless explicitly asked.';
   }
 
   const taskPrompt = getTaskPrompt(writingTask);

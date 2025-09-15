@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { StorageProviderCard } from './StorageProviderCard'
 import { StorageProvider, StorageQuota } from '@/lib/storage/types'
 import { storageManager } from '@/lib/storage/storage-manager'
+import { supabaseStorageManager } from '@/lib/storage/supabase-storage-manager'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -12,7 +13,7 @@ import { RefreshCw, Settings, Info } from 'lucide-react'
 
 export function StorageManager() {
   const { toast } = useToast()
-  const [providers] = useState<StorageProvider[]>(['google-drive', 'dropbox', 'onedrive'])
+  const [providers] = useState<StorageProvider[]>(['google-drive'])
   const [connectedProviders, setConnectedProviders] = useState<Set<StorageProvider>>(new Set())
   const [activeProvider, setActiveProvider] = useState<StorageProvider | null>(null)
   const [quotas, setQuotas] = useState<Map<StorageProvider, StorageQuota>>(new Map())
@@ -27,6 +28,12 @@ export function StorageManager() {
   const loadConnectedProviders = () => {
     try {
       const connected = storageManager.getConnectedProviders()
+      
+      // Add Google Drive if connected via supabaseStorageManager
+      if (supabaseStorageManager.isGoogleDriveConnected() && !connected.includes('google-drive')) {
+        connected.push('google-drive')
+      }
+      
       setConnectedProviders(new Set(connected))
       
       // Get active provider
@@ -46,7 +53,14 @@ export function StorageManager() {
 
   const loadQuota = async (provider: StorageProvider) => {
     try {
-      const quota = await storageManager.getQuota()
+      let quota;
+      if (provider === 'google-drive' && supabaseStorageManager.isGoogleDriveConnected()) {
+        // Use supabaseStorageManager for Google Drive quota
+        const providerInstance = supabaseStorageManager.getGoogleDriveProvider()
+        quota = await providerInstance.getQuota()
+      } else {
+        quota = await storageManager.getQuota()
+      }
       setQuotas(prev => new Map(prev).set(provider, quota))
     } catch (error) {
       console.error(`Failed to load quota for ${provider}:`, error)
@@ -57,15 +71,36 @@ export function StorageManager() {
     setLoading(prev => new Map(prev).set(provider, true))
     
     try {
-      await storageManager.connectProvider(provider)
+      // Use supabaseStorageManager for Google Drive
+      if (provider === 'google-drive') {
+        // Initialize Google Drive OAuth flow
+        const authUrl = await supabaseStorageManager.initGoogleDriveAuth()
+        
+        // Open OAuth popup
+        const oauthHandler = (window as any).GoogleDriveOAuthHandler?.getInstance() || 
+          new (await import('@/lib/storage/supabase-storage-manager')).GoogleDriveOAuthHandler()
+        
+        await oauthHandler.authenticate()
+        
+        // Reload providers to include the newly connected one
+        await supabaseStorageManager.loadUserProviders()
+      } else {
+        await storageManager.connectProvider(provider)
+      }
       
       // Update state
       setConnectedProviders(prev => new Set(prev).add(provider))
       
       // Set as active if first provider
       if (!activeProvider) {
-        await storageManager.switchProvider(provider)
-        setActiveProvider(provider)
+        if (provider === 'google-drive') {
+          // For Google Drive, we just set it as active
+          setActiveProvider(provider)
+          localStorage.setItem('activeStorageProvider', provider)
+        } else {
+          await storageManager.switchProvider(provider)
+          setActiveProvider(provider)
+        }
       }
       
       // Load quota
@@ -92,7 +127,12 @@ export function StorageManager() {
 
   const handleDisconnect = async (provider: StorageProvider) => {
     try {
-      await storageManager.disconnectProvider(provider)
+      // Use supabaseStorageManager for Google Drive
+      if (provider === 'google-drive') {
+        await supabaseStorageManager.disconnectGoogleDrive()
+      } else {
+        await storageManager.disconnectProvider(provider)
+      }
       
       // Update state
       setConnectedProviders(prev => {
@@ -113,8 +153,12 @@ export function StorageManager() {
         const remaining = Array.from(connectedProviders).filter(p => p !== provider)
         const newActive = remaining[0] || null
         setActiveProvider(newActive)
-        if (newActive) {
+        if (newActive && newActive !== 'google-drive') {
           await storageManager.switchProvider(newActive)
+        } else if (newActive === 'google-drive') {
+          // For Google Drive, we just set it as active
+          setActiveProvider(newActive)
+          localStorage.setItem('activeStorageProvider', newActive)
         }
       }
       
@@ -133,8 +177,14 @@ export function StorageManager() {
 
   const handleSetActive = async (provider: StorageProvider) => {
     try {
-      await storageManager.switchProvider(provider)
-      setActiveProvider(provider)
+      if (provider === 'google-drive') {
+        // For Google Drive, we just set it as active
+        setActiveProvider(provider)
+        localStorage.setItem('activeStorageProvider', provider)
+      } else {
+        await storageManager.switchProvider(provider)
+        setActiveProvider(provider)
+      }
       
       toast({
         title: 'Provider switched',
@@ -153,6 +203,7 @@ export function StorageManager() {
     setSyncing(true)
     
     try {
+      // Sync regular storage manager operations
       await storageManager.syncPendingOperations()
       
       // Reload quotas

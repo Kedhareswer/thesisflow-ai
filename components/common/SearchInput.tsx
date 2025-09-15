@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Search, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ interface SearchInputProps {
   autoFocus?: boolean
   buttonText?: string
   showButton?: boolean
+  initialValue?: string
 }
 
 export function SearchInput({
@@ -24,8 +25,16 @@ export function SearchInput({
   autoFocus = false,
   buttonText = "Search",
   showButton = false,
+  initialValue = "",
 }: SearchInputProps) {
-  const [query, setQuery] = useState("")
+  const [query, setQuery] = useState(initialValue)
+
+  // Update query when initialValue changes (for external updates)
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setQuery(initialValue)
+    }
+  }, [initialValue])
 
   const handleSearch = useCallback(() => {
     if (query.trim()) {
@@ -46,7 +55,7 @@ export function SearchInput({
   }
 
   return (
-    <div className={cn("flex w-full items-center gap-2", className)}>
+    <div className={cn("flex w-full items-stretch gap-2 flex-col sm:flex-row", className)}>
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <Input
@@ -70,7 +79,7 @@ export function SearchInput({
         )}
       </div>
       {showButton && (
-        <Button onClick={handleSearch} disabled={!query.trim()} type="button">
+        <Button onClick={handleSearch} disabled={!query.trim()} type="button" className="w-full sm:w-auto">
           <Search className="mr-2 h-4 w-4" />
           {buttonText}
         </Button>

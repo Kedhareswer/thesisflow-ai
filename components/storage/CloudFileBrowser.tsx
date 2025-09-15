@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { storageManager } from '@/lib/storage/storage-manager'
+import { supabaseStorageManager } from '@/lib/storage/supabase-storage-manager'
 import { StorageFile, StorageProvider } from '@/lib/storage/types'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -70,11 +71,17 @@ export function CloudFileBrowser({
   const loadFiles = async () => {
     setLoading(true)
     try {
-      const result = await storageManager.listFiles(currentFolderId, {
-        useCache: true,
-        limit: 100
-      })
-      setFiles(result.files)
+      // Check if Google Drive is connected and use the appropriate manager
+      if (supabaseStorageManager.isGoogleDriveConnected()) {
+        const files = await supabaseStorageManager.listGoogleDriveFiles(currentFolderId)
+        setFiles(files)
+      } else {
+        const result = await storageManager.listFiles(currentFolderId, {
+          useCache: true,
+          limit: 100
+        })
+        setFiles(result.files)
+      }
     } catch (error: any) {
       toast({
         title: 'Failed to load files',
@@ -114,7 +121,14 @@ export function CloudFileBrowser({
 
   const handleDownload = async (file: StorageFile) => {
     try {
-      const blob = await storageManager.downloadFile(file.id, { cache: true })
+      let blob: Blob;
+      
+      // Check if Google Drive is connected and the file is from Google Drive
+      if (supabaseStorageManager.isGoogleDriveConnected() && file.provider === 'google-drive') {
+        blob = await supabaseStorageManager.downloadGoogleDriveFile(file.id)
+      } else {
+        blob = await storageManager.downloadFile(file.id, { cache: true })
+      }
       
       // Create download link
       const url = URL.createObjectURL(blob)
@@ -145,7 +159,14 @@ export function CloudFileBrowser({
     }
     
     try {
-      await storageManager.deleteFile(file.id)
+      // Check if Google Drive is connected and the file is from Google Drive
+      if (supabaseStorageManager.isGoogleDriveConnected() && file.provider === 'google-drive') {
+        // For Google Drive, we need to get the provider instance and call deleteFile directly
+        const provider = supabaseStorageManager.getGoogleDriveProvider()
+        await provider.deleteFile(file.id)
+      } else {
+        await storageManager.deleteFile(file.id)
+      }
       await loadFiles()
       
       toast({
@@ -166,7 +187,14 @@ export function CloudFileBrowser({
     if (!newName || newName === file.name) return
     
     try {
-      await storageManager.renameFile(file.id, newName)
+      // Check if Google Drive is connected and the file is from Google Drive
+      if (supabaseStorageManager.isGoogleDriveConnected() && file.provider === 'google-drive') {
+        // For Google Drive, we need to get the provider instance and call renameFile directly
+        const provider = supabaseStorageManager.getGoogleDriveProvider()
+        await provider.renameFile(file.id, newName)
+      } else {
+        await storageManager.renameFile(file.id, newName)
+      }
       await loadFiles()
       
       toast({
@@ -190,11 +218,22 @@ export function CloudFileBrowser({
     
     setLoading(true)
     try {
-      const result = await storageManager.searchFiles(searchQuery, {
-        parentId: currentFolderId,
-        limit: 100
-      })
-      setFiles(result.files)
+      // Check if Google Drive is connected and use the appropriate manager
+      if (supabaseStorageManager.isGoogleDriveConnected()) {
+        // For Google Drive search, we need to get the provider instance and call searchFiles directly
+        const provider = supabaseStorageManager.getGoogleDriveProvider()
+        const result = await provider.searchFiles(searchQuery, {
+          parentId: currentFolderId,
+          limit: 100
+        })
+        setFiles(result.files)
+      } else {
+        const result = await storageManager.searchFiles(searchQuery, {
+          parentId: currentFolderId,
+          limit: 100
+        })
+        setFiles(result.files)
+      }
     } catch (error: any) {
       toast({
         title: 'Search failed',
@@ -317,7 +356,11 @@ export function CloudFileBrowser({
       {showUploadDialog && (
         <CloudFileUploader
           parentId={currentFolderId}
-          onUploadComplete={(uploadedFiles) => {
+          onUploadComplete={async (uploadedFiles) => {
+            // If Google Drive is connected, we might need to reload the providers
+            if (supabaseStorageManager.isGoogleDriveConnected()) {
+              await supabaseStorageManager.loadUserProviders()
+            }
             loadFiles()
             setShowUploadDialog(false)
           }}

@@ -10,6 +10,13 @@ export interface GenerateTextOptions {
   userId?: string
 }
 
+export interface GenerateTextStreamOptions extends GenerateTextOptions {
+  onToken?: (token: string) => void
+  onProgress?: (progress: { message?: string; percentage?: number }) => void
+  onError?: (error: string) => void
+  abortSignal?: AbortSignal
+}
+
 export interface GenerateTextResult {
   success: boolean
   content?: string
@@ -52,6 +59,38 @@ export interface UserApiKey {
 }
 
 class EnhancedAIService {
+  /**
+   * Test whether a given API key is valid for the selected provider by making a
+   * lightweight completion request. Returns a model name if successful.
+   */
+  async testApiKey(
+    provider: string,
+    apiKey: string,
+  ): Promise<{ valid: boolean; error?: string; model?: string }> {
+    try {
+      if (!AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]) {
+        return { valid: false, error: `Unsupported provider: ${provider}` }
+      }
+      const providerConfig = AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]
+      const model = providerConfig.models[0]
+
+      // Use a tiny prompt that costs almost nothing
+      const result = await this.callProviderAPI(provider as any, apiKey, {
+        prompt: "ping",
+        model,
+        maxTokens: 1,
+        temperature: 0,
+      } as any)
+
+      if (result.success) {
+        return { valid: true, model: result.model || model }
+      }
+      return { valid: false, error: result.error }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      return { valid: false, error: errorMsg }
+    }
+  }
   private supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: {
       storageKey: "ai-research-platform-auth",
@@ -552,7 +591,7 @@ class EnhancedAIService {
       usage: {
         promptTokens: data.usage?.input_tokens,
         completionTokens: data.usage?.output_tokens,
-        totalTokens: data.usage?.input_tokens + data.usage?.output_tokens,
+        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
       },
     }
   }
@@ -566,29 +605,91 @@ class EnhancedAIService {
   ): Promise<GenerateTextResult> {
     console.log("Enhanced AI Service: Calling Mistral API...")
 
+    // Map UI model names to actual Mistral API model names
+    const modelMapping: Record<string, string> = {
+      "mistral-small-2407": "mistral-small-latest",
+      "mistral-medium-2508": "mistral-medium-latest", 
+      "mistral-large-2411": "mistral-large-latest",
+      "codestral-2508": "codestral-latest",
+      "pixtral-large-2411": "pixtral-large-latest",
+      "ministral-3b-2410": "ministral-3b-latest",
+      "ministral-8b-2410": "ministral-8b-latest",
+      "mistral-nemo": "open-mistral-nemo"
+    }
+
+    const actualModel = modelMapping[model] || model || "mistral-small-latest"
+    console.log(`Enhanced AI Service: Using Mistral model: ${actualModel} (mapped from ${model})`)
+
+    // Ensure reasonable limits for Mistral API
+    const clampedMaxTokens = Math.min(maxTokens, 32768) // Mistral has lower token limits
+    const clampedTemperature = Math.max(0.0, Math.min(1.0, temperature)) // Ensure valid range
+
+    const requestBody = {
+      model: actualModel,
+      max_tokens: clampedMaxTokens,
+      temperature: clampedTemperature,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    }
+
+    console.log("Enhanced AI Service: Mistral request body:", {
+      model: requestBody.model,
+      max_tokens: requestBody.max_tokens,
+      temperature: requestBody.temperature,
+      messageLength: prompt.length
+    })
+
     const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: model || "mistral-large-latest",
-        max_tokens: maxTokens,
-        temperature: temperature,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error("Enhanced AI Service: Mistral API error data:", errorData)
-      throw new Error(`Mistral API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+      const errorText = await response.text().catch(() => "Unknown error")
+      let errorData: any = {}
+      
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText }
+      }
+      
+      console.error("Enhanced AI Service: Mistral API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        model: actualModel,
+        originalModel: model
+      })
+      
+      // Provide more specific error messages for common issues
+      let errorMessage = `Mistral API error: ${response.status} - ${response.statusText}`
+      
+      if (response.status === 400) {
+        if (errorData.message?.includes('model')) {
+          errorMessage = `Mistral model '${actualModel}' not supported or invalid`
+        } else if (errorData.message?.includes('token')) {
+          errorMessage = `Mistral API token limit exceeded (requested: ${clampedMaxTokens})`
+        } else {
+          errorMessage = `Mistral API bad request: ${errorData.message || 'Invalid parameters'}`
+        }
+      } else if (response.status === 401) {
+        errorMessage = "Mistral API authentication failed - check API key"
+      } else if (response.status === 429) {
+        errorMessage = "Mistral API rate limit exceeded - try again later"
+      } else if (response.status >= 500) {
+        errorMessage = "Mistral API server error - service temporarily unavailable"
+      }
+      
+      throw new Error(errorMessage)
     }
 
     const data = await response.json()
@@ -610,7 +711,7 @@ class EnhancedAIService {
       success: true,
       content,
       provider: "mistral",
-      model,
+      model: actualModel,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
@@ -1246,48 +1347,154 @@ SENTIMENT: [positive/neutral/negative]`
       sentiment,
     }
   }
-
+ 
   /**
-   * Lightweight validation of an API key. For now, we only verify the format.
-   * You can extend this method to hit a cheap provider endpoint for deeper checks.
+   * Simulate streaming by chunking a full provider response.
+   * Returns true on success or if aborted (to prevent fallback from engaging after client disconnects).
    */
-  async testApiKey(provider: string, apiKey: string): Promise<{ valid: boolean; model?: string; error?: string }> {
+  private async callProviderStreamingAPI(
+    provider: AIProvider,
+    apiKey: string,
+    options: GenerateTextStreamOptions & { provider: AIProvider; model: string },
+  ): Promise<boolean> {
     try {
-      // Basic length sanity check
-      if (!apiKey || apiKey.length < 10) {
-        return { valid: false, error: "API key too short" }
+      const result = await this.callProviderAPI(provider, apiKey, {
+        prompt: options.prompt,
+        model: options.model,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+      })
+
+      if (!result.success || !result.content) {
+        if (!options.abortSignal?.aborted) {
+          options.onError?.(result.error || "Failed to generate content")
+        }
+        return false
       }
 
-      // Provider-specific regex patterns
-      const regexMap: Record<string, RegExp> = {
-        openai: /^sk-[A-Za-z0-9]{48,}$/,
-        groq: /^gsk_[A-Za-z0-9]{50,}$/,
-        gemini: /^AIza[A-Za-z0-9_-]{35,}$/,
-        anthropic: /^sk-ant-[A-Za-z0-9]{40,}$/,
-        mistral: /^[A-Za-z0-9]{32,}$/,
-        aiml: /.{10,}/,
+      const text = result.content
+      const total = text.length
+      let emitted = 0
+
+      // Dynamic chunk size for faster, smoother streaming
+      const chunkSize = total >= 5000 ? 12 : total >= 2000 ? 8 : 4
+
+      while (emitted < total) {
+        if (options.abortSignal?.aborted) {
+          options.onProgress?.({
+            message: "Streaming aborted by client.",
+            percentage: Math.round((emitted / Math.max(total, 1)) * 100),
+          })
+          return true
+        }
+
+        const next = text.slice(emitted, Math.min(emitted + chunkSize, total))
+        if (next) {
+          options.onToken?.(next)
+        }
+        emitted += next.length
+
+        // Emit progress frequently for responsive UI
+        if (emitted % (chunkSize * 3) === 0 || emitted === total) {
+          options.onProgress?.({ percentage: Math.round((emitted / Math.max(total, 1)) * 100) })
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 8))
       }
 
-      const pattern = regexMap[provider]
-      if (pattern && !pattern.test(apiKey)) {
-        return { valid: false, error: "API key format looks invalid" }
-      }
-
-      // Mapping of default models per provider for UI feedback
-      const defaultModelMap: Record<string, string> = {
-        openai: "gpt-4o",
-        groq: "llama-3.1-70b-versatile",
-        gemini: "gemini-1.5-pro",
-        anthropic: "claude-3-sonnet",
-        mistral: "mistral-small",
-        aiml: "claude-3-sonnet",
-      }
-
-      return { valid: true, model: defaultModelMap[provider] }
+      options.onProgress?.({ message: "Streaming complete", percentage: 100 })
+      return true
     } catch (error) {
-      return { valid: false, error: error instanceof Error ? error.message : "Unknown error" }
+      const message = error instanceof Error ? error.message : String(error)
+      if (!options.abortSignal?.aborted) {
+        options.onError?.(message || "Streaming failed")
+      }
+      return false
     }
   }
+
+  /**
+   * Generate text with streaming support
+   */
+  async generateTextStream(options: GenerateTextStreamOptions): Promise<void> {
+    try {
+      console.log("Enhanced AI Service: Starting streaming text generation...")
+
+      // Load user API keys
+      const userApiKeys = await this.loadUserApiKeys(options.userId)
+      let availableProviders = userApiKeys
+        .filter((key) => key.is_active && key.test_status === "valid" && key.decrypted_key)
+        .map((key) => key.provider as AIProvider)
+
+      if (availableProviders.length === 0) {
+        options.onError?.("No valid API keys available. Please configure API keys in Settings.")
+        return
+      }
+
+      // Reorder providers to honor preferred provider first
+      if (options.provider && availableProviders.includes(options.provider)) {
+        availableProviders = [
+          options.provider,
+          ...availableProviders.filter((p) => p !== options.provider),
+        ]
+      }
+
+      const errors: Array<{ provider: AIProvider; error: string }> = []
+
+      for (const provider of availableProviders) {
+        if (options.abortSignal?.aborted) {
+          console.log("Enhanced AI Service: Streaming aborted before starting provider", provider)
+          return
+        }
+
+        options.onProgress?.({ message: `Connecting to ${provider}...` })
+
+        // Get API key for this provider
+        const userApiKey = userApiKeys.find(
+          (key) => key.provider === provider && key.is_active && key.test_status === "valid" && key.decrypted_key,
+        )
+
+        if (!userApiKey?.decrypted_key) {
+          errors.push({ provider, error: "No valid API key" })
+          continue
+        }
+
+        const providerConfig = AI_PROVIDERS[provider]
+        if (!providerConfig) {
+          errors.push({ provider, error: "Unknown provider" })
+          continue
+        }
+
+        const selectedModel = options.model && providerConfig.models.includes(options.model)
+          ? options.model
+          : providerConfig.models[0]
+
+        console.log(`Enhanced AI Service: Streaming with ${provider} using model ${selectedModel}`)
+
+        const ok = await this.callProviderStreamingAPI(provider, userApiKey.decrypted_key, {
+          ...options,
+          model: selectedModel,
+          provider,
+        })
+
+        if (ok) {
+          // Successful streaming; exit
+          return
+        }
+
+        // If failed, record and try next provider
+        errors.push({ provider, error: "Streaming failed" })
+        options.onProgress?.({ message: `Falling back from ${provider}...` })
+      }
+
+      // If we reached here, all providers failed
+      options.onError?.("All AI providers failed for streaming.")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      options.onError?.(message || "Streaming failed")
+    }
+  }
+
 }
 
 export const enhancedAIService = new EnhancedAIService()
