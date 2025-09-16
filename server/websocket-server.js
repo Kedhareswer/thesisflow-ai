@@ -16,7 +16,8 @@ const envDefault = path.resolve(__dirname, '../.env');
 
 dotenv.config({ path: fs.existsSync(envLocal) ? envLocal : envDefault });
 
-const PORT = process.env.WS_PORT || 3001;
+// Prefer platform-provided PORT (Render/Heroku/Railway), then fallback to WS_PORT, then 3001
+const PORT = process.env.PORT || process.env.WS_PORT || 3001;
 const CORS_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // Create Supabase admin client
