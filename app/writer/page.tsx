@@ -43,7 +43,6 @@ import { useGlobalErrorHandler } from "./hooks/use-global-error-handler"
 import { UserProfileAvatar } from "@/components/user-profile-avatar" // For user editing indicator
 import { supabase } from "@/lib/supabase"
 import type { AIProvider } from "@/lib/ai-providers"
-import { WriterCommandMenu } from "./components/writer-command-menu"
 import WriterShareModal from "./components/writer-share-modal"
 import { AIDetectionBadge } from "@/components/ai-detection-badge"
 import { AIDetectionResult } from "@/lib/services/ai-detection.service"
@@ -817,59 +816,6 @@ export default function WriterPage() {
               {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
             </div>
 
-            {/* Center – Quick Actions */}
-            <div className="flex items-center justify-center">
-              <WriterCommandMenu
-                onNewDocument={handleNewDocument}
-                onSaveDocument={handleSaveDocument}
-                onExportDocument={handleExportDocument}
-                onImportDocument={handleImportDocument}
-                onShareDocument={handleShareDocument}
-                onToggleAiAssistant={handleToggleAiAssistant}
-                onToggleCitationManager={handleToggleCitationManager}
-                onToggleAiDetection={handleToggleAiDetection}
-                onToggleHumanize={handleToggleHumanize}
-                onFormatBold={handleFormatBold}
-                onFormatItalic={handleFormatItalic}
-                onFormatList={handleFormatList}
-                onFormatQuote={handleFormatQuote}
-                onFormatLink={handleFormatLink}
-                onFormatImage={handleFormatImage}
-                onFormatTable={handleFormatTable}
-                onFormatCode={handleFormatCode}
-                onFormatHeading1={handleFormatHeading1}
-                onFormatHeading2={handleFormatHeading2}
-                onFormatHeading3={handleFormatHeading3}
-                onAlignLeft={handleAlignLeft}
-                onAlignCenter={handleAlignCenter}
-                onAlignRight={handleAlignRight}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                onFindReplace={handleFindReplace}
-                onWordCount={handleWordCount}
-                onSpellCheck={handleSpellCheck}
-                onGrammarCheck={handleGrammarCheck}
-                onReadabilityScore={handleReadabilityScore}
-                onToneAnalysis={handleToneAnalysis}
-                onSentimentAnalysis={handleSentimentAnalysis}
-                onKeywordDensity={handleKeywordDensity}
-                onReadAloud={handleReadAloud}
-                onPrint={handlePrint}
-                onPrintPreview={handlePrintPreview}
-                onPageSetup={handlePageSetup}
-                onPreferences={handlePreferences}
-                onHelp={handleHelp}
-                onAbout={handleAbout}
-                onFeedback={handleFeedback}
-                onReportBug={handleReportBug}
-                onFeatureRequest={handleFeatureRequest}
-                onContactSupport={handleContactSupport}
-                onDocumentation={handleDocumentation}
-                onTutorial={handleTutorial}
-                onKeyboardShortcuts={handleKeyboardShortcuts}
-                onAccessibility={handleAccessibility}
-              />
-            </div>
 
             {/* Right section */}
             <div className="flex-1 flex items-center justify-end gap-2">
