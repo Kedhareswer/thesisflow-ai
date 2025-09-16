@@ -38,7 +38,7 @@ class SocketService {
 
     this.userId = userId
 
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "https://thesisflow-socket-railway.onrender.com"
     const path = process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io"
 
     // Create socket instance but don't auto-connect until we attach auth token
