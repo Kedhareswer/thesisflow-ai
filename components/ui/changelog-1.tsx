@@ -107,13 +107,23 @@ export const Changelog1 = ({
               id={entry.version}
               className="relative flex flex-col gap-4 md:flex-row md:gap-16"
             >
-              <div className="top-8 flex h-min w-64 shrink-0 items-center gap-4 md:sticky">
-                <Badge variant="secondary" className="text-xs">
-                  {entry.version}
-                </Badge>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {entry.date}
-                </span>
+              <div className="top-8 flex h-min w-64 shrink-0 flex-col gap-4 md:sticky">
+                <div className="flex items-center gap-4">
+                  <Badge variant="secondary" className="text-xs">
+                    {entry.version}
+                  </Badge>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {entry.date}
+                  </span>
+                </div>
+                {entry.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={entry.image}
+                    alt={`${entry.version} visual`}
+                    className="w-full rounded-lg object-cover shadow-sm border"
+                  />
+                )}
               </div>
               <div className="flex flex-col">
                 <h2 className="mb-3 text-lg leading-tight font-bold text-foreground/90 md:text-2xl">
@@ -130,14 +140,6 @@ export const Changelog1 = ({
                       </li>
                     ))}
                   </ul>
-                )}
-                {entry.image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={entry.image}
-                    alt={`${entry.version} visual`}
-                    className="mt-8 w-full rounded-lg object-cover"
-                  />
                 )}
                 {entry.button && (
                   <Button variant="link" className="mt-4 self-end" asChild>
