@@ -3,6 +3,7 @@
 import { io, type Socket } from "socket.io-client"
 import { useEffect, useState } from "react"
 import { supabase } from "@/integrations/supabase/client"
+import { renderKeepAliveService } from "./render-keepalive.service"
 
 // Socket events
 export enum SocketEvent {
@@ -38,19 +39,25 @@ class SocketService {
 
     this.userId = userId
 
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "https://thesisflow-socket-railway.onrender.com"
     const path = process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io"
+    const timeout = parseInt(process.env.NEXT_PUBLIC_SOCKET_TIMEOUT || "20000", 10)
+    const reconnectionAttempts = parseInt(process.env.NEXT_PUBLIC_SOCKET_RECONNECTION_ATTEMPTS || "10", 10)
 
     // Create socket instance but don't auto-connect until we attach auth token
     this.socket = io(url, {
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      // Use same path as server and prefer websockets to avoid polling 400s/CORS issues
+      reconnectionAttempts,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+      // Use same path as server and prefer polling first to wake up sleeping service
       path,
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
       withCredentials: true,
+      timeout,
+      forceNew: true,
+      upgrade: true,
     })
 
     // Wire up base events once
@@ -69,12 +76,24 @@ class SocketService {
       // Provide detailed diagnostics for connection errors
       this.socket.on("connect_error", (err: any) => {
         if (this.isDev) console.warn("socket: connect_error -", err?.message)
+        // Try to wake up the service with a simple HTTP request
+        if (err?.message?.includes('timeout') || err?.message?.includes('closed')) {
+          renderKeepAliveService.wakeUp()
+        }
       })
       this.socket.on("error", (err: any) => {
         if (this.isDev) console.warn("socket: error -", err?.message || err)
       })
       this.socket.io.on("reconnect_error", (err: any) => {
         if (this.isDev) console.warn("socket: reconnect_error -", err?.message)
+      })
+      
+      // Handle reconnection attempts
+      this.socket.io.on("reconnect_attempt", (attempt: number) => {
+        if (this.isDev) console.debug(`socket: reconnect attempt ${attempt}`)
+        if (attempt === 1) {
+          renderKeepAliveService.wakeUp()
+        }
       })
 
       // Cleanly mark offline on page unload
@@ -224,6 +243,25 @@ class SocketService {
       this.startTyping(teamId)
     } else {
       this.stopTyping(teamId)
+    }
+  }
+
+  // Wake up sleeping Render service with HTTP request
+  private async wakeUpService(): Promise<void> {
+    try {
+      const url = process.env.NEXT_PUBLIC_SOCKET_URL || "https://thesisflow-socket-railway.onrender.com"
+      if (this.isDev) console.debug("socket: attempting to wake up service")
+      
+      // Simple HTTP GET to wake up the service
+      await fetch(url, { 
+        method: 'GET',
+        mode: 'no-cors', // Avoid CORS issues for wake-up call
+        cache: 'no-cache'
+      })
+      
+      if (this.isDev) console.debug("socket: wake-up request sent")
+    } catch (error) {
+      if (this.isDev) console.debug("socket: wake-up request failed", error)
     }
   }
 
