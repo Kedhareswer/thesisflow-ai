@@ -1,5 +1,23 @@
 [
   {
+    "version": "v2.0.0",
+    "date": "2025-09-16",
+    "title": "Complete Platform Redesign & Enhanced Accessibility",
+    "description": "Major milestone release featuring comprehensive UI/UX redesign, enhanced accessibility features, and significant performance improvements across all research tools.",
+    "items": [
+      "Complete visual redesign with modern, accessible interface",
+      "Enhanced accessibility features including improved keyboard navigation",
+      "Redesigned research workflow with streamlined user experience",
+      "Advanced AI integration with improved response quality",
+      "Performance optimizations across all core features",
+      "Enhanced mobile responsiveness and cross-platform compatibility",
+      "Improved data visualization and result presentation",
+      "Advanced collaboration features and sharing capabilities"
+    ],
+    "button": { "url": "/explorer", "text": "Explore New Interface" },
+    "image": "/v2.png"
+  },
+  {
     "version": "v1.0.9",
     "date": "2025-09-07",
     "title": "Deep Research Integrated into Topic Explorer",
@@ -114,12 +132,19 @@
   {
     "version": "v1.0.0",
     "date": "2025-07-18",
-    "title": "Plan-and-Execute Streaming API",
-    "description": "New SSE route to plan tasks and stream execution progress with heartbeat and abort handling.",
+    "title": "ThesisFlow-AI Platform Launch",
+    "description": "Initial release of the comprehensive AI-powered research platform with core features for academic research, writing, and collaboration.",
     "items": [
-      "Streaming plan-and-execute route with init/plan/progress/done/error/ping",
-      "Rate limiting via Supabase RPC",
-      "Tool selection and robust error handling"
-    ]
+      "Complete research assistant with AI chat capabilities",
+      "Literature search and review tools with multi-source integration",
+      "Document extraction and analysis system",
+      "LaTeX-based academic writing environment",
+      "Project planning and task management features",
+      "Real-time collaboration and sharing capabilities",
+      "Streaming plan-and-execute API with progress tracking",
+      "Comprehensive user authentication and data security"
+    ],
+    "button": { "url": "/explorer", "text": "Start Researching" },
+    "image": "/v1.png"
   }
 ]
