@@ -652,9 +652,12 @@ export default function SummarizerPage() {
       // Ensure Summary tab is shown after successful generation
       handleTabChange('summary')
 
-      // Consume one summary token and record usage
+      // Consume one summary token and record usage (include provider/model context)
       try {
-        await incrementUsage('document_summaries')
+        await incrementUsage('document_summaries', {
+          provider: selectedProvider,
+          model: selectedModel,
+        })
         // Ensure UI reflects new counts promptly
         await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
       } catch (e) {

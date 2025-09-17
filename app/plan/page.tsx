@@ -15,7 +15,7 @@ import { RouteGuard } from "@/components/route-guard"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { loadStripe } from "@stripe/stripe-js"
 import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
-import ProjectAnalyticsChart from "@/components/ui/project-analytics-chart"
+import UsageAnalyticsChart from "@/components/ui/usage-analytics-chart"
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
@@ -544,37 +544,33 @@ Thank you!`)
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
-          {tokenStatus && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" /> Token Usage
-                </CardTitle>
-                <CardDescription>Overview of your daily and monthly token consumption</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Daily</span>
-                    <span className="font-medium">{tokenStatus.dailyUsed} / {tokenStatus.dailyLimit}</span>
+            {tokenStatus && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-medium">Token Usage</CardTitle>
+                  <CardDescription>Daily and monthly consumption</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Daily</span>
+                      <span className="font-medium">{tokenStatus.dailyUsed} / {tokenStatus.dailyLimit}</span>
+                    </div>
+                    <Progress value={tokenStatus.dailyLimit ? (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100 : 0} className="h-2" />
                   </div>
-                  <Progress value={tokenStatus.dailyLimit ? (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100 : 0} className="h-2" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Monthly</span>
-                    <span className="font-medium">{tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Monthly</span>
+                      <span className="font-medium">{tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit}</span>
+                    </div>
+                    <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
                   </div>
-                  <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-semibold mb-2">Project Analytics</h2>
-              <p className="text-muted-foreground">Track your team's productivity and project progress over time</p>
-            </div>
-            <ProjectAnalyticsChart />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Detailed usage chart (Service / Provider / Model) */}
+            <UsageAnalyticsChart />
           </TabsContent>
         </Tabs>
       </div>

@@ -135,9 +135,15 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
       // Add papers to research session
       if (searchResult.papers.length > 0) {
         addPapers(searchResult.papers, query.trim(), filters)
-        
-        // Increment usage after successful search
-        await incrementUsage('literature_searches')
+
+        // Increment usage after successful search (include provider/model context)
+        const providerCtx = Array.isArray(searchResult.sources) && searchResult.sources.length > 0
+          ? searchResult.sources.join('+')
+          : 'explorer'
+        await incrementUsage('literature_searches', {
+          provider: providerCtx,
+          model: 'enhanced-search'
+        })
         
         toast({
           title: "Search Complete",

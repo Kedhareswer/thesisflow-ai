@@ -172,7 +172,7 @@ export function useUserPlan() {
     }
   }, [user?.id, session?.access_token])
 
-  const incrementUsage = useCallback(async (feature: string): Promise<boolean> => {
+  const incrementUsage = useCallback(async (feature: string, context?: Record<string, any>): Promise<boolean> => {
     if (!user || !session) return false
 
     try {
@@ -183,7 +183,7 @@ export function useUserPlan() {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ feature, amount: 1 }),
+        body: JSON.stringify({ feature, amount: 1, context }),
       })
 
       if (deductResp.status === 429) {
@@ -221,7 +221,7 @@ export function useUserPlan() {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ feature, amount: 1 }),
+          body: JSON.stringify({ feature, amount: 1, context }),
         }).catch(() => {})
 
         toast({
@@ -244,7 +244,7 @@ export function useUserPlan() {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ feature, amount: 1 }),
+          body: JSON.stringify({ feature, amount: 1, context }),
         }).catch(() => {})
         throw new Error('Failed to increment usage')
       }

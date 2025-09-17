@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController, type ChatMessage } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
+import { useUserPlan } from "@/hooks/use-user-plan"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
@@ -197,6 +198,7 @@ export function ResearchAssistant({
   onPersonalityChange 
 }: ResearchAssistantProps) {
   const { toast } = useToast()
+  const { canUseFeature, incrementUsage, fetchPlanData, fetchTokenStatus } = useUserPlan()
   const { 
     session, 
     buildResearchContext, 
@@ -358,6 +360,16 @@ export function ResearchAssistant({
   const handleSendMessage = async () => {
     if (!value.trim() || isSending || !selectedProvider || !selectedModel) return
 
+    // Gate by plan limits before starting a generation
+    if (!canUseFeature('ai_generations')) {
+      toast({
+        title: 'Usage Limit Exceeded',
+        description: 'You have reached your monthly AI generation limit. Please upgrade your plan to continue.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -446,7 +458,7 @@ Use this research context to provide more relevant and targeted responses. Refer
           setReasoningLines([])
           setReasoningProgress(undefined)
         },
-        onDone: (metadata) => {
+        onDone: async (metadata) => {
           console.log('Streaming complete:', metadata)
           setIsTyping(false)
           setIsSending(false)
@@ -463,6 +475,15 @@ Use this research context to provide more relevant and targeted responses. Refer
             setReasoningLines([])
             setReasoningProgress(undefined)
           }, 600)
+          
+          // Consume one AI Assistant generation on success (include provider/model context)
+          try {
+            await incrementUsage('ai_generations', {
+              provider: selectedProvider,
+              model: selectedModel,
+            })
+            await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
+          } catch (_) {}
           
           // Save messages to session
           addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
