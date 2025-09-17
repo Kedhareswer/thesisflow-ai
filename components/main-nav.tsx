@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Search, FileText, Bot, Calendar, Users, Settings, User, LogOut, PenLine, Crown, Menu } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TokenMeter } from "@/components/token/token-meter"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,27 +114,53 @@ export function MainNav() {
 
           {/* Navigation (visible to all users) */}
           <nav className="hidden md:flex items-center space-x-1">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
+            <TooltipProvider>
+              {navigation.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href
 
-              return (
-                <Link key={item.name} href={item.href}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-9 px-3 text-sm font-medium transition-colors",
-                      "hover:bg-gray-100 hover:text-black",
-                      isActive ? "bg-gray-100 text-black" : "text-gray-600",
-                    )}
-                  >
-                    <Icon className="mr-2 h-4 w-4" />
-                    {item.name}
-                  </Button>
-                </Link>
-              )
-            })}
+                const tip = (() => {
+                  switch (item.name) {
+                    case "Explorer":
+                      return "Deep Research • consumes tokens";
+                    case "Summarizer":
+                      return "Summarizer • consumes tokens";
+                    case "AI Agents":
+                      return "AI Chat & Tools • consumes tokens";
+                    case "Planner":
+                      return "Plan & Execute • may consume tokens";
+                    default:
+                      return undefined;
+                  }
+                })();
+
+                const button = (
+                  <Link key={item.name} href={item.href}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-9 px-3 text-sm font-medium transition-colors",
+                        "hover:bg-gray-100 hover:text-black",
+                        isActive ? "bg-gray-100 text-black" : "text-gray-600",
+                      )}
+                    >
+                      <Icon className="mr-2 h-4 w-4" />
+                      {item.name}
+                    </Button>
+                  </Link>
+                );
+
+                return tip ? (
+                  <Tooltip key={item.name}>
+                    <TooltipTrigger asChild>{button}</TooltipTrigger>
+                    <TooltipContent>{tip}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  button
+                );
+              })}
+            </TooltipProvider>
           </nav>
 
           {/* Mobile Navigation */}
@@ -179,6 +207,8 @@ export function MainNav() {
           <div className="flex items-center space-x-4">
             {user && !isLoading ? (
               <>
+                {/* Mini Token Meter */}
+                <TokenMeter compact />
                 {/* Notification Bell */}
                 <Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
                   <NotificationBell />
@@ -211,6 +241,12 @@ export function MainNav() {
                   <Link href="/settings" className="flex items-center w-full">
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/tokens" className="flex items-center w-full">
+                    <Crown className="mr-2 h-4 w-4" />
+                    Tokens
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
