@@ -232,11 +232,38 @@ export function useUserPlan() {
           lastDailyReset: (data as any).last_daily_reset ? String((data as any).last_daily_reset) : undefined,
           lastMonthlyReset: (data as any).last_monthly_reset ? String((data as any).last_monthly_reset) : undefined,
         })
+        return
       }
+      // Fall through to HTTP fallback when no row
     } catch (err) {
-      // Non-fatal: keep UI resilient
+      // Try HTTP fallback if direct query failed
       if (process.env.NODE_ENV === 'development') {
-        console.warn('Failed to fetch token status', err)
+        console.warn('Direct Supabase token fetch failed; trying /api/user/tokens fallback', err)
+      }
+    }
+    // Fallback to API route which also upserts default row when missing
+    try {
+      const resp = await fetch('/api/user/tokens', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+      if (resp.ok) {
+        const data = await resp.json()
+        setTokenStatus({
+          dailyUsed: Number(data.dailyUsed ?? 0),
+          monthlyUsed: Number(data.monthlyUsed ?? 0),
+          dailyLimit: Number(data.dailyLimit ?? 0),
+          monthlyLimit: Number(data.monthlyLimit ?? 0),
+          dailyRemaining: Number(data.dailyRemaining ?? 0),
+          monthlyRemaining: Number(data.monthlyRemaining ?? 0),
+          lastDailyReset: data.lastDailyReset ? String(data.lastDailyReset) : undefined,
+          lastMonthlyReset: data.lastMonthlyReset ? String(data.lastMonthlyReset) : undefined,
+        })
+      }
+    } catch (fallbackErr) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Fallback /api/user/tokens also failed', fallbackErr)
       }
     }
   }, [user?.id, session?.access_token])

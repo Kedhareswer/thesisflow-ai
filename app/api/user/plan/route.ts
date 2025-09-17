@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Validate and normalize plan data
     const validStatuses = ['active', 'pending', 'canceled', 'expired']
-    const validPlanTypes = ['free', 'pro', 'enterprise']
+    const validPlanTypes = ['free', 'pro']
     const normalizedPlan = plan 
       ? {
           plan_type: validPlanTypes.includes(plan.plan_type) ? plan.plan_type : 'free',
@@ -44,27 +44,33 @@ export async function GET(request: NextRequest) {
       : { plan_type: 'free', status: 'active' }
 
     // Get usage summary using the function
-    const { data: usage, error: usageError } = await supabaseAdmin
-      .rpc('get_user_usage_summary', { p_user_uuid: user.id })
-
-    if (usageError) {
-      console.error('Usage error:', usageError)
-      return NextResponse.json({ error: 'Failed to get usage' }, { status: 500 })
+    let transformedUsage: any[] = []
+    try {
+      const { data: usage, error: usageError } = await supabaseAdmin
+        .rpc('get_user_usage_summary', { p_user_uuid: user.id })
+      if (usageError) {
+        console.warn('[user/plan] get_user_usage_summary failed; returning plan without usage', usageError)
+      } else {
+        transformedUsage = (usage || []).map((item: any) => ({
+          feature: item.feature_name,
+          usage_count: item.usage_count,
+          limit_count: item.limit_count,
+          remaining: item.remaining,
+          is_unlimited: item.is_unlimited
+        }))
+      }
+    } catch (rpcErr) {
+      console.warn('[user/plan] usage RPC threw; returning plan without usage', rpcErr)
     }
 
-    // Transform usage data to match expected format
-    const transformedUsage = (usage || []).map((item: any) => ({
-      feature: item.feature_name,
-      usage_count: item.usage_count,
-      limit_count: item.limit_count,
-      remaining: item.remaining,
-      is_unlimited: item.is_unlimited
-    }))
-
-    return NextResponse.json({
+    const res = NextResponse.json({
       plan: normalizedPlan,
       usage: transformedUsage
     })
+    // Optional debug header to verify which project handled the request
+    res.headers.set('x-plan-source', new URL(supabaseUrl).host)
+    return res
+
   } catch (error) {
     console.error('Error getting user plan:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
