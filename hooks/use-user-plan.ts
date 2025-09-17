@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { planCache } from '@/lib/services/cache.service'
 
 interface UserPlan {
-  plan_type: 'free' | 'pro' | 'enterprise'
+  plan_type: 'free' | 'pro'
   status: 'active' | 'cancelled' | 'expired' | 'suspended'
   current_period_end: string
 }
@@ -76,10 +76,21 @@ export function useUserPlan() {
       }
 
       const data = await response.json()
-      setPlanData(data)
+      // Normalize plan type to only 'free' | 'pro'
+      const rawType = String(data?.plan?.plan_type || '').toLowerCase()
+      const paidAliases = new Set(['pro','professional','premium','plus','paid','starter_pro','business','enterprise'])
+      const normalizedPlanType: 'free' | 'pro' = paidAliases.has(rawType) ? 'pro' : 'free'
+      const normalized: PlanData = {
+        ...data,
+        plan: {
+          ...data.plan,
+          plan_type: normalizedPlanType,
+        },
+      }
+      setPlanData(normalized)
       
       // Cache the data
-      planCache.set(cacheKey, data, 5 * 60 * 1000) // 5 minutes TTL
+      planCache.set(cacheKey, normalized, 5 * 60 * 1000) // 5 minutes TTL
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch plan data'
       setError(errorMessage)
@@ -152,9 +163,9 @@ export function useUserPlan() {
     const usageItem = planData.usage.find(item => item.feature === key)
 
     if (!usageItem) {
-      // If usage record is missing but user is Pro/Enterprise, default-allow
+      // If usage record is missing but user is Pro, default-allow
       const planType = planData.plan?.plan_type
-      if (planType === 'pro' || planType === 'enterprise') {
+      if (planType === 'pro') {
         return true
       }
       return false
@@ -175,14 +186,10 @@ export function useUserPlan() {
 
   const isProOrHigher = useCallback((): boolean => {
     const planType = getPlanType()
-    return planType === 'pro' || planType === 'enterprise'
+    return planType === 'pro'
   }, [getPlanType])
 
   const isProfessionalOrHigher = isProOrHigher
-
-  const isEnterprise = useCallback((): boolean => {
-    return getPlanType() === 'enterprise'
-  }, [getPlanType])
 
   const isPlanDataReady = useCallback((): boolean => {
     return !loading && planData !== null
@@ -324,7 +331,6 @@ export function useUserPlan() {
     getPlanType,
     isProOrHigher,
     isProfessionalOrHigher,
-    isEnterprise,
     isPlanDataReady,
     tokenStatus,
   }

@@ -94,6 +94,27 @@ cd python && python app.py  # Literature search (port 5000)
 
 ---
 
+## 🪙 Plans & Tokens
+
+ThesisFlow-AI uses a token-based usage model with two plans:
+
+- __Free__: 10 daily tokens, 50 monthly cap
+- __Pro__: 100 daily tokens, 500 monthly cap
+
+__Where tokens are consumed__
+- AI Chat (messages and streaming)
+- Explorer (topic exploration, deep research)
+- Summarizer
+- Plan-and-Execute workflows and related AI tools
+
+__Where you can see usage__
+- Top nav mini meter: shows remaining daily tokens, with a tooltip for daily/monthly breakdown
+- Profile dropdown: shows current plan, daily remaining count, and a Manage/Upgrade button
+- Plan & Analytics page (`/plan`): Token bars and usage by feature
+- Tokens page (`/tokens`): Full dashboard with recent transactions and feature costs
+
+Only two roles are recognized across the app: __free__ and __pro__. Any paid alias from the backend (e.g., professional, premium, enterprise) is normalized to `pro` on the client.
+
 ## 📣 Changelog
 
 Stay up to date with the latest releases and improvements:

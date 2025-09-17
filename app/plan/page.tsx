@@ -21,7 +21,7 @@ import ProjectAnalyticsChart from "@/components/ui/project-analytics-chart"
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
 export default function PlanPage() {
-  const { planData, loading, getPlanType, getUsageForFeature, isProOrHigher, isEnterprise, tokenStatus } = useUserPlan()
+  const { planData, loading, getPlanType, getUsageForFeature, isProOrHigher, tokenStatus } = useUserPlan()
   const { toast } = useToast()
   const { session } = useSupabaseAuth()
   const router = useRouter()
@@ -73,14 +73,6 @@ export default function PlanPage() {
       description: "Enhanced features with higher limits",
       price: "$29",
       period: "month"
-    },
-    enterprise: {
-      name: "Enterprise",
-      icon: <Sparkles className="h-6 w-6" />,
-      color: "bg-gradient-to-r from-purple-500 to-pink-500",
-      description: "Unlimited access to all features",
-      price: "Custom",
-      period: "contact us"
     }
   }
 
@@ -483,43 +475,6 @@ Thank you!`)
                             <ArrowRight className="h-4 w-4 ml-2" />
                           </>
                         )}
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Enterprise Plan */}
-                  <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-pink-500" />
-                        <span className="font-semibold">Enterprise</span>
-                      </div>
-                      <span className="text-lg font-bold">Custom</span>
-                    </div>
-                    <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                      <li>• Unlimited literature searches</li>
-                      <li>• Unlimited document summaries</li>
-                      <li>• Unlimited document uploads</li>
-                      <li>• Unlimited AI generations</li>
-                      <li>• Unlimited team collaboration</li>
-                    </ul>
-                    {planType === 'enterprise' ? (
-                      <Button 
-                        variant="outline" 
-                        className="w-full" 
-                        disabled
-                      >
-                        Current Plan
-                        <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        className="w-full" 
-                        onClick={handleContactSales}
-                      >
-                        Contact Sales
-                        <PhoneCall className="h-4 w-4 ml-2" />
                       </Button>
                     )}
                   </div>
