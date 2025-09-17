@@ -3,10 +3,13 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { PenLine, MessageSquare, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown, Home } from "lucide-react"
+import { PenLine, MessageSquare, Search, RefreshCcw, Quote, Database, ShieldCheck, Plus, Lightbulb, ArrowUpRight, Calendar, Users, User, Settings, LogOut, Crown, Home, Sparkles } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { TokenMeter } from "@/components/token/token-meter"
+import { useUserPlan } from "@/hooks/use-user-plan"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type SidebarProps = {
   collapsed: boolean
@@ -36,6 +39,7 @@ const navItems = [
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading, signOut } = useSupabaseAuth()
+  const { getPlanType, tokenStatus, isProOrHigher } = useUserPlan()
 
   // Simple avatar used in profile dropdown
   const SimpleAvatar = ({ size = "sm" }: { size?: "sm" | "md" }) => {
@@ -102,6 +106,11 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto">
+
+        {/* Mini Token Meter */}
+        <div className="px-3 pb-2">
+          <TokenMeter compact />
+        </div>
 
         {/* Nav */}
         <nav className="px-1">
@@ -184,6 +193,23 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <NotificationsModal />
             </React.Suspense>
 
+            {/* Always-visible token chip */}
+            {tokenStatus && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={`flex items-center gap-1 rounded-full border bg-white px-2 h-7 text-xs ${collapsed ? 'mt-1' : ''}`}>
+                      <Sparkles className="h-3.5 w-3.5 text-[#FF6B2C]" />
+                      <span className="tabular-nums">{tokenStatus.dailyRemaining}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
             <DropdownMenu
               trigger={
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hover:bg-gray-100">
@@ -202,6 +228,32 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     {user.user_metadata?.full_name || user.user_metadata?.display_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : "User")}
                   </p>
                   <p className="w-[180px] truncate text-xs text-gray-600">{user.email}</p>
+                </div>
+              </div>
+              {/* Plan + Usage card */}
+              <div className="p-3 border-b">
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold">
+                      {getPlanType() === 'pro' ? 'Pro Plan' : 'Free Plan'}
+                    </span>
+                    <span className="inline-flex items-center text-xs text-muted-foreground">
+                      <Sparkles className="h-3 w-3 mr-1 text-[#FF6B2C]" />
+                      {tokenStatus ? `${tokenStatus.dailyRemaining} left` : '—'}
+                    </span>
+                  </div>
+                  {tokenStatus && (
+                    <div className="text-[11px] text-muted-foreground">
+                      Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    <Link href="/plan">
+                      <Button variant="outline" size="sm" className="w-full h-7 text-xs">
+                        {isProOrHigher() ? 'Manage Plan' : 'Upgrade Plan'}
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
               <DropdownMenuItem>
