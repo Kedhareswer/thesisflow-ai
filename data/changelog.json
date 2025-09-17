@@ -1,5 +1,19 @@
 [
   {
+    "version": "v2.1.0",
+    "date": "2025-09-17",
+    "title": "Token-based Usage System + Plan & Analytics Updates",
+    "description": "Introduced a unified token system with daily and monthly limits that power AI features. Updated Home pricing section and the Plan & Analytics page to clearly show token allowances and live usage.",
+    "items": [
+      "New token-based usage model with daily and monthly resets",
+      "Home > Pricing: token-focused plans, copy, and explainer",
+      "Plan & Analytics: current plan now shows daily/monthly tokens used/remaining",
+      "Analytics tab: new Token Usage card with progress bars",
+      "Backend: token status fetched in real time from Supabase (user_tokens)"
+    ],
+    "button": { "url": "/plan", "text": "Manage your plan" }
+  },
+  {
     "version": "v2.0.0",
     "date": "2025-09-16",
     "title": "Complete Platform Redesign & Enhanced Accessibility",

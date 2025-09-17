@@ -80,12 +80,19 @@ export function SmartUpgradeBanner({
     try {
       const isProOrAbove = isProfessionalOrHigher();
 
-      // Determine effective limit from plan usage if available
+      // Never show for Pro users
+      if (isProOrAbove) {
+        setIsVisible(false);
+        setLoading(false);
+        return;
+      }
+
+      // Determine effective limit from plan usage if available (Free users only)
       const usage = getUsageForFeature(feature === 'team members' ? 'team_members' : feature.replace(' ', '_'));
       const effectiveLimit = typeof usage?.limit_count === 'number' && usage.limit_count > 0 ? usage.limit_count : limit;
 
       const nearLimit = !!(usage && !usage.is_unlimited && currentUsage >= Math.max(1, Math.floor(effectiveLimit * 0.8)));
-      const eligible: boolean = (!isProOrAbove && showForFreeUsers) || nearLimit;
+      const eligible: boolean = (showForFreeUsers && !isProOrAbove) || nearLimit;
       const shouldShow: boolean = !!(eligible && !isDismissed());
 
       setIsVisible(shouldShow);

@@ -1,85 +1,56 @@
-import { NextRequest } from 'next/server';
-import { requireAuth } from '@/lib/auth-utils';
+import { NextRequest, NextResponse } from 'next/server';
 import { enhancedAIService } from '@/lib/enhanced-ai-service';
-import { createClient } from '@supabase/supabase-js';
 import { type AIProvider } from '@/lib/ai-providers';
+import { withTokenValidation } from '@/lib/middleware/token-middleware';
 
 // Ensure Node.js runtime for service-role usage and stable SSE behavior
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Supabase client (service role for server-side ops like rate limiting)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const aiService = enhancedAIService;
 
-interface RateLimitResult {
-  allowed: boolean;
-  current_count: number;
-  reset_time: string;
-}
-
-export async function GET(request: NextRequest) {
-  const startTime = Date.now();
-  
-  try {
-    // Authenticate user - supports header, query param, or cookie auth for SSE
-    const user = await requireAuth(request, "ai-chat-stream");
+// Use token-based middleware for GET
+export const GET = withTokenValidation(
+  'ai_chat',
+  async (userId: string, request: NextRequest): Promise<NextResponse> => {
+    const startTime = Date.now();
     
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const message = searchParams.get('message')?.trim() || '';
-    const messagesParam = searchParams.get('messages');
-    const provider = searchParams.get('provider') as AIProvider;
-    const model = searchParams.get('model') || '';
-    const systemPrompt = searchParams.get('systemPrompt') || '';
-    const temperature = parseFloat(searchParams.get('temperature') || '0.7');
-    const maxTokens = parseInt(searchParams.get('maxTokens') || '2000');
+    try {
+      // Parse query parameters
+      const { searchParams } = new URL(request.url);
+      const message = searchParams.get('message')?.trim() || '';
+      const messagesParam = searchParams.get('messages');
+      const provider = searchParams.get('provider') as AIProvider;
+      const model = searchParams.get('model') || '';
+      const systemPrompt = searchParams.get('systemPrompt') || '';
+      const temperature = parseFloat(searchParams.get('temperature') || '0.7');
+      const maxTokens = parseInt(searchParams.get('maxTokens') || '2000');
     
-    // Handle conversation history or single message
-    let conversationHistory: Array<{ role: string; content: string }> = [];
-    
-    if (messagesParam) {
-      try {
-        conversationHistory = JSON.parse(messagesParam);
-        if (!Array.isArray(conversationHistory)) {
-          return new Response('Invalid messages format', { status: 400 });
+      // Handle conversation history or single message
+      let conversationHistory: Array<{ role: string; content: string }> = [];
+      
+      if (messagesParam) {
+        try {
+          conversationHistory = JSON.parse(messagesParam);
+          if (!Array.isArray(conversationHistory)) {
+            return new NextResponse('Invalid messages format', { status: 400 });
+          }
+        } catch (error) {
+          return new NextResponse('Invalid messages JSON', { status: 400 });
         }
-      } catch (error) {
-        return new Response('Invalid messages JSON', { status: 400 });
+      } else if (message) {
+        // Single message mode for backward compatibility
+        conversationHistory = [{ role: 'user', content: message }];
+      } else {
+        return new NextResponse('Message or messages required', { status: 400 });
       }
-    } else if (message) {
-      // Single message mode for backward compatibility
-      conversationHistory = [{ role: 'user', content: message }];
-    } else {
-      return new Response('Message or messages required', { status: 400 });
-    }
-    
-    // Validate conversation length
-    const totalLength = conversationHistory.reduce((sum, msg) => sum + msg.content.length, 0);
-    if (totalLength > 50000) {
-      return new Response('Conversation too long (max 50,000 characters total)', { status: 400 });
-    }
-
-    // Check rate limit
-    const clientIP = getClientIP(request);
-    const rateLimit = await checkRateLimit(user.id, clientIP);
-    if (!rateLimit.allowed) {
-      const retryAfterSec = Math.max(1, Math.ceil((new Date(rateLimit.reset_time).getTime() - Date.now()) / 1000));
-      return new Response('Rate limit exceeded. Try later.', {
-        status: 429,
-        headers: {
-          'X-RateLimit-Limit': '50',
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': new Date(rateLimit.reset_time).getTime().toString(),
-          'Retry-After': retryAfterSec.toString(),
-        },
-      });
-    }
+      
+      // Validate conversation length
+      const totalLength = conversationHistory.reduce((sum, msg) => sum + msg.content.length, 0);
+      if (totalLength > 50000) {
+        return new NextResponse('Conversation too long (max 50,000 characters total)', { status: 400 });
+      }
 
     const encoder = new TextEncoder();
     let controller: ReadableStreamDefaultController<Uint8Array>;
@@ -95,11 +66,6 @@ export async function GET(request: NextRequest) {
           type: 'init',
           provider: provider || 'auto',
           model: model || 'auto',
-          rateLimit: {
-            limit: 50,
-            remaining: Math.max(0, 50 - rateLimit.current_count),
-            resetTime: rateLimit.reset_time,
-          },
           timestamp: new Date().toISOString(),
         };
         
@@ -157,7 +123,7 @@ export async function GET(request: NextRequest) {
                 model: model,
                 temperature: temperature,
                 maxTokens: maxTokens,
-                userId: user.id,
+                userId: userId,
                 onToken: (token: string) => {
                   if (closed) return;
                   totalTokens++;
@@ -265,7 +231,7 @@ export async function GET(request: NextRequest) {
                   prompt: fullPrompt,
                   temperature: temperature,
                   maxTokens: maxTokens,
-                  userId: user.id,
+                  userId: userId,
                   // Don't specify provider to trigger automatic fallback
                   onToken: (token: string) => {
                     if (closed) return;
@@ -378,15 +344,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return new Response(stream, {
+    return new NextResponse(stream, {
       status: 200,
       headers: {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
-        'X-RateLimit-Limit': '50',
-        'X-RateLimit-Remaining': Math.max(0, 50 - rateLimit.current_count).toString(),
-        'X-RateLimit-Reset': new Date(rateLimit.reset_time).getTime().toString(),
       },
     });
 
@@ -394,43 +357,10 @@ export async function GET(request: NextRequest) {
     console.error('AI Chat Stream API Error:', error);
     
     if (error instanceof Error && error.message === 'Authentication required') {
-      return new Response('Authentication required', { status: 401 });
+      return new NextResponse('Authentication required', { status: 401 });
     }
     
-    return new Response('Internal server error', { status: 500 });
+    return new NextResponse('Internal server error', { status: 500 });
   }
 }
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  const cfConnectingIP = request.headers.get('cf-connecting-ip');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  if (realIP) return realIP;
-  if (cfConnectingIP) return cfConnectingIP;
-  return '127.0.0.1';
-}
-
-async function checkRateLimit(userId: string, ipAddress: string): Promise<RateLimitResult> {
-  try {
-    const { data, error } = await supabase.rpc('check_literature_search_rate_limit', {
-      p_user_id: userId,
-      p_ip_address: ipAddress,
-      p_limit: 50, // Lower limit for AI chat streaming
-      p_window_minutes: 60,
-    });
-    if (error) throw error;
-    return data?.[0] || {
-      allowed: true,
-      current_count: 0,
-      reset_time: new Date(Date.now() + 3600000).toISOString(),
-    };
-  } catch (e) {
-    // Soft-fail: allow request
-    return {
-      allowed: true,
-      current_count: 0,
-      reset_time: new Date(Date.now() + 3600000).toISOString(),
-    };
-  }
-}
+);

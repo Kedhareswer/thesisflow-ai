@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Validate and normalize plan data
     const validStatuses = ['active', 'pending', 'canceled', 'expired']
-    const validPlanTypes = ['free', 'pro', 'enterprise']
+    const validPlanTypes = ['free', 'pro']
     const normalizedPlan = plan 
       ? {
           plan_type: validPlanTypes.includes(plan.plan_type) ? plan.plan_type : 'free',
@@ -44,27 +44,33 @@ export async function GET(request: NextRequest) {
       : { plan_type: 'free', status: 'active' }
 
     // Get usage summary using the function
-    const { data: usage, error: usageError } = await supabaseAdmin
-      .rpc('get_user_usage_summary', { p_user_uuid: user.id })
-
-    if (usageError) {
-      console.error('Usage error:', usageError)
-      return NextResponse.json({ error: 'Failed to get usage' }, { status: 500 })
+    let transformedUsage: any[] = []
+    try {
+      const { data: usage, error: usageError } = await supabaseAdmin
+        .rpc('get_user_usage_summary', { p_user_uuid: user.id })
+      if (usageError) {
+        console.warn('[user/plan] get_user_usage_summary failed; returning plan without usage', usageError)
+      } else {
+        transformedUsage = (usage || []).map((item: any) => ({
+          feature: item.feature_name,
+          usage_count: item.usage_count,
+          limit_count: item.limit_count,
+          remaining: item.remaining,
+          is_unlimited: item.is_unlimited
+        }))
+      }
+    } catch (rpcErr) {
+      console.warn('[user/plan] usage RPC threw; returning plan without usage', rpcErr)
     }
 
-    // Transform usage data to match expected format
-    const transformedUsage = (usage || []).map((item: any) => ({
-      feature: item.feature_name,
-      usage_count: item.usage_count,
-      limit_count: item.limit_count,
-      remaining: item.remaining,
-      is_unlimited: item.is_unlimited
-    }))
-
-    return NextResponse.json({
+    const res = NextResponse.json({
       plan: normalizedPlan,
       usage: transformedUsage
     })
+    // Optional debug header to verify which project handled the request
+    res.headers.set('x-plan-source', new URL(supabaseUrl).host)
+    return res
+
   } catch (error) {
     console.error('Error getting user plan:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -108,18 +114,58 @@ export async function POST(request: NextRequest) {
       }, { status: 429 })
     }
 
-    // Increment usage
-    const { data: incremented, error: incrementError } = await supabaseAdmin
-      .rpc('increment_usage', { p_user_uuid: user.id, p_feature_name: feature, p_amount: 1 })
+    // Get or create user_usage record
+    let { data: usageRow, error: fetchUsageErr } = await supabaseAdmin
+      .from('user_usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('feature_name', feature)
+      .maybeSingle()
 
-    if (incrementError) {
-      console.error('Increment error:', incrementError)
-      return NextResponse.json({ error: 'Failed to increment usage' }, { status: 500 })
+    if (fetchUsageErr) {
+      console.error('Fetch usage error:', fetchUsageErr)
+      return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 })
+    }
+
+    let newUsageCount = 1
+    if (!usageRow) {
+      // Create new usage record
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from('user_usage')
+        .insert({
+          user_id: user.id,
+          feature_name: feature,
+          usage_count: 1,
+        })
+        .select('*')
+        .maybeSingle()
+      
+      if (insertErr) {
+        console.error('Insert usage error:', insertErr)
+        return NextResponse.json({ error: 'Failed to create usage record' }, { status: 500 })
+      }
+      usageRow = inserted
+    } else {
+      // Update existing usage record
+      newUsageCount = (usageRow.usage_count || 0) + 1
+      const { data: updated, error: updateErr } = await supabaseAdmin
+        .from('user_usage')
+        .update({ usage_count: newUsageCount })
+        .eq('user_id', user.id)
+        .eq('feature_name', feature)
+        .select('*')
+        .maybeSingle()
+      
+      if (updateErr) {
+        console.error('Update usage error:', updateErr)
+        return NextResponse.json({ error: 'Failed to update usage' }, { status: 500 })
+      }
+      usageRow = updated
     }
 
     return NextResponse.json({ 
       success: true,
-      incremented: incremented
+      incremented: newUsageCount
     })
   } catch (error) {
     console.error('Error incrementing usage:', error)

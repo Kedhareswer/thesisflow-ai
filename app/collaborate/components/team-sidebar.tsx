@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,7 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
-import { Plus, Crown, UserPlus, Search as SearchIcon, Users, Globe, MoreHorizontal, Inbox } from "lucide-react"
+import { Plus, Crown, UserPlus, Search as SearchIcon, Users, Globe, MoreHorizontal, Inbox, Sparkles, User as UserIcon, Settings as SettingsIcon } from "lucide-react"
+import { TokenMeter } from "@/components/token/token-meter"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { useUserPlan } from "@/hooks/use-user-plan"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type UserStatus = "online" | "offline" | "away" | "busy"
 
@@ -71,6 +76,28 @@ export function TeamSidebar(props: TeamSidebarProps) {
     onOpenInvitations,
     invitationsCount = 0,
   } = props
+
+  const { user, isLoading, signOut } = useSupabaseAuth()
+  const { getPlanType, tokenStatus, isProOrHigher } = useUserPlan()
+
+  // Simple avatar used in profile dropdown
+  const SimpleAvatar = ({ size = "sm" }: { size?: "sm" | "md" }) => {
+    const getInitials = () => {
+      if (user?.user_metadata?.display_name) return user.user_metadata.display_name[0].toUpperCase()
+      if (user?.email) return user.email[0].toUpperCase()
+      return "U"
+    }
+    const sizeClass = size === "sm" ? "h-8 w-8 text-sm" : "h-10 w-10 text-base"
+    const avatarUrl = user?.user_metadata?.avatar_url
+    if (avatarUrl) {
+      return <img src={`${avatarUrl}?v=${Date.now()}`} alt="Profile" className={`${sizeClass} rounded-full object-cover`} />
+    }
+    return (
+      <div className={`${sizeClass} bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold rounded-full flex items-center justify-center`}>
+        {getInitials()}
+      </div>
+    )
+  }
 
   const filtered = React.useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
@@ -155,6 +182,12 @@ export function TeamSidebar(props: TeamSidebarProps) {
                   </DropdownMenuItem>
                 </DropdownMenu>
               </div>
+              {/* Mini Token Meter */}
+              {user && !isLoading && (
+                <div className="mt-3">
+                  <TokenMeter compact />
+                </div>
+              )}
             </div>
             <div className="p-4 space-y-2">
               {filtered.map((team) => (
@@ -227,6 +260,92 @@ export function TeamSidebar(props: TeamSidebarProps) {
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Footer with token chip and profile dropdown */}
+      {user && !isLoading && (
+        <div className="rounded-lg border bg-white p-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            {/* Token chip */}
+            {tokenStatus && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 rounded-full border bg-white px-2 h-7 text-xs">
+                      <Sparkles className="h-3.5 w-3.5 text-[#FF6B2C]" />
+                      <span className="tabular-nums">{tokenStatus.dailyRemaining}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            <DropdownMenu
+              trigger={
+                <button className="relative h-9 w-9 rounded-full overflow-hidden border hover:opacity-90">
+                  <SimpleAvatar size="sm" />
+                </button>
+              }
+              className="w-56 right-0"
+              side="top"
+              align="end"
+              sideOffset={8}
+            >
+              <div className="flex items-center justify-start gap-3 p-3 border-b">
+                <SimpleAvatar size="md" />
+                <div className="flex flex-col space-y-1 leading-none">
+                  <p className="font-medium text-sm">{user.user_metadata?.full_name || user.user_metadata?.display_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : "User")}</p>
+                  <p className="w-[180px] truncate text-xs text-gray-600">{user.email}</p>
+                </div>
+              </div>
+              {/* Plan + Usage card */}
+              <div className="p-3 border-b">
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold">{getPlanType() === 'pro' ? 'Pro Plan' : 'Free Plan'}</span>
+                    <span className="inline-flex items-center text-xs text-muted-foreground">
+                      <Sparkles className="h-3 w-3 mr-1 text-[#FF6B2C]" />
+                      {tokenStatus ? `${tokenStatus.dailyRemaining} left` : '—'}
+                    </span>
+                  </div>
+                  {tokenStatus && (
+                    <div className="text-[11px] text-muted-foreground">Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}</div>
+                  )}
+                  <div className="mt-2">
+                    <Link href="/plan">
+                      <Button variant="outline" size="sm" className="w-full h-7 text-xs">{isProOrHigher() ? 'Manage Plan' : 'Upgrade Plan'}</Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+              <DropdownMenuItem>
+                <Link href="/profile" className="flex items-center w-full">
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Link href="/settings" className="flex items-center w-full">
+                  <SettingsIcon className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Link href="/plan" className="flex items-center w-full">
+                  <Crown className="mr-2 h-4 w-4" />
+                  Plan
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600" onClick={() => signOut()}>
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

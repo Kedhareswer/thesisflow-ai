@@ -9,6 +9,7 @@ import { Lightbulb, TrendingUp, Info, Save, CheckSquare, Square } from "lucide-r
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { useToast } from "@/hooks/use-toast"
+import { useUserPlan } from "@/hooks/use-user-plan"
 import Link from "next/link"
 import { useResearchIdeas, useResearchContext, useResearchTopics } from "@/components/research-session-provider"
 import type { AIProvider } from "@/lib/ai-providers"
@@ -70,6 +71,7 @@ interface IdeaGeneratorProps {
 
 export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const { toast } = useToast()
+  const { canUseFeature, incrementUsage, fetchPlanData, fetchTokenStatus } = useUserPlan()
   const { ideas: sessionIdeas, selectedIdeas, addIdeas, selectIdea } = useResearchIdeas()
   const { hasContext, contextSummary, buildContext, currentTopic } = useResearchContext()
   const { topics } = useResearchTopics()
@@ -121,6 +123,16 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
       return
     }
 
+    // Gate by plan limits before starting a generation
+    if (!canUseFeature('ai_generations')) {
+      toast({
+        title: 'Usage Limit Exceeded',
+        description: 'You have reached your monthly AI generation limit. Please upgrade your plan to continue.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     // Clear any existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current)
@@ -149,6 +161,15 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           title: "Ideas Generated",
           description: `${ideaCount} research ideas generated successfully.`,
         })
+
+        // Record usage (include provider/model context)
+        try {
+          await incrementUsage('ai_generations', {
+            provider: selectedProvider,
+            model: selectedModel,
+          })
+          await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
+        } catch (_) {}
       } catch (error) {
         setIdeaGenerationError(error instanceof Error ? error.message : "Failed to generate ideas. Please try again.")
         toast({
