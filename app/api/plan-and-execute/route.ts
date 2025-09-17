@@ -1,37 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { requireAuth } from '@/lib/auth-utils'
 import { ErrorHandler } from '@/lib/utils/error-handler'
 import { PlanningService } from '@/lib/services/planning.service'
 import { ExecutingService, ExecutionProgress } from '@/lib/services/executing.service'
 import { DeepResearcherService, DeepResearchResult } from '@/lib/services/deep-researcher.service'
-
-// Supabase client (service role) for rate limiting and optional usage tracking
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-interface RateLimitResult {
-  allowed: boolean
-  current_count: number
-  reset_time: string
-}
+import { TokenMiddleware } from '@/lib/middleware/token-middleware'
 
 export async function POST(request: NextRequest) {
   try {
-    // 1) Parse JSON body
+    // Parse JSON body for tokens context
     const { userQuery, selectedTools = [], useDeepResearch = false, maxIterations = 4 } = await request.json()
 
-    // 2) Require auth (reject unauthenticated)
-    const user = await requireAuth(request, 'plan-and-execute')
-    const userId = user.id
-
-    // 3) Validate inputs
+    // Validate inputs early (before token deduction)
     if (!userQuery || typeof userQuery !== 'string' || userQuery.trim().length < 3) {
       const validationError = ErrorHandler.processError('userQuery must be a non-empty string (min 3 chars)', {
         operation: 'plan-and-execute-validation',
-        userId,
+        userId: 'unknown',
       })
       return NextResponse.json(
         ErrorHandler.formatErrorResponse(validationError),
@@ -41,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(selectedTools) || selectedTools.some(t => typeof t !== 'string')) {
       const validationError = ErrorHandler.processError('selectedTools must be an array of strings', {
         operation: 'plan-and-execute-validation',
-        userId,
+        userId: 'unknown',
       })
       return NextResponse.json(
         ErrorHandler.formatErrorResponse(validationError),
@@ -49,33 +32,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 4) Rate limit check (consistent with literature stream route)
-    const clientIP = getClientIP(request)
-    const rateLimit = await checkRateLimit(userId, clientIP)
-    if (!rateLimit.allowed) {
-      const rlError = ErrorHandler.processError('Rate limit exceeded', {
-        operation: 'plan-and-execute-rate-limit',
-        userId,
-      })
-      const retryAfterSeconds = Math.max(
-        0,
-        Math.ceil((new Date(rateLimit.reset_time).getTime() - Date.now()) / 1000)
-      )
-      return NextResponse.json(
-        ErrorHandler.formatErrorResponse(rlError),
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': '100',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': new Date(rateLimit.reset_time).getTime().toString(),
-            'Retry-After': retryAfterSeconds.toString(),
-          },
-        }
-      )
-    }
+    // Use token middleware with dynamic feature and requiredTokens
+    const featureName = useDeepResearch ? 'deep_research' : 'plan_and_execute'
+    const requiredTokens = useDeepResearch ? 4 : 2
 
-    // 5) Prepare SSE stream
+    return TokenMiddleware.withTokens(
+      request,
+      { featureName, requiredTokens, context: { max_iterations: maxIterations } },
+      async (userId: string): Promise<NextResponse> => {
+        // 5) Prepare SSE stream
     const startTime = Date.now()
     const encoder = new TextEncoder()
     let controller: ReadableStreamDefaultController<Uint8Array>
@@ -98,11 +63,8 @@ export async function POST(request: NextRequest) {
           userId,
           useDeepResearch,
           maxIterations: useDeepResearch ? maxIterations : 0,
-          rateLimit: {
-            limit: 100,
-            remaining: Math.max(0, 100 - rateLimit.current_count),
-            resetTime: rateLimit.reset_time,
-          },
+          tokenFeature: featureName,
+          tokensCharged: requiredTokens,
         }
         controller.enqueue(encoder.encode(`event: init\n`))
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(initPayload)}\n\n`))
@@ -217,17 +179,16 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return new Response(stream, {
+    return new NextResponse(stream, {
       status: 200,
       headers: {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
-        'X-RateLimit-Limit': '100',
-        'X-RateLimit-Remaining': Math.max(0, 100 - rateLimit.current_count).toString(),
-        'X-RateLimit-Reset': new Date(rateLimit.reset_time).getTime().toString(),
       },
     })
+      }
+    )
   } catch (error) {
     // Non-streaming error path (parse/auth/validation failures)
     const processed = ErrorHandler.processError(error, {
@@ -243,38 +204,5 @@ export async function POST(request: NextRequest) {
       ErrorHandler.formatErrorResponse(processed),
       { status }
     )
-  }
-}
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  const realIP = request.headers.get('x-real-ip')
-  const cfConnectingIP = request.headers.get('cf-connecting-ip')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  if (realIP) return realIP
-  if (cfConnectingIP) return cfConnectingIP
-  return '127.0.0.1'
-}
-
-async function checkRateLimit(userId: string | null, ipAddress: string): Promise<RateLimitResult> {
-  try {
-    const { data, error } = await supabase.rpc('check_literature_search_rate_limit', {
-      p_user_id: userId ? userId : null,
-      p_ip_address: ipAddress,
-      p_limit: 100,
-      p_window_minutes: 60,
-    })
-    if (error) throw error
-    return data?.[0] || {
-      allowed: true,
-      current_count: 0,
-      reset_time: new Date(Date.now() + 3600000).toISOString(),
-    }
-  } catch {
-    return {
-      allowed: true,
-      current_count: 0,
-      reset_time: new Date(Date.now() + 3600000).toISOString(),
-    }
   }
 }

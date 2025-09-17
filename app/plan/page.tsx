@@ -21,7 +21,7 @@ import ProjectAnalyticsChart from "@/components/ui/project-analytics-chart"
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
 export default function PlanPage() {
-  const { planData, loading, getPlanType, getUsageForFeature, isProOrHigher, isEnterprise } = useUserPlan()
+  const { planData, loading, getPlanType, getUsageForFeature, isProOrHigher, isEnterprise, tokenStatus } = useUserPlan()
   const { toast } = useToast()
   const { session } = useSupabaseAuth()
   const router = useRouter()
@@ -318,6 +318,35 @@ Thank you!`)
                   </div>
                 </div>
 
+                {tokenStatus && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold">Tokens</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Daily</span>
+                        <span className="font-medium">
+                          {tokenStatus.dailyUsed} / {tokenStatus.dailyLimit} used • {tokenStatus.dailyRemaining} left
+                        </span>
+                      </div>
+                      <Progress value={tokenStatus.dailyLimit ? (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100 : 0} className="h-2" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Monthly</span>
+                        <span className="font-medium">
+                          {tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit} used • {tokenStatus.monthlyRemaining} left
+                        </span>
+                      </div>
+                      <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
+                    </div>
+                    {(tokenStatus.lastDailyReset || tokenStatus.lastMonthlyReset) && (
+                      <p className="text-xs text-muted-foreground">
+                        Resets — Daily: {tokenStatus.lastDailyReset ? new Date(tokenStatus.lastDailyReset).toLocaleDateString() : '—'} • Monthly: {tokenStatus.lastMonthlyReset ? new Date(tokenStatus.lastMonthlyReset).toLocaleDateString() : '—'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {planData?.usage && planData.usage.length > 0 && (
                   <div className="space-y-4">
                     <h3 className="font-semibold">Usage This Month</h3>
@@ -360,221 +389,241 @@ Thank you!`)
 
                 {/* Available Plans */}
                 <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5" />
-                  Available Plans
-                </CardTitle>
-                <CardDescription>
-                  Choose the plan that fits your research needs
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {planType === 'free' && (
-                  <div className={`p-4 rounded-lg border ${planType === 'free' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5" />
+                    Available Plans
+                  </CardTitle>
+                  <CardDescription>
+                    Choose the plan that fits your research needs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {planType === 'free' && (
+                    <div className={`p-4 rounded-lg border ${planType === 'free' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-blue-500" />
+                          <span className="font-semibold">Free</span>
+                        </div>
+                        <span className="text-lg font-bold">$0</span>
+                      </div>
+                      <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                        <li>• 10 daily tokens</li>
+                        <li>• 50 monthly token cap</li>
+                        <li>• Core features (Explorer, Summarizer)</li>
+                        <li className="text-gray-400 line-through">• Team collaboration</li>
+                      </ul>
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        disabled
+                      >
+                        Current Plan
+                        <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Pro Plan */}
+                  <div className={`p-4 rounded-lg border ${planType === 'pro' ? 'border-purple-500 bg-purple-50' : 'border-gray-200'} relative`}>
+                    <Badge className="absolute -top-2 right-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
+                      Most Popular
+                    </Badge>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-blue-500" />
-                        <span className="font-semibold">Free</span>
+                        <Crown className="h-4 w-4 text-purple-500" />
+                        <span className="font-semibold">Pro</span>
                       </div>
-                      <span className="text-lg font-bold">$0</span>
+                      <div>
+                        <span className="text-2xl font-bold">$29</span>
+                        <span className="text-sm text-gray-500">/month</span>
+                      </div>
                     </div>
                     <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                      <li>• 5 literature searches/month</li>
-                      <li>• 3 document summaries/month</li>
-                      <li>• 3 document uploads/month</li>
-                      <li>• 10 AI generations/month</li>
-                      <li className="text-gray-400 line-through">• No team collaboration</li>
+                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 100 daily tokens</li>
+                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 500 monthly token cap</li>
+                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> Team collaboration (up to 10 members)</li>
+                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> Priority support</li>
                     </ul>
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      disabled
-                    >
-                      Current Plan
-                      <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
-                    </Button>
-                  </div>
-                )}
-
-                {/* Pro Plan */}
-                <div className={`p-4 rounded-lg border ${planType === 'pro' ? 'border-purple-500 bg-purple-50' : 'border-gray-200'} relative`}>
-                  <Badge className="absolute -top-2 right-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
-                    Most Popular
-                  </Badge>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-purple-500" />
-                      <span className="font-semibold">Pro</span>
-                    </div>
-                    <div>
-                      <span className="text-2xl font-bold">$29</span>
-                      <span className="text-sm text-gray-500">/month</span>
-                    </div>
-                  </div>
-                  <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 500 literature searches/month</li>
-                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 200 document summaries/month</li>
-                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 100 document uploads/month</li>
-                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 300 AI generations/month</li>
-                    <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> Team collaboration (up to 10 members)</li>
-                  </ul>
-                  {planType === 'pro' ? (
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      onClick={handleManageSubscription}
-                      disabled={processingPortal}
-                    >
-                      {processingPortal ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Loading...
-                        </>
-                      ) : (
-                        <>
-                          Manage Plan
-                          <Settings className="h-4 w-4 ml-2" />
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      onClick={handleStartFreeTrial}
-                      disabled={processingCheckout}
-                    >
-                      {processingCheckout ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          Start 7-Day Trial
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-
-                {/* Enterprise Plan */}
-                <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-pink-500" />
-                      <span className="font-semibold">Enterprise</span>
-                    </div>
-                    <span className="text-lg font-bold">Custom</span>
-                  </div>
-                  <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                    <li>• Unlimited literature searches</li>
-                    <li>• Unlimited document summaries</li>
-                    <li>• Unlimited document uploads</li>
-                    <li>• Unlimited AI generations</li>
-                    <li>• Unlimited team collaboration</li>
-                  </ul>
-                  {planType === 'enterprise' ? (
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      disabled
-                    >
-                      Current Plan
-                      <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      onClick={handleContactSales}
-                    >
-                      Contact Sales
-                      <PhoneCall className="h-4 w-4 ml-2" />
-                    </Button>
-                  )}
-                </div>
-
-                {!isProOrHigher() && (
-                  <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full" size="lg">
-                        <Crown className="h-4 w-4 mr-2" />
-                        Upgrade to Pro
-                        <ArrowRight className="h-4 w-4 ml-2" />
+                    {planType === 'pro' ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        onClick={handleManageSubscription}
+                        disabled={processingPortal}
+                      >
+                        {processingPortal ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            Manage Plan
+                            <Settings className="h-4 w-4 ml-2" />
+                          </>
+                        )}
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Upgrade Your Plan</DialogTitle>
-                        <DialogDescription>
-                          Get more features and higher limits with our Pro plan.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span>500 literature searches per month</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span>200 document summaries per month</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span>Team collaboration (up to 10 members)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span>100 document uploads per month</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span>300 AI generations per month</span>
-                        </div>
-                        <div className="pt-4 space-y-2">
-                          <Button 
-                            onClick={handleStartFreeTrial} 
-                            className="w-full"
-                            disabled={processingCheckout}
-                          >
-                            {processingCheckout ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Processing...
-                              </>
-                            ) : (
-                              <>
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Start 7-Day Free Trial
-                              </>
-                            )}
-                          </Button>
-                          <p className="text-xs text-center text-gray-500">
-                            Cancel anytime. No credit card required for trial.
-                          </p>
-                        </div>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        onClick={handleStartFreeTrial}
+                        disabled={processingCheckout}
+                      >
+                        {processingCheckout ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            Start 7-Day Trial
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Enterprise Plan */}
+                  <div className={`p-4 rounded-lg border ${planType === 'enterprise' ? 'border-pink-500 bg-pink-50' : 'border-gray-200'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-pink-500" />
+                        <span className="font-semibold">Enterprise</span>
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
+                      <span className="text-lg font-bold">Custom</span>
+                    </div>
+                    <ul className="text-sm space-y-1 text-gray-600 mb-4">
+                      <li>• Unlimited literature searches</li>
+                      <li>• Unlimited document summaries</li>
+                      <li>• Unlimited document uploads</li>
+                      <li>• Unlimited AI generations</li>
+                      <li>• Unlimited team collaboration</li>
+                    </ul>
+                    {planType === 'enterprise' ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        disabled
+                      >
+                        Current Plan
+                        <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        onClick={handleContactSales}
+                      >
+                        Contact Sales
+                        <PhoneCall className="h-4 w-4 ml-2" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {!isProOrHigher() && (
+                    <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" size="lg">
+                          <Crown className="h-4 w-4 mr-2" />
+                          Upgrade to Pro
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Upgrade Your Plan</DialogTitle>
+                          <DialogDescription>
+                            Get more features and higher limits with our Pro plan.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>100 daily tokens</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>500 monthly token cap</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>Team collaboration (up to 10 members)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>Priority support</span>
+                          </div>
+                          <div className="pt-4 space-y-2">
+                            <Button 
+                              onClick={handleStartFreeTrial} 
+                              className="w-full"
+                              disabled={processingCheckout}
+                            >
+                              {processingCheckout ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="h-4 w-4 mr-2" />
+                                  Start 7-Day Free Trial
+                                </>
+                              )}
+                            </Button>
+                            <p className="text-xs text-center text-gray-500">
+                              Cancel anytime. No credit card required for trial.
+                            </p>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+          {tokenStatus && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" /> Token Usage
+                </CardTitle>
+                <CardDescription>Overview of your daily and monthly token consumption</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Daily</span>
+                    <span className="font-medium">{tokenStatus.dailyUsed} / {tokenStatus.dailyLimit}</span>
+                  </div>
+                  <Progress value={tokenStatus.dailyLimit ? (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100 : 0} className="h-2" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Monthly</span>
+                    <span className="font-medium">{tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit}</span>
+                  </div>
+                  <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
+                </div>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-semibold mb-2">Project Analytics</h2>
-            <p className="text-muted-foreground">Track your team's productivity and project progress over time</p>
-          </div>
-          <ProjectAnalyticsChart />
-        </TabsContent>
-      </Tabs>
+          )}
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-semibold mb-2">Project Analytics</h2>
+              <p className="text-muted-foreground">Track your team's productivity and project progress over time</p>
+            </div>
+            <ProjectAnalyticsChart />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
-  </div>
-</RouteGuard>
+  </RouteGuard>
   )
 }

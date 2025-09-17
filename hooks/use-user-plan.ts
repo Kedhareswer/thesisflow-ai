@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from '@/hooks/use-toast'
 import { createClient } from '@supabase/supabase-js'
@@ -31,7 +32,18 @@ export function useUserPlan() {
   const [error, setError] = useState<string | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const subscriptionRef = useRef<any>(null)
+  const subscriptionTokensRef = useRef<any>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [tokenStatus, setTokenStatus] = useState<{
+    dailyUsed: number
+    monthlyUsed: number
+    dailyLimit: number
+    monthlyLimit: number
+    dailyRemaining: number
+    monthlyRemaining: number
+    lastDailyReset?: string
+    lastMonthlyReset?: string
+  } | null>(null)
 
   const fetchPlanData = useCallback(async (forceRefresh = false) => {
     if (!user || !session) return
@@ -166,7 +178,6 @@ export function useUserPlan() {
     return planType === 'pro' || planType === 'enterprise'
   }, [getPlanType])
 
-  // Alias for backward compatibility
   const isProfessionalOrHigher = isProOrHigher
 
   const isEnterprise = useCallback((): boolean => {
@@ -177,13 +188,62 @@ export function useUserPlan() {
     return !loading && planData !== null
   }, [loading, planData])
 
-  // Setup real-time subscription for usage updates
+  const ensureSupabase = () => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+    }
+    return supabaseRef.current
+  }
+
+  const fetchTokenStatus = useCallback(async () => {
+    if (!user || !session) return
+    try {
+      const supa = ensureSupabase()
+      const { data, error } = await supa
+        .from('user_tokens')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+      if (error) throw error
+      if (data) {
+        const dailyLimit = Number((data as any).daily_limit ?? 0)
+        const dailyUsed = Number((data as any).daily_tokens_used ?? 0)
+        const monthlyLimit = Number((data as any).monthly_limit ?? 0)
+        const monthlyUsed = Number((data as any).monthly_tokens_used ?? 0)
+        const dailyRemaining = Math.max(0, dailyLimit - dailyUsed)
+        const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed)
+        setTokenStatus({
+          dailyUsed,
+          monthlyUsed,
+          dailyLimit,
+          monthlyLimit,
+          dailyRemaining,
+          monthlyRemaining,
+          lastDailyReset: (data as any).last_daily_reset ? String((data as any).last_daily_reset) : undefined,
+          lastMonthlyReset: (data as any).last_monthly_reset ? String((data as any).last_monthly_reset) : undefined,
+        })
+      }
+    } catch (err) {
+      // Non-fatal: keep UI resilient
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Failed to fetch token status', err)
+      }
+    }
+  }, [user?.id, session?.access_token])
+
   useEffect(() => {
     if (!user || !session) {
       // Cleanup existing subscription
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe()
         subscriptionRef.current = null
+      }
+      if (subscriptionTokensRef.current) {
+        subscriptionTokensRef.current.unsubscribe()
+        subscriptionTokensRef.current = null
       }
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -192,16 +252,10 @@ export function useUserPlan() {
       return
     }
 
-    // Initialize Supabase client if not already done
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-    }
+    ensureSupabase()
 
-    // Subscribe to user_usage table changes for this user
-    subscriptionRef.current = supabaseRef.current
+    const supa = ensureSupabase()
+    subscriptionRef.current = supa
       .channel('user_usage_changes')
       .on(
         'postgres_changes',
@@ -213,32 +267,46 @@ export function useUserPlan() {
         },
         (payload) => {
           if (process.env.NODE_ENV === 'development') {
-            // eslint-disable-next-line no-console
             console.log('Usage updated:', payload)
           }
-          // Refresh plan data when usage changes (force refresh)
           fetchPlanData(true)
         }
       )
       .subscribe()
 
-    // Initial fetch
-    fetchPlanData()
+    subscriptionTokensRef.current = supa
+      .channel('user_tokens_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_tokens',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => fetchTokenStatus()
+      )
+      .subscribe()
 
-    // Cleanup subscription on unmount
+    fetchPlanData()
+    fetchTokenStatus()
+
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe()
         subscriptionRef.current = null
+      }
+      if (subscriptionTokensRef.current) {
+        subscriptionTokensRef.current.unsubscribe()
+        subscriptionTokensRef.current = null
       }
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
     }
-  }, [user?.id, session?.access_token]) // Only re-run when user ID or session token changes
+  }, [user?.id, session?.access_token])
 
-  // Add a manual refresh function
   const refreshPlanData = useCallback(() => {
     fetchPlanData()
   }, [fetchPlanData])
@@ -248,14 +316,16 @@ export function useUserPlan() {
     loading,
     error,
     fetchPlanData,
+    fetchTokenStatus,
     refreshPlanData,
     incrementUsage,
     canUseFeature,
     getUsageForFeature,
     getPlanType,
     isProOrHigher,
-    isProfessionalOrHigher, // Backward compatibility
+    isProfessionalOrHigher,
     isEnterprise,
     isPlanDataReady,
+    tokenStatus,
   }
-} 
+}
