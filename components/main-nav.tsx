@@ -177,18 +177,38 @@ export function MainNav() {
                   {navigation.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href
+
+                    const tip = (() => {
+                      switch (item.name) {
+                        case "Explorer":
+                          return "Deep Research • consumes tokens";
+                        case "Summarizer":
+                          return "Summarizer • consumes tokens";
+                        case "AI Agents":
+                          return "AI Chat & Tools • consumes tokens";
+                        case "Planner":
+                          return "Plan & Execute • may consume tokens";
+                        default:
+                          return undefined;
+                      }
+                    })();
+
                     return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center rounded-md px-3 py-2 text-sm font-medium",
-                          isActive ? "bg-gray-100 text-black" : "text-gray-700 hover:bg-gray-100"
+                      <div key={item.name} className="flex flex-col">
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "flex items-center rounded-md px-3 py-2 text-sm font-medium",
+                            isActive ? "bg-gray-100 text-black" : "text-gray-700 hover:bg-gray-100"
+                          )}
+                        >
+                          <Icon className="mr-2 h-4 w-4" />
+                          {item.name}
+                        </Link>
+                        {tip && (
+                          <span className="pl-9 pr-3 pb-2 -mt-1 text-xs text-muted-foreground">{tip}</span>
                         )}
-                      >
-                        <Icon className="mr-2 h-4 w-4" />
-                        {item.name}
-                      </Link>
+                      </div>
                     )
                   })}
                   {/* Auth actions */}

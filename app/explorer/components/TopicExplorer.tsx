@@ -17,6 +17,7 @@ import { useResearchTopics, useResearchContext } from "@/components/research-ses
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 
 // Enhanced research service that uses real AI
@@ -345,16 +346,23 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">
-              {topicExploration.loading ? (
-                <LoadingSpinner size="sm" text="Exploring..." />
-              ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  Explore Topic
-                </>
-              )}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleTopicExploration} disabled={topicExploration.loading} className="w-full">
+                    {topicExploration.loading ? (
+                      <LoadingSpinner size="sm" text="Exploring..." />
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Explore Topic
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Explorer • consumes tokens</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
 

@@ -15,6 +15,9 @@ export function TokenMeter({ compact = true }: { compact?: boolean }) {
   const dailyPct = tokenStatus.dailyLimit
     ? Math.min(100, (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100)
     : 0;
+  const monthlyPct = tokenStatus.monthlyLimit
+    ? Math.min(100, (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100)
+    : 0;
 
   return (
     <TooltipProvider>
@@ -28,26 +31,29 @@ export function TokenMeter({ compact = true }: { compact?: boolean }) {
               </Badge>
             </div>
             {!compact && (
-              <div className="w-16">
+              <div className="w-20 space-y-1">
                 <Progress value={dailyPct} className="h-1" />
+                <Progress value={monthlyPct} className="h-1" />
               </div>
             )}
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center">
-          <div className="text-xs space-y-1">
+          <div className="text-xs space-y-2">
             <div className="flex items-center justify-between gap-6">
               <span className="text-muted-foreground">Daily</span>
               <span className="font-medium">
                 {tokenStatus.dailyUsed} / {tokenStatus.dailyLimit} used
               </span>
             </div>
+            <Progress value={dailyPct} className="h-1.5" />
             <div className="flex items-center justify-between gap-6">
               <span className="text-muted-foreground">Monthly</span>
               <span className="font-medium">
                 {tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit} used
               </span>
             </div>
+            <Progress value={monthlyPct} className="h-1.5" />
             {(tokenStatus.lastDailyReset || tokenStatus.lastMonthlyReset) && (
               <div className="pt-1 text-[10px] text-muted-foreground">
                 Resets — Daily: {tokenStatus.lastDailyReset ? new Date(tokenStatus.lastDailyReset).toLocaleDateString() : "—"} • Monthly: {tokenStatus.lastMonthlyReset ? new Date(tokenStatus.lastMonthlyReset).toLocaleDateString() : "—"}
