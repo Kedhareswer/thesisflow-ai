@@ -108,6 +108,40 @@ export function useUserPlan() {
     }
   }, [user?.id, session?.access_token])
 
+  // Feature key helpers must be defined BEFORE they are used in incrementUsage
+  const normalizeFeatureKey = useCallback((f: string) => f.replace(/\s+/g, '_').toLowerCase(), [])
+
+  // Map common aliases to canonical backend keys
+  const canonicalizeFeature = useCallback((feature: string) => {
+    const key = normalizeFeatureKey(feature)
+    const map: Record<string, string> = {
+      // Literature Search
+      'literature_search': 'literature_searches',
+      'literature_searches': 'literature_searches',
+      'search_literature': 'literature_searches',
+      'explorer_search': 'literature_searches',
+      'explorer': 'literature_searches',
+      // Summarizer
+      'document_summary': 'document_summaries',
+      'document_summaries': 'document_summaries',
+      'summary': 'document_summaries',
+      'summarizer': 'document_summaries',
+      // AI Assistant / Generations / Writer
+      'ai_generation': 'ai_generations',
+      'ai_generations': 'ai_generations',
+      'assistant': 'ai_generations',
+      'ai_assistant': 'ai_generations',
+      'chat': 'ai_generations',
+      'writer': 'ai_generations',
+      'ai_writer': 'ai_generations',
+      // Uploads
+      'document_uploads': 'document_uploads',
+      'doc_uploads': 'document_uploads',
+      'uploads': 'document_uploads',
+    }
+    return map[key] || key
+  }, [normalizeFeatureKey])
+
   // Move fetchTokenStatus above incrementUsage to avoid 'used before declaration' lint
   const fetchTokenStatus = useCallback(async () => {
     if (!user || !session) return
@@ -176,14 +210,16 @@ export function useUserPlan() {
     if (!user || !session) return false
 
     try {
+      const canonicalFeature = canonicalizeFeature(feature)
       // Step 1: Deduct tokens first (checks availability too)
       const deductResp = await fetch('/api/user/tokens/deduct', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({ feature, amount: 1, context }),
+        body: JSON.stringify({ feature: canonicalFeature, amount: 1, context }),
       })
 
       if (deductResp.status === 429) {
@@ -204,49 +240,86 @@ export function useUserPlan() {
       try { broadcastRef.current?.postMessage({ type: 'tokens-updated' }) } catch {}
 
       // Step 2: Increment feature usage (limits per feature)
-      const response = await fetch('/api/user/plan', {
+      // Try primary route first
+      let response = await fetch('/api/user/plan', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({ feature }),
+        body: JSON.stringify({ feature: canonicalFeature }),
       })
 
       if (response.status === 429) {
-        // Usage limit exceeded -> refund tokens
-        await fetch('/api/user/tokens/refund', {
+        // Some environments misreport can_use_feature; attempt safe fallback increment
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[use-user-plan] /api/user/plan returned 429 — trying fallback /api/user/usage/increment before refund')
+        }
+        const fb429 = await fetch('/api/user/usage/increment', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
-          body: JSON.stringify({ feature, amount: 1, context }),
-        }).catch(() => {})
-
-        toast({
-          title: 'Usage Limit Exceeded',
-          description: `You've reached your monthly limit for ${feature}. Please upgrade your plan to continue.`,
-          variant: 'destructive',
+          body: JSON.stringify({ feature: canonicalFeature, metadata: { context, source: 'client-fallback-429' } }),
         })
-        // Broadcast token change after refund
-        try { broadcastRef.current?.postMessage({ type: 'tokens-updated' }) } catch {}
-        // Refresh tokens (after refund) and plan just in case
-        await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
-        return false
+
+        if (!fb429.ok) {
+          // Fallback also failed -> refund tokens and notify
+          await fetch('/api/user/tokens/refund', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ feature: canonicalFeature, amount: 1, context }),
+          }).catch(() => {})
+
+          toast({
+            title: 'Usage Limit Exceeded',
+            description: `You've reached your monthly limit for ${canonicalFeature}. Please upgrade your plan to continue.`,
+            variant: 'destructive',
+          })
+          // Broadcast token change after refund
+          try { broadcastRef.current?.postMessage({ type: 'tokens-updated' }) } catch {}
+          // Refresh tokens (after refund) and plan just in case
+          await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
+          return false
+        }
       }
 
-      if (!response.ok) {
-        // Unknown failure -> refund tokens
-        await fetch('/api/user/tokens/refund', {
+      // If primary route failed due to feature mismatch (e.g., 400/404/406/500),
+      // attempt fallback increment endpoint before refunding
+      if (!response.ok && ![429].includes(response.status)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[use-user-plan] /api/user/plan failed with', response.status, '— trying fallback /api/user/usage/increment')
+        }
+        const fb = await fetch('/api/user/usage/increment', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
-          body: JSON.stringify({ feature, amount: 1, context }),
-        }).catch(() => {})
-        throw new Error('Failed to increment usage')
+          body: JSON.stringify({ feature: canonicalFeature, metadata: { context, source: 'client-fallback' } }),
+        })
+
+        if (!fb.ok) {
+          // Both failed -> refund tokens
+          await fetch('/api/user/tokens/refund', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ feature: canonicalFeature, amount: 1, context }),
+          }).catch(() => {})
+          const errTxt = await fb.text().catch(() => '')
+          throw new Error(`Failed to increment usage (fallback): ${fb.status} ${errTxt}`)
+        }
       }
 
       // Broadcast usage updated
@@ -265,9 +338,9 @@ export function useUserPlan() {
       })
       return false
     }
-  }, [user?.id, session?.access_token, fetchPlanData, fetchTokenStatus, toast])
+  }, [user?.id, session?.access_token, fetchPlanData, fetchTokenStatus, toast, canonicalizeFeature])
 
-  const normalizeFeatureKey = useCallback((f: string) => f.replace(/\s+/g, '_').toLowerCase(), [])
+  // (removed duplicate canonicalizeFeature/normalizeFeatureKey declarations)
 
   const canUseFeature = useCallback((feature: string): boolean => {
     // If plan data is still loading, we can't make a determination yet

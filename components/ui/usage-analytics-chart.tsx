@@ -107,9 +107,14 @@ export default function UsageAnalyticsChart() {
     const src = data.series[dimension];
     return data.days.map((day, i) => {
       const point: Record<string, any> = { date: day };
+      let total = 0;
       Object.entries(src).forEach(([key, arr]) => {
-        point[key] = (arr as number[])[i] || 0;
+        const v = (arr as number[])[i] || 0;
+        point[key] = v;
+        total += v;
       });
+      // Overlay total for the day across all series
+      point.__total = total;
       return point;
     });
   }, [data, dimension]);
@@ -148,6 +153,8 @@ export default function UsageAnalyticsChart() {
     seriesKeys.forEach((k) => {
       cfg[k] = { label: k, color: colorsByKey[k] };
     });
+    // Provide config for totals overlay (legend styling if used elsewhere)
+    cfg.__total = { label: 'Total', color: '#6b7280' };
     return cfg;
   }, [seriesKeys, colorsByKey]);
 
@@ -244,6 +251,17 @@ export default function UsageAnalyticsChart() {
                     name={key}
                   />
                 ))}
+                {/* Daily totals overlay */}
+                <Line
+                  key="__total"
+                  type="monotone"
+                  dataKey="__total"
+                  stroke="#6b7280"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  name="Total"
+                />
               </LineChart>
             </ChartContainer>
           )}
