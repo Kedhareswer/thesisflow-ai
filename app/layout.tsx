@@ -4,7 +4,7 @@ import type { Metadata } from "next"
 export { metadata } from "./seo/root-metadata"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
-// Navbar removed: MainNav no longer used
+import { MainNav } from "@/components/main-nav"
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import { AuthErrorBoundary } from "@/components/auth-error-boundary"
 import { ResearchSessionProvider } from "@/components/research-session-provider"
@@ -30,7 +30,7 @@ export default function RootLayout({
             <SupabaseAuthProvider>
               <ResearchSessionProvider>
                 <div className="min-h-screen bg-gray-50">
-                  {/* Navbar removed */}
+                  <MainNav />
                   <main className="flex-1">{children}</main>
                 </div>
                 <Toaster />

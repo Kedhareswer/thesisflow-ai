@@ -32,7 +32,13 @@ export class TokenService {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     typeof window === 'undefined'
       ? process.env.SUPABASE_SERVICE_ROLE_KEY!
-      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        storageKey: 'ai-research-platform-auth',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      },
+    }
   );
 
   /**
@@ -229,6 +235,32 @@ export class TokenService {
     monthlyRemaining: number;
   } | null> {
     try {
+      // Prefer API route which upserts defaults when missing
+      let accessToken: string | null = null;
+      try {
+        const { data: sessionData } = await this.supabase.auth.getSession();
+        accessToken = sessionData.session?.access_token ?? null;
+      } catch {}
+
+      if (accessToken) {
+        const resp = await fetch('/api/user/tokens', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (resp.ok) {
+          const payload = await resp.json();
+          return {
+            dailyUsed: Number(payload.dailyUsed ?? 0),
+            monthlyUsed: Number(payload.monthlyUsed ?? 0),
+            dailyLimit: Number(payload.dailyLimit ?? 0),
+            monthlyLimit: Number(payload.monthlyLimit ?? 0),
+            dailyRemaining: Number(payload.dailyRemaining ?? 0),
+            monthlyRemaining: Number(payload.monthlyRemaining ?? 0),
+          };
+        }
+        // if 401 or other, fall through to direct query
+      }
+
+      // Fallback: direct read (will fail with 406 if row missing)
       const { data, error } = await this.supabase
         .from('user_tokens')
         .select('*')
@@ -243,10 +275,11 @@ export class TokenService {
         dailyLimit: data.daily_limit,
         monthlyLimit: data.monthly_limit,
         dailyRemaining: data.daily_limit - data.daily_tokens_used,
-        monthlyRemaining: data.monthly_limit - data.monthly_tokens_used
+        monthlyRemaining: data.monthly_limit - data.monthly_tokens_used,
       };
     } catch (error) {
-      console.error('Error fetching user token status:', error);
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('Error fetching user token status:', message);
       return null;
     }
   }
