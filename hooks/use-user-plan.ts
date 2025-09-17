@@ -34,6 +34,7 @@ export function useUserPlan() {
   const subscriptionRef = useRef<any>(null)
   const subscriptionTokensRef = useRef<any>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const broadcastRef = useRef<BroadcastChannel | null>(null)
   const [tokenStatus, setTokenStatus] = useState<{
     dailyUsed: number
     monthlyUsed: number
@@ -107,104 +108,7 @@ export function useUserPlan() {
     }
   }, [user?.id, session?.access_token])
 
-  const incrementUsage = useCallback(async (feature: string): Promise<boolean> => {
-    if (!user || !session) return false
-
-    try {
-      const response = await fetch('/api/user/plan', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ feature }),
-      })
-
-      if (response.status === 429) {
-        // Usage limit exceeded
-        const data = await response.json()
-        toast({
-          title: "Usage Limit Exceeded",
-          description: `You've reached your monthly limit for ${feature}. Please upgrade your plan to continue.`,
-          variant: "destructive",
-        })
-        return false
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to increment usage')
-      }
-
-      // Refresh plan data after incrementing (force refresh to get latest)
-      await fetchPlanData(true)
-      return true
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to increment usage'
-      console.error('Error incrementing usage:', err)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      return false
-    }
-  }, [user?.id, session?.access_token, fetchPlanData, toast])
-
-  const normalizeFeatureKey = useCallback((f: string) => f.replace(/\s+/g, '_').toLowerCase(), [])
-
-  const canUseFeature = useCallback((feature: string): boolean => {
-    // If plan data is still loading, we can't make a determination yet
-    if (loading) return false
-    
-    // If no plan data and not loading, assume free plan restrictions
-    if (!planData) return false
-
-    const key = normalizeFeatureKey(feature)
-    const usageItem = planData.usage.find(item => item.feature === key)
-
-    if (!usageItem) {
-      // If usage record is missing but user is Pro, default-allow
-      const planType = planData.plan?.plan_type
-      if (planType === 'pro') {
-        return true
-      }
-      return false
-    }
-    
-    return usageItem.is_unlimited || usageItem.remaining > 0
-  }, [planData, loading, normalizeFeatureKey])
-
-  const getUsageForFeature = useCallback((feature: string): UsageItem | null => {
-    if (!planData) return null
-    const key = normalizeFeatureKey(feature)
-    return planData.usage.find(item => item.feature === key) || null
-  }, [planData, normalizeFeatureKey])
-
-  const getPlanType = useCallback((): string => {
-    return planData?.plan?.plan_type || 'free'
-  }, [planData])
-
-  const isProOrHigher = useCallback((): boolean => {
-    const planType = getPlanType()
-    return planType === 'pro'
-  }, [getPlanType])
-
-  const isProfessionalOrHigher = isProOrHigher
-
-  const isPlanDataReady = useCallback((): boolean => {
-    return !loading && planData !== null
-  }, [loading, planData])
-
-  const ensureSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-    }
-    return supabaseRef.current
-  }
-
+  // Move fetchTokenStatus above incrementUsage to avoid 'used before declaration' lint
   const fetchTokenStatus = useCallback(async () => {
     if (!user || !session) return
     try {
@@ -268,6 +172,158 @@ export function useUserPlan() {
     }
   }, [user?.id, session?.access_token])
 
+  const incrementUsage = useCallback(async (feature: string): Promise<boolean> => {
+    if (!user || !session) return false
+
+    try {
+      // Step 1: Deduct tokens first (checks availability too)
+      const deductResp = await fetch('/api/user/tokens/deduct', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feature, amount: 1 }),
+      })
+
+      if (deductResp.status === 429) {
+        const msg = await deductResp.json().catch(() => ({}))
+        toast({
+          title: 'Not enough tokens',
+          description: 'You have run out of daily/monthly tokens. Consider upgrading to Pro.',
+          variant: 'destructive',
+        })
+        return false
+      }
+      if (!deductResp.ok) {
+        const txt = await deductResp.text()
+        throw new Error(`Token deduction failed: ${txt}`)
+      }
+
+      // Notify other tabs/components that tokens changed
+      try { broadcastRef.current?.postMessage({ type: 'tokens-updated' }) } catch {}
+
+      // Step 2: Increment feature usage (limits per feature)
+      const response = await fetch('/api/user/plan', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feature }),
+      })
+
+      if (response.status === 429) {
+        // Usage limit exceeded -> refund tokens
+        await fetch('/api/user/tokens/refund', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ feature, amount: 1 }),
+        }).catch(() => {})
+
+        toast({
+          title: 'Usage Limit Exceeded',
+          description: `You've reached your monthly limit for ${feature}. Please upgrade your plan to continue.`,
+          variant: 'destructive',
+        })
+        // Broadcast token change after refund
+        try { broadcastRef.current?.postMessage({ type: 'tokens-updated' }) } catch {}
+        // Refresh tokens (after refund) and plan just in case
+        await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
+        return false
+      }
+
+      if (!response.ok) {
+        // Unknown failure -> refund tokens
+        await fetch('/api/user/tokens/refund', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ feature, amount: 1 }),
+        }).catch(() => {})
+        throw new Error('Failed to increment usage')
+      }
+
+      // Broadcast usage updated
+      try { broadcastRef.current?.postMessage({ type: 'usage-updated' }) } catch {}
+
+      // Refresh plan and tokens after successful consumption
+      await Promise.all([fetchPlanData(true), fetchTokenStatus()])
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to consume tokens/usage'
+      console.error('Error incrementing usage:', err)
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      })
+      return false
+    }
+  }, [user?.id, session?.access_token, fetchPlanData, fetchTokenStatus, toast])
+
+  const normalizeFeatureKey = useCallback((f: string) => f.replace(/\s+/g, '_').toLowerCase(), [])
+
+  const canUseFeature = useCallback((feature: string): boolean => {
+    // If plan data is still loading, we can't make a determination yet
+    if (loading) return false
+    
+    // If no plan data and not loading, assume free plan restrictions
+    if (!planData) return false
+
+    const key = normalizeFeatureKey(feature)
+    const usageItem = planData.usage.find(item => item.feature === key)
+
+    if (!usageItem) {
+      // If usage record is missing but user is Pro, default-allow
+      const planType = planData.plan?.plan_type
+      if (planType === 'pro') {
+        return true
+      }
+      return false
+    }
+    
+    return usageItem.is_unlimited || usageItem.remaining > 0
+  }, [planData, loading, normalizeFeatureKey])
+
+  const getUsageForFeature = useCallback((feature: string): UsageItem | null => {
+    if (!planData) return null
+    const key = normalizeFeatureKey(feature)
+    return planData.usage.find(item => item.feature === key) || null
+  }, [planData, normalizeFeatureKey])
+
+  const getPlanType = useCallback((): string => {
+    return planData?.plan?.plan_type || 'free'
+  }, [planData])
+
+  const isProOrHigher = useCallback((): boolean => {
+    const planType = getPlanType()
+    return planType === 'pro'
+  }, [getPlanType])
+
+  const isProfessionalOrHigher = isProOrHigher
+
+  const isPlanDataReady = useCallback((): boolean => {
+    return !loading && planData !== null
+  }, [loading, planData])
+
+  const ensureSupabase = () => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+    }
+    return supabaseRef.current
+  }
+
+  // fetchTokenStatus has been moved above
+
   useEffect(() => {
     if (!user || !session) {
       // Cleanup existing subscription
@@ -278,6 +334,10 @@ export function useUserPlan() {
       if (subscriptionTokensRef.current) {
         subscriptionTokensRef.current.unsubscribe()
         subscriptionTokensRef.current = null
+      }
+      if (broadcastRef.current) {
+        try { broadcastRef.current.close() } catch {}
+        broadcastRef.current = null
       }
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -324,6 +384,19 @@ export function useUserPlan() {
 
     fetchPlanData()
     fetchTokenStatus()
+
+    // Fallback cross-component sync via BroadcastChannel
+    try {
+      broadcastRef.current = new BroadcastChannel('usage-events')
+      broadcastRef.current.onmessage = (ev: MessageEvent) => {
+        const type = ev?.data?.type
+        if (type === 'tokens-updated') {
+          fetchTokenStatus()
+        } else if (type === 'usage-updated') {
+          fetchPlanData(true)
+        }
+      }
+    } catch {}
 
     return () => {
       if (subscriptionRef.current) {

@@ -23,9 +23,11 @@ import {
   type UsageStatistics
 } from "./components/analytics-tab"
 import { ErrorDisplay } from "./components/error-display"
+import { useUserPlan } from "@/hooks/use-user-plan"
 
 export default function SummarizerPage() {
   const { toast } = useToast()
+  const { canUseFeature, incrementUsage, fetchPlanData, fetchTokenStatus } = useUserPlan()
 
   // Tab management
   const {
@@ -569,6 +571,14 @@ export default function SummarizerPage() {
       trimmedLength: safeTrimLen(textToSummarize)
     });
     
+    // Check feature allowance before proceeding
+    if (!canUseFeature('document_summaries')) {
+      const limitErr = ErrorHandler.processError('You have reached your monthly summaries limit. Upgrade to Pro for unlimited summaries.', { operation: 'summarization-quota' })
+      setError(limitErr)
+      toast({ title: 'Limit reached', description: limitErr.message, variant: 'destructive' })
+      return
+    }
+
     // More lenient validation - only check for truly empty content
     if (typeof textToSummarize !== 'string' || textToSummarize.trim().length < 10) {
       const validationError = ErrorHandler.processError(
@@ -641,6 +651,15 @@ export default function SummarizerPage() {
       completeProcessing(true)
       // Ensure Summary tab is shown after successful generation
       handleTabChange('summary')
+
+      // Consume one summary token and record usage
+      try {
+        await incrementUsage('document_summaries')
+        // Ensure UI reflects new counts promptly
+        await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
+      } catch (e) {
+        // Non-fatal; already handled inside hook
+      }
 
       // Save the summary to the database
       const { data: { user } } = await supabase.auth.getUser()
