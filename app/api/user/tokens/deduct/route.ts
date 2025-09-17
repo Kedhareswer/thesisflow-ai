@@ -23,43 +23,91 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Feature is required' }, { status: 400 })
     }
 
-    // First, check user tokens
-    const { data: check, error: checkErr } = await supabaseAdmin
-      .rpc('check_user_tokens', { p_user_id: user.id, p_tokens_needed: amount })
-    if (checkErr) {
-      console.error('[tokens/deduct] check_user_tokens error', checkErr)
-      return NextResponse.json({ error: 'Failed to check tokens' }, { status: 500 })
+    // Get current user_tokens row (create if missing)
+    let { data: tokenRow, error: fetchTokenErr } = await supabaseAdmin
+      .from('user_tokens')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (fetchTokenErr) {
+      console.error('[tokens/deduct] fetch tokens error', fetchTokenErr)
+      return NextResponse.json({ error: 'Failed to fetch tokens' }, { status: 500 })
     }
-    if (!check?.has_tokens) {
+
+    // Initialize if missing
+    if (!tokenRow) {
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from('user_tokens')
+        .insert({
+          user_id: user.id,
+          daily_tokens_used: 0,
+          monthly_tokens_used: 0,
+          daily_limit: 10,
+          monthly_limit: 50,
+        })
+        .select('*')
+        .maybeSingle()
+      if (insertErr) {
+        console.error('[tokens/deduct] insert tokens error', insertErr)
+        return NextResponse.json({ error: 'Failed to initialize tokens' }, { status: 500 })
+      }
+      tokenRow = inserted
+    }
+
+    const dailyUsed = Number(tokenRow.daily_tokens_used || 0)
+    const monthlyUsed = Number(tokenRow.monthly_tokens_used || 0)
+    const dailyLimit = Number(tokenRow.daily_limit || 10)
+    const monthlyLimit = Number(tokenRow.monthly_limit || 50)
+
+    // Check if user has enough tokens
+    if (dailyUsed + amount > dailyLimit || monthlyUsed + amount > monthlyLimit) {
       return NextResponse.json({
         error: 'Insufficient tokens',
-        dailyRemaining: check?.daily_remaining ?? 0,
-        monthlyRemaining: check?.monthly_remaining ?? 0,
+        dailyRemaining: Math.max(0, dailyLimit - dailyUsed),
+        monthlyRemaining: Math.max(0, monthlyLimit - monthlyUsed),
       }, { status: 429 })
     }
 
-    // Deduct tokens
-    const { data: deducted, error: deductErr } = await supabaseAdmin
-      .rpc('deduct_user_tokens', {
-        p_user_id: user.id,
-        p_feature_name: feature,
-        p_tokens_amount: amount,
-        p_context: context,
+    // Update user_tokens directly
+    const { data: updated, error: updateErr } = await supabaseAdmin
+      .from('user_tokens')
+      .update({
+        daily_tokens_used: dailyUsed + amount,
+        monthly_tokens_used: monthlyUsed + amount,
       })
+      .eq('user_id', user.id)
+      .select('*')
+      .maybeSingle()
 
-    if (deductErr) {
-      console.error('[tokens/deduct] deduct_user_tokens error', deductErr)
+    if (updateErr) {
+      console.error('[tokens/deduct] update tokens error', updateErr)
       return NextResponse.json({ error: 'Failed to deduct tokens' }, { status: 500 })
     }
-    if (!deducted?.success) {
-      return NextResponse.json({ error: deducted?.error || 'Token deduction failed' }, { status: 400 })
+
+    // Log transaction
+    try {
+      await supabaseAdmin
+        .from('token_transactions')
+        .insert({
+          user_id: user.id,
+          feature_name: feature,
+          tokens_amount: amount,
+          operation_type: 'deduct',
+          operation_context: context,
+          success: true,
+        })
+    } catch (err: any) {
+      console.warn('[tokens/deduct] transaction log failed', err)
     }
 
+    tokenRow = updated || tokenRow
+
     // Return updated token status
-    const { data: row, error: fetchErr } = await supabaseAdmin
+    const { data: row, error: finalFetchErr } = await supabaseAdmin
       .from('user_tokens').select('*').eq('user_id', user.id).maybeSingle()
-    if (fetchErr) {
-      console.warn('[tokens/deduct] deduction ok but failed to fetch tokens row', fetchErr)
+    if (finalFetchErr) {
+      console.warn('[tokens/deduct] deduction ok but failed to fetch tokens row', finalFetchErr)
     }
 
     return NextResponse.json({

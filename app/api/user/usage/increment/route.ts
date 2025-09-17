@@ -58,20 +58,54 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Increment usage safely
-    const { data: incrementResult, error: incrementError } = await supabaseAdmin
-      .rpc('increment_user_usage', { 
-        p_user_uuid: user.id, 
-        p_feature_name: feature,
-        p_metadata: metadata || null
-      })
+    // Get or create user_usage record directly
+    let { data: usageRow, error: fetchUsageErr } = await supabaseAdmin
+      .from('user_usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('feature_name', feature)
+      .maybeSingle()
 
-    if (incrementError) {
-      console.error('Failed to increment usage:', incrementError)
-      return NextResponse.json({ error: 'Failed to increment usage' }, { status: 500 })
+    if (fetchUsageErr) {
+      console.error('Failed to fetch usage:', fetchUsageErr)
+      return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 })
     }
 
-    const actualNewCount = incrementResult?.new_usage_count ?? (featureUsage.usage_count + 1)
+    let actualNewCount = 1
+    if (!usageRow) {
+      // Create new usage record
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from('user_usage')
+        .insert({
+          user_id: user.id,
+          feature_name: feature,
+          usage_count: 1,
+        })
+        .select('*')
+        .maybeSingle()
+      
+      if (insertErr) {
+        console.error('Failed to insert usage:', insertErr)
+        return NextResponse.json({ error: 'Failed to create usage record' }, { status: 500 })
+      }
+      actualNewCount = 1
+    } else {
+      // Update existing usage record
+      actualNewCount = (usageRow.usage_count || 0) + 1
+      const { data: updated, error: updateErr } = await supabaseAdmin
+        .from('user_usage')
+        .update({ usage_count: actualNewCount })
+        .eq('user_id', user.id)
+        .eq('feature_name', feature)
+        .select('*')
+        .maybeSingle()
+      
+      if (updateErr) {
+        console.error('Failed to update usage:', updateErr)
+        return NextResponse.json({ error: 'Failed to update usage' }, { status: 500 })
+      }
+    }
+
     const actualRemaining = featureUsage.is_unlimited
       ? -1
       : (featureUsage.limit_count - actualNewCount)

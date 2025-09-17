@@ -114,18 +114,58 @@ export async function POST(request: NextRequest) {
       }, { status: 429 })
     }
 
-    // Increment usage
-    const { data: incremented, error: incrementError } = await supabaseAdmin
-      .rpc('increment_usage', { p_user_uuid: user.id, p_feature_name: feature, p_amount: 1 })
+    // Get or create user_usage record
+    let { data: usageRow, error: fetchUsageErr } = await supabaseAdmin
+      .from('user_usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('feature_name', feature)
+      .maybeSingle()
 
-    if (incrementError) {
-      console.error('Increment error:', incrementError)
-      return NextResponse.json({ error: 'Failed to increment usage' }, { status: 500 })
+    if (fetchUsageErr) {
+      console.error('Fetch usage error:', fetchUsageErr)
+      return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 })
+    }
+
+    let newUsageCount = 1
+    if (!usageRow) {
+      // Create new usage record
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from('user_usage')
+        .insert({
+          user_id: user.id,
+          feature_name: feature,
+          usage_count: 1,
+        })
+        .select('*')
+        .maybeSingle()
+      
+      if (insertErr) {
+        console.error('Insert usage error:', insertErr)
+        return NextResponse.json({ error: 'Failed to create usage record' }, { status: 500 })
+      }
+      usageRow = inserted
+    } else {
+      // Update existing usage record
+      newUsageCount = (usageRow.usage_count || 0) + 1
+      const { data: updated, error: updateErr } = await supabaseAdmin
+        .from('user_usage')
+        .update({ usage_count: newUsageCount })
+        .eq('user_id', user.id)
+        .eq('feature_name', feature)
+        .select('*')
+        .maybeSingle()
+      
+      if (updateErr) {
+        console.error('Update usage error:', updateErr)
+        return NextResponse.json({ error: 'Failed to update usage' }, { status: 500 })
+      }
+      usageRow = updated
     }
 
     return NextResponse.json({ 
       success: true,
-      incremented: incremented
+      incremented: newUsageCount
     })
   } catch (error) {
     console.error('Error incrementing usage:', error)
