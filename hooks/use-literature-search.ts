@@ -182,11 +182,22 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         lastQueryFetchRef.current[key] = Date.now();
       } catch {}
 
+      // Attach Supabase auth token so server can authorize the request
+      let authHeader: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          authHeader = { ...authHeader, Authorization: `Bearer ${token}` };
+        }
+      } catch {
+        // no-op; proceed without auth header (will 401 if route requires auth)
+      }
+
       const response = await fetch(`/api/literature-search?${params}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeader,
         signal: abortControllerRef.current.signal
       });
 
