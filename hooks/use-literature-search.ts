@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useAuthenticatedAPI } from '@/lib/api-client';
 
 export interface Paper {
   id: string;
@@ -76,6 +77,9 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     userIdForSession,
     includeInPreload = 'results'
   } = options;
+
+  // Centralized authenticated API wrapper (adds Authorization header, caching, retry)
+  const authApi = useAuthenticatedAPI();
 
   // Per-query cooldown (to avoid rapid repeat hits of the same normalized query)
   const PER_QUERY_COOLDOWN_MS = 60000; // 60s
@@ -196,84 +200,14 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         lastQueryFetchRef.current[key] = Date.now();
       } catch {}
 
-      // Attach Authorization header so server middleware can authenticate the user
-      const hdrs = new Headers({ 'Content-Type': 'application/json' });
-      const token = getAuthToken();
-      if (token) hdrs.set('Authorization', `Bearer ${token}`);
-
-      const response = await fetch(`/api/literature-search?${params}`, {
-        method: 'GET',
-        headers: hdrs,
-        // Include credentials to allow cookie-based fallbacks when available
-        credentials: 'same-origin',
-        signal: abortControllerRef.current.signal
+      // Use centralized authenticated API client for consistency
+      const url = `/api/literature-search?${params.toString()}`;
+      const result = await authApi.get<SearchResult>(url, {
+        // preserve abort semantics
+        signal: abortControllerRef.current.signal,
+        // we already implement our own cooldown/aggregation, so disable API cache here
+        cacheOptions: { enabled: false },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({} as any));
-
-        // Build a helpful message
-        const errorMessage = (errorData && (errorData.error || errorData.message))
-          || (response.status === 429 ? 'Rate limit exceeded. Please try again later.' : `HTTP ${response.status}: ${response.statusText}`);
-
-        // Extract rate limit info from payload or headers (best-effort)
-        let rateLimitInfo = errorData?.rateLimitInfo || null;
-        if (!rateLimitInfo) {
-          const limit = Number(response.headers.get('X-RateLimit-Limit') || '')
-          const remaining = Number(response.headers.get('X-RateLimit-Remaining') || '')
-          const reset = response.headers.get('X-RateLimit-Reset') || ''
-          if (!Number.isNaN(limit) && !Number.isNaN(remaining)) {
-            rateLimitInfo = {
-              limit,
-              remaining,
-              resetTime: reset || new Date(Date.now() + 60_000).toISOString()
-            }
-          }
-        }
-
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: errorMessage,
-          results: [],
-          rateLimitInfo
-        }));
-
-        // Reset aggregation flags on failure
-        aggregatingRef.current = false;
-        aggregationDeadlineRef.current = null;
-
-        // Limited auto-retry aligned to server-provided reset with small jitter
-        const status = response.status;
-        if (status === 429 && rateLimitInfo?.resetTime) {
-          const resetAt = new Date(rateLimitInfo.resetTime).getTime();
-          const now = Date.now();
-          let waitMs = resetAt - now;
-          // Prefer standard Retry-After header if present
-          const retryAfterHeader = response.headers.get('Retry-After');
-          if (retryAfterHeader) {
-            const sec = Number(retryAfterHeader);
-            if (!Number.isNaN(sec)) {
-              waitMs = Math.max(waitMs, sec * 1000);
-            }
-          }
-          // Add jitter (500–1500ms) to avoid herding
-          const jitter = Math.floor(Math.random() * 1000) + 500;
-          waitMs = Math.max(0, waitMs + jitter);
-          const withinTwoMin = waitMs <= 120000;
-          if (withinTwoMin && waitMs > 0) {
-            retryTimeoutRef.current = setTimeout(() => {
-              // Only retry if not aborted by a new search in the meantime
-              search(query, lastLimitRef.current || defaultLimit, userId);
-            }, waitMs);
-          }
-        }
-
-        if (onError) onError(errorMessage);
-        return null;
-      }
-
-      const result: SearchResult = await response.json();
 
       // Ensure newest-first ordering by year when available
       const sorted = [...(result.papers || [])].sort((a: Paper, b: Paper) => {
@@ -311,17 +245,28 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         return null;
       }
 
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      const msg = error instanceof Error ? error.message : String(error);
+      // Best-effort 429 handling without headers when using centralized client
+      let rateLimitInfo: UseLiteratureSearchState['rateLimitInfo'] = null;
+      if (typeof msg === 'string' && msg.includes('HTTP 429')) {
+        rateLimitInfo = {
+          limit: 100,
+          remaining: 0,
+          resetTime: new Date(Date.now() + 60_000).toISOString(),
+        };
+      }
+      const errorMessage = msg || 'An unexpected error occurred';
       setState(prev => ({
         ...prev,
         isLoading: false,
         error: errorMessage,
-        results: []
+        results: [],
+        rateLimitInfo,
       }));
       if (onError) onError(errorMessage);
       return null;
     }
-  }, [aggregateWindowMs, defaultLimit, onError, onSuccess]);
+  }, [aggregateWindowMs, defaultLimit, onError, onSuccess, authApi.get]);
 
   const search = useCallback(async (
     query: string,
@@ -551,12 +496,9 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       if (include) qs.set('include', include);
       // Include Authorization header when preloading a session (if route is secured)
       const sessionUrl = `/api/literature-search/session/${encodeURIComponent(sid)}?${qs.toString()}`;
-      const token = getAuthToken();
-      const headers = new Headers();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      const res = await fetch(sessionUrl, { headers, credentials: 'same-origin' });
-      if (!res.ok) return { success: false } as any;
-      const payload = await res.json();
+      const payload = await authApi.get<any>(sessionUrl, {
+        cacheOptions: { enabled: false },
+      });
 
       const loadedResults: Paper[] = (payload?.results || []).map((r: any) => r.paper as Paper);
       // Seed dedupe set from loaded results
