@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tokenService } from '@/lib/services/token.service';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { requireAuth } from '@/lib/server/auth';
 
 export interface TokenMiddlewareOptions {
   featureName: string;
@@ -14,28 +9,11 @@ export interface TokenMiddlewareOptions {
   requiredTokens?: number; // Override calculated tokens
 }
 
-// Authentication helper function
+// Centralized authentication helper using server-side requireAuth
 async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    const cookieHeader = request.headers.get('cookie');
-    
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      return { user, error };
-    }
-    
-    // Try to get user from session cookie
-    if (cookieHeader) {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      return { user, error };
-    }
-    
-    return { user: null, error: new Error('No authentication found') };
-  } catch (error) {
-    return { user: null, error };
-  }
+  const result = await requireAuth(request)
+  if ('error' in result) return { user: null, error: new Error('Unauthorized') }
+  return { user: result.user, error: null }
 }
 
 export class TokenMiddleware {

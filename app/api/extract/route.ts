@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-// Authentication will be handled by middleware or other means
 import { supabase } from '@/integrations/supabase/client';
+import { requireAuth } from '@/lib/server/auth';
 import { ExtractionOrchestrator } from '@/lib/services/file-extraction/extraction-orchestrator';
 import { DataExtractionService } from '@/lib/services/data-extraction.service';
 
@@ -14,8 +14,10 @@ const dataExtractionService = new DataExtractionService();
 
 export async function POST(request: NextRequest) {
   try {
-    // Note: Authentication should be handled by middleware
-    // For now, proceeding without auth check
+    // Require authentication consistently
+    const auth = await requireAuth(request)
+    if ('error' in auth) return auth.error
+    const { user } = auth
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest) {
       const { data: inserted, error: insertError } = await supabase
         .from('extractions' as any)
         .insert({
-          user_id: null,
+          user_id: user.id,
           file_name: file.name,
           file_type: file.type,
           file_size: file.size,

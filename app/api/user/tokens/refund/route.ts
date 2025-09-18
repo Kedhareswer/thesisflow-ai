@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/server/auth'
 import { tokenService } from '@/lib/services/token.service'
+import { logApiEvent } from '@/lib/server/logger'
 
 export async function POST(request: NextRequest) {
   try {
+    const started = Date.now()
     const auth = await requireAuth(request)
     if ('error' in auth) return auth.error
     const { user } = auth
@@ -23,8 +25,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
 
-    const context = payload.idempotencyKey
-      ? { ...payload.context, idempotencyKey: payload.idempotencyKey }
+    // Prefer Idempotency-Key header if provided; fallback to body.idempotencyKey
+    const headerIdem = request.headers.get('idempotency-key') || undefined
+    const idem = headerIdem ?? payload.idempotencyKey
+    const context = idem
+      ? { ...payload.context, idempotencyKey: idem }
       : payload.context
 
     const result = await tokenService.refundTokens(
@@ -35,7 +40,20 @@ export async function POST(request: NextRequest) {
     )
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error || 'Failed to refund tokens' }, { status: 500 })
+      const resp = NextResponse.json({ error: result.error || 'Failed to refund tokens' }, { status: 500 })
+      logApiEvent({
+        route: '/api/user/tokens/refund',
+        user_id: user.id,
+        feature: payload.feature,
+        amount: payload.amount,
+        idempotency_key: idem || null,
+        success: false,
+        status: 500,
+        elapsed_ms: Date.now() - started,
+        extra: { error: result.error },
+        ts: new Date().toISOString(),
+      })
+      return resp
     }
 
     const status = await tokenService.getUserTokenStatus(user.id)
@@ -44,6 +62,18 @@ export async function POST(request: NextRequest) {
       ...(status ?? {}),
     })
     response.headers.set('Cache-Control', 'no-store, max-age=0')
+    logApiEvent({
+      route: '/api/user/tokens/refund',
+      user_id: user.id,
+      feature: payload.feature,
+      amount: payload.amount,
+      idempotency_key: idem || null,
+      success: true,
+      status: 200,
+      elapsed_ms: Date.now() - started,
+      extra: status ?? undefined,
+      ts: new Date().toISOString(),
+    })
     return response
   } catch (error) {
     console.error('[tokens/refund] unexpected error', error)
