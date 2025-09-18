@@ -38,6 +38,21 @@ export class TokenMiddleware {
       const userId = user.id;
       const { featureName, context = {}, skipDeduction = false, requiredTokens } = options;
 
+      // Explorer-specific bypass: Assistant on Explorer tab is unlimited (user-provided keys)
+      const isExplorerAssistant =
+        featureName === 'ai_chat' &&
+        (context as any)?.origin === 'explorer' &&
+        ((context as any)?.feature === 'assistant');
+
+      if (isExplorerAssistant) {
+        // Skip all rate/token checks and execute handler directly
+        const response = await handler(userId);
+        // annotate headers to make it explicit no tokens were used
+        response.headers.set('X-Tokens-Used', '0');
+        response.headers.set('X-Explorer-Bypass', 'assistant');
+        return response;
+      }
+
       // Get client IP and user agent for tracking
       const clientIP = request.headers.get('x-forwarded-for') || 
         request.headers.get('x-real-ip') || 
@@ -213,6 +228,12 @@ export class TokenMiddleware {
         context.high_quality = true;
       }
     }
+
+    // Pass through optional flags for selective bypass
+    const origin = searchParams.get('origin');
+    const feature = searchParams.get('feature');
+    if (origin) context.origin = origin;
+    if (feature) context.feature = feature;
 
     return context;
   }
