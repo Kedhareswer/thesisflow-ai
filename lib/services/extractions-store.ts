@@ -21,17 +21,22 @@ export type ExtractionWithChats = {
 }
 
 export async function fetchRecentExtractions(limit = 10): Promise<RecentExtraction[]> {
-  if (!supabaseUtils.isConfigured()) return []
-  const { data, error } = await supabase
-    .from('extractions' as any)
-    .select('id, file_name, file_type, file_size, summary, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) {
-    supabaseUtils.logError('fetchRecentExtractions', error)
+  try {
+    const { data: sessionRes } = await supabase.auth.getSession()
+    const accessToken = sessionRes?.session?.access_token
+    const res = await fetch(`/api/extractions/recent?limit=${encodeURIComponent(String(limit))}` , {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      return []
+    }
+    const body = await res.json().catch(() => ({}))
+    return Array.isArray(body.items) ? (body.items as RecentExtraction[]) : []
+  } catch (e) {
+    supabaseUtils.logError('fetchRecentExtractions/fetch', e)
     return []
   }
-  return (data || []) as RecentExtraction[]
 }
 
 export async function fetchExtractionWithChats(id: string): Promise<ExtractionWithChats | null> {
@@ -70,43 +75,34 @@ export async function saveChatMessage(extractionId: string, role: 'user' | 'assi
 
 // Delete a single extraction (and its chats via cascade)
 export async function deleteExtraction(id: string) {
-  if (!supabaseUtils.isConfigured()) return { success: false }
   try {
-    const { error } = await supabase
-      .from('extractions' as any)
-      .delete()
-      .eq('id', id)
-    if (error) {
-      supabaseUtils.logError('deleteExtraction', error)
-      return { success: false, error }
-    }
-    return { success: true }
+    const { data: sessionRes } = await supabase.auth.getSession()
+    const accessToken = sessionRes?.session?.access_token
+    const res = await fetch(`/api/extractions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    })
+    const body = await res.json().catch(() => ({}))
+    return { success: !!body?.success, error: body?.error }
   } catch (error) {
-    supabaseUtils.logError('deleteExtraction/catch', error)
+    supabaseUtils.logError('deleteExtraction/fetch', error)
     return { success: false, error }
   }
 }
 
 // Clear all extractions for current user
 export async function clearAllExtractions() {
-  if (!supabaseUtils.isConfigured()) return { success: false, error: 'Not configured' }
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const userId = session?.user?.id
-    if (!userId) {
-      return { success: false, error: 'No active session' }
-    }
-    const { error } = await supabase
-      .from('extractions' as any)
-      .delete()
-      .eq('user_id', userId)
-    if (error) {
-      supabaseUtils.logError('clearAllExtractions', error)
-      return { success: false, error }
-    }
-    return { success: true }
+    const { data: sessionRes } = await supabase.auth.getSession()
+    const accessToken = sessionRes?.session?.access_token
+    const res = await fetch('/api/extractions/clear', {
+      method: 'DELETE',
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    })
+    const body = await res.json().catch(() => ({}))
+    return { success: !!body?.success, error: body?.error }
   } catch (error) {
-    supabaseUtils.logError('clearAllExtractions/catch', error)
+    supabaseUtils.logError('clearAllExtractions/fetch', error)
     return { success: false, error }
   }
 }

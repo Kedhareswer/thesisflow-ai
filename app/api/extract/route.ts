@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/integrations/supabase/client';
+import { getSupabaseAdmin } from '@/lib/server/supabase-admin';
 import { requireAuth } from '@/lib/server/auth';
 import { ExtractionOrchestrator } from '@/lib/services/file-extraction/extraction-orchestrator';
 import { DataExtractionService } from '@/lib/services/data-extraction.service';
@@ -105,7 +105,8 @@ export async function POST(request: NextRequest) {
         ? (processedResult as any).summary as string
         : (typeof (processedResult as any)?.text === 'string' ? ((processedResult as any).text as string).slice(0, 600) : null);
 
-      const { data: inserted, error: insertError } = await supabase
+      const admin = getSupabaseAdmin()
+      const { data: inserted, error: insertError } = await admin
         .from('extractions' as any)
         .insert({
           user_id: user.id,
