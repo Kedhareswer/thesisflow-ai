@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { LiteratureSearchService } from '@/lib/services/literature-search.service';
+import { requireAuth } from '@/lib/server/auth';
 
 // Ensure Node.js runtime for service-role usage and stable SSE behavior
 export const runtime = 'nodejs';
@@ -26,26 +27,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query')?.trim() || '';
   const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
-  let userId = searchParams.get('userId');
+  // Authenticate the user (supports Authorization header, access_token query, or cookies)
+  const auth = await requireAuth(request);
+  if ('error' in auth) {
+    return auth.error; // 401 Unauthorized
+  }
+  const userId = auth.user.id as string;
   const mode = (searchParams.get('mode') || '').toLowerCase(); // "forward" | "backward" | ""
   const seed = searchParams.get('seed')?.trim() || '';
   const sessionId = (searchParams.get('sessionId')?.trim()) || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const accessToken = searchParams.get('access_token');
-
-  // Validate authentication if access_token is provided
-  if (accessToken) {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-      if (!error && user) {
-        userId = user.id; // Use authenticated user ID
-      } else {
-        return new Response('Invalid authentication token', { status: 401 });
-      }
-    } catch (error) {
-      console.error('Authentication error in streaming route:', error);
-      return new Response('Authentication failed', { status: 401 });
-    }
-  }
 
   const isCitation = mode === 'forward' || mode === 'backward';
   if (!isCitation && query.length < 3) {

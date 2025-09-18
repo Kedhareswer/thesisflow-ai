@@ -1,40 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
-// Authentication helper function using Supabase session
-const getAuthHeaders = async (): Promise<HeadersInit> => {
-  if (typeof window === 'undefined') return new Headers({ 'Content-Type': 'application/json' });
-  
-  try {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.access_token) {
-      return new Headers({ 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}` 
-      });
-    }
-  } catch (error) {
-    console.warn('Failed to get auth session:', error);
-  }
-  
-  return new Headers({ 'Content-Type': 'application/json' });
-};
-
-// Get auth token for query parameters (EventSource)
-const getAuthToken = async (): Promise<string | null> => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || null;
-  } catch (error) {
-    console.warn('Failed to get auth token:', error);
-    return null;
-  }
-};
-
 export interface Paper {
   id: string;
   title: string;
@@ -162,6 +127,20 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     return `hash:${JSON.stringify(p).toLowerCase()}`;
   };
 
+  // Retrieve Supabase access token from localStorage (client-side only)
+  // This is used to authenticate requests to secured API routes.
+  const getAuthToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('ai-research-platform-auth');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw || '{}');
+      return parsed?.access_token || null;
+    } catch {
+      return null;
+    }
+  };
+
   // Internal: perform classic fetch flow (existing implementation)
   const doFetchSearch = useCallback(async (
     query: string,
@@ -217,10 +196,16 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
         lastQueryFetchRef.current[key] = Date.now();
       } catch {}
 
-      const headers = await getAuthHeaders();
+      // Attach Authorization header so server middleware can authenticate the user
+      const hdrs = new Headers({ 'Content-Type': 'application/json' });
+      const token = getAuthToken();
+      if (token) hdrs.set('Authorization', `Bearer ${token}`);
+
       const response = await fetch(`/api/literature-search?${params}`, {
         method: 'GET',
-        headers: headers,
+        headers: hdrs,
+        // Include credentials to allow cookie-based fallbacks when available
+        credentials: 'same-origin',
         signal: abortControllerRef.current.signal
       });
 
@@ -385,10 +370,10 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       if (userId) params.append('userId', userId);
       if (sessionIdRef.current) params.append('sessionId', sessionIdRef.current);
 
-      // Add auth token to query params for EventSource (since it doesn't support custom headers)
-      const authToken = await getAuthToken();
-      if (authToken) {
-        params.append('access_token', authToken);
+      // Pass access_token via query param for SSE (headers are not supported by EventSource)
+      {
+        const token = getAuthToken();
+        if (token) params.append('access_token', token);
       }
       const es = new EventSource(`/api/literature-search/stream?${params.toString()}`);
       eventSourceRef.current = es;
@@ -564,11 +549,12 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       const qs = new URLSearchParams();
       if (userIdArg || userIdForSession) qs.set('userId', (userIdArg || userIdForSession) as string);
       if (include) qs.set('include', include);
-      const headers = await getAuthHeaders();
-      const res = await fetch(`/api/literature-search/session/${encodeURIComponent(sid)}?${qs.toString()}`, {
-        method: 'GET',
-        headers: headers
-      });
+      // Include Authorization header when preloading a session (if route is secured)
+      const sessionUrl = `/api/literature-search/session/${encodeURIComponent(sid)}?${qs.toString()}`;
+      const token = getAuthToken();
+      const headers = new Headers();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const res = await fetch(sessionUrl, { headers, credentials: 'same-origin' });
       if (!res.ok) return { success: false } as any;
       const payload = await res.json();
 
