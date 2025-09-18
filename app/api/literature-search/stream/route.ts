@@ -26,10 +26,26 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query')?.trim() || '';
   const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
-  const userId = searchParams.get('userId');
+  let userId = searchParams.get('userId');
   const mode = (searchParams.get('mode') || '').toLowerCase(); // "forward" | "backward" | ""
   const seed = searchParams.get('seed')?.trim() || '';
   const sessionId = (searchParams.get('sessionId')?.trim()) || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const accessToken = searchParams.get('access_token');
+
+  // Validate authentication if access_token is provided
+  if (accessToken) {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+      if (!error && user) {
+        userId = user.id; // Use authenticated user ID
+      } else {
+        return new Response('Invalid authentication token', { status: 401 });
+      }
+    } catch (error) {
+      console.error('Authentication error in streaming route:', error);
+      return new Response('Authentication failed', { status: 401 });
+    }
+  }
 
   const isCitation = mode === 'forward' || mode === 'backward';
   if (!isCitation && query.length < 3) {
