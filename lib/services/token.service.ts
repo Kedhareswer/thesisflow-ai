@@ -229,57 +229,43 @@ export class TokenService {
     monthlyRemaining: number;
   } | null> {
     try {
+      // Try to get existing row
       const { data, error } = await this.supabase
         .from('user_tokens')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
+      let row = data
+      if (!row) {
+        // Initialize via RPC then refetch
+        await this.initializeUserTokens(userId)
+        const { data: afterInit, error: refetchErr } = await this.supabase
+          .from('user_tokens')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (refetchErr) throw refetchErr
+        row = afterInit || null
+      }
+
+      if (!row) return null
+
       return {
-        dailyUsed: data.daily_tokens_used,
-        monthlyUsed: data.monthly_tokens_used,
-        dailyLimit: data.daily_limit,
-        monthlyLimit: data.monthly_limit,
-        dailyRemaining: data.daily_limit - data.daily_tokens_used,
-        monthlyRemaining: data.monthly_limit - data.monthly_tokens_used
+        dailyUsed: row.daily_tokens_used,
+        monthlyUsed: row.monthly_tokens_used,
+        dailyLimit: row.daily_limit,
+        monthlyLimit: row.monthly_limit,
+        dailyRemaining: row.daily_limit - row.daily_tokens_used,
+        monthlyRemaining: row.monthly_limit - row.monthly_tokens_used
       };
     } catch (error: any) {
-      // Better diagnostics
       const msg = error?.message || String(error);
       const code = error?.code || error?.status || 'unknown';
-      console.warn(`[token.service] direct user_tokens fetch failed (${code}):`, msg);
-
-      // Fallback: call app API to upsert defaults and return token status
-      try {
-        const { data: sessionData } = await this.supabase.auth.getSession();
-        const access = sessionData?.session?.access_token;
-        if (!access) {
-          console.warn('[token.service] no session access token for /api/user/tokens fallback');
-          return null;
-        }
-        const resp = await fetch('/api/user/tokens', {
-          headers: { Authorization: `Bearer ${access}` },
-        });
-        if (!resp.ok) {
-          const text = await resp.text();
-          console.warn('[token.service] /api/user/tokens fallback not ok:', resp.status, text);
-          return null;
-        }
-        const json = await resp.json();
-        return {
-          dailyUsed: Number(json.dailyUsed ?? 0),
-          monthlyUsed: Number(json.monthlyUsed ?? 0),
-          dailyLimit: Number(json.dailyLimit ?? 0),
-          monthlyLimit: Number(json.monthlyLimit ?? 0),
-          dailyRemaining: Number(json.dailyRemaining ?? 0),
-          monthlyRemaining: Number(json.monthlyRemaining ?? 0),
-        };
-      } catch (fallbackErr: any) {
-        console.error('[token.service] fallback /api/user/tokens failed:', fallbackErr?.message || fallbackErr);
-        return null;
-      }
+      console.warn(`[token.service] user_tokens fetch failed (${code}):`, msg);
+      return null;
     }
   }
 
