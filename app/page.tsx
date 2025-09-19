@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 // Removed unused Card imports
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target, Menu, Bird } from "lucide-react"
+import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Pricing } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
@@ -209,115 +208,18 @@ export default function HomePage() {
         ]}
       >
         <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
-        <div className="container mx-auto px-4 min-h-screen bg-background">
-      {/* Header */}
-      <header className="flex h-16 items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Bird className="h-6 w-6 text-[#FF6B2C]" />
-          <span className="text-xl font-bold">ThesisFlow-AI</span>
-        </div>
-        
-        {/* Desktop Navigation */}
-        {user && (
-          <nav className="hidden md:flex space-x-8">
-            <Link href="/explorer" className="font-medium hover:text-[#FF6B2C] transition-colors">
-              Explorer
-            </Link>
-            <Link href="/planner" className="font-medium hover:text-[#FF6B2C] transition-colors">
-              Planner
-            </Link>
-            <Link href="/collaborate" className="font-medium hover:text-[#FF6B2C] transition-colors">
-              Collaborate
-            </Link>
-            <Link href="#pricing" className="font-medium hover:text-[#FF6B2C] transition-colors">
-              Pricing
-            </Link>
-            <Link href="#faq" className="font-medium hover:text-[#FF6B2C] transition-colors">
-              FAQ
-            </Link>
-          </nav>
-        )}
-        
-        {/* Desktop CTA + Mobile Menu */}
-        <div className="flex items-center space-x-4">
-          {user ? (
-            <Button 
-              asChild
-              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium"
-            >
-              <Link href="/changelog">
-                View Changelog
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          ) : (
-            <Button 
-              asChild
-              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium"
-            >
-              <Link href="/signup">
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          )}
-          
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <div className="flex flex-col space-y-4 mt-8">
-                {user && (
-                  <>
-                    <Link href="/explorer" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
-                      Explorer
-                    </Link>
-                    <Link href="/planner" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
-                      Planner
-                    </Link>
-                    <Link href="/collaborate" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
-                      Collaborate
-                    </Link>
-                    <Link href="#pricing" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
-                      Pricing
-                    </Link>
-                    <Link href="#faq" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
-                      FAQ
-                    </Link>
-                  </>
-                )}
-                {user ? (
-                  <Button 
-                    asChild
-                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium mt-4"
-                  >
-                    <Link href="/changelog">
-                      View Changelog
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button 
-                    asChild
-                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium mt-4"
-                  >
-                    <Link href="/signup">
-                      Get Started
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
+        <div className="container mx-auto px-4 min-h-screen">
       {/* Hero Section - background image with left and right content like the reference */}
       <main className="relative min-h-[680px] md:min-h-[740px] lg:min-h-[780px] overflow-hidden">
+        {/* Top overlay header */}
+        <div className="absolute top-0 left-0 right-0 z-20 py-4">
+          <div className="container mx-auto px-6 flex items-center justify-between text-white">
+            <span className="text-lg font-semibold">ThesisFlow-AI</span>
+            <Button variant="outline" className="rounded-none border-white text-white hover:bg-white/10">
+              Join Waitlist
+            </Button>
+          </div>
+        </div>
         {/* Background image */}
         <div className="absolute inset-0 -z-10">
           <Image
