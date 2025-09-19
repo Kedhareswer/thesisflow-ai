@@ -3,7 +3,7 @@
 This document describes the token accounting model, relevant database objects, RPC functions, and HTTP API endpoints.
 
 ## Overview
-- Token quotas are tracked per user with daily and monthly limits.
+- Token quotas are tracked per user with monthly limits only.
 - All deductions/refunds are performed atomically inside Postgres functions (RPC), eliminating race conditions.
 - Operations are idempotent when a stable `Idempotency-Key` is provided.
 - Server routes authenticate via a centralized `requireAuth` helper that accepts Bearer header, query token, or Supabase cookies.
@@ -12,8 +12,8 @@ This document describes the token accounting model, relevant database objects, R
 
 - `user_tokens`
   - Tracks usage and limits per user.
-  - Columns: `user_id (PK/FK)`, `daily_tokens_used`, `monthly_tokens_used`, `daily_limit`, `monthly_limit`, `last_daily_reset (date)`, `last_monthly_reset (date)`, timestamps.
-  - Resets are triggered by `reset_user_tokens_if_needed(user_id)`.
+  - Columns: `user_id (PK/FK)`, `monthly_tokens_used`, `monthly_limit`, `last_monthly_reset (date)`, timestamps.
+  - Resets are triggered by `reset_user_tokens_if_needed(user_id)` at month boundaries.
 
 - `token_transactions`
   - Append-only ledger of token operations.
@@ -40,13 +40,13 @@ All functions are defined with `security definer` and pinned `search_path = publ
   - Ensures a `user_tokens` row exists.
 
 - `reset_user_tokens_if_needed(p_user_id uuid)`
-  - Resets daily/monthly counters based on dates.
+  - Resets monthly counters at month boundaries.
 
 - `check_user_tokens(p_user_id uuid, p_tokens_needed int)` => jsonb
-  - Returns `{ has_tokens, daily_remaining, monthly_remaining, daily_limit, monthly_limit, tokens_needed }`.
+  - Returns `{ has_tokens, monthly_remaining, monthly_limit, tokens_needed }`.
 
 - `check_token_rate_limit(p_user_id uuid, p_feature_name text, p_context jsonb)` => jsonb
-  - Returns `{ allowed, tokensNeeded, dailyRemaining, monthlyRemaining, resetTime, errorMessage? }`.
+  - Returns `{ allowed, tokensNeeded, monthlyRemaining, resetTime, errorMessage? }`.
 
 - `get_feature_cost(p_feature_name text, p_context jsonb)` => int
   - Returns dynamic cost for a feature based on context multipliers.
@@ -70,11 +70,8 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
 - Response:
 ```json
 {
-  "dailyUsed": number,
   "monthlyUsed": number,
-  "dailyLimit": number,
   "monthlyLimit": number,
-  "dailyRemaining": number,
   "monthlyRemaining": number
 }
 ```
@@ -96,11 +93,8 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
 ```json
 {
   "success": true,
-  "dailyUsed": number,
   "monthlyUsed": number,
-  "dailyLimit": number,
   "monthlyLimit": number,
-  "dailyRemaining": number,
   "monthlyRemaining": number
 }
 ```
