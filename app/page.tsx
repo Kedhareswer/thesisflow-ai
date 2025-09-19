@@ -274,23 +274,70 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Features Section */}
-      <section className="py-32 bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+      {/* Light Showcase Section - 'Everything You Need for Research' */}
+      <section className="relative isolate bg-[#F7F6F3] py-28 md:py-32 lg:py-36">
+        <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_60%_at_50%_40%,black,transparent)] bg-black/5"></div>
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-20"
+            className="text-center max-w-3xl mx-auto"
           >
-            <h2 className="text-5xl font-bold mb-6 text-foreground tracking-tight">Everything You Need for Research</h2>
-            <p className="text-2xl text-muted-foreground font-normal leading-relaxed max-w-4xl mx-auto">
+            <h2 className="text-neutral-900 tracking-tight font-medium leading-tight text-4xl sm:text-5xl md:text-6xl">
+              <span className="block">Everything You Need</span>
+              <span className="block">for Research.</span>
+            </h2>
+            <p className="mt-4 text-neutral-600 text-lg sm:text-xl md:text-[20px] leading-relaxed max-w-2xl mx-auto">
               Comprehensive tools designed to streamline every aspect of your research workflow with AI-powered insights.
             </p>
           </motion.div>
-          {/* Feature grid with hover effects (single source of truth) */}
-          <div className="mt-12">
+
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            viewport={{ once: true }}
+            className="mt-16 lg:mt-20"
+          >
+            <div className="relative max-w-5xl mx-auto rounded-[24px] bg-white ring-1 ring-black/10 shadow-[0_30px_60px_-12px_rgba(0,0,0,0.35)] overflow-hidden">
+              <div className="h-12 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2 px-4">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#28C840]" />
+              </div>
+              <div className="relative aspect-[16/10] bg-white">
+                <Image
+                  src="/screenshots/research-dashboard-mock.svg"
+                  alt="ThesisFlow research dashboard preview"
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
+                  priority={false}
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Dark Features Section */}
+      <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.15),transparent)]" />
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">Built for Researchers, Not Busywork.</h3>
+            <p className="mt-4 text-neutral-300 max-w-2xl mx-auto text-lg leading-relaxed">Simple, powerful tools that feel effortless—explore the platform's core capabilities.</p>
+          </motion.div>
+          {/* Enable dark: styles within the grid */}
+          <div className="dark">
             <FeaturesSectionWithHoverEffects features={hoverFeatures} />
           </div>
         </div>
