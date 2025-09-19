@@ -159,7 +159,7 @@ export default function HomePage() {
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
-            src="/research.png"
+            src="/hero.png"
             alt="Hero background"
             fill
             priority
@@ -405,7 +405,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials Section removed per request */}
+      {/* Testimonials Section removed for Future Use */}
 
       {/* Pricing Section */}
       <motion.div 
