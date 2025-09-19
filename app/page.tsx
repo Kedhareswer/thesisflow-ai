@@ -209,58 +209,67 @@ export default function HomePage() {
       >
         <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
         <div className="container mx-auto px-4 min-h-screen">
-      {/* Hero Section - background image with left and right content like the reference */}
-      <main className="relative min-h-[680px] md:min-h-[740px] lg:min-h-[780px] overflow-hidden">
-        {/* Top overlay header */}
-        <div className="absolute top-0 left-0 right-0 z-20 py-4">
-          <div className="container mx-auto px-6 flex items-center justify-between text-white">
-            <span className="text-lg font-semibold">ThesisFlow-AI</span>
-            <Button variant="outline" className="rounded-none border-white text-white hover:bg-white/10">
-              Join Waitlist
-            </Button>
-          </div>
-        </div>
+      {/* Hero Section - exact match to reference image */}
+      <main className="relative min-h-[100vh] overflow-hidden">
         {/* Background image */}
-        <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0">
           <Image
-            src="public\hero.png"
+            src="/hero.png"
             alt="Hero background"
             fill
             priority
             className="object-cover object-center"
           />
-          {/* Dark-to-transparent gradient for left text legibility */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
+        </div>
+
+        {/* Top navbar overlay */}
+        <div className="absolute top-0 left-0 right-0 z-20 px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center text-white">
+              <span className="text-xl font-normal">ThesisFlow-AI</span>
+            </div>
+            <Button 
+              variant="outline" 
+              className="rounded-sm border-white text-white hover:bg-white/10 px-6 py-2 text-sm font-normal"
+              onClick={() => handleProtectedAction('/explorer')}
+            >
+              Get Started
+            </Button>
+          </div>
         </div>
 
         {/* Content overlay */}
-        <div className="relative z-10 h-full">
-          <div className="container mx-auto px-6 h-full grid grid-cols-12 items-center gap-6">
-            {/* Left block */}
-            <div className="col-span-12 md:col-span-7 lg:col-span-6 text-left text-white">
-              <div className="mb-6 text-[10px] md:text-xs tracking-[0.2em] uppercase text-white/80">
-                Coming Soon
+        <div className="relative z-10 h-full min-h-[100vh] flex items-center">
+          <div className="w-full px-8">
+            <div className="grid grid-cols-12 gap-8 items-center">
+              {/* Left content block */}
+              <div className="col-span-12 lg:col-span-6 text-white">
+                <div className="mb-4">
+                  <div className="text-xs font-normal tracking-[0.15em] uppercase text-white/90 mb-6">
+                    COMING SOON
+                  </div>
+                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-normal leading-[1.1] mb-8">
+                    AI Research Sidekick<br />
+                    Built for Big Dreamers<br />
+                    Who Hate Spreadsheets
+                  </h1>
+                  <div className="mt-8">
+                    <Button
+                      className="rounded-sm bg-white text-black hover:bg-white/90 px-6 py-3 text-sm font-normal"
+                      onClick={() => handleProtectedAction('/explorer')}
+                    >
+                      Get Started
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
-                AI Accounting Sidekick
-                <br />
-                <span className="text-white/90">Built for Big Dreamers</span>
-                <br />
-                <span className="text-white/90">Who Hate Spreadsheets</span>
-              </h1>
-              <div className="mt-8">
-                <Button
-                  size="lg"
-                  className="rounded-none bg-white text-black hover:bg-white/90 shadow-md"
-                >
-                  Join Waitlist
-                </Button>
-              </div>
-            </div>
 
-            {/* Right block */}
-            <div className="hidden md:block md:col-span-4 lg:col-span-3 md:ml-auto text-white/85 text-sm leading-relaxed">
-              We’re putting the finishing touches on a tool that automates your accounting, teaches you as you go, and gives you daily insights that actually help you run your business better.
+              {/* Right content block */}
+              <div className="hidden lg:block lg:col-span-4 lg:col-start-9 text-white/90">
+                <p className="text-sm font-normal leading-relaxed">
+                  We're putting the finishing touches on a tool that automates your research, teaches you as you go, and gives you daily insights that actually help you run your research better.
+                </p>
+              </div>
             </div>
           </div>
         </div>
