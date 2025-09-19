@@ -208,7 +208,6 @@ export default function HomePage() {
         ]}
       >
         <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
-        <div className="container mx-auto px-4 min-h-screen">
       {/* Hero Section - exact match to reference image */}
       <main className="relative min-h-[100vh] overflow-hidden">
         {/* Background image */}
@@ -230,7 +229,7 @@ export default function HomePage() {
             </div>
             <Button 
               variant="outline" 
-              className="rounded-sm border-white text-white hover:bg-white/10 px-6 py-2 text-sm font-normal"
+              className="rounded-sm border-white/40 text-white hover:bg-white/20 backdrop-blur-md bg-white/15 px-6 py-2 text-sm font-normal shadow-lg"
               onClick={() => handleProtectedAction('/explorer')}
             >
               Get Started
@@ -255,7 +254,7 @@ export default function HomePage() {
                   </h1>
                   <div className="mt-8">
                     <Button
-                      className="rounded-sm bg-white text-black hover:bg-white/90 px-6 py-3 text-sm font-normal"
+                      className="rounded-sm bg-white/20 backdrop-blur-md border border-white/40 text-white hover:bg-white/30 px-6 py-3 text-sm font-normal shadow-lg"
                       onClick={() => handleProtectedAction('/explorer')}
                     >
                       Get Started
@@ -444,7 +443,6 @@ export default function HomePage() {
       {/* Footer */}
       <Footer />
       
-        </div>
       </WebPage>
     </SoftwareApplication>
   )
