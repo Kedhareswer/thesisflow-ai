@@ -210,30 +210,30 @@ export default function HomePage() {
         ]}
       >
         <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
-        <div className="container mx-auto px-4 min-h-screen bg-background font-mono">
+        <div className="container mx-auto px-4 min-h-screen bg-background">
       {/* Header */}
       <header className="flex h-16 items-center justify-between">
         <div className="flex items-center space-x-2">
           <Bird className="h-6 w-6 text-[#FF6B2C]" />
-          <span className="text-xl font-bold font-mono">ThesisFlow-AI</span>
+          <span className="text-xl font-bold">ThesisFlow-AI</span>
         </div>
         
         {/* Desktop Navigation */}
         {user && (
           <nav className="hidden md:flex space-x-8">
-            <Link href="/explorer" className="font-mono hover:text-[#FF6B2C] transition-colors">
+            <Link href="/explorer" className="font-medium hover:text-[#FF6B2C] transition-colors">
               Explorer
             </Link>
-            <Link href="/planner" className="font-mono hover:text-[#FF6B2C] transition-colors">
+            <Link href="/planner" className="font-medium hover:text-[#FF6B2C] transition-colors">
               Planner
             </Link>
-            <Link href="/collaborate" className="font-mono hover:text-[#FF6B2C] transition-colors">
+            <Link href="/collaborate" className="font-medium hover:text-[#FF6B2C] transition-colors">
               Collaborate
             </Link>
-            <Link href="#pricing" className="font-mono hover:text-[#FF6B2C] transition-colors">
+            <Link href="#pricing" className="font-medium hover:text-[#FF6B2C] transition-colors">
               Pricing
             </Link>
-            <Link href="#faq" className="font-mono hover:text-[#FF6B2C] transition-colors">
+            <Link href="#faq" className="font-medium hover:text-[#FF6B2C] transition-colors">
               FAQ
             </Link>
           </nav>
@@ -244,7 +244,7 @@ export default function HomePage() {
           {user ? (
             <Button 
               asChild
-              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
+              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium"
             >
               <Link href="/changelog">
                 View Changelog
@@ -254,7 +254,7 @@ export default function HomePage() {
           ) : (
             <Button 
               asChild
-              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
+              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium"
             >
               <Link href="/signup">
                 Get Started
@@ -274,19 +274,19 @@ export default function HomePage() {
               <div className="flex flex-col space-y-4 mt-8">
                 {user && (
                   <>
-                    <Link href="/explorer" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                    <Link href="/explorer" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
                       Explorer
                     </Link>
-                    <Link href="/planner" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                    <Link href="/planner" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
                       Planner
                     </Link>
-                    <Link href="/collaborate" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                    <Link href="/collaborate" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
                       Collaborate
                     </Link>
-                    <Link href="#pricing" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                    <Link href="#pricing" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
                       Pricing
                     </Link>
-                    <Link href="#faq" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
+                    <Link href="#faq" className="font-medium text-lg hover:text-[#FF6B2C] transition-colors">
                       FAQ
                     </Link>
                   </>
@@ -294,7 +294,7 @@ export default function HomePage() {
                 {user ? (
                   <Button 
                     asChild
-                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
+                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium mt-4"
                   >
                     <Link href="/changelog">
                       View Changelog
@@ -304,7 +304,7 @@ export default function HomePage() {
                 ) : (
                   <Button 
                     asChild
-                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
+                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium mt-4"
                   >
                     <Link href="/signup">
                       Get Started
@@ -318,7 +318,7 @@ export default function HomePage() {
         </div>
       </header>
       {/* Hero Section */}
-      <main className="relative flex flex-col items-center text-center py-24 min-h-[600px]">
+      <main className="relative flex flex-col items-center text-center py-32 min-h-[700px]">
         {/* PixelTrail Background */}
         <div className="absolute inset-0 z-0">
           <PixelTrail
@@ -330,38 +330,38 @@ export default function HomePage() {
         </div>
         
         {/* Hero Content */}
-        <div className="relative z-10 w-full">
+        <div className="relative z-10 w-full max-w-5xl mx-auto px-4">
 
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="mb-6"
+          transition={{ duration: 0.8, delay: 0.1 }}
+          className="mb-8"
         >
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-mono leading-tight text-foreground">
+          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-[0.9] text-foreground tracking-tight">
             <motion.span 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
               className="block"
             >
-              Accelerate
+              AI Research
             </motion.span>
             <motion.span 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
               className="block"
             >
-              Your Research
+              Platform Built for
             </motion.span>
             <motion.span 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
               className="block text-[#FF6B2C]"
             >
-              with AI
+              Big Dreamers
             </motion.span>
           </h1>
         </motion.div>
@@ -369,8 +369,8 @@ export default function HomePage() {
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto leading-relaxed font-mono"
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="text-2xl text-muted-foreground text-balance mb-12 max-w-3xl mx-auto leading-relaxed font-normal"
         >
           Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals.
         </motion.p>
@@ -386,7 +386,7 @@ export default function HomePage() {
               <Link
                 key={f.title}
                 href={f.href}
-                className="text-sm font-mono border border-border text-muted-foreground rounded-full px-3 py-1 hover:text-[#FF6B2C] hover:border-[#FF6B2C] hover:bg-[#FF6B2C]/10 transition-colors"
+                className="text-sm font-medium border border-border text-muted-foreground rounded-full px-3 py-1 hover:text-[#FF6B2C] hover:border-[#FF6B2C] hover:bg-[#FF6B2C]/10 transition-colors"
               >
                 {f.title}
               </Link>
@@ -397,37 +397,37 @@ export default function HomePage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center"
+          transition={{ duration: 0.8, delay: 0.8 }}
+          className="flex flex-col sm:flex-row gap-6 justify-center"
         >
           <Button 
             size="lg" 
-            className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
+            className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium px-8 py-4 text-lg shadow-lg"
             onClick={() => handleProtectedAction('/explorer')}
           >
-            Start Exploring
-            <ArrowRight className="ml-2 h-4 w-4" />
+            Join Waitlist
+            <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
-          <Button variant="outline" size="lg" asChild className="font-mono">
-            <Link href="/signup">Create Account</Link>
+          <Button variant="outline" size="lg" asChild className="font-medium px-8 py-4 text-lg border-2">
+            <Link href="/signup">Learn More</Link>
           </Button>
         </motion.div>
         </div>
       </main>
 
       {/* Features Section */}
-      <section className="py-24 bg-muted/30">
-        <div className="max-w-6xl mx-auto">
+      <section className="py-32 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <h2 className="text-4xl font-bold font-mono mb-4 text-foreground">Everything You Need for Research</h2>
-            <p className="text-xl text-muted-foreground font-mono leading-relaxed">
-              Comprehensive tools designed to streamline every aspect of your research workflow.
+            <h2 className="text-5xl font-bold mb-6 text-foreground tracking-tight">Everything You Need for Research</h2>
+            <p className="text-2xl text-muted-foreground font-normal leading-relaxed max-w-4xl mx-auto">
+              Comprehensive tools designed to streamline every aspect of your research workflow with AI-powered insights.
             </p>
           </motion.div>
           {/* Feature grid with hover effects (single source of truth) */}
@@ -438,19 +438,19 @@ export default function HomePage() {
       </section>
 
       {/* Research Challenges Section */}
-      <section className="py-24 bg-background">
-        <div className="max-w-6xl mx-auto">
+      <section className="py-32 bg-background">
+        <div className="max-w-7xl mx-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <h2 className="text-4xl font-bold font-mono text-foreground mb-6">
+            <h2 className="text-5xl font-bold text-foreground mb-8 tracking-tight">
               Research Shouldn't Be This Hard
             </h2>
-            <p className="text-xl text-muted-foreground font-mono max-w-3xl mx-auto leading-relaxed">
+            <p className="text-2xl text-muted-foreground font-normal max-w-4xl mx-auto leading-relaxed">
               Academic researchers waste 40% of their time on administrative tasks and tool-switching instead of actual research.
             </p>
           </motion.div>
@@ -466,8 +466,8 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Clock className="w-6 h-6 text-[#FF6B2C]" />
               </div>
-              <h3 className="text-xl font-bold font-mono text-foreground mb-3">Time Wasted</h3>
-              <p className="text-muted-foreground font-mono leading-relaxed">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">Time Wasted</h3>
+              <p className="text-muted-foreground font-medium leading-relaxed">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
             </motion.div>
             
             <motion.div 
@@ -480,8 +480,8 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="w-6 h-6 text-[#FF6B2C]" />
               </div>
-              <h3 className="text-xl font-bold font-mono text-foreground mb-3">Lost Focus</h3>
-              <p className="text-muted-foreground font-mono leading-relaxed">Constant context switching breaks deep work and reduces research quality.</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">Lost Focus</h3>
+              <p className="text-muted-foreground font-medium leading-relaxed">Constant context switching breaks deep work and reduces research quality.</p>
             </motion.div>
             
             <motion.div 
@@ -494,8 +494,8 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Users className="w-6 h-6 text-[#FF6B2C]" />
               </div>
-              <h3 className="text-xl font-bold font-mono text-foreground mb-3">Team Chaos</h3>
-              <p className="text-muted-foreground font-mono leading-relaxed">Fragmented communication and version control nightmares slow collaboration.</p>
+              <h3 className="text-xl font-bold text-foreground mb-3">Team Chaos</h3>
+              <p className="text-muted-foreground font-medium leading-relaxed">Fragmented communication and version control nightmares slow collaboration.</p>
             </motion.div>
           </div>
 
@@ -507,7 +507,7 @@ export default function HomePage() {
             className="text-center"
           >
             <Button 
-              className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono px-8 py-4 text-base shadow-lg"
+              className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium px-8 py-4 text-base shadow-lg"
               onClick={() => handleProtectedAction('/explorer')}
             >
               Solve This Now
@@ -518,21 +518,21 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials Section */}
-      <section className="bg-background py-24 relative">
-        <div className="max-w-6xl mx-auto">
+      <section className="bg-background py-32 relative">
+        <div className="max-w-7xl mx-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="flex text-center justify-center items-center gap-4 flex-col"
+            className="flex text-center justify-center items-center gap-6 flex-col mb-20"
           >
-            <Badge className="font-mono">Testimonials</Badge>
-            <div className="flex gap-2 flex-col">
-              <h2 className="text-4xl font-bold font-mono text-foreground max-w-xl text-center">
+            <Badge className="font-medium text-lg px-4 py-2">Testimonials</Badge>
+            <div className="flex gap-4 flex-col">
+              <h2 className="text-5xl font-bold text-foreground max-w-2xl text-center tracking-tight">
                 What our users say
               </h2>
-              <p className="text-xl leading-relaxed font-mono text-muted-foreground max-w-xl text-center">
+              <p className="text-2xl leading-relaxed font-normal text-muted-foreground max-w-2xl text-center">
                 See what our customers have to say about us.
               </p>
             </div>
@@ -564,17 +564,17 @@ export default function HomePage() {
       </motion.div>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-24 bg-background">
-        <div className="max-w-4xl mx-auto">
+      <section id="faq" className="py-32 bg-background">
+        <div className="max-w-5xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-12"
+            className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold font-mono text-foreground mb-4">Frequently Asked Questions</h2>
-            <p className="text-lg text-muted-foreground font-mono leading-relaxed">
+            <h2 className="text-5xl font-bold text-foreground mb-6 tracking-tight">Frequently Asked Questions</h2>
+            <p className="text-2xl text-muted-foreground font-normal leading-relaxed max-w-3xl mx-auto">
               Answers to common questions about ThesisFlow-AI.
             </p>
           </motion.div>
