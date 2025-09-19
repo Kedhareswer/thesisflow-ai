@@ -23,7 +23,7 @@ function Pricing() {
               Unlock the full potential of Thesis Flow AI.
             </p>
             <p className="text-xs md:text-sm leading-relaxed tracking-tight text-muted-foreground max-w-2xl text-center">
-              Plans use tokens that reset <span className="font-medium">daily</span> and <span className="font-medium">monthly</span>. Tokens are consumed by AI Chat, Deep Research, Summarizer, Plan-and-Execute, and related AI features.
+              Plans use tokens that reset <span className="font-medium">monthly</span>. Tokens are consumed by AI Chat, Deep Research, Summarizer, Plan-and-Execute, and related AI features.
             </p>
           </div>
 
@@ -52,7 +52,7 @@ function Pricing() {
                       <Check className="w-4 h-4 mt-2 text-green-500" />
                       <div className="flex flex-col">
                         <p>Tokens Included</p>
-                        <p className="text-muted-foreground text-sm">10 daily tokens, 50 tokens monthly maximum</p>
+                        <p className="text-muted-foreground text-sm">50 monthly tokens</p>
                       </div>
                     </div>
                     <div className="flex flex-row gap-4">
@@ -118,7 +118,7 @@ function Pricing() {
                       <Check className="w-4 h-4 mt-2 text-green-500" />
                       <div className="flex flex-col">
                         <p>Tokens Included</p>
-                        <p className="text-muted-foreground text-sm">100 daily tokens, 500 tokens monthly maximum</p>
+                        <p className="text-muted-foreground text-sm">500 monthly tokens</p>
                       </div>
                     </div>
                     <div className="flex flex-row gap-4">

@@ -2,9 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export interface TokenStatus {
   hasTokens: boolean;
-  dailyRemaining: number;
   monthlyRemaining: number;
-  dailyLimit: number;
   monthlyLimit: number;
   tokensNeeded: number;
 }
@@ -48,12 +46,10 @@ export class TokenService {
       if (error) throw error;
 
       return {
-        hasTokens: data.has_tokens,
-        dailyRemaining: data.daily_remaining,
-        monthlyRemaining: data.monthly_remaining,
-        dailyLimit: data.daily_limit,
-        monthlyLimit: data.monthly_limit,
-        tokensNeeded: data.tokens_needed
+        hasTokens: Boolean(data.has_tokens),
+        monthlyRemaining: Number(data.monthly_remaining ?? 0),
+        monthlyLimit: Number(data.monthly_limit ?? 0),
+        tokensNeeded: Number(data.tokens_needed ?? tokensNeeded),
       };
     } catch (error) {
       console.error('Error checking user tokens:', error);
@@ -71,9 +67,8 @@ export class TokenService {
   ): Promise<{
     allowed: boolean;
     tokensNeeded: number;
-    dailyRemaining: number;
     monthlyRemaining: number;
-    resetTime: number;
+    resetTime: number; // epoch ms when monthly quota resets
     errorMessage?: string;
   }> {
     try {
@@ -84,7 +79,14 @@ export class TokenService {
       });
 
       if (error) throw error;
-      return data;
+      // Map snake_case -> camelCase and ensure resetTime is epoch ms (monthly reset)
+      return {
+        allowed: Boolean(data.allowed),
+        tokensNeeded: Number(data.tokens_needed ?? 1),
+        monthlyRemaining: Number(data.monthly_remaining ?? 0),
+        resetTime: Number(data.reset_time ?? 0),
+        errorMessage: data.error_message || undefined,
+      };
     } catch (error) {
       console.error('Error checking rate limit:', error);
       throw new Error('Failed to check rate limit');
@@ -221,11 +223,8 @@ export class TokenService {
    * Get current user token status
    */
   async getUserTokenStatus(userId: string): Promise<{
-    dailyUsed: number;
     monthlyUsed: number;
-    dailyLimit: number;
     monthlyLimit: number;
-    dailyRemaining: number;
     monthlyRemaining: number;
   } | null> {
     try {
@@ -254,12 +253,9 @@ export class TokenService {
       if (!row) return null
 
       return {
-        dailyUsed: row.daily_tokens_used,
-        monthlyUsed: row.monthly_tokens_used,
-        dailyLimit: row.daily_limit,
-        monthlyLimit: row.monthly_limit,
-        dailyRemaining: row.daily_limit - row.daily_tokens_used,
-        monthlyRemaining: row.monthly_limit - row.monthly_tokens_used
+        monthlyUsed: Number(row.monthly_tokens_used ?? 0),
+        monthlyLimit: Number(row.monthly_limit ?? 0),
+        monthlyRemaining: Math.max(0, Number(row.monthly_limit ?? 0) - Number(row.monthly_tokens_used ?? 0)),
       };
     } catch (error: any) {
       const msg = error?.message || String(error);

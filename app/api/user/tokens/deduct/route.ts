@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
       const res = NextResponse.json({
         error: rl.errorMessage || 'Rate limited',
         resetTime: rl.resetTime || null,
-        dailyRemaining: rl.dailyRemaining,
         monthlyRemaining: rl.monthlyRemaining,
       }, { status: 429 })
       if (rl.resetTime) {

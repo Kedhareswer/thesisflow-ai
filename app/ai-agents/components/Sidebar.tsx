@@ -193,18 +193,18 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <NotificationsModal />
             </React.Suspense>
 
-            {/* Always-visible token chip */}
+            {/* Always-visible token chip (monthly-only) */}
             {tokenStatus && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className={`flex items-center gap-1 rounded-full border bg-white px-2 h-7 text-xs ${collapsed ? 'mt-1' : ''}`}>
                       <Sparkles className="h-3.5 w-3.5 text-[#FF6B2C]" />
-                      <span className="tabular-nums">{tokenStatus.dailyRemaining}</span>
+                      <span className="tabular-nums">{tokenStatus.monthlyRemaining}</span>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                    Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -239,12 +239,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     </span>
                     <span className="inline-flex items-center text-xs text-muted-foreground">
                       <Sparkles className="h-3 w-3 mr-1 text-[#FF6B2C]" />
-                      {tokenStatus ? `${tokenStatus.dailyRemaining} left` : '—'}
+                      {tokenStatus ? `${tokenStatus.monthlyRemaining} left` : '—'}
                     </span>
                   </div>
                   {tokenStatus && (
                     <div className="text-[11px] text-muted-foreground">
-                      Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                      Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
                     </div>
                   )}
                   <div className="mt-2">

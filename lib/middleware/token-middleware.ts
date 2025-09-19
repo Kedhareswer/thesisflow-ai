@@ -73,7 +73,6 @@ export class TokenMiddleware {
             code: 'RATE_LIMIT_EXCEEDED',
             details: {
               tokensNeeded: rateLimit.tokensNeeded,
-              dailyRemaining: rateLimit.dailyRemaining,
               monthlyRemaining: rateLimit.monthlyRemaining,
               resetTime: rateLimit.resetTime
             }
@@ -81,10 +80,9 @@ export class TokenMiddleware {
           { 
             status: 429,
             headers: {
-              'Retry-After': Math.ceil(rateLimit.resetTime / 1000).toString(),
-              'X-RateLimit-Remaining-Daily': rateLimit.dailyRemaining.toString(),
+              'Retry-After': Math.max(1, Math.ceil((rateLimit.resetTime - Date.now()) / 1000)).toString(),
               'X-RateLimit-Remaining-Monthly': rateLimit.monthlyRemaining.toString(),
-              'X-RateLimit-Reset': new Date(Date.now() + rateLimit.resetTime * 1000).toISOString()
+              'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString()
             }
           }
         );
@@ -121,7 +119,6 @@ export class TokenMiddleware {
         
         // Add token usage headers to response
         response.headers.set('X-Tokens-Used', tokensNeeded.toString());
-        response.headers.set('X-Tokens-Remaining-Daily', rateLimit.dailyRemaining.toString());
         response.headers.set('X-Tokens-Remaining-Monthly', rateLimit.monthlyRemaining.toString());
         
         if (transactionId) {
@@ -183,12 +180,18 @@ export class TokenMiddleware {
             code: 'RATE_LIMIT_EXCEEDED',
             details: {
               tokensNeeded: rateLimit.tokensNeeded,
-              dailyRemaining: rateLimit.dailyRemaining,
               monthlyRemaining: rateLimit.monthlyRemaining,
               resetTime: rateLimit.resetTime
             }
           },
-          { status: 429 }
+          { 
+            status: 429,
+            headers: {
+              'Retry-After': Math.ceil(rateLimit.resetTime / 1000).toString(),
+              'X-RateLimit-Remaining-Monthly': rateLimit.monthlyRemaining.toString(),
+              'X-RateLimit-Reset': new Date(Date.now() + rateLimit.resetTime).toISOString()
+            }
+          }
         );
       }
 

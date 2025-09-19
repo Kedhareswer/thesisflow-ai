@@ -40,7 +40,6 @@ export function MainNav() {
 
   // Low-token threshold config
   const LOW_TOKEN_PERCENT = 0.15 // 15%
-  const LOW_TOKEN_MIN_DAILY = 5  // absolute daily tokens
   const LOW_TOKEN_MIN_MONTHLY = 25 // absolute monthly tokens
 
   useEffect(() => {
@@ -74,11 +73,9 @@ export function MainNav() {
 
   const lowToken = (() => {
     if (!tokenStatus) return false
-    const dailyPercentLow = tokenStatus.dailyLimit > 0 && (tokenStatus.dailyRemaining / tokenStatus.dailyLimit) < LOW_TOKEN_PERCENT
     const monthlyPercentLow = tokenStatus.monthlyLimit > 0 && (tokenStatus.monthlyRemaining / tokenStatus.monthlyLimit) < LOW_TOKEN_PERCENT
-    const dailyCountLow = tokenStatus.dailyRemaining <= LOW_TOKEN_MIN_DAILY
     const monthlyCountLow = tokenStatus.monthlyRemaining <= LOW_TOKEN_MIN_MONTHLY
-    return dailyPercentLow || monthlyPercentLow || dailyCountLow || monthlyCountLow
+    return monthlyPercentLow || monthlyCountLow
   })()
 
   // Simple avatar component
@@ -283,11 +280,11 @@ export function MainNav() {
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1 rounded-full border bg-white px-2 h-7 text-xs cursor-default select-none">
                           <Sparkles className="h-3.5 w-3.5 text-[#FF6B2C]" />
-                          <span className="tabular-nums">{tokenStatus.dailyRemaining}</span>
+                          <span className="tabular-nums">{tokenStatus.monthlyRemaining}</span>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                        Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -319,12 +316,12 @@ export function MainNav() {
                       </span>
                       <span className="inline-flex items-center text-xs text-muted-foreground">
                         <Sparkles className="h-3 w-3 mr-1 text-[#FF6B2C]" />
-                        {tokenStatus ? `${tokenStatus.dailyRemaining} left` : '—'}
+                        {tokenStatus ? `${tokenStatus.monthlyRemaining} left` : '—'}
                       </span>
                     </div>
                     {tokenStatus && (
                       <div className="text-[11px] text-muted-foreground">
-                        Daily: {tokenStatus.dailyUsed}/{tokenStatus.dailyLimit} • Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
+                        Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
                       </div>
                     )}
                     <div className="mt-2">
@@ -390,7 +387,7 @@ export function MainNav() {
                 <AlertTriangle className="h-4 w-4" />
                 <span className="font-medium">Low on tokens</span>
                 <span className="text-amber-900/80">
-                  Today: {tokenStatus.dailyRemaining} left • Month: {tokenStatus.monthlyRemaining} left
+                  Month: {tokenStatus.monthlyRemaining} left
                 </span>
               </div>
               <div className="flex items-center gap-2">
