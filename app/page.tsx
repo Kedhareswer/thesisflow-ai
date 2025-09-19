@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 // Removed unused Card imports
@@ -14,8 +15,7 @@ import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
-import { PixelTrail } from "@/components/ui/pixel-trail"
-import { useScreenSize } from "@/components/hooks/use-screen-size"
+// Removed PixelTrail and screen-size hooks in favor of static hero background image
 import { HomeLoader } from "@/components/ui/home-loader"
 import { Footer } from "@/components/ui/footer"
 
@@ -24,7 +24,6 @@ import { Footer } from "@/components/ui/footer"
 export default function HomePage() {
   const { user } = useSupabaseAuth()
   const router = useRouter()
-  const screenSize = useScreenSize()
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
 
   const handleProtectedAction = (href: string) => {
@@ -317,101 +316,51 @@ export default function HomePage() {
           </Sheet>
         </div>
       </header>
-      {/* Hero Section */}
-      <main className="relative flex flex-col items-center text-center py-32 min-h-[700px]">
-        {/* PixelTrail Background */}
-        <div className="absolute inset-0 z-0">
-          <PixelTrail
-            pixelSize={screenSize.lessThan('md') ? 32 : 48}
-            fadeDuration={800}
-            delay={200}
-            pixelClassName="rounded-full bg-[#FF6B2C] opacity-60"
+      {/* Hero Section - background image with left and right content like the reference */}
+      <main className="relative min-h-[680px] md:min-h-[740px] lg:min-h-[780px] overflow-hidden">
+        {/* Background image */}
+        <div className="absolute inset-0 -z-10">
+          <Image
+            src="/hero.png"
+            alt="Hero background"
+            fill
+            priority
+            className="object-cover object-center"
           />
+          {/* Dark-to-transparent gradient for left text legibility */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
         </div>
-        
-        {/* Hero Content */}
-        <div className="relative z-10 w-full max-w-5xl mx-auto px-4">
 
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1 }}
-          className="mb-8"
-        >
-          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-[0.9] text-foreground tracking-tight">
-            <motion.span 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="block"
-            >
-              AI Research
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="block"
-            >
-              Platform Built for
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="block text-[#FF6B2C]"
-            >
-              Big Dreamers
-            </motion.span>
-          </h1>
-        </motion.div>
+        {/* Content overlay */}
+        <div className="relative z-10 h-full">
+          <div className="container mx-auto px-6 h-full grid grid-cols-12 items-center gap-6">
+            {/* Left block */}
+            <div className="col-span-12 md:col-span-7 lg:col-span-6 text-left text-white">
+              <div className="mb-6 text-[10px] md:text-xs tracking-[0.2em] uppercase text-white/80">
+                Coming Soon
+              </div>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
+                AI Accounting Sidekick
+                <br />
+                <span className="text-white/90">Built for Big Dreamers</span>
+                <br />
+                <span className="text-white/90">Who Hate Spreadsheets</span>
+              </h1>
+              <div className="mt-8">
+                <Button
+                  size="lg"
+                  className="rounded-none bg-white text-black hover:bg-white/90 shadow-md"
+                >
+                  Join Waitlist
+                </Button>
+              </div>
+            </div>
 
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="text-2xl text-muted-foreground text-balance mb-12 max-w-3xl mx-auto leading-relaxed font-normal"
-        >
-          Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals.
-        </motion.p>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="flex flex-col sm:flex-row gap-6 justify-center mb-12"
-        >
-          <div className="flex flex-wrap justify-center gap-3">
-            {features.map((f) => (
-              <Link
-                key={f.title}
-                href={f.href}
-                className="text-sm font-medium border border-border text-muted-foreground rounded-full px-3 py-1 hover:text-[#FF6B2C] hover:border-[#FF6B2C] hover:bg-[#FF6B2C]/10 transition-colors"
-              >
-                {f.title}
-              </Link>
-            ))}
+            {/* Right block */}
+            <div className="hidden md:block md:col-span-4 lg:col-span-3 md:ml-auto text-white/85 text-sm leading-relaxed">
+              We’re putting the finishing touches on a tool that automates your accounting, teaches you as you go, and gives you daily insights that actually help you run your business better.
+            </div>
           </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-          className="flex flex-col sm:flex-row gap-6 justify-center"
-        >
-          <Button 
-            size="lg" 
-            className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium px-8 py-4 text-lg shadow-lg"
-            onClick={() => handleProtectedAction('/explorer')}
-          >
-            Join Waitlist
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-          <Button variant="outline" size="lg" asChild className="font-medium px-8 py-4 text-lg border-2">
-            <Link href="/signup">Learn More</Link>
-          </Button>
-        </motion.div>
         </div>
       </main>
 
