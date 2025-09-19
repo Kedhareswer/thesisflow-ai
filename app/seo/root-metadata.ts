@@ -16,7 +16,9 @@ export const metadata: Metadata = {
     'research assistant',
     'research productivity software'
   ],
-  generator: 'v0.dev',
+  alternates: {
+    canonical: siteUrl + '/',
+  },
   openGraph: {
     title: 'ThesisFlow-AI — AI Research Platform',
     description:
@@ -25,7 +27,7 @@ export const metadata: Metadata = {
     siteName: 'ThesisFlow-AI',
     images: [
       {
-        url: siteUrl + '/og-image-1200x630.png',
+        url: siteUrl + '/v2.png',
         width: 1200,
         height: 630,
         alt: 'ThesisFlow-AI — Accelerate your research with AI',
@@ -38,7 +40,7 @@ export const metadata: Metadata = {
     title: 'ThesisFlow-AI — AI Research Platform',
     description:
       'Accelerate your research with AI. Discover papers, summarize instantly, plan projects, and collaborate seamlessly.',
-    images: [siteUrl + '/og-image-1200x630.png'],
+    images: [siteUrl + '/v2.png'],
     site: '@ThesisFlowAI',
     creator: '@ThesisFlowAI',
   },

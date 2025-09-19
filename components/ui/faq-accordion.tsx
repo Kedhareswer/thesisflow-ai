@@ -81,7 +81,7 @@ export {
 	CustomAccordionContent,
 };
 
-const faqs = [
+export const faqs = [
   {
     question: 'What is ThesisFlow-AI?',
     answer:
@@ -130,8 +130,27 @@ const faqs = [
 ];
 
 export function AccordionComponent() {
+  // Build JSON-LD that reflects the visible Q&A content
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer,
+      },
+    })),
+  }
+
   return (
     <div className="max-w-3xl w-full mx-auto">
+      <script
+        type="application/ld+json"
+        // Static strings defined in this file; safe to stringify directly
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       <CustomAccordion
         type="single"
         collapsible

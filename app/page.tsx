@@ -25,6 +25,7 @@ export default function HomePage() {
   const { user } = useSupabaseAuth()
   const router = useRouter()
   const screenSize = useScreenSize()
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
 
   const handleProtectedAction = (href: string) => {
     if (!user) {
@@ -177,7 +178,7 @@ export default function HomePage() {
       description="Accelerate your research with AI-powered tools for discovering papers, summarizing content, and planning projects. All-in-one platform for scholars and professionals."
       applicationCategory="EducationalApplication"
       operatingSystem="Web Browser"
-      url="https://thesisflow-ai.com"
+      url={baseUrl}
       author={{
         name: "ThesisFlow-AI",
         type: "Organization"
@@ -198,14 +199,14 @@ export default function HomePage() {
       <WebPage
         name="ThesisFlow-AI - AI-Powered Research Platform"
         description="Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals."
-        url="https://thesisflow-ai.com"
+        url={baseUrl}
         dateModified={new Date().toISOString().split('T')[0]}
         author={{
           name: "ThesisFlow-AI",
           type: "Organization"
         }}
         breadcrumb={[
-          { name: "Home", url: "https://thesisflow-ai.com" }
+          { name: "Home", url: baseUrl }
         ]}
       >
         <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
