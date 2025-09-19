@@ -70,8 +70,7 @@ async function main() {
   const iAfter = await getStatus();
   console.log('First response:', i1.status);
   console.log('Second response (should not double-charge):', i2.status);
-  console.log('Status delta (idempotency): dailyUsed', iAfter.dailyUsed - iBefore.dailyUsed,
-              'monthlyUsed', iAfter.monthlyUsed - iBefore.monthlyUsed);
+  console.log('Status delta (idempotency): monthlyUsed', iAfter.monthlyUsed - iBefore.monthlyUsed);
 
   // 3) Rate limit test
   console.log('\n[RateLimit] Requesting huge amount to provoke 429');
