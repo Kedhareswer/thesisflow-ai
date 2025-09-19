@@ -13,7 +13,6 @@ import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
 // Removed PixelTrail and screen-size hooks in favor of static hero background image
-import { HomeLoader } from "@/components/ui/home-loader"
 import { Footer } from "@/components/ui/footer"
 
 // metadata moved to app/seo/root-metadata.ts
@@ -153,17 +152,16 @@ export default function HomePage() {
           { name: "Home", url: baseUrl }
         ]}
       >
-        <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
       {/* Hero Section - exact match to reference image */}
       <main className="relative min-h-[100vh] overflow-hidden">
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
-            src="/hero.png"
+            src="/research.png"
             alt="Hero background"
             fill
             priority
-            className="object-cover object-center"
+            className="object-cover object-[center_40%]"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
         </div>
@@ -222,7 +220,7 @@ export default function HomePage() {
       </main>
 
       {/* Light Showcase Section - 'Everything You Need for Research' */}
-      <section className="relative isolate bg-[#F7F6F3] py-28 md:py-32 lg:py-36">
+      <section className="relative isolate overflow-hidden bg-[#F7F6F3] py-28 md:py-32 lg:py-36">
         <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_60%_at_50%_40%,black,transparent)] bg-black/5"></div>
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
@@ -270,7 +268,7 @@ export default function HomePage() {
       </section>
 
       {/* Benefits Section (Dark) */}
-      <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
+      <section className="relative overflow-hidden bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <motion.div
@@ -302,7 +300,7 @@ export default function HomePage() {
       {/* Image Band: Doing research is hard enough */}
       <section className="relative min-h-[520px] md:min-h-[560px] overflow-hidden">
         <div className="absolute inset-0">
-          <Image src="/research.png" alt="Research band" fill className="object-cover" />
+          <Image src="/research.png" alt="Research band" fill className="object-cover object-[center_40%]" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex items-center">
