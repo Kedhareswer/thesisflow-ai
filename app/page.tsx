@@ -36,37 +36,37 @@ export default function HomePage() {
     {
       icon: Search,
       title: "Research Explorer",
-      description: "Discover and analyze research papers with AI-powered insights and recommendations.",
+      description: "Find seminal papers fast with multi-source search, ranking, and de-duplication.",
       href: "/explorer",
     },
     {
       icon: FileText,
       title: "Smart Summarizer",
-      description: "Generate comprehensive summaries from papers, documents, and web content.",
+      description: "Turn PDFs into structured abstracts, key claims, and limitations in minutes.",
       href: "/summarizer",
     },
     {
       icon: Calendar,
       title: "Project Planner",
-      description: "Organize research projects with intelligent task management and timelines.",
+      description: "Plan studies and experiments with AI tasking, timelines, and milestones.",
       href: "/planner",
     },
     {
       icon: Lightbulb,
       title: "AI Tools",
-      description: "Access powerful AI-powered research tools and utilities for analysis.",
+      description: "One-click helpers for extraction, citation, and data prep—right where you work.",
       href: "/ai-tools",
     },
     {
       icon: Users,
       title: "Collaboration Hub",
-      description: "Work together with real-time chat, shared workspaces, and team management.",
+      description: "Share context, notes, and drafts without tool-switching or version chaos.",
       href: "/collaborate",
     },
     {
       icon: Bot,
       title: "AI Research Assistant",
-      description: "Get expert guidance on methodology, analysis, and research best practices.",
+      description: "Ask methods and stats questions in plain English—get sourced, checkable answers.",
       href: "/research-assistant",
     },
   ]
@@ -148,7 +148,7 @@ export default function HomePage() {
     return {
       title: f.title,
       description: f.description,
-      icon: <Icon className="h-6 w-6" />,
+      icon: <Icon className="h-7 w-7" />,
     }
   })
 
@@ -299,13 +299,13 @@ export default function HomePage() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
             viewport={{ once: true }}
-            className="mt-16 lg:mt-20"
+            className="mt-12 md:mt-14 lg:mt-16"
           >
-            <div className="relative max-w-5xl mx-auto rounded-[24px] bg-white ring-1 ring-black/10 shadow-[0_30px_60px_-12px_rgba(0,0,0,0.35)] overflow-hidden">
-              <div className="h-12 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2 px-4">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#28C840]" />
+            <div className="relative max-w-[1040px] mx-auto rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">
+              <div className="h-11 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2.5 px-5">
+                <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FF5F57]" />
+                <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]" />
+                <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#28C840]" />
               </div>
               <div className="relative aspect-[16/10] bg-white">
                 <Image
@@ -324,21 +324,21 @@ export default function HomePage() {
 
       {/* Dark Features Section */}
       <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
-        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.15),transparent)]" />
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-14"
           >
             <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">Built for Researchers, Not Busywork.</h3>
             <p className="mt-4 text-neutral-300 max-w-2xl mx-auto text-lg leading-relaxed">Simple, powerful tools that feel effortless—explore the platform's core capabilities.</p>
           </motion.div>
           {/* Enable dark: styles within the grid */}
           <div className="dark">
-            <FeaturesSectionWithHoverEffects features={hoverFeatures} />
+            <FeaturesSectionWithHoverEffects features={hoverFeatures} className="py-0" />
           </div>
         </div>
       </section>
