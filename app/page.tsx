@@ -5,12 +5,10 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 // Removed unused Card imports
-import { Badge } from "@/components/ui/badge"
-import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target } from "lucide-react"
+import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Clock, Target, MessageSquare, Share2, BarChart3 } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Pricing } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
-import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
@@ -71,76 +69,7 @@ export default function HomePage() {
     },
   ]
 
-  // Testimonials data (updated for ThesisFlow-AI)
-  const testimonials = [
-    {
-      text:
-        "Deep Research helped me synthesize a complete literature review in a single day. The multi-source search and deduplication are spot on.",
-      image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      name: "Dr. Elena Ruiz",
-      role: "Assistant Professor",
-    },
-    {
-      text:
-        "Smart Summarizer creates structured abstracts, key claims, and limitations from PDFs in minutes—perfect for paper triage.",
-      image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=200&auto=format&fit=crop",
-      name: "Marcus Lee",
-      role: "PhD Candidate",
-    },
-    {
-      text:
-        "The Project Planner keeps experiments, tasks, and due dates together. No more juggling spreadsheets and sticky notes.",
-      image: "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
-      name: "Priya Nair",
-      role: "Research Manager",
-    },
-    {
-      text:
-        "Collaboration Hub replaced my chat + docs combo. Inline citations and previews keep everyone aligned without context switching.",
-      image: "https://images.unsplash.com/photo-1544005311-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      name: "Ahmed Karim",
-      role: "Lab Coordinator",
-    },
-    {
-      text:
-        "AI Research Assistant explains methods and statistics in plain language—and links to sources so I can verify quickly.",
-      image: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?q=80&w=200&auto=format&fit=crop",
-      name: "Sara Novak",
-      role: "Data Scientist",
-    },
-    {
-      text:
-        "Explorer with aggregation surfaced seminal papers I would've missed. Great balance of recall and precision.",
-      image: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=200&auto=format&fit=crop",
-      name: "Tomás García",
-      role: "Postdoctoral Fellow",
-    },
-    {
-      text:
-        "Setup took minutes—imported PDFs and got clean summaries with one click. The UI is fast and intuitive.",
-      image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=200&auto=format&fit=crop",
-      name: "Jia Chen",
-      role: "Graduate Researcher",
-    },
-    {
-      text:
-        "Security and reliability give me confidence to use it for grant and manuscript work.",
-      image: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=200&auto=format&fit=crop",
-      name: "Rachel Moore",
-      role: "Principal Investigator",
-    },
-    {
-      text:
-        "ThesisFlow-AI removes tool fatigue—search, summarize, plan, and collaborate without leaving the page.",
-      image: "https://images.unsplash.com/photo-1544005316-04ce1f1a65a2?q=80&w=200&auto=format&fit=crop",
-      name: "Leo Martins",
-      role: "Engineer, R&D",
-    },
-  ]
-
-  const firstColumn = testimonials.slice(0, 3)
-  const secondColumn = testimonials.slice(3, 6)
-  const thirdColumn = testimonials.slice(6, 9)
+  // Removed testimonials
 
   // Map existing features to the new hover component input shape
   const hoverFeatures: FeatureItem[] = features.map((f) => {
@@ -152,23 +81,35 @@ export default function HomePage() {
     }
   })
 
-  const benefits = [
+  // Benefits content for dark band (mirrors reference, customized for research)
+  const benefitItems = [
+    {
+      icon: MessageSquare,
+      title: "Chat-to-Action Command Center",
+      description:
+        "Tell ThesisFlow what you need—‘Compile related work on diffusion models’—and it kicks off retrieval, deduping, summaries, and a project plan.",
+    },
     {
       icon: Zap,
-      title: "Accelerated Research",
-      description: "Reduce research time by 60% with AI-powered tools and automation.",
+      title: "Instant, Accurate Organization",
+      description:
+        "We auto‑categorize papers, notes, and citations in real time and learn your taxonomy—so everything stays where you expect it.",
     },
     {
-      icon: Shield,
-      title: "Enterprise Security",
-      description: "Bank-grade security with encrypted data and secure API handling.",
+      icon: BarChart3,
+      title: "Research Planning That Works",
+      description:
+        "As your work evolves, timelines and milestones update automatically—clear views of what’s next and what’s at risk.",
     },
     {
-      icon: Globe,
-      title: "Global Collaboration",
-      description: "Connect with researchers worldwide through real-time collaboration tools.",
+      icon: Share2,
+      title: "Seamless Advisor & Team Sharing",
+      description:
+        "Invite co‑authors, advisors, or teammates with one click. Set granular permission levels; keep context without version chaos.",
     },
   ]
+
+  // removed old placeholder benefits (replaced by benefitItems above)
 
   return (
     <SoftwareApplication
@@ -322,7 +263,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Dark Features Section */}
+      {/* Benefits Section (Dark) */}
       <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
         <div className="max-w-7xl mx-auto px-6 relative z-10">
@@ -333,12 +274,47 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-14"
           >
+            <div className="text-xs tracking-[0.2em] text-neutral-400 uppercase mb-4">Benefits</div>
             <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">Built for Researchers, Not Busywork.</h3>
             <p className="mt-4 text-neutral-300 max-w-2xl mx-auto text-lg leading-relaxed">Simple, powerful tools that feel effortless—explore the platform's core capabilities.</p>
           </motion.div>
-          {/* Enable dark: styles within the grid */}
-          <div className="dark">
-            <FeaturesSectionWithHoverEffects features={hoverFeatures} className="py-0" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+            {benefitItems.map((b) => {
+              const Icon = b.icon
+              return (
+                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all p-6 lg:p-7">
+                  <Icon className="h-7 w-7 text-white mb-4" />
+                  <div className="text-lg font-medium mb-2">{b.title}</div>
+                  <p className="text-sm text-neutral-300 leading-relaxed">{b.description}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Image Band: Doing research is hard enough */}
+      <section className="relative min-h-[520px] md:min-h-[560px] overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/hero.png" alt="Research band" fill className="object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+        </div>
+        <div className="relative z-10 h-full flex items-center">
+          <div className="container mx-auto px-6 grid grid-cols-12 items-center">
+            <div className="col-span-12 md:col-span-7 lg:col-span-6 text-white">
+              <h3 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight leading-tight">
+                Doing research
+                <br />is hard enough—
+                <br />your tooling shouldn’t be.
+              </h3>
+              <p className="mt-4 text-lg text-white/90 max-w-xl leading-relaxed">
+                ThesisFlow handles the tedious parts—deduping, citations, summaries, and now even acts on plain‑language commands—so you can focus on discovery, writing, and breakthroughs.
+              </p>
+              <div className="mt-8 flex gap-4">
+                <Button className="rounded-sm bg-white/15 border border-white/40 text-white hover:bg-white/25 backdrop-blur-md px-6">Try the Explorer</Button>
+                <Button variant="outline" className="rounded-sm border-white/40 text-white hover:bg-white/20 backdrop-blur-md px-6">See the Planner</Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -423,40 +399,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="bg-background py-32 relative">
-        <div className="max-w-7xl mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="flex text-center justify-center items-center gap-6 flex-col mb-20"
-          >
-            <Badge className="font-medium text-lg px-4 py-2">Testimonials</Badge>
-            <div className="flex gap-4 flex-col">
-              <h2 className="text-5xl font-bold text-foreground max-w-2xl text-center tracking-tight">
-                What our users say
-              </h2>
-              <p className="text-2xl leading-relaxed font-normal text-muted-foreground max-w-2xl text-center">
-                See what our customers have to say about us.
-              </p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            viewport={{ once: true }}
-            className="flex justify-center gap-6 mt-12 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] max-h-[740px] overflow-hidden"
-          >
-            <TestimonialsColumn testimonials={firstColumn} duration={15} />
-            <TestimonialsColumn testimonials={secondColumn} className="hidden md:block" duration={19} />
-            <TestimonialsColumn testimonials={thirdColumn} className="hidden lg:block" duration={17} />
-          </motion.div>
-        </div>
-      </section>
+      {/* Testimonials Section removed per request */}
 
       {/* Pricing Section */}
       <motion.div 
