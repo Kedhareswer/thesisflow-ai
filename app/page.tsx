@@ -23,6 +23,11 @@ export default function HomePage() {
   const router = useRouter()
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
 
+  // Consistent button styles across the page
+  const glassBtn = "rounded-sm border border-white/40 text-white bg-white/10 hover:bg-white/20 backdrop-blur-md px-6 py-3 text-sm font-medium shadow-lg"
+  const glassBtnSoft = "rounded-sm border border-white/30 text-white bg-white/5 hover:bg-white/15 backdrop-blur-md px-6 py-3 text-sm font-medium"
+  const primaryBtn = "rounded-sm bg-[#FF6B2C] text-white hover:bg-[#FF6B2C]/90 px-6 py-3 text-sm font-medium shadow-lg"
+
   const handleProtectedAction = (href: string) => {
     if (!user) {
       router.push('/login')
@@ -154,12 +159,13 @@ export default function HomePage() {
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
-            src="/hero.png"
+            src="/research.png"
             alt="Hero background"
             fill
             priority
             className="object-cover object-center"
           />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
         </div>
 
         {/* Top navbar overlay */}
@@ -170,7 +176,7 @@ export default function HomePage() {
             </div>
             <Button 
               variant="outline" 
-              className="rounded-sm border-white/40 text-white hover:bg-white/20 backdrop-blur-md bg-white/15 px-6 py-2 text-sm font-normal shadow-lg"
+              className={`${glassBtn} px-5 py-2.5`}
               onClick={() => handleProtectedAction('/explorer')}
             >
               Get Started
@@ -195,7 +201,7 @@ export default function HomePage() {
                   </h1>
                   <div className="mt-8">
                     <Button
-                      className="rounded-sm bg-white/20 backdrop-blur-md border border-white/40 text-white hover:bg-white/30 px-6 py-3 text-sm font-normal shadow-lg"
+                      className={glassBtn}
                       onClick={() => handleProtectedAction('/explorer')}
                     >
                       Get Started
@@ -296,7 +302,7 @@ export default function HomePage() {
       {/* Image Band: Doing research is hard enough */}
       <section className="relative min-h-[520px] md:min-h-[560px] overflow-hidden">
         <div className="absolute inset-0">
-          <Image src="/hero.png" alt="Research band" fill className="object-cover" />
+          <Image src="/research.png" alt="Research band" fill className="object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex items-center">
@@ -311,8 +317,8 @@ export default function HomePage() {
                 ThesisFlow handles the tedious parts—deduping, citations, summaries, and now even acts on plain‑language commands—so you can focus on discovery, writing, and breakthroughs.
               </p>
               <div className="mt-8 flex gap-4">
-                <Button className="rounded-sm bg-white/15 border border-white/40 text-white hover:bg-white/25 backdrop-blur-md px-6">Try the Explorer</Button>
-                <Button variant="outline" className="rounded-sm border-white/40 text-white hover:bg-white/20 backdrop-blur-md px-6">See the Planner</Button>
+                <Button className={glassBtn}>Try the Explorer</Button>
+                <Button variant="outline" className={glassBtnSoft}>See the Planner</Button>
               </div>
             </div>
           </div>
@@ -389,7 +395,7 @@ export default function HomePage() {
             className="text-center"
           >
             <Button 
-              className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-medium px-8 py-4 text-base shadow-lg"
+              className={primaryBtn}
               onClick={() => handleProtectedAction('/explorer')}
             >
               Solve This Now
