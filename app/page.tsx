@@ -223,7 +223,7 @@ export default function HomePage() {
         {/* Background image */}
         <div className="absolute inset-0 -z-10">
           <Image
-            src="/hero.png"
+            src="public\hero.png"
             alt="Hero background"
             fill
             priority
