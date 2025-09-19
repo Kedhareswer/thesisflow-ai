@@ -307,9 +307,19 @@ export default function ExtractPage() {
       formData.append('outputFormat', outputFormat)
       formData.append('ocrEnabled', ocrEnabled.toString())
       
+      // Include Supabase auth for protected API route
+      let authHeaders: HeadersInit | undefined = undefined
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: sessionRes } = await supabase.auth.getSession()
+        const token = sessionRes?.session?.access_token
+        if (token) authHeaders = { Authorization: `Bearer ${token}` }
+      } catch {}
+
       const response = await fetch('/api/extract', {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: authHeaders,
       })
       // Robust parse: handle non-JSON (e.g., platform 413 HTML/plain responses)
       const contentType = response.headers.get('content-type') || ''
@@ -329,6 +339,10 @@ export default function ExtractPage() {
       }
       
       if (!response.ok) {
+        // Improve 401 message for clarity
+        if (response.status === 401) {
+          throw new Error('Unauthorized: please sign in again and try uploading the file. If you are signed in, refresh the page and retry.')
+        }
         throw new Error(data?.error || 'Extraction failed')
       }
       
@@ -751,7 +765,16 @@ export default function ExtractPage() {
 
   const fetchSupportedExtensions = async () => {
     try {
-      const response = await fetch('/api/extract')
+      // Pass auth if available, though this endpoint does not require it
+      let headers: HeadersInit | undefined = undefined
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: sessionRes } = await supabase.auth.getSession()
+        const token = sessionRes?.session?.access_token
+        if (token) headers = { Authorization: `Bearer ${token}` }
+      } catch {}
+
+      const response = await fetch('/api/extract', { headers })
       const ct = response.headers.get('content-type') || ''
       let data: any = null
       let textBody = ''
