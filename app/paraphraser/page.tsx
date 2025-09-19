@@ -3,8 +3,6 @@
 import React, { useState, useCallback, useRef } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { FileText, Copy } from "lucide-react"
-import type { AIProvider } from "@/lib/ai-providers"
-import CompactAIProviderSelector from "@/components/compact-ai-provider-selector"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -35,10 +33,6 @@ export default function ParaphraserPage() {
   // Streaming state (always-on)
   const [streamProgress, setStreamProgress] = useState<number | undefined>(undefined)
   const esRef = useRef<EventSource | null>(null)
-
-  // Provider / Model selection (optional)
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
 
   const morePresets = ['Academic', 'Fluent', 'Formal', 'Creative', 'Casual', 'Technical', 'Simple']
 
@@ -80,8 +74,7 @@ export default function ParaphraserPage() {
       params.set('mode', mode)
       params.set('preserveLength', String(preserveLength))
       params.set('variationLevel', variationLevel)
-      if (selectedProvider) params.set('provider', selectedProvider)
-      if (selectedModel) params.set('model', selectedModel)
+      // Use default "Auto" provider/model selection
       try {
         const { supabase } = await import('@/integrations/supabase/client')
         const sess = await supabase.auth.getSession()
@@ -102,7 +95,11 @@ export default function ParaphraserPage() {
           } else if (type === 'progress') {
             if (typeof payload.percentage === 'number') setStreamProgress(payload.percentage)
           } else if (type === 'error') {
-            setError(payload.error || 'Streaming error')
+            // Handle error object properly to avoid React error #31
+            const errorMessage = payload.error && typeof payload.error === 'object' 
+              ? payload.error.message || String(payload.error)
+              : payload.error || 'Streaming error'
+            setError(errorMessage)
           } else if (type === 'done') {
             setIsLoading(false)
             setStreamProgress(100)
@@ -122,7 +119,7 @@ export default function ParaphraserPage() {
       setError(e?.message || 'Failed to paraphrase')
       setIsLoading(false)
     }
-  }, [inputText, activeTab, preserveLength, variationLevel, selectedProvider, selectedModel])
+  }, [inputText, activeTab, preserveLength, variationLevel])
 
   const stopStreaming = () => {
     if (esRef.current) {
@@ -256,16 +253,7 @@ export default function ParaphraserPage() {
             <p className="text-sm text-gray-600">Rewrite text clearly and originally.</p>
           </div>
 
-          {/* Provider / Model selector (compact) */}
-          <div className="mb-2">
-            <CompactAIProviderSelector
-              variant="compact"
-              selectedProvider={selectedProvider}
-              onProviderChange={(provider) => setSelectedProvider(provider)}
-              selectedModel={selectedModel}
-              onModelChange={(model) => setSelectedModel(model)}
-            />
-          </div>
+          {/* Using default "Auto" provider/model selection */}
 
           {/* Content Container */}
           <div className="mx-auto w-full max-w-5xl rounded-lg border border-gray-200 bg-white">
