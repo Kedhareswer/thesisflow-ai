@@ -21,9 +21,6 @@ function Pricing() {
             <h2 className="text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl text-center font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
               Choose a Plan
             </h2>
-            <p className="text-xl md:text-2xl leading-relaxed tracking-tight text-muted-foreground max-w-3xl text-center font-light">
-              Unlock the full potential of ThesisFlow-AI.
-            </p>
             <p className="text-sm md:text-base leading-relaxed tracking-tight text-muted-foreground max-w-4xl text-center font-normal">
               Plans use tokens that reset <span className="font-semibold text-foreground">monthly</span>. Tokens are consumed by AI Chat, Deep Research, Summarizer, Plan-and-Execute, and related AI features.
             </p>
