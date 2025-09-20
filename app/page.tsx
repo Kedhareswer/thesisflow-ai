@@ -157,13 +157,13 @@ export default function HomePage() {
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
-            src="/research.png"
+            src="/hero.png"
             alt="Hero background"
             fill
             priority
             className="object-cover object-left"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
         </div>
 
         {/* Top navbar overlay */}
@@ -365,7 +365,7 @@ export default function HomePage() {
       {/* Image Band: Doing research is hard enough */}
       <section className="relative min-h-[520px] md:min-h-[560px] overflow-hidden">
         <div className="absolute inset-0">
-          <Image src="/research.png" alt="Research band" fill className="object-cover object-left" />
+          <Image src="/research.png" alt="Research band" fill className="object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex items-center">
