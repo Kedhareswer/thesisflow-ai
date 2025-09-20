@@ -363,12 +363,12 @@ export default function HomePage() {
       </section>
 
       {/* Image Band: Doing research is hard enough */}
-      <section className="relative min-h-[520px] md:min-h-[560px] overflow-hidden">
+      <section className="relative min-h-[100vh] overflow-hidden">
         <div className="absolute inset-0">
           <Image src="/research.png" alt="Research band" fill className="object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
-        <div className="relative z-10 h-full flex items-center">
+        <div className="relative z-10 h-full min-h-[100vh] flex items-center">
           <div className="container mx-auto px-6 grid grid-cols-12 items-center">
             <div className="col-span-12 md:col-span-7 lg:col-span-6 text-white">
               <h3 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight leading-tight">
@@ -388,85 +388,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Research Challenges Section */}
-      <section className="py-32 bg-background">
-        <div className="max-w-7xl mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-5xl font-bold text-foreground mb-8 tracking-tight">
-              Research Shouldn't Be This Hard
-            </h2>
-            <p className="text-2xl text-muted-foreground font-normal max-w-4xl mx-auto leading-relaxed">
-              Academic researchers waste 40% of their time on administrative tasks and tool-switching instead of actual research.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="bg-background border p-8"
-            >
-              <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="w-6 h-6 text-[#FF6B2C]" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-3">Time Wasted</h3>
-              <p className="text-muted-foreground font-medium leading-relaxed">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
-            </motion.div>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="bg-background border p-8"
-            >
-              <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="w-6 h-6 text-[#FF6B2C]" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-3">Lost Focus</h3>
-              <p className="text-muted-foreground font-medium leading-relaxed">Constant context switching breaks deep work and reduces research quality.</p>
-            </motion.div>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: true }}
-              className="bg-background border p-8"
-            >
-              <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-[#FF6B2C]" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-3">Team Chaos</h3>
-              <p className="text-muted-foreground font-medium leading-relaxed">Fragmented communication and version control nightmares slow collaboration.</p>
-            </motion.div>
-          </div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            viewport={{ once: true }}
-            className="text-center"
-          >
-            <Button 
-              className={primaryBtn}
-              onClick={() => handleProtectedAction('/explorer')}
-            >
-              Solve This Now
-              <ArrowRight className="w-5 h-5 inline ml-2" />
-            </Button>
-          </motion.div>
-        </div>
-      </section>
 
       {/* Testimonials Section removed for Future Use */}
 
