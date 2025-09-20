@@ -1,22 +1,18 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 // Removed unused Card imports
-import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Shield, Globe, Clock, Target, Menu, Bird } from "lucide-react"
+import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Clock, Target, MessageSquare, Share2, BarChart3 } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Pricing } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
-import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
-import { PixelTrail } from "@/components/ui/pixel-trail"
-import { useScreenSize } from "@/components/hooks/use-screen-size"
-import { HomeLoader } from "@/components/ui/home-loader"
+// Removed PixelTrail and screen-size hooks in favor of static hero background image
 import { Footer } from "@/components/ui/footer"
 
 // metadata moved to app/seo/root-metadata.ts
@@ -24,7 +20,12 @@ import { Footer } from "@/components/ui/footer"
 export default function HomePage() {
   const { user } = useSupabaseAuth()
   const router = useRouter()
-  const screenSize = useScreenSize()
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app').replace(/\/+$/, '')
+
+  // Consistent button styles across the page
+  const glassBtn = "rounded-sm border border-white/40 text-white bg-white/10 hover:bg-white/20 backdrop-blur-md px-6 py-3 text-sm font-medium shadow-lg"
+  const glassBtnSoft = "rounded-sm border border-white/30 text-white bg-white/5 hover:bg-white/15 backdrop-blur-md px-6 py-3 text-sm font-medium"
+  const primaryBtn = "rounded-sm bg-[#FF6B2C] text-white hover:bg-[#FF6B2C]/90 px-6 py-3 text-sm font-medium shadow-lg"
 
   const handleProtectedAction = (href: string) => {
     if (!user) {
@@ -37,111 +38,42 @@ export default function HomePage() {
     {
       icon: Search,
       title: "Research Explorer",
-      description: "Discover and analyze research papers with AI-powered insights and recommendations.",
+      description: "Find seminal papers fast with multi-source search, ranking, and de-duplication.",
       href: "/explorer",
     },
     {
       icon: FileText,
       title: "Smart Summarizer",
-      description: "Generate comprehensive summaries from papers, documents, and web content.",
+      description: "Turn PDFs into structured abstracts, key claims, and limitations in minutes.",
       href: "/summarizer",
     },
     {
       icon: Calendar,
       title: "Project Planner",
-      description: "Organize research projects with intelligent task management and timelines.",
+      description: "Plan studies and experiments with AI tasking, timelines, and milestones.",
       href: "/planner",
     },
     {
       icon: Lightbulb,
       title: "AI Tools",
-      description: "Access powerful AI-powered research tools and utilities for analysis.",
+      description: "One-click helpers for extraction, citation, and data prep—right where you work.",
       href: "/ai-tools",
     },
     {
       icon: Users,
       title: "Collaboration Hub",
-      description: "Work together with real-time chat, shared workspaces, and team management.",
+      description: "Share context, notes, and drafts without tool-switching or version chaos.",
       href: "/collaborate",
     },
     {
       icon: Bot,
       title: "AI Research Assistant",
-      description: "Get expert guidance on methodology, analysis, and research best practices.",
+      description: "Ask methods and stats questions in plain English—get sourced, checkable answers.",
       href: "/research-assistant",
     },
   ]
 
-  // Testimonials data (updated for ThesisFlow-AI)
-  const testimonials = [
-    {
-      text:
-        "Deep Research helped me synthesize a complete literature review in a single day. The multi-source search and deduplication are spot on.",
-      image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      name: "Dr. Elena Ruiz",
-      role: "Assistant Professor",
-    },
-    {
-      text:
-        "Smart Summarizer creates structured abstracts, key claims, and limitations from PDFs in minutes—perfect for paper triage.",
-      image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=200&auto=format&fit=crop",
-      name: "Marcus Lee",
-      role: "PhD Candidate",
-    },
-    {
-      text:
-        "The Project Planner keeps experiments, tasks, and due dates together. No more juggling spreadsheets and sticky notes.",
-      image: "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
-      name: "Priya Nair",
-      role: "Research Manager",
-    },
-    {
-      text:
-        "Collaboration Hub replaced my chat + docs combo. Inline citations and previews keep everyone aligned without context switching.",
-      image: "https://images.unsplash.com/photo-1544005311-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      name: "Ahmed Karim",
-      role: "Lab Coordinator",
-    },
-    {
-      text:
-        "AI Research Assistant explains methods and statistics in plain language—and links to sources so I can verify quickly.",
-      image: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?q=80&w=200&auto=format&fit=crop",
-      name: "Sara Novak",
-      role: "Data Scientist",
-    },
-    {
-      text:
-        "Explorer with aggregation surfaced seminal papers I would've missed. Great balance of recall and precision.",
-      image: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=200&auto=format&fit=crop",
-      name: "Tomás García",
-      role: "Postdoctoral Fellow",
-    },
-    {
-      text:
-        "Setup took minutes—imported PDFs and got clean summaries with one click. The UI is fast and intuitive.",
-      image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=200&auto=format&fit=crop",
-      name: "Jia Chen",
-      role: "Graduate Researcher",
-    },
-    {
-      text:
-        "Security and reliability give me confidence to use it for grant and manuscript work.",
-      image: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=200&auto=format&fit=crop",
-      name: "Rachel Moore",
-      role: "Principal Investigator",
-    },
-    {
-      text:
-        "ThesisFlow-AI removes tool fatigue—search, summarize, plan, and collaborate without leaving the page.",
-      image: "https://images.unsplash.com/photo-1544005316-04ce1f1a65a2?q=80&w=200&auto=format&fit=crop",
-      name: "Leo Martins",
-      role: "Engineer, R&D",
-    },
-  ]
-
-  const firstColumn = testimonials.slice(0, 3)
-  const secondColumn = testimonials.slice(3, 6)
-  const thirdColumn = testimonials.slice(6, 9)
+  // Removed testimonials
 
   // Map existing features to the new hover component input shape
   const hoverFeatures: FeatureItem[] = features.map((f) => {
@@ -149,27 +81,39 @@ export default function HomePage() {
     return {
       title: f.title,
       description: f.description,
-      icon: <Icon className="h-6 w-6" />,
+      icon: <Icon className="h-7 w-7" />,
     }
   })
 
-  const benefits = [
+  // Benefits content for dark band (mirrors reference, customized for research)
+  const benefitItems = [
+    {
+      icon: MessageSquare,
+      title: "Chat-to-Action Command Center",
+      description:
+        "Tell ThesisFlow what you need—‘Compile related work on diffusion models’—and it kicks off retrieval, deduping, summaries, and a project plan.",
+    },
     {
       icon: Zap,
-      title: "Accelerated Research",
-      description: "Reduce research time by 60% with AI-powered tools and automation.",
+      title: "Instant, Accurate Organization",
+      description:
+        "We auto‑categorize papers, notes, and citations in real time and learn your taxonomy—so everything stays where you expect it.",
     },
     {
-      icon: Shield,
-      title: "Enterprise Security",
-      description: "Bank-grade security with encrypted data and secure API handling.",
+      icon: BarChart3,
+      title: "Research Planning That Works",
+      description:
+        "As your work evolves, timelines and milestones update automatically—clear views of what’s next and what’s at risk.",
     },
     {
-      icon: Globe,
-      title: "Global Collaboration",
-      description: "Connect with researchers worldwide through real-time collaboration tools.",
+      icon: Share2,
+      title: "Seamless Advisor & Team Sharing",
+      description:
+        "Invite co‑authors, advisors, or teammates with one click. Set granular permission levels; keep context without version chaos.",
     },
   ]
+
+  // removed old placeholder benefits (replaced by benefitItems above)
 
   return (
     <SoftwareApplication
@@ -177,7 +121,7 @@ export default function HomePage() {
       description="Accelerate your research with AI-powered tools for discovering papers, summarizing content, and planning projects. All-in-one platform for scholars and professionals."
       applicationCategory="EducationalApplication"
       operatingSystem="Web Browser"
-      url="https://thesisflow-ai.com"
+      url={baseUrl}
       author={{
         name: "ThesisFlow-AI",
         type: "Organization"
@@ -198,358 +142,280 @@ export default function HomePage() {
       <WebPage
         name="ThesisFlow-AI - AI-Powered Research Platform"
         description="Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals."
-        url="https://thesisflow-ai.com"
+        url={baseUrl}
         dateModified={new Date().toISOString().split('T')[0]}
         author={{
           name: "ThesisFlow-AI",
           type: "Organization"
         }}
         breadcrumb={[
-          { name: "Home", url: "https://thesisflow-ai.com" }
+          { name: "Home", url: baseUrl }
         ]}
       >
-        <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
-        <div className="container mx-auto px-4 min-h-screen bg-background font-mono">
-      {/* Header */}
-      <header className="flex h-16 items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Bird className="h-6 w-6 text-[#FF6B2C]" />
-          <span className="text-xl font-bold font-mono">ThesisFlow-AI</span>
-        </div>
-        
-        {/* Desktop Navigation */}
-        {user && (
-          <nav className="hidden md:flex space-x-8">
-            <Link href="/explorer" className="font-mono hover:text-[#FF6B2C] transition-colors">
-              Explorer
-            </Link>
-            <Link href="/planner" className="font-mono hover:text-[#FF6B2C] transition-colors">
-              Planner
-            </Link>
-            <Link href="/collaborate" className="font-mono hover:text-[#FF6B2C] transition-colors">
-              Collaborate
-            </Link>
-            <Link href="#pricing" className="font-mono hover:text-[#FF6B2C] transition-colors">
-              Pricing
-            </Link>
-            <Link href="#faq" className="font-mono hover:text-[#FF6B2C] transition-colors">
-              FAQ
-            </Link>
-          </nav>
-        )}
-        
-        {/* Desktop CTA + Mobile Menu */}
-        <div className="flex items-center space-x-4">
-          {user ? (
-            <Button 
-              asChild
-              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
-            >
-              <Link href="/changelog">
-                View Changelog
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          ) : (
-            <Button 
-              asChild
-              className="hidden md:inline-flex rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
-            >
-              <Link href="/signup">
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          )}
-          
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <div className="flex flex-col space-y-4 mt-8">
-                {user && (
-                  <>
-                    <Link href="/explorer" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                      Explorer
-                    </Link>
-                    <Link href="/planner" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                      Planner
-                    </Link>
-                    <Link href="/collaborate" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                      Collaborate
-                    </Link>
-                    <Link href="#pricing" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                      Pricing
-                    </Link>
-                    <Link href="#faq" className="font-mono text-lg hover:text-[#FF6B2C] transition-colors">
-                      FAQ
-                    </Link>
-                  </>
-                )}
-                {user ? (
-                  <Button 
-                    asChild
-                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
-                  >
-                    <Link href="/changelog">
-                      View Changelog
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button 
-                    asChild
-                    className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono mt-4"
-                  >
-                    <Link href="/signup">
-                      Get Started
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
-      {/* Hero Section */}
-      <main className="relative flex flex-col items-center text-center py-24 min-h-[600px]">
-        {/* PixelTrail Background */}
-        <div className="absolute inset-0 z-0">
-          <PixelTrail
-            pixelSize={screenSize.lessThan('md') ? 32 : 48}
-            fadeDuration={800}
-            delay={200}
-            pixelClassName="rounded-full bg-[#FF6B2C] opacity-60"
+      {/* Hero Section - exact match to reference image */}
+      <main className="relative min-h-[100vh] overflow-hidden">
+        {/* Background image */}
+        <div className="absolute inset-0">
+          <Image
+            src="/hero.png"
+            alt="Hero background"
+            fill
+            priority
+            className="object-cover object-left"
           />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
         </div>
-        
-        {/* Hero Content */}
-        <div className="relative z-10 w-full">
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="mb-6"
-        >
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-mono leading-tight text-foreground">
-            <motion.span 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="block"
+        {/* Top navbar overlay */}
+        <div className="absolute top-0 left-0 right-0 z-20 px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center text-white">
+              <span className="text-xl font-normal">ThesisFlow-AI</span>
+            </div>
+            <Button 
+              variant="outline" 
+              className={`${glassBtn} px-5 py-2.5`}
+              onClick={() => handleProtectedAction('/explorer')}
             >
-              Accelerate
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="block"
-            >
-              Your Research
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="block text-[#FF6B2C]"
-            >
-              with AI
-            </motion.span>
-          </h1>
-        </motion.div>
-
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto leading-relaxed font-mono"
-        >
-          Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals.
-        </motion.p>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="flex flex-col sm:flex-row gap-6 justify-center mb-12"
-        >
-          <div className="flex flex-wrap justify-center gap-3">
-            {features.map((f) => (
-              <Link
-                key={f.title}
-                href={f.href}
-                className="text-sm font-mono border border-border text-muted-foreground rounded-full px-3 py-1 hover:text-[#FF6B2C] hover:border-[#FF6B2C] hover:bg-[#FF6B2C]/10 transition-colors"
-              >
-                {f.title}
-              </Link>
-            ))}
+              Get Started
+            </Button>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center"
-        >
-          <Button 
-            size="lg" 
-            className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono"
-            onClick={() => handleProtectedAction('/explorer')}
-          >
-            Start Exploring
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="lg" asChild className="font-mono">
-            <Link href="/signup">Create Account</Link>
-          </Button>
-        </motion.div>
+        {/* Content overlay */}
+        <div className="relative z-10 h-full min-h-[100vh] flex items-center">
+          <div className="w-full px-8">
+            <div className="grid grid-cols-12 gap-8 items-center">
+              {/* Left content block */}
+              <div className="col-span-12 lg:col-span-6 text-white">
+                <div className="mb-4">
+                  <div className="text-xs font-normal tracking-[0.15em] uppercase text-white/90 mb-6">
+                    COMING SOON
+                  </div>
+                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-normal leading-[1.1] mb-8">
+                    AI Research Sidekick<br />
+                    Built for Big Dreamers<br />
+                    Who Hate Spreadsheets
+                  </h1>
+                  <div className="mt-8">
+                    <Button
+                      className={glassBtn}
+                      onClick={() => handleProtectedAction('/explorer')}
+                    >
+                      Get Started
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right content block */}
+              <div className="hidden lg:block lg:col-span-4 lg:col-start-9 text-white/90">
+                <p className="text-sm font-normal leading-relaxed">
+                  We're putting the finishing touches on a tool that automates your research, teaches you as you go, and gives you daily insights that actually help you run your research better.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 
-      {/* Features Section */}
-      <section className="py-24 bg-muted/30">
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+      {/* Light Showcase Section - 'Everything You Need for Research' */}
+      <section className="relative isolate bg-[#F7F6F3] py-28 md:py-32 lg:py-36">
+        <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_60%_at_50%_40%,black,transparent)] bg-black/5"></div>
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center max-w-3xl mx-auto"
           >
-            <h2 className="text-4xl font-bold font-mono mb-4 text-foreground">Everything You Need for Research</h2>
-            <p className="text-xl text-muted-foreground font-mono leading-relaxed">
-              Comprehensive tools designed to streamline every aspect of your research workflow.
-            </p>
-          </motion.div>
-          {/* Feature grid with hover effects (single source of truth) */}
-          <div className="mt-12">
-            <FeaturesSectionWithHoverEffects features={hoverFeatures} />
-          </div>
-        </div>
-      </section>
-
-      {/* Research Challenges Section */}
-      <section className="py-24 bg-background">
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl font-bold font-mono text-foreground mb-6">
-              Research Shouldn't Be This Hard
+            <h2 className="text-neutral-900 tracking-tight font-medium leading-tight text-4xl sm:text-5xl md:text-6xl">
+              <span className="block">Everything You Need</span>
+              <span className="block">for Research.</span>
             </h2>
-            <p className="text-xl text-muted-foreground font-mono max-w-3xl mx-auto leading-relaxed">
-              Academic researchers waste 40% of their time on administrative tasks and tool-switching instead of actual research.
+            <p className="mt-4 text-neutral-600 text-lg sm:text-xl md:text-[20px] leading-relaxed max-w-2xl mx-auto">
+              Comprehensive tools designed to streamline every aspect of your research workflow with AI-powered insights.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="bg-background border p-8"
-            >
-              <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="w-6 h-6 text-[#FF6B2C]" />
-              </div>
-              <h3 className="text-xl font-bold font-mono text-foreground mb-3">Time Wasted</h3>
-              <p className="text-muted-foreground font-mono leading-relaxed">Switching between 8+ different tools for literature review, writing, and collaboration.</p>
-            </motion.div>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="bg-background border p-8"
-            >
-              <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="w-6 h-6 text-[#FF6B2C]" />
-              </div>
-              <h3 className="text-xl font-bold font-mono text-foreground mb-3">Lost Focus</h3>
-              <p className="text-muted-foreground font-mono leading-relaxed">Constant context switching breaks deep work and reduces research quality.</p>
-            </motion.div>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: true }}
-              className="bg-background border p-8"
-            >
-              <div className="w-12 h-12 bg-[#FF6B2C]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-[#FF6B2C]" />
-              </div>
-              <h3 className="text-xl font-bold font-mono text-foreground mb-3">Team Chaos</h3>
-              <p className="text-muted-foreground font-mono leading-relaxed">Fragmented communication and version control nightmares slow collaboration.</p>
-            </motion.div>
-          </div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
             viewport={{ once: true }}
-            className="text-center"
+            className="mt-12 md:mt-14 lg:mt-16"
           >
-            <Button 
-              className="rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 font-mono px-8 py-4 text-base shadow-lg"
-              onClick={() => handleProtectedAction('/explorer')}
-            >
-              Solve This Now
-              <ArrowRight className="w-5 h-5 inline ml-2" />
-            </Button>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="bg-background py-24 relative">
-        <div className="max-w-6xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="flex text-center justify-center items-center gap-4 flex-col"
-          >
-            <Badge className="font-mono">Testimonials</Badge>
-            <div className="flex gap-2 flex-col">
-              <h2 className="text-4xl font-bold font-mono text-foreground max-w-xl text-center">
-                What our users say
-              </h2>
-              <p className="text-xl leading-relaxed font-mono text-muted-foreground max-w-xl text-center">
-                See what our customers have to say about us.
-              </p>
+            <div className="relative max-w-[1040px] mx-auto rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">
+              <div className="h-11 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2.5 px-5">
+                <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FF5F57]" />
+                <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]" />
+                <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#28C840]" />
+              </div>
+              <div className="relative aspect-[16/10] bg-white">
+                <Image
+                  src="/screenshots/research-dashboard-mock.svg"
+                  alt="ThesisFlow research dashboard preview"
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
+                  priority={false}
+                />
+              </div>
             </div>
           </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            viewport={{ once: true }}
-            className="flex justify-center gap-6 mt-12 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] max-h-[740px] overflow-hidden"
-          >
-            <TestimonialsColumn testimonials={firstColumn} duration={15} />
-            <TestimonialsColumn testimonials={secondColumn} className="hidden md:block" duration={19} />
-            <TestimonialsColumn testimonials={thirdColumn} className="hidden lg:block" duration={17} />
-          </motion.div>
         </div>
       </section>
+
+      {/* Benefits Section (Dark) */}
+      <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <div className="text-xs tracking-[0.2em] text-neutral-400 uppercase mb-4">Benefits</div>
+            <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">Built for Researchers, Not Busywork.</h3>
+            <p className="mt-4 text-neutral-300 max-w-2xl mx-auto text-lg leading-relaxed">Simple, powerful tools that feel effortless—explore the platform's core capabilities.</p>
+          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+            {benefitItems.map((b) => {
+              const Icon = b.icon
+              return (
+                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all p-6 lg:p-7">
+                  <Icon className="h-7 w-7 text-white mb-4" />
+                  <div className="text-lg font-medium mb-2">{b.title}</div>
+                  <p className="text-sm text-neutral-300 leading-relaxed">{b.description}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Who We Serve Section - Pixel Perfect Match to Reference */}
+      <section className="py-28 md:py-32 lg:py-36 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center max-w-4xl mx-auto"
+          >
+            <div className="text-xs tracking-[0.2em] text-neutral-500 uppercase mb-4 font-normal">WHO WE SERVE</div>
+            <h3 className="text-4xl sm:text-5xl md:text-6xl font-normal tracking-tight text-neutral-900 leading-[1.1]">
+              For Students, Researchers &<br />Growing Teams
+            </h3>
+            <p className="mt-6 text-neutral-600 text-lg leading-relaxed max-w-2xl mx-auto">
+              From solo projects to research groups and labs, ThesisFlow meets you where you are and scales as your ambitions take off.
+            </p>
+          </motion.div>
+
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Card 1 - Students */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="relative aspect-[4/3]">
+                <Image 
+                  src="/students.png" 
+                  alt="Students" 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                />
+                <div className="absolute inset-x-0 bottom-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="relative p-6">
+                    <div className="text-xs tracking-[0.15em] uppercase text-white/90 mb-3 font-medium">STUDENTS</div>
+                    <p className="text-white text-sm leading-relaxed font-normal">Ace your literature reviews, organize notes, and turn messy PDFs into polished summaries.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2 - Independent Researchers */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="relative aspect-[4/3]">
+                <Image 
+                  src="/researchers.png" 
+                  alt="Independent Researchers" 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                />
+                <div className="absolute inset-x-0 bottom-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="relative p-6">
+                    <div className="text-xs tracking-[0.15em] uppercase text-white/90 mb-3 font-medium">INDEPENDENT RESEARCHERS</div>
+                    <p className="text-white text-sm leading-relaxed font-normal">Build a repeatable workflow—retrieval, deduping, and project planning in one place.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3 - Research Teams & Labs */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="relative aspect-[4/3]">
+                <Image 
+                  src="/research_labs.png" 
+                  alt="Research Teams & Labs" 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                />
+                <div className="absolute inset-x-0 bottom-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="relative p-6">
+                    <div className="text-xs tracking-[0.15em] uppercase text-white/90 mb-3 font-medium">RESEARCH TEAMS & LABS</div>
+                    <p className="text-white text-sm leading-relaxed font-normal">Share context, assign tasks, and publish faster with aligned timelines and sources.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Image Band: Doing research is hard enough */}
+      <section className="relative min-h-[100vh] overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/research.png" alt="Research band" fill className="object-cover object-center" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+        </div>
+        <div className="relative z-10 h-full min-h-[100vh] flex items-center">
+          <div className="container mx-auto px-6 grid grid-cols-12 items-center">
+            <div className="col-span-12 md:col-span-7 lg:col-span-6 text-white">
+              <h3 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight leading-tight">
+                Doing research
+                <br />is hard enough—
+                <br />your tooling shouldn’t be.
+              </h3>
+              <p className="mt-4 text-lg text-white/90 max-w-xl leading-relaxed">
+                ThesisFlow handles the tedious parts—deduping, citations, summaries, and now even acts on plain‑language commands—so you can focus on discovery, writing, and breakthroughs.
+              </p>
+              <div className="mt-8 flex gap-4">
+                <Button
+                  className={glassBtn}
+                  onClick={(e) => { e.preventDefault?.(); handleProtectedAction('/explorer') }}
+                >
+                  Try the Explorer
+                </Button>
+                <Button
+                  variant="outline"
+                  className={glassBtnSoft}
+                  onClick={(e) => { e.preventDefault?.(); handleProtectedAction('/planner') }}
+                >
+                  See the Planner
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      {/* Testimonials Section removed for Future Use */}
 
       {/* Pricing Section */}
       <motion.div 
@@ -563,17 +429,17 @@ export default function HomePage() {
       </motion.div>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-24 bg-background">
-        <div className="max-w-4xl mx-auto">
+      <section id="faq" className="py-32 bg-background">
+        <div className="max-w-5xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-12"
+            className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold font-mono text-foreground mb-4">Frequently Asked Questions</h2>
-            <p className="text-lg text-muted-foreground font-mono leading-relaxed">
+            <h2 className="text-5xl font-bold text-foreground mb-6 tracking-tight">Frequently Asked Questions</h2>
+            <p className="text-2xl text-muted-foreground font-normal leading-relaxed max-w-3xl mx-auto">
               Answers to common questions about ThesisFlow-AI.
             </p>
           </motion.div>
@@ -583,7 +449,6 @@ export default function HomePage() {
       {/* Footer */}
       <Footer />
       
-        </div>
       </WebPage>
     </SoftwareApplication>
   )

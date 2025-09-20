@@ -16,9 +16,25 @@ export default function ChangelogPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const visibleEntries = useMemo(() => allEntries.slice(0, visibleCount), [allEntries, visibleCount]);
   const hasMore = visibleCount < allEntries.length;
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app').replace(/\/+$/, '')
+
+  // Structured data: ItemList of changelog entries
+  const itemListSchema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: allEntries.map((e, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      url: `${baseUrl}/changelog#${encodeURIComponent(e.version)}`,
+      name: `${e.version}: ${e.title}`,
+      datePublished: new Date(e.date).toISOString(),
+      description: e.description,
+    })),
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>
       {/* Header */}
       <header className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#EFEFFA"/>
+      <stop offset="100%" stop-color="#E6E6F2"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7C8CF8"/>
+      <stop offset="100%" stop-color="#B6C0FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" rx="24" fill="url(#bg)"/>
+  <g opacity="0.08">
+    <rect x="180" y="160" width="320" height="220" rx="16" fill="#000"/>
+    <rect x="540" y="160" width="220" height="160" rx="16" fill="#000"/>
+    <rect x="800" y="160" width="640" height="120" rx="16" fill="#000"/>
+    <rect x="180" y="420" width="1260" height="380" rx="20" fill="#000"/>
+  </g>
+  <rect x="120" y="140" width="480" height="280" rx="20" fill="#FFFFFF"/>
+  <rect x="620" y="140" width="860" height="40" rx="10" fill="#FFFFFF"/>
+  <rect x="620" y="200" width="600" height="20" rx="10" fill="#F0F0F3"/>
+  <rect x="120" y="460" width="1360" height="12" rx="6" fill="url(#accent)"/>
+  <text x="800" y="940" text-anchor="middle" font-family="'IBM Plex Sans', Arial, sans-serif" font-size="22" fill="#9CA3AF">Independent Researchers — Placeholder Art</text>
+</svg>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/integrations/supabase/client'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/server/auth'
 
 // Create Supabase client with service key for file operations
 // Handle missing environment variables during build
@@ -54,21 +55,16 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth
+    const auth = await requireAuth(request)
+    if ('error' in auth) return auth.error
+    const { user } = auth
+
     // Check if Supabase admin is available
     if (!supabaseAdmin) {
       return NextResponse.json(
         { error: 'Service configuration error' },
         { status: 500 }
-      )
-    }
-    
-    // Get user from auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
       )
     }
 
@@ -224,15 +220,10 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    // Get user from auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    // Auth
+    const auth = await requireAuth(request)
+    if ('error' in auth) return auth.error
+    const { user } = auth
 
     // Build query
     let query = supabase

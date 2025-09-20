@@ -13,7 +13,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController, type ChatMessage } from "@/lib/ai-providers"
 import { AIProviderDetector } from "@/lib/ai-provider-detector"
 import { useToast } from "@/hooks/use-toast"
-import { useUserPlan } from "@/hooks/use-user-plan"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
 import { Badge } from "@/components/ui/badge"
@@ -198,7 +197,6 @@ export function ResearchAssistant({
   onPersonalityChange 
 }: ResearchAssistantProps) {
   const { toast } = useToast()
-  const { canUseFeature, incrementUsage, fetchPlanData, fetchTokenStatus } = useUserPlan()
   const { 
     session, 
     buildResearchContext, 
@@ -360,15 +358,7 @@ export function ResearchAssistant({
   const handleSendMessage = async () => {
     if (!value.trim() || isSending || !selectedProvider || !selectedModel) return
 
-    // Gate by plan limits before starting a generation
-    if (!canUseFeature('ai_generations')) {
-      toast({
-        title: 'Usage Limit Exceeded',
-        description: 'You have reached your monthly AI generation limit. Please upgrade your plan to continue.',
-        variant: 'destructive',
-      })
-      return
-    }
+    // No plan/usage gating in Explorer Assistant — unlimited when using user-provided keys
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -476,14 +466,7 @@ Use this research context to provide more relevant and targeted responses. Refer
             setReasoningProgress(undefined)
           }, 600)
           
-          // Consume one AI Assistant generation on success (include provider/model context)
-          try {
-            await incrementUsage('ai_generations', {
-              provider: selectedProvider,
-              model: selectedModel,
-            })
-            await Promise.all([fetchTokenStatus(), fetchPlanData(true)])
-          } catch (_) {}
+          // No token deduction or usage increment for Explorer Assistant
           
           // Save messages to session
           addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
@@ -521,7 +504,10 @@ Use this research context to provide more relevant and targeted responses. Refer
         {
           systemPrompt,
           temperature: 0.7,
-          maxTokens: 2000
+          maxTokens: 2000,
+          // Identify Explorer Assistant origin so server can bypass token middleware
+          origin: 'explorer',
+          feature: 'assistant'
         }
       )
       

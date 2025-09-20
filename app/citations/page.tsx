@@ -2,14 +2,13 @@
 
 import React, { useMemo, useState, useCallback, useEffect } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
-import { Search, Copy, Check, Download, Trash2, Plus, BookOpen, Upload, FolderPlus, Edit3, CheckSquare, Square } from "lucide-react"
+import { Search, Copy, Check, Download, Trash2, Plus, BookOpen, FolderPlus, Edit3, CheckSquare, Square } from "lucide-react"
 import type { Citation, FormattedCitation } from "@/lib/services/citation.service"
 import { citationService } from "@/lib/services/citation.service"
 import { useToast } from "@/components/ui/use-toast"
-import { useDropzone } from "react-dropzone"
 import { bibliographyService } from "@/lib/services/bibliography.service"
 
-type ImportResult = { fileName: string; citation: Citation | null; formatted: FormattedCitation | null; error?: string }
+// Removed PDF import/upload UI from this page per request
 
 export default function CitationsPage() {
   const [collapsed, setCollapsed] = useState(false)
@@ -28,9 +27,6 @@ export default function CitationsPage() {
   >([])
   const [collections, setCollections] = useState<{ id: string; name: string }[]>([])
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null)
-  const [importResults, setImportResults] = useState<ImportResult[]>([])
-  const [isOverBib, setIsOverBib] = useState(false)
-  const [selectedImport, setSelectedImport] = useState<Record<number, boolean>>({})
   const [selectedBib, setSelectedBib] = useState<Record<number, boolean>>({})
   const [moveTarget, setMoveTarget] = useState<string | null>(null)
   const [manual, setManual] = useState<Citation>({
@@ -50,26 +46,7 @@ export default function CitationsPage() {
 
   const { toast } = useToast()
 
-  // PDF import: send to API for metadata extraction
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (!acceptedFiles?.length) return
-    try {
-      const fd = new FormData()
-      acceptedFiles.forEach((f) => fd.append("file", f))
-      const res = await fetch("/api/citation/from-pdf", { method: "POST", body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || "Import failed")
-      setImportResults(data.results || [])
-      toast({ title: "Import complete", description: `${(data.results || []).length} file(s) processed.` })
-    } catch (e: any) {
-      toast({ title: "Import error", description: e?.message || "Failed to import PDFs", variant: "destructive" })
-    }
-  }, [toast])
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    multiple: true,
-    accept: { "application/pdf": [".pdf"] },
-  })
+  // PDF upload/import UI has been removed
 
   // Load collections and bibliography from Supabase
   useEffect(() => {
@@ -214,29 +191,7 @@ export default function CitationsPage() {
     URL.revokeObjectURL(url)
   }
 
-  // Drag-and-drop to bibliography
-  function handleBibDragOver(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    setIsOverBib(true)
-  }
-  function handleBibDragLeave() {
-    setIsOverBib(false)
-  }
-  function handleBibDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    setIsOverBib(false)
-    const idxStr = e.dataTransfer.getData('text/plain')
-    const idx = Number(idxStr)
-    const r = importResults[idx]
-    if (!r?.citation || !r?.formatted) return
-    ;(async () => {
-      try {
-        const row = await bibliographyService.addItem(r.citation as any, r.formatted as any, selectedCollection)
-        setBibliography(prev=>[...prev, { id: row?.id, citation: r.citation as any, formatted: r.formatted as any }])
-        toast({ title: "Added to bibliography" })
-      } catch {}
-    })()
-  }
+  // Drag-and-drop helpers removed along with upload/import UI
 
 
   const currentText = useMemo(() => {
@@ -370,23 +325,9 @@ export default function CitationsPage() {
 
           {/* Content */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
-            {/* Library Sidebar (left) */}
+            {/* Library Sidebar (left) - simplified (upload removed) */}
             <aside className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm h-fit">
-              <button className="mb-4 inline-flex items-center gap-2 rounded-md bg-[#ee691a] px-3 py-2 text-sm font-semibold text-white hover:bg-[#d85f18]">
-                <Plus className="h-4 w-4" /> Add references
-              </button>
-              <div
-                {...getRootProps({
-                  className: `mb-4 border-2 border-dashed rounded-md p-4 text-center cursor-pointer transition ${isDragActive ? 'border-[#ee691a] bg-orange-50' : 'border-gray-300 bg-gray-50/60 hover:border-[#ee691a]'} `,
-                })}
-                aria-label="Upload PDFs"
-              >
-                <input {...getInputProps()} />
-                <div className="flex flex-col items-center gap-2 text-gray-600">
-                  <Upload className="h-5 w-5" />
-                  <p className="text-xs">Drop PDFs here or click to upload</p>
-                </div>
-              </div>
+              {/* Upload/Add References UI removed */}
               <nav aria-label="Library Navigation" className="space-y-2 text-sm">
                 <div className="font-medium text-gray-700">All References</div>
                 <div className="flex items-center justify-between text-gray-600">
@@ -698,71 +639,12 @@ export default function CitationsPage() {
             </div>
           </div>
 
-          {/* Import Results & Batch add */}
-          {importResults.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm mt-6">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">Imported from PDFs</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setSelectedImport({})} className="text-xs text-gray-600 hover:underline">Clear Selection</button>
-                  <button
-                    onClick={async ()=>{
-                      const toAdd = importResults.map((r,idx)=>({r, idx})).filter(x=>selectedImport[x.idx] && x.r.citation && x.r.formatted)
-                      for (const {r} of toAdd) {
-                        try {
-                          const row = await bibliographyService.addItem(r.citation as any, r.formatted as any, selectedCollection)
-                          setBibliography(prev=>[...prev, { id: row?.id, citation: r.citation as any, formatted: r.formatted as any }])
-                        } catch {}
-                      }
-                      toast({ title: "Added", description: `${toAdd.length} item(s) added to bibliography.` })
-                    }}
-                    className="inline-flex items-center rounded bg-[#ee691a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#d85f18]"
-                  >Add Selected</button>
-                  <button
-                    onClick={async ()=>{
-                      const toAdd = importResults.filter(r=>r.citation && r.formatted)
-                      for (const r of toAdd) {
-                        try {
-                          const row = await bibliographyService.addItem(r.citation as any, r.formatted as any, selectedCollection)
-                          setBibliography(prev=>[...prev, { id: row?.id, citation: r.citation as any, formatted: r.formatted as any }])
-                        } catch {}
-                      }
-                      toast({ title: "Added", description: `${toAdd.length} item(s) added to bibliography.` })
-                    }}
-                    className="inline-flex items-center rounded border px-3 py-1.5 text-xs"
-                  >Add All</button>
-                </div>
-              </div>
-              <ul className="divide-y divide-gray-200">
-                {importResults.map((r, idx)=> (
-                  <li key={idx}
-                      draggable
-                      onDragStart={(e)=>{ e.dataTransfer.setData('text/plain', String(idx)); }}
-                      className="flex items-start gap-2 py-2">
-                    <button
-                      onClick={()=> setSelectedImport(prev=> ({...prev, [idx]: !prev[idx]}))}
-                      className="mt-0.5 text-gray-600 hover:text-gray-900">
-                      {selectedImport[idx] ? <CheckSquare className="h-4 w-4"/> : <Square className="h-4 w-4"/>}
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-gray-900 truncate">{r.citation?.title || r.fileName}</div>
-                      <div className="text-xs text-gray-600 truncate">{r.citation?.authors?.join(', ') || r.error || '—'}</div>
-                    </div>
-                    {r.citation?.doi && <span className="text-[10px] text-gray-500">{r.citation.doi}</span>}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs text-gray-500">Tip: Drag an imported row into the Bibliography section to add it.</p>
-            </div>
-          )}
+          {/* Imported results UI removed */}
 
           {/* Bibliography */}
           <div
-            className={`mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm ${isOverBib ? 'ring-2 ring-[#ee691a]' : ''}`}
-            onDragOver={handleBibDragOver}
-            onDrop={handleBibDrop}
-            onDragLeave={handleBibDragLeave}
-            aria-label="Bibliography Dropzone"
+            className={`mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm`}
+            aria-label="Bibliography"
           >
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">

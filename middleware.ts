@@ -3,6 +3,11 @@ import type { NextRequest } from "next/server"
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+
+  // Ensure API routes are never indexed by search engines
+  if (req.nextUrl.pathname.startsWith('/api')) {
+    res.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  }
   
   // Check for Supabase session cookie
   const supabaseToken = req.cookies.get('sb-access-token')?.value ||

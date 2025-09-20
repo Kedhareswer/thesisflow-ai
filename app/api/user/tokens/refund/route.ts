@@ -1,92 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+import { z } from 'zod'
+import { requireAuth } from '@/lib/server/auth'
+import { tokenService } from '@/lib/services/token.service'
+import { logApiEvent } from '@/lib/server/logger'
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const started = Date.now()
+    const auth = await requireAuth(request)
+    if ('error' in auth) return auth.error
+    const { user } = auth
 
-    const token = authHeader.substring(7)
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    const { feature, amount = 1, context = {} } = await request.json().catch(() => ({}))
-    if (!feature) {
-      return NextResponse.json({ error: 'Feature is required' }, { status: 400 })
-    }
-
-    // Get current user_tokens row
-    const { data: tokenRow, error: fetchErr } = await supabaseAdmin
-      .from('user_tokens')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (fetchErr) {
-      console.error('[tokens/refund] fetch tokens error', fetchErr)
-      return NextResponse.json({ error: 'Failed to fetch tokens' }, { status: 500 })
-    }
-
-    if (!tokenRow) {
-      console.warn('[tokens/refund] no token row found for user', user.id)
-      return NextResponse.json({ error: 'No token record found' }, { status: 404 })
-    }
-
-    const dailyUsed = Number(tokenRow.daily_tokens_used || 0)
-    const monthlyUsed = Number(tokenRow.monthly_tokens_used || 0)
-
-    // Update user_tokens directly (ensure we don't go below 0)
-    const { data: updated, error: updateErr } = await supabaseAdmin
-      .from('user_tokens')
-      .update({
-        daily_tokens_used: Math.max(0, dailyUsed - amount),
-        monthly_tokens_used: Math.max(0, monthlyUsed - amount),
-      })
-      .eq('user_id', user.id)
-      .select('*')
-      .maybeSingle()
-
-    if (updateErr) {
-      console.error('[tokens/refund] update tokens error', updateErr)
-      return NextResponse.json({ error: 'Failed to refund tokens' }, { status: 500 })
-    }
-
-    // Log transaction
-    try {
-      await supabaseAdmin
-        .from('token_transactions')
-        .insert({
-          user_id: user.id,
-          feature_name: feature,
-          tokens_amount: amount,
-          operation_type: 'refund',
-          operation_context: context,
-          success: true,
-        })
-    } catch (err: any) {
-      console.warn('[tokens/refund] transaction log failed', err)
-    }
-
-    const { data: row } = await supabaseAdmin
-      .from('user_tokens').select('*').eq('user_id', user.id).maybeSingle()
-
-    return NextResponse.json({
-      success: true,
-      dailyUsed: Number(row?.daily_tokens_used ?? 0),
-      monthlyUsed: Number(row?.monthly_tokens_used ?? 0),
-      dailyLimit: Number(row?.daily_limit ?? 0),
-      monthlyLimit: Number(row?.monthly_limit ?? 0),
-      dailyRemaining: Math.max(0, Number(row?.daily_limit ?? 0) - Number(row?.daily_tokens_used ?? 0)),
-      monthlyRemaining: Math.max(0, Number(row?.monthly_limit ?? 0) - Number(row?.monthly_tokens_used ?? 0)),
+    const schema = z.object({
+      feature: z.string().min(1).max(64),
+      amount: z.number().int().min(1).max(1000).default(1),
+      context: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}),
+      idempotencyKey: z.string().max(128).optional(),
     })
+
+    let payload: z.infer<typeof schema>
+    try {
+      payload = schema.parse(await request.json())
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+    }
+
+    // Prefer Idempotency-Key header if provided; fallback to body.idempotencyKey
+    const headerIdem = request.headers.get('idempotency-key') || undefined
+    const idem = headerIdem ?? payload.idempotencyKey
+    const context = idem
+      ? { ...payload.context, idempotencyKey: idem }
+      : payload.context
+
+    const result = await tokenService.refundTokens(
+      user.id,
+      payload.feature,
+      payload.amount,
+      context,
+    )
+
+    if (!result.success) {
+      const resp = NextResponse.json({ error: result.error || 'Failed to refund tokens' }, { status: 500 })
+      logApiEvent({
+        route: '/api/user/tokens/refund',
+        user_id: user.id,
+        feature: payload.feature,
+        amount: payload.amount,
+        idempotency_key: idem || null,
+        success: false,
+        status: 500,
+        elapsed_ms: Date.now() - started,
+        extra: { error: result.error },
+        ts: new Date().toISOString(),
+      })
+      return resp
+    }
+
+    const status = await tokenService.getUserTokenStatus(user.id)
+    const response = NextResponse.json({
+      success: true,
+      ...(status ?? {}),
+    })
+    response.headers.set('Cache-Control', 'no-store, max-age=0')
+    logApiEvent({
+      route: '/api/user/tokens/refund',
+      user_id: user.id,
+      feature: payload.feature,
+      amount: payload.amount,
+      idempotency_key: idem || null,
+      success: true,
+      status: 200,
+      elapsed_ms: Date.now() - started,
+      extra: status ?? undefined,
+      ts: new Date().toISOString(),
+    })
+    return response
   } catch (error) {
     console.error('[tokens/refund] unexpected error', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

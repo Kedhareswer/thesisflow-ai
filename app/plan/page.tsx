@@ -315,15 +315,6 @@ Thank you!`)
                     <h3 className="font-semibold">Tokens</h3>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Daily</span>
-                        <span className="font-medium">
-                          {tokenStatus.dailyUsed} / {tokenStatus.dailyLimit} used • {tokenStatus.dailyRemaining} left
-                        </span>
-                      </div>
-                      <Progress value={tokenStatus.dailyLimit ? (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100 : 0} className="h-2" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Monthly</span>
                         <span className="font-medium">
                           {tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit} used • {tokenStatus.monthlyRemaining} left
@@ -331,11 +322,16 @@ Thank you!`)
                       </div>
                       <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
                     </div>
-                    {(tokenStatus.lastDailyReset || tokenStatus.lastMonthlyReset) && (
-                      <p className="text-xs text-muted-foreground">
-                        Resets — Daily: {tokenStatus.lastDailyReset ? new Date(tokenStatus.lastDailyReset).toLocaleDateString() : '—'} • Monthly: {tokenStatus.lastMonthlyReset ? new Date(tokenStatus.lastMonthlyReset).toLocaleDateString() : '—'}
-                      </p>
-                    )}
+                    {(() => {
+                      if (!tokenStatus.lastMonthlyReset) return null
+                      const d = new Date(tokenStatus.lastMonthlyReset)
+                      if (isNaN(d.getTime())) return null
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          Resets — Monthly: {d.toLocaleDateString()}
+                        </p>
+                      )
+                    })()}
                   </div>
                 )}
 
@@ -401,8 +397,7 @@ Thank you!`)
                         <span className="text-lg font-bold">$0</span>
                       </div>
                       <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                        <li>• 10 daily tokens</li>
-                        <li>• 50 monthly token cap</li>
+                        <li>• 50 monthly tokens</li>
                         <li>• Core features (Explorer, Summarizer)</li>
                         <li className="text-gray-400 line-through">• Team collaboration</li>
                       </ul>
@@ -433,8 +428,7 @@ Thank you!`)
                       </div>
                     </div>
                     <ul className="text-sm space-y-1 text-gray-600 mb-4">
-                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 100 daily tokens</li>
-                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 500 monthly token cap</li>
+                      <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> 500 monthly tokens</li>
                       <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> Team collaboration (up to 10 members)</li>
                       <li className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-500" /> Priority support</li>
                     </ul>
@@ -498,11 +492,7 @@ Thank you!`)
                         <div className="space-y-4">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span>100 daily tokens</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span>500 monthly token cap</span>
+                            <span>500 monthly tokens</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
@@ -548,16 +538,9 @@ Thank you!`)
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base font-medium">Token Usage</CardTitle>
-                  <CardDescription>Daily and monthly consumption</CardDescription>
+                  <CardDescription>Monthly consumption</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Daily</span>
-                      <span className="font-medium">{tokenStatus.dailyUsed} / {tokenStatus.dailyLimit}</span>
-                    </div>
-                    <Progress value={tokenStatus.dailyLimit ? (tokenStatus.dailyUsed / tokenStatus.dailyLimit) * 100 : 0} className="h-2" />
-                  </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Monthly</span>

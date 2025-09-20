@@ -215,6 +215,8 @@ export class AIProviderService {
       temperature?: number
       maxTokens?: number
       systemPrompt?: string
+      origin?: string
+      feature?: string
     } = {}
   ): Promise<StreamingController> {
     try {
@@ -246,6 +248,14 @@ export class AIProviderService {
 
       if (options.systemPrompt) {
         params.set('systemPrompt', options.systemPrompt)
+      }
+
+      // Pass through optional origin/feature flags (used to selectively bypass token middleware for Explorer)
+      if (options.origin) {
+        params.set('origin', options.origin)
+      }
+      if (options.feature) {
+        params.set('feature', options.feature)
       }
 
       if (authToken) {

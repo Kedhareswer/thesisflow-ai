@@ -1,127 +1,141 @@
 import React from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 type FooterProps = React.ComponentProps<'footer'> & {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 };
 
-export function Footer({ className, ...props }: Omit<FooterProps, 'children'>) {
+export function Footer({ className, ...props }: FooterProps) {
   return (
     <footer
       className={cn(
-        'relative isolate overflow-visible border-t border-border bg-background text-foreground h-[100svh]',
+        'relative isolate overflow-hidden',
         className,
       )}
       role="contentinfo"
       {...props}
     >
-
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-6 md:px-8 py-16 md:py-24 flex flex-col justify-center">
-        {/* Top subtle rule (blazity-like) */}
-        <div className="absolute left-1/2 top-6 h-[2px] w-[min(100vw,theme(maxWidth.7xl))] -translate-x-1/2 bg-border" />
-
-        <div className="relative grid grid-cols-1 gap-10 md:grid-cols-12">
-          {/* Intro / Tagline */}
-          <div className="md:col-span-3 pr-2">
-            <p className="text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.25em] text-black mb-3">
-              Make your Research
-            </p>
-            <h2 className="text-4xl md:text-5xl font-extrabold leading-tight text-black">
-              with minimal distractions
-            </h2>
-          </div>
-
-          {/* Link columns */}
-          <div className="md:col-span-9 grid grid-cols-2 lg:grid-cols-4 gap-8">
-            <LinksGroup
-              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-border"
-              title="Platform"
-              links={[
-                { title: 'Research Explorer', href: '/explorer' },
-                { title: 'Smart Summarizer', href: '/summarizer' },
-                { title: 'Project Planner', href: '/planner' },
-                { title: 'Collaboration Hub', href: '/collaborate' },
-                { title: 'AI Research Assistant', href: '/research-assistant' },
-              ]}
-            />
-            <LinksGroup
-              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-border"
-              title="Resources"
-              links={[
-                { title: 'Pricing', href: '#pricing' },
-                { title: 'FAQs', href: '#faq' },
-                { title: 'Docs', href: '/docs' },
-                { title: 'Guides', href: '/docs/guides' },
-                { title: 'Blog', href: '/blog' },
-              ]}
-            />
-            <LinksGroup
-              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-border"
-              title="Community"
-              links={[
-                { title: 'Forum', href: '/community' },
-                { title: 'Events', href: '/events' },
-                { title: 'Partners', href: '/partners' },
-                { title: 'Affiliates', href: '/affiliates' },
-                { title: 'Careers', href: '/careers' },
-              ]}
-            />
-            <LinksGroup
-              className="first:pl-0 first:border-l-0 pl-6 lg:pl-8 border-l md:border-l-2 border-border"
-              title="Legal"
-              links={[
-                { title: 'Terms', href: '/terms' },
-                { title: 'Privacy', href: '/privacy' },
-                { title: 'Security', href: '/.well-known/security.txt' },
-                { title: 'Cookie Policy', href: '/privacy#cookies' },
-                { title: 'Legal', href: '/legal' },
-              ]}
-            />
+      {/* Main hero section with pool/laptop image */}
+      <section className="relative min-h-[100vh] overflow-hidden">
+        <div className="absolute inset-0">
+          <Image
+            src="/footer.png"
+            alt="Take control of your research without the stress"
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
+        </div>
+        
+        <div className="relative z-10 h-full min-h-[100vh] flex items-center">
+          <div className="container mx-auto px-6 lg:px-8">
+            <div className="max-w-2xl">
+              <h2 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight mb-6">
+                Take Control of<br />
+                Your Research<br />
+                Without the<br />
+                Stress.
+              </h2>
+              <p className="text-lg text-white/90 mb-8 max-w-md leading-relaxed">
+                Get on the list, no spam, no pressure. Just smarter research, coming soon.
+              </p>
+              <Button 
+                className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white px-6 py-3 text-sm font-medium rounded-sm shadow-lg"
+              >
+                Join Waitlist
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Watermark wordmark (4/5 visible, 1/5 hidden) */}
-      <div className="pointer-events-none select-none absolute inset-x-0 bottom-8 z-0 overflow-hidden">
-        <div
-          className="text-transparent uppercase tracking-tight leading-none whitespace-nowrap font-extrabold"
-          style={{ 
-            WebkitTextStroke: '1.25px rgba(255,107,44,0.28)',
-            transform: 'translateX(-10%)', // Hide 1/5 (20%) by shifting left 10%
-            width: '125%' // Make text 25% wider to ensure it spans full width when shifted
-          }}
-        >
-          <span className="block leading-none text-[clamp(120px,20vw,300px)]">@thesisflow</span>
+      {/* Bottom section with social links and infinite scroll */}
+      <section className="relative bg-black text-white py-8">
+        {/* Social links */}
+        <div className="container mx-auto px-6 lg:px-8 flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-6">
+            <a 
+              href="https://twitter.com/thesisflow-ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
+              aria-label="Twitter"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
+            <a 
+              href="https://facebook.com/thesisflow-ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
+              aria-label="Facebook"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+            </a>
+            <a 
+              href="https://linkedin.com/company/thesisflow-ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
+              aria-label="LinkedIn"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+            </a>
+          </div>
+          
+          <div className="flex items-center">
+            <Button 
+              className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white border-2 border-[#FF6B2C] hover:border-[#FF6B2C]/90 px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              Join Waitlist
+            </Button>
+          </div>
         </div>
-      </div>
+
+        {/* Infinite scrolling text */}
+        <div className="relative overflow-hidden py-8">
+          <div className="flex animate-scroll-infinite whitespace-nowrap">
+            <div 
+              className="text-[clamp(120px,20vw,300px)] font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none flex-shrink-0 pr-8"
+              style={{ 
+                WebkitTextStroke: '3px rgba(255,107,44,0.15)',
+                fontFamily: 'IBM Plex Sans, sans-serif'
+              }}
+            >
+              THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI
+            </div>
+            <div 
+              className="text-[clamp(120px,20vw,300px)] font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none flex-shrink-0 pr-8"
+              style={{ 
+                WebkitTextStroke: '3px rgba(255,107,44,0.15)',
+                fontFamily: 'IBM Plex Sans, sans-serif'
+              }}
+            >
+              THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI
+            </div>
+          </div>
+        </div>
+
+        {/* Copyright */}
+        <div className="container mx-auto px-6 lg:px-8 pt-8">
+          <div className="flex items-center justify-between text-sm text-white/70">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-[#FF6B2C]" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+              <span className="font-semibold text-white">ThesisFlow-AI</span>
+            </div>
+            <div className="font-medium">
+              Copyright © 2025 ThesisFlow-AI. All Rights Reserved
+            </div>
+          </div>
+        </div>
+      </section>
     </footer>
   );
 }
 
-interface LinksGroupProps {
-  title: string;
-  links: { title: string; href: string }[];
-  className?: string;
-}
-function LinksGroup({ title, links, className }: LinksGroupProps) {
-  return (
-    <div className={cn('p-2', className)}>
-      <h3 className="text-black mt-2 mb-4 text-xs md:text-sm font-semibold tracking-[0.22em] uppercase">
-        {title}
-      </h3>
-      <ul className="space-y-2">
-        {links.map((link) => (
-          <li key={link.title}>
-            <a
-              href={link.href}
-              className="text-black hover:text-black hover:underline underline-offset-4 decoration-border/60 text-[15px] md:text-[17px] font-medium"
-            >
-              {link.title}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 

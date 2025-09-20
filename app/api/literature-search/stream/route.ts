@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { LiteratureSearchService } from '@/lib/services/literature-search.service';
+import { requireAuth } from '@/lib/server/auth';
 
 // Ensure Node.js runtime for service-role usage and stable SSE behavior
 export const runtime = 'nodejs';
@@ -26,7 +27,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query')?.trim() || '';
   const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
-  const userId = searchParams.get('userId');
+  // Authenticate the user (supports Authorization header, access_token query, or cookies)
+  const auth = await requireAuth(request);
+  if ('error' in auth) {
+    return auth.error; // 401 Unauthorized
+  }
+  const userId = auth.user.id as string;
   const mode = (searchParams.get('mode') || '').toLowerCase(); // "forward" | "backward" | ""
   const seed = searchParams.get('seed')?.trim() || '';
   const sessionId = (searchParams.get('sessionId')?.trim()) || `${Date.now()}-${Math.random().toString(36).slice(2)}`;

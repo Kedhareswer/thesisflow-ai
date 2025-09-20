@@ -1,12 +1,5 @@
-import SummarizerSEOHead from "../../head"
-
-interface HeadProps {
-  documentTitle?: string;
-  documentType?: string;
-  summaryStyle?: string;
-  customDescription?: string;
-}
-
-export default function Head(props: HeadProps = {}) {
-  return <SummarizerSEOHead {...props} />
+// Legacy head file intentionally returns null to avoid duplicate metadata.
+// Metadata is owned by the Next.js Metadata API via app/seo/summarizer-metadata.ts.
+export default function Head() {
+  return null
 }

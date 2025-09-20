@@ -6,15 +6,12 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, TrendingUp, TrendingDown, Activity, CreditCard, Clock, AlertTriangle } from 'lucide-react';
-import { tokenService, TokenTransaction, TokenStatus } from '@/lib/services/token.service';
+import { tokenService, TokenTransaction } from '@/lib/services/token.service';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UserTokenData {
-  dailyUsed: number;
   monthlyUsed: number;
-  dailyLimit: number;
   monthlyLimit: number;
-  dailyRemaining: number;
   monthlyRemaining: number;
 }
 
@@ -57,7 +54,11 @@ export function TokenUsageDashboard() {
         tokenService.getFeatureCosts()
       ]);
 
-      setTokenData(tokenStatus);
+      setTokenData(tokenStatus ? {
+        monthlyUsed: tokenStatus.monthlyUsed,
+        monthlyLimit: tokenStatus.monthlyLimit,
+        monthlyRemaining: tokenStatus.monthlyRemaining,
+      } : null);
       setTransactions(transactionList);
       setFeatureCosts(costList);
     } catch (error) {
@@ -140,7 +141,6 @@ export function TokenUsageDashboard() {
     );
   }
 
-  const dailyPercentage = (tokenData.dailyUsed / tokenData.dailyLimit) * 100;
   const monthlyPercentage = (tokenData.monthlyUsed / tokenData.monthlyLimit) * 100;
 
   return (
@@ -162,20 +162,6 @@ export function TokenUsageDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Daily Remaining</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{tokenData.dailyRemaining}</div>
-            <p className="text-xs text-muted-foreground">
-              {tokenData.dailyUsed} / {tokenData.dailyLimit} used
-            </p>
-            <Progress value={dailyPercentage} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Monthly Remaining</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -185,19 +171,6 @@ export function TokenUsageDashboard() {
               {tokenData.monthlyUsed} / {tokenData.monthlyLimit} used
             </p>
             <Progress value={monthlyPercentage} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Daily Usage</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{tokenData.dailyUsed}</div>
-            <p className="text-xs text-muted-foreground">
-              {dailyPercentage.toFixed(1)}% of limit
-            </p>
           </CardContent>
         </Card>
 

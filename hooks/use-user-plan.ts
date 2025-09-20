@@ -36,13 +36,9 @@ export function useUserPlan() {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const broadcastRef = useRef<BroadcastChannel | null>(null)
   const [tokenStatus, setTokenStatus] = useState<{
-    dailyUsed: number
     monthlyUsed: number
-    dailyLimit: number
     monthlyLimit: number
-    dailyRemaining: number
     monthlyRemaining: number
-    lastDailyReset?: string
     lastMonthlyReset?: string
   } | null>(null)
 
@@ -154,21 +150,22 @@ export function useUserPlan() {
         .single()
       if (error) throw error
       if (data) {
-        const dailyLimit = Number((data as any).daily_limit ?? 0)
-        const dailyUsed = Number((data as any).daily_tokens_used ?? 0)
         const monthlyLimit = Number((data as any).monthly_limit ?? 0)
         const monthlyUsed = Number((data as any).monthly_tokens_used ?? 0)
-        const dailyRemaining = Math.max(0, dailyLimit - dailyUsed)
         const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed)
+        const rawReset = (data as any).last_monthly_reset
+        let isoReset: string | undefined = undefined
+        if (rawReset != null) {
+          try {
+            const d = new Date(rawReset)
+            if (!isNaN(d.getTime())) isoReset = d.toISOString()
+          } catch {}
+        }
         setTokenStatus({
-          dailyUsed,
           monthlyUsed,
-          dailyLimit,
           monthlyLimit,
-          dailyRemaining,
           monthlyRemaining,
-          lastDailyReset: (data as any).last_daily_reset ? String((data as any).last_daily_reset) : undefined,
-          lastMonthlyReset: (data as any).last_monthly_reset ? String((data as any).last_monthly_reset) : undefined,
+          lastMonthlyReset: isoReset,
         })
         return
       }
@@ -188,15 +185,19 @@ export function useUserPlan() {
       })
       if (resp.ok) {
         const data = await resp.json()
+        let isoReset: string | undefined = undefined
+        const rawReset = data.lastMonthlyReset ?? data?.data?.lastMonthlyReset
+        if (rawReset != null) {
+          try {
+            const d = new Date(rawReset)
+            if (!isNaN(d.getTime())) isoReset = d.toISOString()
+          } catch {}
+        }
         setTokenStatus({
-          dailyUsed: Number(data.dailyUsed ?? 0),
-          monthlyUsed: Number(data.monthlyUsed ?? 0),
-          dailyLimit: Number(data.dailyLimit ?? 0),
-          monthlyLimit: Number(data.monthlyLimit ?? 0),
-          dailyRemaining: Number(data.dailyRemaining ?? 0),
-          monthlyRemaining: Number(data.monthlyRemaining ?? 0),
-          lastDailyReset: data.lastDailyReset ? String(data.lastDailyReset) : undefined,
-          lastMonthlyReset: data.lastMonthlyReset ? String(data.lastMonthlyReset) : undefined,
+          monthlyUsed: Number(data.monthlyUsed ?? data?.data?.monthlyUsed ?? 0),
+          monthlyLimit: Number(data.monthlyLimit ?? data?.data?.monthlyLimit ?? 0),
+          monthlyRemaining: Number(data.monthlyRemaining ?? data?.data?.monthlyRemaining ?? 0),
+          lastMonthlyReset: isoReset,
         })
       }
     } catch (fallbackErr) {
@@ -226,7 +227,7 @@ export function useUserPlan() {
         const msg = await deductResp.json().catch(() => ({}))
         toast({
           title: 'Not enough tokens',
-          description: 'You have run out of daily/monthly tokens. Consider upgrading to Pro.',
+          description: 'You have run out of monthly tokens. Consider upgrading to Pro.',
           variant: 'destructive',
         })
         return false

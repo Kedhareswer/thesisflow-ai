@@ -1,11 +1,14 @@
 import type { Metadata } from 'next'
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app').replace(/\/+$/, '')
 
 export const metadata: Metadata = {
   title: 'Smart Summarizer — ThesisFlow-AI',
   description:
     'Summarize PDFs, DOCX, URLs, and text with AI. Key points, sentiment, reading time, and export options built-in — powered by multiple AI providers.',
+  alternates: {
+    canonical: siteUrl + '/summarizer',
+  },
   openGraph: {
     title: 'Smart Summarizer — ThesisFlow-AI',
     description:
@@ -14,7 +17,7 @@ export const metadata: Metadata = {
     siteName: 'ThesisFlow-AI',
     images: [
       {
-        url: siteUrl + '/og-image-1200x630.png',
+        url: siteUrl + '/v2.png',
         width: 1200,
         height: 630,
         alt: 'ThesisFlow-AI — Smart Summarizer',
@@ -27,7 +30,7 @@ export const metadata: Metadata = {
     title: 'Smart Summarizer — ThesisFlow-AI',
     description:
       'Summarize PDFs, DOCX, URLs, and text with AI. Key points, sentiment, reading time, and export options built-in.',
-    images: [siteUrl + '/og-image-1200x630.png'],
+    images: [siteUrl + '/v2.png'],
     site: '@ThesisFlowAI',
     creator: '@ThesisFlowAI',
   },
