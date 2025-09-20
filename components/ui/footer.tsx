@@ -21,7 +21,7 @@ export function Footer({ className, ...props }: FooterProps) {
       <section className="relative min-h-[100vh] overflow-hidden">
         <div className="absolute inset-0">
           <Image
-            src="/research.png"
+            src="/footer.png"
             alt="Take control of your research without the stress"
             fill
             className="object-cover object-center"
