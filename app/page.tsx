@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 // Removed unused Card imports
 import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Clock, Target, MessageSquare, Share2, BarChart3 } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
-import { Pricing } from "@/components/ui/pricing-cards"
+import { Pricing2 } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
 import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
@@ -114,6 +114,46 @@ export default function HomePage() {
   ]
 
   // removed old placeholder benefits (replaced by benefitItems above)
+
+  // ThesisFlow pricing for the redesigned Pricing section
+  const pricingPlans = [
+    {
+      id: "free",
+      name: "Free",
+      description: "For individuals and students",
+      monthlyPrice: "$0",
+      yearlyPrice: "$0",
+      features: [
+        { text: "50 monthly tokens" },
+        { text: "Explorer (limited)" },
+        { text: "Summarizer (basic)" },
+        { text: "Docs & Guides" },
+      ],
+      button: {
+        text: "Get Started",
+        url: "/signup",
+      },
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      description: "For power users and growing teams",
+      monthlyPrice: "$29",
+      yearlyPrice: "$24",
+      features: [
+        { text: "500 monthly tokens" },
+        { text: "Everything in Free" },
+        { text: "Advanced collaboration (up to 10 members)" },
+        { text: "AI Writing Assistant" },
+        { text: "Unlimited documents" },
+        { text: "Priority support" },
+      ],
+      button: {
+        text: "Start Free Trial",
+        url: "/signup?plan=pro",
+      },
+    },
+  ]
 
   return (
     <SoftwareApplication
@@ -399,7 +439,11 @@ export default function HomePage() {
         transition={{ duration: 0.6 }}
         viewport={{ once: true }}
       >
-        <Pricing />
+        <Pricing2 
+          heading="Plans & Pricing"
+          description="Choose the plan that matches your research workflow and scale with ease."
+          plans={pricingPlans}
+        />
       </motion.div>
 
       {/* FAQ Section */}
