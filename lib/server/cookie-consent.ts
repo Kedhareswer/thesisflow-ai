@@ -15,8 +15,8 @@ export type CookieConsentState = {
   prefs: CookiePrefs;
 };
 
-export function readCookieConsent(): CookieConsentState {
-  const store = cookies();
+export async function readCookieConsent(): Promise<CookieConsentState> {
+  const store = await cookies();
   const consentVal = store.get(CONSENT_COOKIE_NAME)?.value ?? null;
   const versionVal = store.get(VERSION_COOKIE_NAME)?.value ?? null;
   const prefsRaw = store.get(PREFS_COOKIE_NAME)?.value ?? null;
@@ -36,17 +36,17 @@ export function readCookieConsent(): CookieConsentState {
   return { hasConsent, version: versionVal, prefs };
 }
 
-export function hasAnalyticsConsent(): boolean {
-  const { hasConsent, prefs } = readCookieConsent();
+export async function hasAnalyticsConsent(): Promise<boolean> {
+  const { hasConsent, prefs } = await readCookieConsent();
   return hasConsent && !!prefs.analytics;
 }
 
-export function hasMarketingConsent(): boolean {
-  const { hasConsent, prefs } = readCookieConsent();
+export async function hasMarketingConsent(): Promise<boolean> {
+  const { hasConsent, prefs } = await readCookieConsent();
   return hasConsent && !!prefs.marketing;
 }
 
-export function shouldShowCookieBanner(): boolean {
-  const { hasConsent } = readCookieConsent();
+export async function shouldShowCookieBanner(): Promise<boolean> {
+  const { hasConsent } = await readCookieConsent();
   return !hasConsent;
 }

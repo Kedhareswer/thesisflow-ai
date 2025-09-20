@@ -33,11 +33,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { parseISO, parse, isValid, format } from "date-fns"
 import { usePlanAndExecute } from "@/hooks/use-plan-and-execute"
+import { Label } from "@/components/ui/label"
+import { useDeepSearch } from "@/hooks/use-deep-search"
 
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  // Auto Planner hooks - declare early to avoid hoisting issues
+  const planExec = usePlanAndExecute()
+  const deep = useDeepSearch()
+  const [planDraft, setPlanDraft] = useState<any | null>(null)
   const calendarData = useMemo(() => {
     return tasks
       .filter((task) => {
@@ -65,6 +71,177 @@ export default function PlannerPage() {
         }
       })
   }, [tasks])
+
+  // Sync planDraft whenever a new plan arrives
+  useEffect(() => {
+    if (planExec.plan) {
+      try { setPlanDraft(JSON.parse(JSON.stringify(planExec.plan))) } catch { setPlanDraft(planExec.plan) }
+      // Analytics: Plan generated
+      trackAnalytics('plan_generated', { taskCount: planExec.plan?.tasks?.length || 0, planId: planExec.plan?.id })
+    }
+  }, [planExec.plan])
+
+  // Offline draft persistence (localStorage)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('auto_planner_draft')
+      if (saved && !planExec.isStreaming && !planExec.plan && !planDraft) {
+        setPlanDraft(JSON.parse(saved))
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    try {
+      if (planDraft) localStorage.setItem('auto_planner_draft', JSON.stringify(planDraft))
+    } catch {}
+  }, [planDraft])
+
+  // Inline editing helpers
+  const updateTaskField = (taskId: string, field: string, value: any) => {
+    setPlanDraft((prev: any) => {
+      if (!prev) return prev
+      const tasks = (prev.tasks || []).map((t: any) => (t.id === taskId ? { ...t, [field]: value } : t))
+      // Analytics: Task edited
+      trackAnalytics('task_edited', { taskId, field, planId: prev.id })
+      return { ...prev, tasks }
+    })
+  }
+  const moveTask = (taskId: string, dir: -1 | 1) => {
+    setPlanDraft((prev: any) => {
+      if (!prev) return prev
+      const idx = (prev.tasks || []).findIndex((t: any) => t.id === taskId)
+      if (idx < 0) return prev
+      const arr = [...prev.tasks]
+      const ni = Math.max(0, Math.min(arr.length - 1, idx + dir))
+      if (ni === idx) return prev
+      const [item] = arr.splice(idx, 1)
+      arr.splice(ni, 0, item)
+      return { ...prev, tasks: arr }
+    })
+  }
+  const addSubtaskInline = (taskId: string) => {
+    setPlanDraft((prev: any) => {
+      if (!prev) return prev
+      const tasks = (prev.tasks || []).map((t: any) =>
+        t.id === taskId ? { ...t, subtasks: [...(t.subtasks || []), "New subtask"] } : t,
+      )
+      return { ...prev, tasks }
+    })
+  }
+  const updateSubtaskInline = (taskId: string, index: number, value: string) => {
+    setPlanDraft((prev: any) => {
+      if (!prev) return prev
+      const tasks = (prev.tasks || []).map((t: any) => {
+        if (t.id !== taskId) return t
+        const subs = [...(t.subtasks || [])]
+        subs[index] = value
+        return { ...t, subtasks: subs }
+      })
+      return { ...prev, tasks }
+    })
+  }
+  const removeSubtaskInline = (taskId: string, index: number) => {
+    setPlanDraft((prev: any) => {
+      if (!prev) return prev
+      const tasks = (prev.tasks || []).map((t: any) => {
+        if (t.id !== taskId) return t
+        const subs = [...(t.subtasks || [])]
+        subs.splice(index, 1)
+        return { ...t, subtasks: subs }
+      })
+      return { ...prev, tasks }
+    })
+  }
+
+  // Apply plan to backend
+  const applyPlan = async (opts?: { dryRun?: boolean; overwriteExisting?: boolean; projectId?: string | null; newProjectTitle?: string; newProjectDescription?: string }) => {
+    if (applyCooldown > 0) {
+      toast({ title: 'Rate limited', description: `Please wait ${applyCooldown}s before trying again.`, variant: 'destructive' })
+      return
+    }
+    try {
+      const plan = planDraft || planExec.plan
+      if (!plan || !Array.isArray(plan.tasks) || plan.tasks.length === 0) {
+        toast({ title: "Nothing to apply", description: "Generate or edit a plan first.", variant: "destructive" })
+        return
+      }
+      // Analytics: Apply attempt
+      trackAnalytics('plan_apply_attempt', { dryRun: !!opts?.dryRun, taskCount: plan.tasks.length, planId: plan.id })
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const body: any = {
+        idempotencyKey: plan.id || `auto_${Date.now()}`,
+        plan,
+        project: opts?.projectId ? { id: opts.projectId } : { title: opts?.newProjectTitle || plan.title, description: opts?.newProjectDescription || plan.description },
+        options: { dryRun: !!opts?.dryRun, overwriteExisting: !!opts?.overwriteExisting },
+      }
+      const res = await fetch('/api/planner/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        const retryAfter = res.headers.get('Retry-After')
+        if (res.status === 429 && retryAfter) {
+          const cooldownSeconds = parseInt(retryAfter, 10) || 60
+          setApplyCooldown(cooldownSeconds)
+          toast({ title: 'Rate limited', description: `Try again in ${cooldownSeconds}s`, variant: 'destructive' })
+        } else {
+          toast({ title: 'Apply failed', description: json?.error || 'Unknown error', variant: 'destructive' })
+        }
+        // Analytics: Apply failed
+        trackAnalytics('plan_apply_failed', { error: json?.error, status: res.status, planId: plan.id })
+        return
+      }
+      toast({ title: opts?.dryRun ? 'Dry run complete' : 'Plan applied', description: `Tasks: ${json?.counts?.tasks ?? 0}, Subtasks: ${json?.counts?.subtasks ?? 0}` })
+      // Analytics: Apply success
+      trackAnalytics('plan_apply_success', { dryRun: !!opts?.dryRun, tasksCreated: json?.counts?.tasks, subtasksCreated: json?.counts?.subtasks, planId: plan.id })
+    } catch (err: any) {
+      toast({ title: 'Apply error', description: String(err?.message || err), variant: 'destructive' })
+      trackAnalytics('plan_apply_error', { error: String(err?.message || err) })
+    }
+  }
+
+  // Export helpers
+  const exportJSON = () => {
+    const plan = planDraft || planExec.plan
+    const blob = new Blob([JSON.stringify(plan || {}, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${plan?.title || 'plan'}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  const exportMarkdown = () => {
+    const plan = (planDraft || planExec.plan) as any
+    if (!plan) return
+    const lines: string[] = []
+    lines.push(`# ${plan.title || 'Research Plan'}`)
+    if (plan.description) lines.push(`\n${plan.description}\n`)
+    lines.push(`- Estimated Total Time: ${plan.estimatedTotalTime || 'n/a'}`)
+    lines.push(`\n## Tasks`)
+    ;(plan.tasks || []).forEach((t: any, i: number) => {
+      lines.push(`\n${i + 1}. **${t.title}** (${t.type || 'task'}) — est: ${t.estimatedTime || 'n/a'}; priority: ${t.priority}`)
+      if (t.description) lines.push(`    - ${t.description}`)
+      if (Array.isArray(t.subtasks) && t.subtasks.length) {
+        t.subtasks.forEach((s: any) => lines.push(`    - [ ] ${typeof s === 'string' ? s : s?.title || ''}`))
+      }
+    })
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${plan?.title || 'plan'}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const { toast } = useToast()
@@ -94,7 +271,172 @@ export default function PlannerPage() {
   const [autoUseDeepResearch, setAutoUseDeepResearch] = useState(false)
   const [autoMaxIterations, setAutoMaxIterations] = useState(4)
   const [autoSelectedTools, setAutoSelectedTools] = useState<string>("")
-  const planExec = usePlanAndExecute()
+  // Phase 2 additions
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [autoDeadline, setAutoDeadline] = useState<string>("")
+  const [autoDailyHours, setAutoDailyHours] = useState<number>(2)
+  const [autoScheduleData, setAutoScheduleData] = useState<any[]>([])
+  const [taskResources, setTaskResources] = useState<Record<string, any[]>>({})
+  // Analytics and cooldown state
+  const [applyCooldown, setApplyCooldown] = useState<number>(0)
+  const [ganttSchedule, setGanttSchedule] = useState<any[]>([])
+  const [ganttStartDate, setGanttStartDate] = useState<string>('')
+
+  const reorderTasks = (fromIndex: number, toIndex: number) => {
+    setPlanDraft((prev: any) => {
+      if (!prev) return prev
+      const arr = [...(prev.tasks || [])]
+      if (fromIndex < 0 || fromIndex >= arr.length || toIndex < 0 || toIndex >= arr.length) return prev
+      const [item] = arr.splice(fromIndex, 1)
+      arr.splice(toIndex, 0, item)
+      // Analytics: Task reordered
+      trackAnalytics('task_reordered', { fromIndex, toIndex, taskId: item?.id })
+      return { ...prev, tasks: arr }
+    })
+  }
+
+  // Analytics helper
+  const trackAnalytics = async (event: string, data: any) => {
+    try {
+      if (!userId) return
+      // Use supabase directly for analytics logging since logActivity is private
+      await supabase.from('activity_logs').insert({
+        user_id: userId,
+        action: event,
+        entity_type: 'auto_planner',
+        entity_id: data.planId || 'unknown',
+        metadata: { ...data, timestamp: new Date().toISOString() }
+      })
+    } catch (e) {
+      console.warn('Analytics tracking failed:', e)
+    }
+  }
+
+  // 429 cooldown effect
+  useEffect(() => {
+    if (applyCooldown > 0) {
+      const timer = setInterval(() => {
+        setApplyCooldown(prev => Math.max(0, prev - 1))
+      }, 1000)
+      return () => clearInterval(timer)
+    }
+  }, [applyCooldown])
+
+  const estimatedMinutesFromString = (s?: string): number => {
+    if (!s) return 60
+    const m = s.match(/(\d+)(?:-(\d+))?/)
+    if (!m) return 60
+    const a = parseInt(m[1], 10)
+    const b = m[2] ? parseInt(m[2], 10) : a
+    return Math.round((a + b) / 2)
+  }
+
+  // Gantt timeline helpers
+  const generateGanttSchedule = () => {
+    const plan = planDraft || planExec.plan
+    if (!plan || !Array.isArray(plan.tasks)) return
+    
+    const startDate = ganttStartDate ? new Date(ganttStartDate) : new Date()
+    const schedule = []
+    let currentDate = new Date(startDate)
+    
+    for (const task of plan.tasks) {
+      const minutes = estimatedMinutesFromString(task.estimatedTime)
+      const days = Math.max(1, Math.ceil(minutes / (autoDailyHours * 60)))
+      
+      schedule.push({
+        taskId: task.id,
+        title: task.title,
+        startDate: new Date(currentDate),
+        endDate: new Date(currentDate.getTime() + (days - 1) * 24 * 60 * 60 * 1000),
+        duration: days,
+        estimatedMinutes: minutes
+      })
+      
+      currentDate = new Date(currentDate.getTime() + days * 24 * 60 * 60 * 1000)
+    }
+    
+    setGanttSchedule(schedule)
+    trackAnalytics('gantt_generated', { taskCount: schedule.length, totalDays: schedule.reduce((acc, s) => acc + s.duration, 0) })
+  }
+  
+  const moveTaskInGantt = (taskId: string, newStartDate: Date) => {
+    setGanttSchedule(prev => {
+      const updated = prev.map(item => {
+        if (item.taskId === taskId) {
+          const duration = item.duration
+          return {
+            ...item,
+            startDate: new Date(newStartDate),
+            endDate: new Date(newStartDate.getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
+          }
+        }
+        return item
+      })
+      trackAnalytics('gantt_task_moved', { taskId, newStartDate: newStartDate.toISOString() })
+      return updated
+    })
+  }
+
+  const computeSchedule = () => {
+    const plan: any = planExec.plan
+    if (!plan || !Array.isArray(plan.tasks)) {
+      toast({ title: "No plan available", description: "Generate a plan first.", variant: "destructive" })
+      return
+    }
+    const tasksList = plan.tasks as any[]
+
+    let current = new Date()
+    const deadlineDate = autoDeadline ? new Date(autoDeadline) : null
+    const dailyCap = Math.max(30, Math.min(12 * 60, Math.round((autoDailyHours || 2) * 60)))
+    const sessionLen = 90 // minutes per focus session
+    let remainingToday = dailyCap
+    const calendarBlocks: { day: Date; events: { id: string; name: string; time: string; datetime: string }[] }[] = []
+
+    function pushEvent(date: Date, id: string, name: string, startMin: number, lenMin: number) {
+      const startDate = new Date(date)
+      startDate.setHours(9, startMin, 0, 0)
+      const endDate = new Date(startDate.getTime() + lenMin * 60000)
+      const dayKey = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      let dayEntry = calendarBlocks.find((d) => d.day.getTime() === dayKey.getTime())
+      if (!dayEntry) {
+        dayEntry = { day: dayKey, events: [] }
+        calendarBlocks.push(dayEntry)
+      }
+      const timeStr = format(startDate, "p")
+      dayEntry.events.push({ id, name, time: timeStr, datetime: startDate.toISOString() })
+    }
+
+    for (const t of tasksList) {
+      const minutes = estimatedMinutesFromString(t.estimatedTime)
+      let remaining = minutes
+      let startMinute = 0
+      while (remaining > 0) {
+        if (remainingToday <= 0) {
+          // next day
+          current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1)
+          remainingToday = dailyCap
+          startMinute = 0
+        }
+        const block = Math.min(sessionLen, remaining, remainingToday)
+        pushEvent(current, t.id, t.title, startMinute, block)
+        remaining -= block
+        remainingToday -= block
+        startMinute += block
+      }
+    }
+
+    // Simple deadline notice (no hard enforcement)
+    if (deadlineDate && calendarBlocks.length) {
+      const lastDay = calendarBlocks[calendarBlocks.length - 1].day
+      if (lastDay.getTime() > new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate()).getTime()) {
+        toast({ title: "Schedule exceeds deadline", description: "Consider increasing daily hours or reducing scope.", variant: "destructive" })
+      }
+    }
+
+    setAutoScheduleData(calendarBlocks)
+    trackAnalytics('schedule_computed', { taskCount: tasksList.length, totalBlocks: calendarBlocks.length, dailyHours: autoDailyHours })
+  }
 
   const userId = user?.id || ""
   const userDisplayName = user?.user_metadata?.display_name || user?.email || "Unknown User"
@@ -874,7 +1216,7 @@ export default function PlannerPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <FormLabel>Research Topic</FormLabel>
+                  <Label>Research Topic</Label>
                   <Textarea
                     placeholder="e.g. Graph Neural Networks for citation prediction"
                     value={autoTopic}
@@ -882,7 +1224,7 @@ export default function PlannerPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <FormLabel>Selected Tools (comma-separated)</FormLabel>
+                  <Label>Selected Tools (comma-separated)</Label>
                   <Input
                     placeholder="e.g. web, scholar, code"
                     value={autoSelectedTools}
@@ -890,7 +1232,7 @@ export default function PlannerPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <FormLabel>Use Deep Research</FormLabel>
+                  <Label>Use Deep Research</Label>
                   <Select value={String(autoUseDeepResearch)} onValueChange={(v) => setAutoUseDeepResearch(v === "true")}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -902,7 +1244,7 @@ export default function PlannerPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <FormLabel>Max Iterations (deep research)</FormLabel>
+                  <Label>Max Iterations (deep research)</Label>
                   <Input
                     type="number"
                     min={1}
@@ -952,6 +1294,305 @@ export default function PlannerPage() {
             </CardContent>
           </Card>
 
+          {/* Plan Inspector */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Plan Inspector</CardTitle>
+              <CardDescription>Select a task to view details and suggest resources.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {planExec.plan?.tasks?.length ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Tasks</Label>
+                    <div className="max-h-64 overflow-auto border rounded-md p-2 bg-white">
+                      {(planExec.plan.tasks as any[]).map((t: any) => (
+                        <div key={t.id} className={`flex items-center justify-between gap-2 p-2 rounded ${selectedTaskId === t.id ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{t.title}</div>
+                            <div className="text-xs text-gray-600 truncate">{t.type} • ~{estimatedMinutesFromString(t.estimatedTime)} min</div>
+                          </div>
+                          <Button size="sm" variant={selectedTaskId === t.id ? 'default' : 'outline'} onClick={() => setSelectedTaskId(t.id)}>
+                            {selectedTaskId === t.id ? 'Selected' : 'Select'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label>Selected Task</Label>
+                    {selectedTaskId ? (
+                      (() => {
+                        const t = (planExec.plan.tasks as any[]).find((x: any) => x.id === selectedTaskId)
+                        if (!t) return <div className="text-sm text-gray-600">Not found</div>
+                        return (
+                          <div className="border rounded-md p-3 bg-gray-50">
+                            <div className="font-medium">{t.title}</div>
+                            <div className="text-xs text-gray-600 mb-2">{t.description}</div>
+                            <div className="text-xs">Type: <span className="font-medium">{t.type}</span> • Priority: <span className="font-medium">{t.priority}</span> • Est: <span className="font-medium">{t.estimatedTime}</span></div>
+                            <div className="mt-3 flex items-center gap-2">
+                              <Button size="sm" onClick={() => deep.start({ query: `${t.title} ${t.description || ''}`.trim(), limit: 10 })} disabled={deep.isStreaming}>Suggest Resources</Button>
+                              <Button size="sm" variant="outline" onClick={() => deep.stop()} disabled={!deep.isStreaming}>Stop</Button>
+                              <Button size="sm" variant="ghost" onClick={() => deep.reset()}>Reset</Button>
+                            </div>
+                          </div>
+                        )
+                      })()
+                    ) : (
+                      <div className="text-sm text-gray-600">Select a task from the list.</div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-600">No tasks yet. Generate a plan first.</div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Plan Editor (inline editing + drag reorder) */}
+          {planDraft?.tasks?.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Plan Editor</CardTitle>
+                <CardDescription>Edit tasks inline, reorder by drag, and manage subtasks.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={exportJSON}>Export JSON</Button>
+                  <Button variant="outline" onClick={exportMarkdown}>Export Markdown</Button>
+                  <Button variant="ghost" onClick={() => { try { localStorage.removeItem('auto_planner_draft') } catch {}; setPlanDraft(null) }}>Clear Draft</Button>
+                  <Button variant="ghost" onClick={() => { if (planExec.plan) setPlanDraft(JSON.parse(JSON.stringify(planExec.plan))) }}>Load Latest Plan</Button>
+                </div>
+
+                <div className="space-y-3">
+                  {(planDraft.tasks as any[]).map((t: any, idx: number) => (
+                    <div
+                      key={t.id}
+                      className="border rounded-md p-3 bg-white"
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(idx)) }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => { e.preventDefault(); const from = parseInt(e.dataTransfer.getData('text/plain')); if (!Number.isNaN(from)) reorderTasks(from, idx) }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-gray-500">#{idx + 1}</div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => moveTask(t.id, -1)}>Up</Button>
+                          <Button size="sm" variant="outline" onClick={() => moveTask(t.id, 1)}>Down</Button>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2 mt-2">
+                        <div className="space-y-1">
+                          <Label>Title</Label>
+                          <Input value={t.title} onChange={(e) => updateTaskField(t.id, 'title', e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Priority</Label>
+                          <Select value={String(t.priority ?? 'medium')} onValueChange={(v) => updateTaskField(t.id, 'priority', v)}>
+                            <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <Label>Description</Label>
+                          <Textarea value={t.description || ''} onChange={(e) => updateTaskField(t.id, 'description', e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Estimated Time</Label>
+                          <Input value={t.estimatedTime || ''} onChange={(e) => updateTaskField(t.id, 'estimatedTime', e.target.value)} placeholder="e.g. 3-5 minutes" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Type</Label>
+                          <Select value={String(t.type ?? 'search')} onValueChange={(v) => updateTaskField(t.id, 'type', v)}>
+                            <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="search">Search</SelectItem>
+                              <SelectItem value="analyze">Analyze</SelectItem>
+                              <SelectItem value="synthesize">Synthesize</SelectItem>
+                              <SelectItem value="generate">Generate</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Subtasks */}
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Subtasks</Label>
+                          <Button size="sm" onClick={() => addSubtaskInline(t.id)}>Add Subtask</Button>
+                        </div>
+                        <div className="space-y-2">
+                          {(t.subtasks || []).map((s: any, i: number) => (
+                            <div key={`${t.id}-st-${i}`} className="flex items-center gap-2">
+                              <Input value={typeof s === 'string' ? s : s?.title || ''} onChange={(e) => updateSubtaskInline(t.id, i, e.target.value)} />
+                              <Button size="sm" variant="ghost" onClick={() => removeSubtaskInline(t.id, i)}>Remove</Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Pseudo Gantt bar */}
+                      <div className="mt-3">
+                        <div className="text-xs text-gray-600 mb-1">Duration visual</div>
+                        <div className="h-3 w-full bg-gray-200 rounded">
+                          <div className="h-3 bg-blue-500 rounded" style={{ width: `${Math.min(100, Math.max(10, (estimatedMinutesFromString(t.estimatedTime) / 480) * 100))}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Resource Suggestions */}
+          {selectedTaskId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Suggested Resources</CardTitle>
+                <CardDescription>Streaming results powered by Deep Search.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {deep.error && <div className="text-sm text-red-600 mb-2">{deep.error}</div>}
+                <div className="max-h-64 overflow-auto space-y-2">
+                  {deep.items.map((it, idx) => (
+                    <div key={`${it.url}-${idx}`} className="p-2 border rounded-md bg-white">
+                      <div className="text-sm font-medium truncate">
+                        <a className="underline" href={it.url} target="_blank" rel="noreferrer">{it.title}</a>
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">{it.source} {it.publishedDate ? `• ${it.publishedDate}` : ''}</div>
+                      <div className="text-xs text-gray-700 line-clamp-2">{it.snippet}</div>
+                      <div className="mt-1">
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setTaskResources((prev) => ({ ...prev, [selectedTaskId]: [...(prev[selectedTaskId] || []), it] }))
+                        }}>Add to Task</Button>
+                      </div>
+                    </div>
+                  ))}
+                  {!deep.items.length && !deep.isStreaming && (
+                    <div className="text-sm text-gray-600">No results yet. Click "Suggest Resources" above.</div>
+                  )}
+                </div>
+                {!!(taskResources[selectedTaskId]?.length) && (
+                  <div className="mt-3">
+                    <div className="text-sm font-medium mb-1">Added to Task</div>
+                    <ul className="list-disc pl-5 text-sm">
+                      {taskResources[selectedTaskId]!.map((r, i) => (
+                        <li key={`sel-${i}`} className="truncate"><a className="underline" href={r.url} target="_blank" rel="noreferrer">{r.title}</a></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Scheduling */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Scheduling</CardTitle>
+              <CardDescription>Compute a simple timeboxed schedule and preview on calendar.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Deadline (optional)</Label>
+                  <Input type="date" value={autoDeadline} onChange={(e) => setAutoDeadline(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Daily Focus Hours</Label>
+                  <Input type="number" min={0.5} max={12} step={0.5} value={autoDailyHours} onChange={(e) => setAutoDailyHours(Number(e.target.value || 2))} />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={computeSchedule} disabled={!planExec.plan?.tasks?.length}>Compute Schedule</Button>
+                </div>
+              </div>
+              <div className="mt-2">
+                {autoScheduleData.length ? (
+                  <FullScreenCalendar data={autoScheduleData} />
+                ) : (
+                  <div className="text-sm text-gray-600">No schedule yet. Click Compute Schedule.</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gantt Timeline */}
+          {planDraft?.tasks?.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Gantt Timeline</CardTitle>
+                <CardDescription>Drag tasks across days to reschedule before applying.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input type="date" value={ganttStartDate} onChange={(e) => setGanttStartDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Daily Hours (for duration calc)</Label>
+                    <Input type="number" min={1} max={12} value={autoDailyHours} onChange={(e) => setAutoDailyHours(Number(e.target.value || 2))} />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={generateGanttSchedule} disabled={!planDraft?.tasks?.length}>Generate Timeline</Button>
+                  </div>
+                </div>
+                
+                {ganttSchedule.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium mb-2">Timeline (drag tasks to reschedule)</div>
+                    <div className="space-y-2 max-h-64 overflow-auto">
+                      {ganttSchedule.map((item, idx) => (
+                        <div
+                          key={item.taskId}
+                          className="flex items-center gap-3 p-2 border rounded bg-white hover:bg-gray-50 cursor-move"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', JSON.stringify({ taskId: item.taskId, type: 'gantt' }))
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            try {
+                              const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+                              if (data.type === 'gantt' && data.taskId !== item.taskId) {
+                                // Simple reorder: move dropped task to this position's start date
+                                moveTaskInGantt(data.taskId, item.startDate)
+                              }
+                            } catch {}
+                          }}
+                        >
+                          <div className="text-xs text-gray-500 w-8">#{idx + 1}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{item.title}</div>
+                            <div className="text-xs text-gray-600">
+                              {format(item.startDate, 'MMM d')} - {format(item.endDate, 'MMM d')} ({item.duration} day{item.duration > 1 ? 's' : ''})
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500">{item.estimatedMinutes}min</div>
+                          <div className="w-16 h-2 bg-gray-200 rounded overflow-hidden">
+                            <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (item.duration / 7) * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      Total duration: {ganttSchedule.reduce((acc, s) => Math.max(acc, s.endDate.getTime()), 0) > 0 ? 
+                        Math.ceil((ganttSchedule.reduce((acc, s) => Math.max(acc, s.endDate.getTime()), 0) - ganttSchedule[0]?.startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1 : 0} days
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Plan Preview */}
           <Card>
             <CardHeader>
               <CardTitle>Plan Preview (JSON)</CardTitle>
@@ -960,11 +1601,67 @@ export default function PlannerPage() {
             <CardContent>
               <div className="rounded-md border bg-muted p-3">
                 <pre className="max-h-96 overflow-auto text-xs">
-{planExec.plan ? JSON.stringify(planExec.plan, null, 2) : "No plan yet. Generate to see the preview."}
+{planDraft ? JSON.stringify(planDraft, null, 2) : (planExec.plan ? JSON.stringify(planExec.plan, null, 2) : "No plan yet. Generate to see the preview.")}
                 </pre>
               </div>
             </CardContent>
           </Card>
+
+          {/* Apply Plan */}
+          {planDraft?.tasks?.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Apply Plan</CardTitle>
+                <CardDescription>Persist tasks and subtasks to a project with idempotency.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Apply to Existing Project</Label>
+                    <Select onValueChange={(v) => applyPlan({ projectId: v || null, overwriteExisting: true })}>
+                      <SelectTrigger><SelectValue placeholder="Select a project to apply (overwrites by title)" /></SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => applyPlan({ dryRun: true })} 
+                      disabled={applyCooldown > 0}
+                    >
+                      {applyCooldown > 0 ? `Wait ${applyCooldown}s` : 'Dry Run'}
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>New Project Title</Label>
+                    <Input defaultValue={planDraft?.title || ''} id="apply-new-title" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>New Project Description</Label>
+                    <Input defaultValue={planDraft?.description || ''} id="apply-new-desc" />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button 
+                    onClick={() => {
+                      const titleEl = document.getElementById('apply-new-title') as HTMLInputElement | null
+                      const descEl = document.getElementById('apply-new-desc') as HTMLInputElement | null
+                      applyPlan({ newProjectTitle: titleEl?.value || planDraft?.title, newProjectDescription: descEl?.value || planDraft?.description })
+                    }}
+                    disabled={applyCooldown > 0}
+                  >
+                    {applyCooldown > 0 ? `Wait ${applyCooldown}s` : 'Apply to New Project'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </TabsContent>
       </Tabs>
 
