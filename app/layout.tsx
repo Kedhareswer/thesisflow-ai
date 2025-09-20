@@ -11,7 +11,7 @@ import { ResearchSessionProvider } from "@/components/research-session-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
-import { CookiePanel } from "@/components/ui/cookie-banner-1"
+import CookieConsent from "@/components/ui/cookies"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -36,8 +36,8 @@ export default function RootLayout({
                 <Toaster />
                 <AuthDebug />
                 <Analytics />
-                {/* Global Cookie Consent Banner */}
-                <CookiePanel />
+                {/* Global Cookie Consent Banner (new) */}
+                <CookieConsent />
               </ResearchSessionProvider>
             </SupabaseAuthProvider>
           </AuthErrorBoundary>
