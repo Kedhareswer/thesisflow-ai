@@ -20,7 +20,7 @@ import { Footer } from "@/components/ui/footer"
 export default function HomePage() {
   const { user } = useSupabaseAuth()
   const router = useRouter()
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app'
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thesisflow-ai.vercel.app').replace(/\/+$/, '')
 
   // Consistent button styles across the page
   const glassBtn = "rounded-sm border border-white/40 text-white bg-white/10 hover:bg-white/20 backdrop-blur-md px-6 py-3 text-sm font-medium shadow-lg"
@@ -395,8 +395,19 @@ export default function HomePage() {
                 ThesisFlow handles the tedious parts—deduping, citations, summaries, and now even acts on plain‑language commands—so you can focus on discovery, writing, and breakthroughs.
               </p>
               <div className="mt-8 flex gap-4">
-                <Button className={glassBtn}>Try the Explorer</Button>
-                <Button variant="outline" className={glassBtnSoft}>See the Planner</Button>
+                <Button
+                  className={glassBtn}
+                  onClick={(e) => { e.preventDefault?.(); handleProtectedAction('/explorer') }}
+                >
+                  Try the Explorer
+                </Button>
+                <Button
+                  variant="outline"
+                  className={glassBtnSoft}
+                  onClick={(e) => { e.preventDefault?.(); handleProtectedAction('/planner') }}
+                >
+                  See the Planner
+                </Button>
               </div>
             </div>
           </div>

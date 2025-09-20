@@ -146,11 +146,7 @@ export function AccordionComponent() {
 
   return (
     <div className="max-w-3xl w-full mx-auto">
-      <script
-        type="application/ld+json"
-        // Static strings defined in this file; safe to stringify directly
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
-      />
+      <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       <CustomAccordion
         type="single"
         collapsible

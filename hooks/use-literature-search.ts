@@ -131,19 +131,7 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
     return `hash:${JSON.stringify(p).toLowerCase()}`;
   };
 
-  // Retrieve Supabase access token from localStorage (client-side only)
-  // This is used to authenticate requests to secured API routes.
-  const getAuthToken = (): string | null => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem('ai-research-platform-auth');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw || '{}');
-      return parsed?.access_token || null;
-    } catch {
-      return null;
-    }
-  };
+  // Tokens are no longer appended to SSE URLs; cookie-based auth is used for EventSource.
 
   // Internal: perform classic fetch flow (existing implementation)
   const doFetchSearch = useCallback(async (
@@ -314,13 +302,8 @@ export function useLiteratureSearch(options: UseLiteratureSearchOptions = {}) {
       });
       if (userId) params.append('userId', userId);
       if (sessionIdRef.current) params.append('sessionId', sessionIdRef.current);
-
-      // Pass access_token via query param for SSE (headers are not supported by EventSource)
-      {
-        const token = getAuthToken();
-        if (token) params.append('access_token', token);
-      }
-      const es = new EventSource(`/api/literature-search/stream?${params.toString()}`);
+      // Use cookie-based auth for EventSource; do not include tokens in URL
+      const es = new EventSource(`/api/literature-search/stream?${params.toString()}`, { withCredentials: true });
       eventSourceRef.current = es;
 
       // Fallback timer: if no progress quickly, close and fallback to fetch

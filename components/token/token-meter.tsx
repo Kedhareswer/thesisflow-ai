@@ -43,11 +43,16 @@ export function TokenMeter({ compact = true }: { compact?: boolean }) {
               </span>
             </div>
             <Progress value={monthlyPct} className="h-1.5" />
-            {tokenStatus.lastMonthlyReset && (
-              <div className="pt-1 text-[10px] text-muted-foreground">
-                Resets — Monthly: {new Date(tokenStatus.lastMonthlyReset).toLocaleDateString()}
-              </div>
-            )}
+            {(() => {
+              if (!tokenStatus.lastMonthlyReset) return null;
+              const d = new Date(tokenStatus.lastMonthlyReset);
+              if (isNaN(d.getTime())) return null;
+              return (
+                <div className="pt-1 text-[10px] text-muted-foreground">
+                  Resets — Monthly: {d.toLocaleDateString()}
+                </div>
+              );
+            })()}
           </div>
         </TooltipContent>
       </Tooltip>

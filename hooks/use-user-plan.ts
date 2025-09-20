@@ -153,11 +153,19 @@ export function useUserPlan() {
         const monthlyLimit = Number((data as any).monthly_limit ?? 0)
         const monthlyUsed = Number((data as any).monthly_tokens_used ?? 0)
         const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed)
+        const rawReset = (data as any).last_monthly_reset
+        let isoReset: string | undefined = undefined
+        if (rawReset != null) {
+          try {
+            const d = new Date(rawReset)
+            if (!isNaN(d.getTime())) isoReset = d.toISOString()
+          } catch {}
+        }
         setTokenStatus({
           monthlyUsed,
           monthlyLimit,
           monthlyRemaining,
-          lastMonthlyReset: (data as any).last_monthly_reset ? String((data as any).last_monthly_reset) : undefined,
+          lastMonthlyReset: isoReset,
         })
         return
       }
@@ -177,11 +185,19 @@ export function useUserPlan() {
       })
       if (resp.ok) {
         const data = await resp.json()
+        let isoReset: string | undefined = undefined
+        const rawReset = data.lastMonthlyReset ?? data?.data?.lastMonthlyReset
+        if (rawReset != null) {
+          try {
+            const d = new Date(rawReset)
+            if (!isNaN(d.getTime())) isoReset = d.toISOString()
+          } catch {}
+        }
         setTokenStatus({
           monthlyUsed: Number(data.monthlyUsed ?? data?.data?.monthlyUsed ?? 0),
           monthlyLimit: Number(data.monthlyLimit ?? data?.data?.monthlyLimit ?? 0),
           monthlyRemaining: Number(data.monthlyRemaining ?? data?.data?.monthlyRemaining ?? 0),
-          lastMonthlyReset: data.lastMonthlyReset ? String(data.lastMonthlyReset) : undefined,
+          lastMonthlyReset: isoReset,
         })
       }
     } catch (fallbackErr) {

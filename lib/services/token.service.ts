@@ -5,6 +5,8 @@ export interface TokenStatus {
   monthlyRemaining: number;
   monthlyLimit: number;
   tokensNeeded: number;
+  // Optional: last monthly reset timestamp (ISO-8601 string)
+  lastMonthlyReset?: string;
 }
 
 export interface TokenTransaction {

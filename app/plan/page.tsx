@@ -322,11 +322,16 @@ Thank you!`)
                       </div>
                       <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
                     </div>
-                    {tokenStatus.lastMonthlyReset && (
-                      <p className="text-xs text-muted-foreground">
-                        Resets — Monthly: {new Date(tokenStatus.lastMonthlyReset).toLocaleDateString()}
-                      </p>
-                    )}
+                    {(() => {
+                      if (!tokenStatus.lastMonthlyReset) return null
+                      const d = new Date(tokenStatus.lastMonthlyReset)
+                      if (isNaN(d.getTime())) return null
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          Resets — Monthly: {d.toLocaleDateString()}
+                        </p>
+                      )
+                    })()}
                   </div>
                 )}
 

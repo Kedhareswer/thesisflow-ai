@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef } from "react"
+import React, { useState, useCallback, useRef, useEffect } from "react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { FileText, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,19 @@ export default function ParaphraserPage() {
   // Streaming state (always-on)
   const [streamProgress, setStreamProgress] = useState<number | undefined>(undefined)
   const esRef = useRef<EventSource | null>(null)
+  const mountedRef = useRef<boolean>(true)
+
+  // Ensure we don't leak EventSource connections or set state after unmount
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (esRef.current) {
+        try { esRef.current.close() } catch {}
+        esRef.current = null
+      }
+    }
+  }, [])
 
   const morePresets = ['Academic', 'Fluent', 'Formal', 'Creative', 'Casual', 'Technical', 'Simple']
 
@@ -68,39 +81,38 @@ export default function ParaphraserPage() {
       // Streaming via SSE (always on)
       setStreamProgress(0)
 
-      // Build EventSource URL with auth token
+      // Build EventSource URL (cookie-based auth with withCredentials)
       const params = new URLSearchParams()
       params.set('text', inputText)
       params.set('mode', mode)
       params.set('preserveLength', String(preserveLength))
       params.set('variationLevel', variationLevel)
-      // Use default "Auto" provider/model selection
-      try {
-        const { supabase } = await import('@/integrations/supabase/client')
-        const sess = await supabase.auth.getSession()
-        const token = sess.data.session?.access_token
-        if (token) params.set('access_token', token)
-      } catch {}
+      // Use default "Auto" provider/model selection; no access_token in URL
 
       const url = `/api/paraphraser/stream?${params.toString()}`
       const es = new EventSource(url, { withCredentials: true })
       esRef.current = es
 
       es.onmessage = (ev) => {
+        if (!mountedRef.current || esRef.current !== es) return
         try {
           const payload = JSON.parse(ev.data)
           const type = payload?.type
           if (type === 'token') {
+            if (!mountedRef.current) return
             setResultText((prev) => (prev || '') + (payload.token || ''))
           } else if (type === 'progress') {
+            if (!mountedRef.current) return
             if (typeof payload.percentage === 'number') setStreamProgress(payload.percentage)
           } else if (type === 'error') {
             // Handle error object properly to avoid React error #31
             const errorMessage = payload.error && typeof payload.error === 'object' 
               ? payload.error.message || String(payload.error)
               : payload.error || 'Streaming error'
+            if (!mountedRef.current) return
             setError(errorMessage)
           } else if (type === 'done') {
+            if (!mountedRef.current) return
             setIsLoading(false)
             setStreamProgress(100)
             try { es.close() } catch {}
@@ -110,6 +122,7 @@ export default function ParaphraserPage() {
       }
 
       es.onerror = () => {
+        if (!mountedRef.current || esRef.current !== es) return
         setIsLoading(false)
         setError('Streaming connection error')
         try { es.close() } catch {}
