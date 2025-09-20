@@ -13,7 +13,6 @@ import { motion } from "framer-motion"
 import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
 // Removed PixelTrail and screen-size hooks in favor of static hero background image
-import { HomeLoader } from "@/components/ui/home-loader"
 import { Footer } from "@/components/ui/footer"
 
 // metadata moved to app/seo/root-metadata.ts
@@ -153,19 +152,18 @@ export default function HomePage() {
           { name: "Home", url: baseUrl }
         ]}
       >
-        <HomeLoader text="Thesis Flow" bgColor="#fe7a41" showMs={5000} fadeDurationMs={700} />
       {/* Hero Section - exact match to reference image */}
       <main className="relative min-h-[100vh] overflow-hidden">
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
-            src="/hero.png"
+            src="/research.png"
             alt="Hero background"
             fill
             priority
-            className="object-cover object-center"
+            className="object-cover object-left"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
 
         {/* Top navbar overlay */}
@@ -299,10 +297,75 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Who We Serve Section */}
+      <section className="py-28 md:py-32 lg:py-36 bg-background">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center max-w-3xl mx-auto"
+          >
+            <div className="text-xs tracking-[0.2em] text-neutral-500 uppercase mb-4">Who we serve</div>
+            <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">
+              For Students, Researchers & Growing Teams
+            </h3>
+            <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
+              From solo projects to research groups and labs, ThesisFlow meets you where you are and scales as your ambitions take off.
+            </p>
+          </motion.div>
+
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            {/* Card 1 */}
+            <div className="group relative overflow-hidden rounded-2xl ring-1 ring-black/10 bg-white shadow">
+              <div className="relative aspect-[16/10] md:aspect-[4/3]">
+                <Image src="/who/students.svg" alt="Students" fill className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                <div className="absolute inset-x-0 bottom-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
+                  <div className="relative p-5">
+                    <div className="text-[11px] tracking-[0.15em] uppercase text-white/90 mb-2">Students</div>
+                    <p className="text-white/90 text-sm leading-relaxed">Ace your literature reviews, organize notes, and turn messy PDFs into polished summaries.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2 */}
+            <div className="group relative overflow-hidden rounded-2xl ring-1 ring-black/10 bg-white shadow">
+              <div className="relative aspect-[16/10] md:aspect-[4/3]">
+                <Image src="/who/researchers.svg" alt="Independent Researchers" fill className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                <div className="absolute inset-x-0 bottom-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
+                  <div className="relative p-5">
+                    <div className="text-[11px] tracking-[0.15em] uppercase text-white/90 mb-2">Independent Researchers</div>
+                    <p className="text-white/90 text-sm leading-relaxed">Build a repeatable workflow—retrieval, deduping, and project planning in one place.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3 */}
+            <div className="group relative overflow-hidden rounded-2xl ring-1 ring-black/10 bg-white shadow">
+              <div className="relative aspect-[16/10] md:aspect-[4/3]">
+                <Image src="/who/teams.svg" alt="Research Teams & Labs" fill className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                <div className="absolute inset-x-0 bottom-0">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
+                  <div className="relative p-5">
+                    <div className="text-[11px] tracking-[0.15em] uppercase text-white/90 mb-2">Research Teams & Labs</div>
+                    <p className="text-white/90 text-sm leading-relaxed">Share context, assign tasks, and publish faster with aligned timelines and sources.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Image Band: Doing research is hard enough */}
       <section className="relative min-h-[520px] md:min-h-[560px] overflow-hidden">
         <div className="absolute inset-0">
-          <Image src="/research.png" alt="Research band" fill className="object-cover" />
+          <Image src="/research.png" alt="Research band" fill className="object-cover object-left" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex items-center">

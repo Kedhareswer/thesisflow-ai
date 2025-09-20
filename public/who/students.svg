@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F7EFE9"/>
+      <stop offset="100%" stop-color="#F1E3D8"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF6B2C"/>
+      <stop offset="100%" stop-color="#FFC39F"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" rx="24" fill="url(#bg)"/>
+  <g opacity="0.08">
+    <circle cx="260" cy="220" r="140" fill="#000"/>
+    <circle cx="1360" cy="180" r="180" fill="#000"/>
+    <circle cx="860" cy="760" r="220" fill="#000"/>
+  </g>
+  <rect x="120" y="140" width="480" height="280" rx="20" fill="#FFFFFF"/>
+  <rect x="140" y="170" width="200" height="16" rx="8" fill="#E7E7E7"/>
+  <rect x="140" y="198" width="320" height="12" rx="6" fill="#EFEFEF"/>
+  <rect x="140" y="222" width="280" height="12" rx="6" fill="#EFEFEF"/>
+  <rect x="140" y="246" width="340" height="12" rx="6" fill="#EFEFEF"/>
+  <rect x="120" y="460" width="1360" height="12" rx="6" fill="url(#accent)"/>
+  <text x="800" y="940" text-anchor="middle" font-family="'IBM Plex Sans', Arial, sans-serif" font-size="22" fill="#9CA3AF">Students — Placeholder Art</text>
+</svg>
