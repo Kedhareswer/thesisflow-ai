@@ -22,7 +22,7 @@ export function Footer({ className, ...props }: FooterProps) {
         <div className="absolute inset-0">
           <Image
             src="/footer.png"
-            alt="Take control of your research without the stress"
+            alt="research without stress"
             fill
             className="object-cover object-center"
             priority
@@ -34,9 +34,8 @@ export function Footer({ className, ...props }: FooterProps) {
           <div className="container mx-auto px-6 lg:px-8">
             <div className="max-w-2xl">
               <h2 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight mb-6">
-                Take Control of<br />
-                Your Research<br />
-                Without the<br />
+                Research<br />
+                Without<br />
                 Stress.
               </h2>
               <p className="text-lg text-white/90 mb-8 max-w-md leading-relaxed">

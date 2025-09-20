@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { parseISO, parse, isValid, format } from "date-fns"
+import { usePlanAndExecute } from "@/hooks/use-plan-and-execute"
 
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -88,6 +89,12 @@ export default function PlannerPage() {
    // Global navigation sidebar collapse state
    const [collapsed, setCollapsed] = useState(false)
   const { user } = useSupabaseAuth()
+  // Auto Planner (Phase 1) state and hook
+  const [autoTopic, setAutoTopic] = useState("")
+  const [autoUseDeepResearch, setAutoUseDeepResearch] = useState(false)
+  const [autoMaxIterations, setAutoMaxIterations] = useState(4)
+  const [autoSelectedTools, setAutoSelectedTools] = useState<string>("")
+  const planExec = usePlanAndExecute()
 
   const userId = user?.id || ""
   const userDisplayName = user?.user_metadata?.display_name || user?.email || "Unknown User"
@@ -589,7 +596,7 @@ export default function PlannerPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
@@ -601,6 +608,10 @@ export default function PlannerPage() {
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Analytics
+          </TabsTrigger>
+          <TabsTrigger value="auto-planner" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Auto Planner
           </TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-6">
@@ -851,6 +862,109 @@ export default function PlannerPage() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Auto Planner - Phase 1 (streaming + preview) */}
+        <TabsContent value="auto-planner" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Generate Plan</CardTitle>
+              <CardDescription>Provide a research topic and optional parameters, then stream the AI plan.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <FormLabel>Research Topic</FormLabel>
+                  <Textarea
+                    placeholder="e.g. Graph Neural Networks for citation prediction"
+                    value={autoTopic}
+                    onChange={(e) => setAutoTopic(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel>Selected Tools (comma-separated)</FormLabel>
+                  <Input
+                    placeholder="e.g. web, scholar, code"
+                    value={autoSelectedTools}
+                    onChange={(e) => setAutoSelectedTools(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel>Use Deep Research</FormLabel>
+                  <Select value={String(autoUseDeepResearch)} onValueChange={(v) => setAutoUseDeepResearch(v === "true")}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">Disabled</SelectItem>
+                      <SelectItem value="true">Enabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <FormLabel>Max Iterations (deep research)</FormLabel>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={autoMaxIterations}
+                    onChange={(e) => setAutoMaxIterations(Number(e.target.value || 4))}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => planExec.start({
+                    userQuery: autoTopic,
+                    selectedTools: autoSelectedTools.split(",").map(s => s.trim()).filter(Boolean),
+                    useDeepResearch: autoUseDeepResearch,
+                    maxIterations: autoMaxIterations,
+                  })}
+                  disabled={planExec.isStreaming || !autoTopic.trim()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {planExec.isStreaming ? "Generating…" : "Generate Plan"}
+                </Button>
+                <Button variant="outline" onClick={planExec.stop} disabled={!planExec.isStreaming}>Stop</Button>
+                <Button variant="ghost" onClick={planExec.reset}>Reset</Button>
+                {planExec.progress?.overallProgress !== undefined && (
+                  <span className="text-sm text-gray-600">Progress: {planExec.progress.overallProgress}%</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Streaming Console</CardTitle>
+              <CardDescription>Live output from the planning process.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 w-full overflow-auto rounded-md border bg-black p-3 text-green-300">
+                <pre className="text-xs leading-relaxed">
+{planExec.logs.map((l, i) => `> ${l}`).join("\n")}
+                </pre>
+              </div>
+              {planExec.error && (
+                <div className="mt-2 text-sm text-red-600">Error: {planExec.error}</div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Plan Preview (JSON)</CardTitle>
+              <CardDescription>Initial plan skeleton as received from the backend. Edit support and scheduling arrive in Phase 2.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border bg-muted p-3">
+                <pre className="max-h-96 overflow-auto text-xs">
+{planExec.plan ? JSON.stringify(planExec.plan, null, 2) : "No plan yet. Generate to see the preview."}
+                </pre>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
