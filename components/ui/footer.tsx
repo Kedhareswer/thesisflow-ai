@@ -43,7 +43,7 @@ export function Footer({ className, ...props }: FooterProps) {
                 Get on the list, no spam, no pressure. Just smarter research, coming soon.
               </p>
               <Button 
-                className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white px-8 py-4 text-lg font-semibold rounded-sm"
+                className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white px-6 py-3 text-sm font-medium rounded-sm shadow-lg"
               >
                 Join Waitlist
               </Button>
@@ -106,12 +106,24 @@ export function Footer({ className, ...props }: FooterProps) {
         </div>
 
         {/* Infinite scrolling text */}
-        <div className="relative overflow-hidden">
-          <div className="animate-scroll-infinite whitespace-nowrap text-[clamp(80px,15vw,200px)] font-bold uppercase tracking-tight leading-none text-transparent select-none pointer-events-none"
-               style={{ 
-                 WebkitTextStroke: '2px rgba(255,255,255,0.1)'
-               }}>
-            ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow
+        <div className="relative overflow-hidden py-4">
+          <div className="flex animate-scroll-infinite">
+            <div 
+              className="whitespace-nowrap text-[clamp(80px,15vw,200px)] font-bold uppercase tracking-tight leading-none text-transparent select-none pointer-events-none flex-shrink-0"
+              style={{ 
+                WebkitTextStroke: '2px rgba(255,255,255,0.1)'
+              }}
+            >
+              ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow
+            </div>
+            <div 
+              className="whitespace-nowrap text-[clamp(80px,15vw,200px)] font-bold uppercase tracking-tight leading-none text-transparent select-none pointer-events-none flex-shrink-0"
+              style={{ 
+                WebkitTextStroke: '2px rgba(255,255,255,0.1)'
+              }}
+            >
+              ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow
+            </div>
           </div>
         </div>
 
