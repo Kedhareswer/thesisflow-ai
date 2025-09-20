@@ -58,8 +58,8 @@ export function Footer({ className, ...props }: FooterProps) {
         <div className="container mx-auto px-6 lg:px-8 flex items-center justify-between mb-8">
           <div className="flex items-center space-x-6">
             <a 
-              href="https://twitter.com/thesisflow" 
-              className="text-white hover:text-white/80 transition-colors"
+              href="https://twitter.com/thesisflow-ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
               aria-label="Twitter"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -67,8 +67,8 @@ export function Footer({ className, ...props }: FooterProps) {
               </svg>
             </a>
             <a 
-              href="https://facebook.com/thesisflow" 
-              className="text-white hover:text-white/80 transition-colors"
+              href="https://facebook.com/thesisflow-ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
               aria-label="Facebook"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -76,8 +76,8 @@ export function Footer({ className, ...props }: FooterProps) {
               </svg>
             </a>
             <a 
-              href="https://linkedin.com/company/thesisflow" 
-              className="text-white hover:text-white/80 transition-colors"
+              href="https://linkedin.com/company/thesisflow-ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
               aria-label="LinkedIn"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -85,8 +85,8 @@ export function Footer({ className, ...props }: FooterProps) {
               </svg>
             </a>
             <a 
-              href="https://instagram.com/thesisflow" 
-              className="text-white hover:text-white/80 transition-colors"
+              href="https://instagram.com/thesisflow_ai" 
+              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
               aria-label="Instagram"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -97,8 +97,7 @@ export function Footer({ className, ...props }: FooterProps) {
           
           <div className="flex items-center">
             <Button 
-              variant="outline" 
-              className="border-white text-white hover:bg-white hover:text-black transition-colors"
+              className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white border-2 border-[#FF6B2C] hover:border-[#FF6B2C]/90 px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
             >
               Join Waitlist
             </Button>
@@ -106,38 +105,40 @@ export function Footer({ className, ...props }: FooterProps) {
         </div>
 
         {/* Infinite scrolling text */}
-        <div className="relative overflow-hidden py-4">
-          <div className="flex animate-scroll-infinite">
+        <div className="relative overflow-hidden py-8">
+          <div className="flex animate-scroll-infinite whitespace-nowrap">
             <div 
-              className="whitespace-nowrap text-[clamp(80px,15vw,200px)] font-bold uppercase tracking-tight leading-none text-transparent select-none pointer-events-none flex-shrink-0"
+              className="text-[clamp(120px,20vw,300px)] font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none flex-shrink-0 pr-8"
               style={{ 
-                WebkitTextStroke: '2px rgba(255,255,255,0.1)'
+                WebkitTextStroke: '3px rgba(255,107,44,0.15)',
+                fontFamily: 'IBM Plex Sans, sans-serif'
               }}
             >
-              ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow
+              THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI
             </div>
             <div 
-              className="whitespace-nowrap text-[clamp(80px,15vw,200px)] font-bold uppercase tracking-tight leading-none text-transparent select-none pointer-events-none flex-shrink-0"
+              className="text-[clamp(120px,20vw,300px)] font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none flex-shrink-0 pr-8"
               style={{ 
-                WebkitTextStroke: '2px rgba(255,255,255,0.1)'
+                WebkitTextStroke: '3px rgba(255,107,44,0.15)',
+                fontFamily: 'IBM Plex Sans, sans-serif'
               }}
             >
-              ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow ThesisFlow
+              THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI
             </div>
           </div>
         </div>
 
         {/* Copyright */}
         <div className="container mx-auto px-6 lg:px-8 pt-8">
-          <div className="flex items-center justify-between text-sm text-white/60">
+          <div className="flex items-center justify-between text-sm text-white/70">
             <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#FF6B2C]" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
               </svg>
-              <span className="font-semibold">ThesisFlow</span>
+              <span className="font-semibold text-white">ThesisFlow-AI</span>
             </div>
-            <div>
-              Copyright © 2025 ThesisFlow. All Rights Reserved
+            <div className="font-medium">
+              Copyright © 2025 ThesisFlow-AI. All Rights Reserved
             </div>
           </div>
         </div>
