@@ -297,63 +297,78 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Who We Serve Section */}
-      <section className="py-28 md:py-32 lg:py-36 bg-background">
+      {/* Who We Serve Section - Pixel Perfect Match to Reference */}
+      <section className="py-28 md:py-32 lg:py-36 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center max-w-3xl mx-auto"
+            className="text-center max-w-4xl mx-auto"
           >
-            <div className="text-xs tracking-[0.2em] text-neutral-500 uppercase mb-4">Who we serve</div>
-            <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">
-              For Students, Researchers & Growing Teams
+            <div className="text-xs tracking-[0.2em] text-neutral-500 uppercase mb-4 font-normal">WHO WE SERVE</div>
+            <h3 className="text-4xl sm:text-5xl md:text-6xl font-normal tracking-tight text-neutral-900 leading-[1.1]">
+              For Students, Researchers &<br />Growing Teams
             </h3>
-            <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
+            <p className="mt-6 text-neutral-600 text-lg leading-relaxed max-w-2xl mx-auto">
               From solo projects to research groups and labs, ThesisFlow meets you where you are and scales as your ambitions take off.
             </p>
           </motion.div>
 
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {/* Card 1 */}
-            <div className="group relative overflow-hidden rounded-2xl ring-1 ring-black/10 bg-white shadow">
-              <div className="relative aspect-[16/10] md:aspect-[4/3]">
-                <Image src="/who/students.svg" alt="Students" fill className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Card 1 - Students */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="relative aspect-[4/3]">
+                <Image 
+                  src="/students.png" 
+                  alt="Students" 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                />
                 <div className="absolute inset-x-0 bottom-0">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
-                  <div className="relative p-5">
-                    <div className="text-[11px] tracking-[0.15em] uppercase text-white/90 mb-2">Students</div>
-                    <p className="text-white/90 text-sm leading-relaxed">Ace your literature reviews, organize notes, and turn messy PDFs into polished summaries.</p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="relative p-6">
+                    <div className="text-xs tracking-[0.15em] uppercase text-white/90 mb-3 font-medium">STUDENTS</div>
+                    <p className="text-white text-sm leading-relaxed font-normal">Ace your literature reviews, organize notes, and turn messy PDFs into polished summaries.</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Card 2 */}
-            <div className="group relative overflow-hidden rounded-2xl ring-1 ring-black/10 bg-white shadow">
-              <div className="relative aspect-[16/10] md:aspect-[4/3]">
-                <Image src="/who/researchers.svg" alt="Independent Researchers" fill className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+            {/* Card 2 - Independent Researchers */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="relative aspect-[4/3]">
+                <Image 
+                  src="/researchers.png" 
+                  alt="Independent Researchers" 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                />
                 <div className="absolute inset-x-0 bottom-0">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
-                  <div className="relative p-5">
-                    <div className="text-[11px] tracking-[0.15em] uppercase text-white/90 mb-2">Independent Researchers</div>
-                    <p className="text-white/90 text-sm leading-relaxed">Build a repeatable workflow—retrieval, deduping, and project planning in one place.</p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="relative p-6">
+                    <div className="text-xs tracking-[0.15em] uppercase text-white/90 mb-3 font-medium">INDEPENDENT RESEARCHERS</div>
+                    <p className="text-white text-sm leading-relaxed font-normal">Build a repeatable workflow—retrieval, deduping, and project planning in one place.</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Card 3 */}
-            <div className="group relative overflow-hidden rounded-2xl ring-1 ring-black/10 bg-white shadow">
-              <div className="relative aspect-[16/10] md:aspect-[4/3]">
-                <Image src="/who/teams.svg" alt="Research Teams & Labs" fill className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+            {/* Card 3 - Research Teams & Labs */}
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="relative aspect-[4/3]">
+                <Image 
+                  src="/research_labs.png" 
+                  alt="Research Teams & Labs" 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                />
                 <div className="absolute inset-x-0 bottom-0">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
-                  <div className="relative p-5">
-                    <div className="text-[11px] tracking-[0.15em] uppercase text-white/90 mb-2">Research Teams & Labs</div>
-                    <p className="text-white/90 text-sm leading-relaxed">Share context, assign tasks, and publish faster with aligned timelines and sources.</p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="relative p-6">
+                    <div className="text-xs tracking-[0.15em] uppercase text-white/90 mb-3 font-medium">RESEARCH TEAMS & LABS</div>
+                    <p className="text-white text-sm leading-relaxed font-normal">Share context, assign tasks, and publish faster with aligned timelines and sources.</p>
                   </div>
                 </div>
               </div>
