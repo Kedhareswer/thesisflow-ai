@@ -1,9 +1,14 @@
+'use server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/integrations/supabase/types'
 
 let adminClient: SupabaseClient<Database> | null = null
 
 export function getSupabaseAdmin(): SupabaseClient<Database> {
+  if (typeof window !== 'undefined') {
+    throw new Error('getSupabaseAdmin must not be called from the browser')
+  }
+  // Prevent accidental usage in the browser
   if (adminClient) return adminClient
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
