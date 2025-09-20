@@ -80,7 +80,7 @@ export class TokenMiddleware {
           { 
             status: 429,
             headers: {
-              'Retry-After': Math.max(0, Math.ceil((rateLimit.resetTime - Date.now()) / 1000)).toString(),
+              'Retry-After': Math.max(1, Math.ceil((rateLimit.resetTime - Date.now()) / 1000)).toString(),
               'X-RateLimit-Remaining-Monthly': rateLimit.monthlyRemaining.toString(),
               'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString()
             }
@@ -187,9 +187,9 @@ export class TokenMiddleware {
           { 
             status: 429,
             headers: {
-              'Retry-After': Math.max(0, Math.ceil((rateLimit.resetTime - Date.now()) / 1000)).toString(),
+              'Retry-After': Math.ceil(rateLimit.resetTime / 1000).toString(),
               'X-RateLimit-Remaining-Monthly': rateLimit.monthlyRemaining.toString(),
-              'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString()
+              'X-RateLimit-Reset': new Date(Date.now() + rateLimit.resetTime).toISOString()
             }
           }
         );

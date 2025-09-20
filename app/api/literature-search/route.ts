@@ -3,27 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import { LiteratureSearchService } from '@/lib/services/literature-search.service';
 import { withTokenValidation } from '@/lib/middleware/token-middleware';
 
-// Lazy initialization to avoid build-time env var issues
-let supabase: ReturnType<typeof createClient> | null = null;
-let literatureSearch: LiteratureSearchService | null = null;
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-function getServices() {
-  if (supabase && literatureSearch) {
-    return { supabase, literatureSearch };
-  }
-  
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!url || !key) {
-    throw new Error('Missing Supabase environment variables');
-  }
-  
-  supabase = createClient(url, key);
-  literatureSearch = new LiteratureSearchService(supabase);
-  
-  return { supabase, literatureSearch };
-}
+// Initialize literature search service
+const literatureSearch = new LiteratureSearchService(supabase);
 
 // Maximum allowed aggregation window to prevent integer overflow and overly heavy queries.
 // Clamp user-provided values to this range; if out-of-range or invalid, fall back to 0.
@@ -82,7 +69,6 @@ export const GET = withTokenValidation(
       if (!isCitationMode && (!aggregateWindowMs || aggregateWindowMs <= 0)) {
         const cacheKey = `${query!.trim().toLowerCase()}_${limit}`;
         try {
-          const { supabase } = getServices();
           const { data } = await supabase
             .from('literature_cache')
             .select('result, expires_at')
@@ -91,7 +77,7 @@ export const GET = withTokenValidation(
             .single();
 
           if (data?.result) {
-            const cached: any = JSON.parse(data.result as string);
+            const cached: any = JSON.parse(data.result);
             return NextResponse.json({
               ...cached,
               cached: true,
@@ -109,7 +95,6 @@ export const GET = withTokenValidation(
       }
 
       // Perform search
-      const { literatureSearch } = getServices();
       let result: any;
       if (isCitationMode) {
         const papers = mode === 'forward'
@@ -202,7 +187,6 @@ export const POST = withTokenValidation(
       if (!isCitationMode && (!aggregateWindowMs || aggregateWindowMs <= 0)) {
         const cacheKey = `${String(query).trim().toLowerCase()}_${normalizedLimit}`;
         try {
-          const { supabase } = getServices();
           const { data } = await supabase
             .from('literature_cache')
             .select('result, expires_at')
@@ -211,7 +195,7 @@ export const POST = withTokenValidation(
             .single();
 
           if (data?.result) {
-            const cached: any = JSON.parse(data.result as string);
+            const cached: any = JSON.parse(data.result);
             return NextResponse.json({
               ...cached,
               cached: true
@@ -228,7 +212,6 @@ export const POST = withTokenValidation(
       }
 
       // Perform search
-      const { literatureSearch } = getServices();
       let result: any;
       if (isCitationMode) {
         const papers = mode === 'forward'
@@ -293,7 +276,6 @@ async function checkRateLimit(userId: string | null, ipAddress: string): Promise
   try {
     // Use user ID if available, otherwise use IP address
     const identifier = userId || ipAddress;
-    const { supabase } = getServices();
     
     const { data, error } = await supabase.rpc('check_literature_search_rate_limit', {
       p_user_id: userId ? userId : null,
@@ -312,7 +294,7 @@ async function checkRateLimit(userId: string | null, ipAddress: string): Promise
       };
     }
 
-    return (data as any)?.[0] || {
+    return data[0] || {
       allowed: true,
       current_count: 0,
       reset_time: new Date(Date.now() + 3600000).toISOString()
@@ -331,7 +313,6 @@ async function checkRateLimit(userId: string | null, ipAddress: string): Promise
 
 async function trackUsage(userId: string, query: string, result: any): Promise<void> {
   try {
-    const { supabase } = getServices();
     await supabase
       .from('literature_search_usage')
       .insert({

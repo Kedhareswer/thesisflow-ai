@@ -8,27 +8,13 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Lazy initialization to avoid build-time env var issues
-let supabase: ReturnType<typeof createClient> | null = null;
-let literatureSearch: LiteratureSearchService | null = null;
+// Supabase client (service role for server-side ops like rate limiting + usage)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-function getServices(): { supabase: ReturnType<typeof createClient>; literatureSearch: LiteratureSearchService } {
-  if (supabase && literatureSearch) {
-    return { supabase, literatureSearch } as { supabase: ReturnType<typeof createClient>; literatureSearch: LiteratureSearchService };
-  }
-  
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!url || !key) {
-    throw new Error('Missing Supabase environment variables');
-  }
-  
-  supabase = createClient(url, key);
-  literatureSearch = new LiteratureSearchService(supabase);
-  
-  return { supabase: supabase!, literatureSearch: literatureSearch! };
-}
+const literatureSearch = new LiteratureSearchService(supabase);
 
 interface RateLimitResult {
   allowed: boolean;
@@ -141,7 +127,6 @@ export async function GET(request: NextRequest) {
 
       // Kick off streaming: normal multi-source or citation mode
       const run = async () => {
-        const { literatureSearch } = getServices();
         if (isCitation) {
           const chosenSeed = seed || query;
           try {
@@ -258,7 +243,6 @@ function getClientIP(request: NextRequest): string {
 
 async function checkRateLimit(userId: string | null, ipAddress: string): Promise<RateLimitResult> {
   try {
-    const { supabase } = getServices();
     const { data, error } = await supabase.rpc('check_literature_search_rate_limit', {
       p_user_id: userId ? userId : null,
       p_ip_address: ipAddress,
@@ -266,7 +250,7 @@ async function checkRateLimit(userId: string | null, ipAddress: string): Promise
       p_window_minutes: 60,
     });
     if (error) throw error;
-    return (data as any)?.[0] || {
+    return data?.[0] || {
       allowed: true,
       current_count: 0,
       reset_time: new Date(Date.now() + 3600000).toISOString(),
@@ -283,7 +267,6 @@ async function checkRateLimit(userId: string | null, ipAddress: string): Promise
 
 async function trackUsage(userId: string, query: string, result: any): Promise<void> {
   try {
-    const { supabase } = getServices();
     await supabase
       .from('literature_search_usage')
       .insert({
@@ -325,7 +308,6 @@ async function ensureSessionRecord(
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
-    const { supabase } = getServices();
     await supabase
       .from('search_sessions')
       .upsert({
@@ -348,7 +330,6 @@ async function logSessionEvent(
   data?: any
 ): Promise<void> {
   try {
-    const { supabase } = getServices();
     await supabase
       .from('search_events')
       .insert({
@@ -370,7 +351,6 @@ async function storeSearchResult(sessionId: string, paper: any, orderIndex?: num
       source: paper?.source || null,
       order_index: typeof orderIndex === 'number' ? orderIndex : null,
     } as any;
-    const { supabase } = getServices();
     await supabase
       .from('search_results')
       .upsert(row, { onConflict: 'session_id,stable_key' });
@@ -381,7 +361,6 @@ async function storeSearchResult(sessionId: string, paper: any, orderIndex?: num
 async function completeSession(sessionId: string, totalEmitted: number): Promise<void> {
   try {
     const now = new Date().toISOString();
-    const { supabase } = getServices();
     await supabase
       .from('search_sessions')
       .update({
@@ -395,7 +374,6 @@ async function completeSession(sessionId: string, totalEmitted: number): Promise
 
 async function touchSession(sessionId: string): Promise<void> {
   try {
-    const { supabase } = getServices();
     await supabase
       .from('search_sessions')
       .update({ last_activity_at: new Date().toISOString() })
