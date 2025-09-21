@@ -241,7 +241,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center max-w-3xl mx-auto"
           >
@@ -275,7 +275,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 1.2, delay: 0.2 }}
             viewport={{ once: true }}
             className="mt-12 md:mt-14 lg:mt-16"
           >
@@ -306,7 +306,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center mb-14"
           >
@@ -318,7 +318,7 @@ export default function HomePage() {
             {benefitItems.map((b) => {
               const Icon = b.icon
               return (
-                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all p-6 lg:p-7">
+                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-600 p-6 lg:p-7">
                   <Icon className="h-7 w-7 text-white mb-4" />
                   <div className="text-lg font-medium mb-2">{b.title}</div>
                   <p className="text-sm text-neutral-300 leading-relaxed">{b.description}</p>
@@ -335,7 +335,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center max-w-4xl mx-auto"
           >
@@ -350,13 +350,13 @@ export default function HomePage() {
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Card 1 - Students */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-600">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/students.png" 
                   alt="Students" 
                   fill 
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                  className="object-cover transition-transform duration-1000 group-hover:scale-[1.02]" 
                 />
                 <div className="absolute inset-x-0 bottom-0">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -369,13 +369,13 @@ export default function HomePage() {
             </div>
 
             {/* Card 2 - Independent Researchers */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-600">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/researchers.png" 
                   alt="Independent Researchers" 
                   fill 
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                  className="object-cover transition-transform duration-1000 group-hover:scale-[1.02]" 
                 />
                 <div className="absolute inset-x-0 bottom-0">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -388,13 +388,13 @@ export default function HomePage() {
             </div>
 
             {/* Card 3 - Research Teams & Labs */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-600">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/research_labs.png" 
                   alt="Research Teams & Labs" 
                   fill 
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                  className="object-cover transition-transform duration-1000 group-hover:scale-[1.02]" 
                 />
                 <div className="absolute inset-x-0 bottom-0">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -454,7 +454,7 @@ export default function HomePage() {
         id="pricing"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 1.2 }}
         viewport={{ once: true }}
       >
         <Pricing />
@@ -466,7 +466,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center mb-16"
           >
