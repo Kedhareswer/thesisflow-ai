@@ -1,7 +1,7 @@
 import { AIProviderDetector } from "./ai-provider-detector"
 
 // AI Provider Types
-export type AIProvider = "gemini" | "aiml" | "groq" | "openai" | "anthropic" | "mistral"
+export type AIProvider = "gemini" | "aiml" | "groq" | "openai" | "anthropic" | "mistral" | "openrouter"
 
 export interface AIProviderConfig {
   name: string
@@ -39,6 +39,19 @@ export interface StreamingController {
 
 // Provider configurations
 export const AI_PROVIDERS: Record<AIProvider, AIProviderConfig> = {
+  openrouter: {
+    name: "OpenRouter",
+    models: [
+      "z-ai/glm-4.5-air:free",
+      "agentica-org/deepcoder-14b-preview:free",
+      "nousresearch/deephermes-3-llama-3-8b-preview:free",
+      "nvidia/nemotron-nano-9b-v2:free",
+      "deepseek/deepseek-chat-v3.1:free",
+      "openai/gpt-oss-120b:free",
+    ],
+    maxTokens: 128000,
+    supportedFeatures: ["text", "chat", "summarization", "analysis", "code", "reasoning", "multimodal"],
+  },
   gemini: {
     name: "Google Gemini",
     models: [

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, Activity } from "lucide-react"
+import { CheckCircle2, Clock, Target, TrendingUp, TrendingDown, Plus, Filter, BarChart3, User, AlertCircle, Calendar as CalendarIcon, Flag, MessageSquare, Activity, AlertTriangle } from "lucide-react"
 import Sidebar from "../ai-agents/components/Sidebar"
 import { FullScreenCalendar } from "@/components/ui/fullscreen-calendar"
 import { SmartUpgradeBanner, ProjectLimitBanner } from "@/components/ui/smart-upgrade-banner"
@@ -14,27 +14,29 @@ import projectService, { Project, Task, Subtask, TaskComment } from "@/lib/servi
 import { AnalyticsService, AnalyticsData } from "@/lib/services/analytics.service"
 import { 
   TaskStatusDistribution, 
-  ProjectProgress, 
-  TaskPriorityAnalysis, 
   RecentActivity, 
   PerformanceInsights, 
-  AdvancedAnalytics 
+  AdvancedAnalytics,
+  ProjectProgress,
+  TaskPriorityAnalysis
 } from "@/components/planner/analytics-charts"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
 import { useForm } from "react-hook-form"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
 import { parseISO, parse, isValid, format } from "date-fns"
-import { usePlanAndExecute } from "@/hooks/use-plan-and-execute"
+import { usePlanAndExecute } from '@/hooks/use-plan-and-execute'
+import { useDeepSearch } from '@/hooks/use-deep-search'
+import { plannerAIService, OPENROUTER_MODEL_CAPABILITIES } from '@/lib/services/planner-ai.service'
+import { plannerDraftService } from '@/lib/services/planner-draft.service'
 import { Label } from "@/components/ui/label"
-import { useDeepSearch } from "@/hooks/use-deep-search"
 
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -281,6 +283,15 @@ export default function PlannerPage() {
   const [applyCooldown, setApplyCooldown] = useState<number>(0)
   const [ganttSchedule, setGanttSchedule] = useState<any[]>([])
   const [ganttStartDate, setGanttStartDate] = useState<string>('')
+  
+  // Wizard flow state
+  const [wizardStep, setWizardStep] = useState<'inputs' | 'generate' | 'edit' | 'preview' | 'apply'>('inputs')
+  const [selectedModel, setSelectedModel] = useState<string>('nousresearch/deephermes-3-llama-3-8b-preview:free')
+  const [modelComparison, setModelComparison] = useState<Record<string, any>>({})
+  const [guardrailsResult, setGuardrailsResult] = useState<any>(null)
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [newProjectTitle, setNewProjectTitle] = useState<string>('')
 
   const reorderTasks = (fromIndex: number, toIndex: number) => {
     setPlanDraft((prev: any) => {
@@ -360,22 +371,159 @@ export default function PlannerPage() {
     trackAnalytics('gantt_generated', { taskCount: schedule.length, totalDays: schedule.reduce((acc, s) => acc + s.duration, 0) })
   }
   
-  const moveTaskInGantt = (taskId: string, newStartDate: Date) => {
-    setGanttSchedule(prev => {
-      const updated = prev.map(item => {
-        if (item.taskId === taskId) {
-          const duration = item.duration
-          return {
-            ...item,
-            startDate: new Date(newStartDate),
-            endDate: new Date(newStartDate.getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
-          }
+  const moveTaskInGantt = (taskId: string, newDate: Date) => {
+    setGanttSchedule(prev => prev.map(item => 
+      item.taskId === taskId 
+        ? { ...item, startDate: newDate, endDate: new Date(newDate.getTime() + item.duration * 60000) }
+        : item
+    ))
+    // Analytics: Gantt task moved
+    trackAnalytics('gantt_task_moved', { taskId, newDate: newDate.toISOString() })
+  }
+
+  // Wizard navigation functions
+  const nextWizardStep = () => {
+    const steps: Array<typeof wizardStep> = ['inputs', 'generate', 'edit', 'preview', 'apply']
+    const currentIndex = steps.indexOf(wizardStep)
+    if (currentIndex < steps.length - 1) {
+      setWizardStep(steps[currentIndex + 1])
+    }
+  }
+
+  const prevWizardStep = () => {
+    const steps: Array<typeof wizardStep> = ['inputs', 'generate', 'edit', 'preview', 'apply']
+    const currentIndex = steps.indexOf(wizardStep)
+    if (currentIndex > 0) {
+      setWizardStep(steps[currentIndex - 1])
+    }
+  }
+
+  const goToWizardStep = (step: typeof wizardStep) => {
+    setWizardStep(step)
+  }
+
+  // OpenRouter plan generation
+  const generatePlanWithOpenRouter = async (userQuery: string, taskType: 'planning' | 'analysis' | 'code' | 'research' | 'creative' = 'planning') => {
+    if (!userId) {
+      toast({ title: 'Authentication required', description: 'Please sign in to generate plans.', variant: 'destructive' })
+      return
+    }
+
+    try {
+      setWizardStep('generate')
+      
+      // Analytics: Plan generation started
+      trackAnalytics('plan_generated', { model: selectedModel, taskType, queryLength: userQuery.length })
+
+      const result = await plannerAIService.generatePlan(
+        userQuery,
+        taskType,
+        userId,
+        {
+          maxTokens: 2000,
+          temperature: 0.7,
+          enableGuardrails: true,
+          maxPlanSize: 20,
+          requiredFields: ['title', 'description', 'tasks']
         }
-        return item
+      )
+
+      if (!result.success) {
+        toast({ 
+          title: 'Generation failed', 
+          description: result.error || 'Failed to generate plan',
+          variant: 'destructive' 
+        })
+        return
+      }
+
+      // Parse the generated plan
+      let planData
+      try {
+        planData = JSON.parse(result.content || '{}')
+      } catch {
+        // If not JSON, create a structured plan from the text
+        planData = {
+          id: `plan_${Date.now()}`,
+          title: 'Generated Plan',
+          description: result.content?.substring(0, 200) + '...',
+          tasks: [
+            {
+              id: `task_${Date.now()}`,
+              title: 'Review Generated Content',
+              description: result.content || 'No content generated',
+              type: 'review',
+              priority: 1,
+              estimatedTime: '30 minutes'
+            }
+          ]
+        }
+      }
+
+      setPlanDraft(planData)
+      setGuardrailsResult(result.guardrails)
+
+      // Save draft to Supabase
+      try {
+        const draft = await plannerDraftService.saveDraftProgress({
+          draftId: currentDraftId || undefined,
+          title: planData.title || 'Generated Plan',
+          description: planData.description,
+          user_query: userQuery,
+          plan_data: planData,
+          wizard_step: 'edit',
+          selected_model: selectedModel,
+          metadata: {
+            model_strengths: result.modelStrengths,
+            model_limitations: result.modelLimitations,
+            guardrails: result.guardrails
+          }
+        }, userId)
+        setCurrentDraftId(draft.id)
+      } catch (error) {
+        console.warn('Failed to save draft:', error)
+      }
+
+      setWizardStep('edit')
+      toast({ 
+        title: 'Plan generated', 
+        description: `Generated ${planData.tasks?.length || 0} tasks using ${selectedModel.split('/').pop()}`,
+        variant: 'default'
       })
-      trackAnalytics('gantt_task_moved', { taskId, newStartDate: newStartDate.toISOString() })
-      return updated
-    })
+
+    } catch (error) {
+      console.error('Plan generation error:', error)
+      toast({ 
+        title: 'Generation error', 
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive' 
+      })
+    }
+  }
+
+  // Model comparison function
+  const compareModels = async (userQuery: string) => {
+    if (!userId) return
+
+    const modelsToCompare = Object.keys(OPENROUTER_MODEL_CAPABILITIES).slice(0, 3) // Compare first 3 models
+    
+    try {
+      const results = await plannerAIService.compareModels(userQuery, modelsToCompare, userId)
+      setModelComparison(results)
+      
+      toast({
+        title: 'Model comparison complete',
+        description: `Compared ${modelsToCompare.length} models for analysis`,
+        variant: 'default'
+      })
+    } catch (error) {
+      console.error('Model comparison error:', error)
+      toast({
+        title: 'Comparison failed',
+        description: 'Failed to compare models',
+        variant: 'destructive'
+      })
+    }
   }
 
   const computeSchedule = () => {
@@ -1208,74 +1356,328 @@ export default function PlannerPage() {
 
         {/* Auto Planner - Phase 1 (streaming + preview) */}
         <TabsContent value="auto-planner" className="space-y-6">
+          {/* Wizard Progress Bar */}
           <Card>
-            <CardHeader>
-              <CardTitle>Generate Plan</CardTitle>
-              <CardDescription>Provide a research topic and optional parameters, then stream the AI plan.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Research Topic</Label>
-                  <Textarea
-                    placeholder="e.g. Graph Neural Networks for citation prediction"
-                    value={autoTopic}
-                    onChange={(e) => setAutoTopic(e.target.value)}
-                  />
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  {(['inputs', 'generate', 'edit', 'preview', 'apply'] as const).map((step, index) => (
+                    <div key={step} className="flex items-center">
+                      <div 
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium cursor-pointer transition-colors ${
+                          wizardStep === step 
+                            ? 'bg-blue-600 text-white' 
+                            : index < (['inputs', 'generate', 'edit', 'preview', 'apply'] as const).indexOf(wizardStep)
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}
+                        onClick={() => goToWizardStep(step)}
+                      >
+                        {index + 1}
+                      </div>
+                      <span className={`ml-2 text-sm ${wizardStep === step ? 'font-medium' : 'text-gray-600'}`}>
+                        {step.charAt(0).toUpperCase() + step.slice(1)}
+                      </span>
+                      {index < 4 && <div className="w-8 h-0.5 bg-gray-300 mx-2" />}
+                    </div>
+                  ))}
                 </div>
-                <div className="space-y-2">
-                  <Label>Selected Tools (comma-separated)</Label>
-                  <Input
-                    placeholder="e.g. web, scholar, code"
-                    value={autoSelectedTools}
-                    onChange={(e) => setAutoSelectedTools(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Use Deep Research</Label>
-                  <Select value={String(autoUseDeepResearch)} onValueChange={(v) => setAutoUseDeepResearch(v === "true")}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="false">Disabled</SelectItem>
-                      <SelectItem value="true">Enabled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Max Iterations (deep research)</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={12}
-                    value={autoMaxIterations}
-                    onChange={(e) => setAutoMaxIterations(Number(e.target.value || 4))}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => planExec.start({
-                    userQuery: autoTopic,
-                    selectedTools: autoSelectedTools.split(",").map(s => s.trim()).filter(Boolean),
-                    useDeepResearch: autoUseDeepResearch,
-                    maxIterations: autoMaxIterations,
-                  })}
-                  disabled={planExec.isStreaming || !autoTopic.trim()}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {planExec.isStreaming ? "Generating…" : "Generate Plan"}
-                </Button>
-                <Button variant="outline" onClick={planExec.stop} disabled={!planExec.isStreaming}>Stop</Button>
-                <Button variant="ghost" onClick={planExec.reset}>Reset</Button>
-                {planExec.progress?.overallProgress !== undefined && (
-                  <span className="text-sm text-gray-600">Progress: {planExec.progress.overallProgress}%</span>
-                )}
               </div>
             </CardContent>
           </Card>
+
+          {/* Step 1: Inputs */}
+          {wizardStep === 'inputs' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Plan Inputs</CardTitle>
+                <CardDescription>Define your research topic and select the optimal AI model</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Research Topic</Label>
+                    <Textarea
+                      placeholder="e.g. Graph Neural Networks for citation prediction"
+                      value={autoTopic}
+                      onChange={(e) => setAutoTopic(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>OpenRouter Model</Label>
+                    <Select value={selectedModel} onValueChange={setSelectedModel}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(OPENROUTER_MODEL_CAPABILITIES).map(([model, capabilities]) => (
+                          <SelectItem key={model} value={model}>
+                            <div className="flex flex-col">
+                              <span>{model.split('/').pop()}</span>
+                              <span className="text-xs text-gray-500">
+                                {capabilities.performance.speed} • {capabilities.performance.reasoning} reasoning
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedModel && (
+                      <div className="text-xs text-gray-600 mt-2">
+                        <div><strong>Strengths:</strong> {OPENROUTER_MODEL_CAPABILITIES[selectedModel]?.strengths.join(', ')}</div>
+                        <div><strong>Best for:</strong> {OPENROUTER_MODEL_CAPABILITIES[selectedModel]?.bestUseCases.join(', ')}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => generatePlanWithOpenRouter(autoTopic)}
+                    disabled={!autoTopic.trim()}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Generate Plan
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => compareModels(autoTopic)}
+                    disabled={!autoTopic.trim()}
+                  >
+                    Compare Models
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Generate (Loading/Progress) */}
+          {wizardStep === 'generate' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Generating Plan</CardTitle>
+                <CardDescription>Using {selectedModel.split('/').pop()} to create your research plan...</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-sm text-gray-600">Generating plan with OpenRouter...</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Edit */}
+          {wizardStep === 'edit' && planDraft && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Plan</CardTitle>
+                <CardDescription>
+                  Review and modify your generated plan. 
+                  {guardrailsResult && !guardrailsResult.ok && (
+                    <span className="text-orange-600 ml-2">
+                      ⚠️ {guardrailsResult.issues.length} guardrail issues detected
+                    </span>
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Plan Title</Label>
+                    <Input
+                      value={planDraft.title || ''}
+                      onChange={(e) => setPlanDraft((prev: any) => ({ ...prev, title: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={planDraft.description || ''}
+                      onChange={(e) => setPlanDraft((prev: any) => ({ ...prev, description: e.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+
+                {/* Guardrails Results */}
+                {guardrailsResult && (
+                  <div className={`p-3 rounded-md border ${guardrailsResult.ok ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {guardrailsResult.ok ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      )}
+                      <span className="font-medium">
+                        QA Guardrails {guardrailsResult.ok ? 'Passed' : 'Issues Found'}
+                      </span>
+                    </div>
+                    {!guardrailsResult.ok && (
+                      <ul className="text-sm text-orange-700 list-disc list-inside">
+                        {guardrailsResult.issues.map((issue: string, index: number) => (
+                          <li key={index}>{issue}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Task List Editor */}
+                <div className="space-y-2">
+                  <Label>Tasks ({planDraft.tasks?.length || 0})</Label>
+                  <div className="border rounded-md p-3 max-h-96 overflow-auto">
+                    {planDraft.tasks?.map((task: any, index: number) => (
+                      <div key={task.id || index} className="flex items-center gap-2 p-2 border-b last:border-b-0">
+                        <div className="flex-1">
+                          <Input
+                            value={task.title || ''}
+                            onChange={(e) => updateTaskField(task.id || `task_${index}`, 'title', e.target.value)}
+                            placeholder="Task title"
+                            className="mb-1"
+                          />
+                          <Input
+                            value={task.estimatedTime || ''}
+                            onChange={(e) => updateTaskField(task.id || `task_${index}`, 'estimatedTime', e.target.value)}
+                            placeholder="Estimated time"
+                            className="text-sm"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newTasks = planDraft.tasks.filter((_: any, i: number) => i !== index)
+                            setPlanDraft((prev: any) => ({ ...prev, tasks: newTasks }))
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button onClick={() => setWizardStep('preview')}>
+                    Preview Plan
+                  </Button>
+                  <Button variant="outline" onClick={() => setWizardStep('inputs')}>
+                    Back to Inputs
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 4: Preview */}
+          {wizardStep === 'preview' && planDraft && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Preview Plan</CardTitle>
+                <CardDescription>Review your plan before applying it to your projects</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h3 className="font-medium mb-2">{planDraft.title}</h3>
+                  <p className="text-sm text-gray-600 mb-4">{planDraft.description}</p>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Tasks ({planDraft.tasks?.length || 0}):</h4>
+                    {planDraft.tasks?.map((task: any, index: number) => (
+                      <div key={task.id || index} className="flex items-center gap-2 text-sm">
+                        <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
+                          {index + 1}
+                        </span>
+                        <span className="flex-1">{task.title}</span>
+                        <span className="text-gray-500">{task.estimatedTime}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button 
+                    onClick={() => setWizardStep('apply')}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    Apply Plan
+                  </Button>
+                  <Button variant="outline" onClick={() => setWizardStep('edit')}>
+                    Back to Edit
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 5: Apply */}
+          {wizardStep === 'apply' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Apply Plan</CardTitle>
+                <CardDescription>Choose how to apply your plan to your projects</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Project Selection</Label>
+                    <Select value={selectedProjectId || ''} onValueChange={(v) => setSelectedProjectId(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select existing project or create new" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">Create New Project</SelectItem>
+                        {projects.map(project => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {selectedProjectId === 'new' && (
+                    <div className="space-y-2">
+                      <Label>New Project Title</Label>
+                      <Input
+                        value={newProjectTitle}
+                        onChange={(e) => setNewProjectTitle(e.target.value)}
+                        placeholder="Enter project title"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => applyPlan({
+                      projectId: selectedProjectId === 'new' ? null : selectedProjectId,
+                      newProjectTitle: selectedProjectId === 'new' ? newProjectTitle : undefined,
+                      newProjectDescription: planDraft?.description
+                    })}
+                    disabled={applyCooldown > 0 || !selectedProjectId}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {applyCooldown > 0 ? `Wait ${applyCooldown}s` : 'Apply to Project'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => applyPlan({ dryRun: true })}
+                    disabled={applyCooldown > 0}
+                  >
+                    Dry Run
+                  </Button>
+                  <Button variant="outline" onClick={() => setWizardStep('preview')}>
+                    Back to Preview
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
