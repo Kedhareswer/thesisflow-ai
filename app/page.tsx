@@ -246,7 +246,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="mt-12 md:mt-14 lg:mt-16"
           >
-            <div className="relative max-w-[1040px] mx-auto rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">
+            <div className="relative max-w-[520px] mx-auto rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">
               <div className="h-11 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2.5 px-5">
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FF5F57]" />
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]" />
