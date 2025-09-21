@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { TokenMiddleware } from '@/lib/middleware/token-middleware'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
 
+import { createHash } from 'crypto'
+
 // Utilities
 function parseEstimatedMinutes(s?: string): number {
   if (!s) return 60
@@ -27,13 +29,8 @@ function toPriorityLabel(p: any): 'low' | 'medium' | 'high' {
 
 function hashIdempotency(userId: string, key: string, planId?: string) {
   const data = `${userId}:${key || ''}:${planId || ''}`
-  // Simple FNV-1a
-  let h = 2166136261
-  for (let i = 0; i < data.length; i++) {
-    h ^= data.charCodeAt(i)
-    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)
-  }
-  return `idem_${(h >>> 0).toString(16)}`
+  const digest = createHash('sha256').update(data).digest('hex')
+  return `idem_${digest}`
 }
 
 export async function POST(request: NextRequest) {
@@ -86,8 +83,8 @@ export async function POST(request: NextRequest) {
         if (perr) {
           return NextResponse.json({ error: 'Project not found' }, { status: 404 })
         }
-        if (p.owner_id && p.owner_id !== userId) {
-          return NextResponse.json({ error: 'Forbidden: not project owner' }, { status: 403 })
+        if (!p.owner_id || p.owner_id !== userId) {
+          return NextResponse.json({ error: 'Forbidden: must be project owner' }, { status: 403 })
         }
         targetProjectId = p.id
         // Optionally update deadline (end_date)
