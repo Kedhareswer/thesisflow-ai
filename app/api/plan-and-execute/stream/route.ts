@@ -57,9 +57,39 @@ export async function GET(request: NextRequest) {
         const executingService = new ExecutingService()
         const deepResearcherService = new DeepResearcherService()
 
+        // Expose cleanup to both start() and cancel()
+        let cleanupRef: (() => void) | null = null
+
         const stream = new ReadableStream<Uint8Array>({
           start(c) {
             controller = c
+
+            // Heartbeat/cleanup state
+            let heartbeat: ReturnType<typeof setInterval> | null = null
+            let cleanupCalled = false
+            let abortHandler: (() => void) | null = null
+
+            const cleanup = () => {
+              if (cleanupCalled) return
+              cleanupCalled = true
+              // Clear heartbeat if active
+              if (heartbeat) {
+                clearInterval(heartbeat)
+                heartbeat = null
+              }
+              // Detach abort listener
+              if (abortHandler) {
+                try { request.signal.removeEventListener('abort', abortHandler) } catch {}
+              }
+              // Close controller if not already
+              if (!closed) {
+                closed = true
+                try { controller.close() } catch {}
+              }
+            }
+
+            // Share cleanup with cancel()
+            cleanupRef = cleanup
 
             // Recommend client reconnection wait time
             controller.enqueue(encoder.encode(`retry: 15000\n\n`))
@@ -77,20 +107,18 @@ export async function GET(request: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(initPayload)}\n\n`))
 
             // Heartbeat
-            const interval = setInterval(() => {
+            heartbeat = setInterval(() => {
               if (closed) return
               controller.enqueue(encoder.encode(`event: ping\n`))
               controller.enqueue(encoder.encode(`data: {}\n\n`))
             }, 15000)
 
             // Abort handling
-            const abort = () => {
+            abortHandler = () => {
               if (closed) return
-              closed = true
-              clearInterval(interval)
-              try { controller.close() } catch {}
+              cleanup()
             }
-            request.signal.addEventListener('abort', abort)
+            request.signal.addEventListener('abort', abortHandler)
 
             // Main runner
             const run = async () => {
@@ -152,15 +180,15 @@ export async function GET(request: NextRequest) {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`))
                 }
 
-                try { controller.close() } catch {}
-                closed = true
+                // Ensure cleanup clears heartbeat and closes stream
+                cleanup()
               } catch (err) {
                 if (!closed) {
                   const errorPayload = { type: 'error', message: String(err) }
                   controller.enqueue(encoder.encode(`event: error\n`))
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`))
-                  try { controller.close() } catch {}
-                  closed = true
+                  // Ensure cleanup on error as well
+                  cleanup()
                 }
               }
             }
@@ -168,7 +196,11 @@ export async function GET(request: NextRequest) {
             run().catch(() => { /* no-op */ })
           },
           cancel() {
+            // Ensure cleanup when consumer cancels the stream
             closed = true
+            if (cleanupRef) {
+              try { cleanupRef() } finally { cleanupRef = null }
+            }
           },
         })
 
