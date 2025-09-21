@@ -254,7 +254,7 @@ export default function HomePage() {
               </div>
               <div className="relative aspect-[16/10] bg-white">
                 <Image
-                  src="/screenshots/research-dashboard-mock.svg"
+                  src="/dashboard.png"
                   alt="ThesisFlow research dashboard preview"
                   fill
                   className="object-cover"
