@@ -62,11 +62,16 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
   })
 
   const abortRef = useRef<AbortController | null>(null)
+  const esRef = useRef<EventSource | null>(null)
 
   const reset = useCallback(() => {
     if (abortRef.current) {
       try { abortRef.current.abort() } catch {}
       abortRef.current = null
+    }
+    if (esRef.current) {
+      try { esRef.current.close() } catch {}
+      esRef.current = null
     }
     setState({
       plan: null,
@@ -86,6 +91,10 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
     if (abortRef.current) {
       try { abortRef.current.abort() } catch {}
       abortRef.current = null
+    }
+    if (esRef.current) {
+      try { esRef.current.close() } catch {}
+      esRef.current = null
     }
     setState((s) => ({ ...s, isStreaming: false, finishedAt: Date.now() }))
   }, [])
@@ -127,25 +136,100 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
     })
 
     try {
-      // Try to include the Supabase access token for auth if available
-      let authHeader: Record<string, string> | undefined
+      // Try GET + EventSource first for robust streaming
+      let token: string | undefined
       try {
         const { supabase } = await import("@/integrations/supabase/client")
         const sess = await supabase.auth.getSession()
-        const token = sess.data.session?.access_token
-        if (token) {
-          authHeader = { Authorization: `Bearer ${token}` }
+        token = sess.data.session?.access_token || undefined
+      } catch {}
+
+      const usp = new URLSearchParams()
+      usp.set('userQuery', q)
+      if (description) usp.set('description', String(description))
+      if (typeof maxTasks === 'number') usp.set('maxTasks', String(maxTasks))
+      if (selectedTools && selectedTools.length) usp.set('selectedTools', selectedTools.join(','))
+      usp.set('useDeepResearch', String(!!useDeepResearch))
+      usp.set('maxIterations', String(maxIterations))
+      if (token) usp.set('access_token', token)
+
+      let usingEventSource = false
+      try {
+        const es = new EventSource(`/api/plan-and-execute/stream?${usp.toString()}`, { withCredentials: true })
+        esRef.current = es
+        usingEventSource = true
+
+        const handlePayload = (type: PlanExecuteEventType, payload: any) => {
+          if (onEvent) { try { onEvent({ type, payload }) } catch {} }
+          setState((prev) => {
+            const nextLogs = [...prev.logs]
+            const addLog = (msg?: string) => { if (msg) nextLogs.push(msg) }
+
+            switch (type) {
+              case "init":
+                addLog(`Tokens charged: ${payload?.tokensCharged ?? "?"} (feature: ${payload?.tokenFeature ?? "n/a"})`)
+                return { ...prev, lastEvent: type, logs: nextLogs, progress: { message: "Initialized", overallProgress: 0 } }
+              case "plan":
+                addLog("Plan skeleton received.")
+                return { ...prev, lastEvent: type, logs: nextLogs, plan: payload, progress: { ...prev.progress, message: "Plan received" } }
+              case "progress":
+                addLog(payload?.message || `Progress: ${payload?.overallProgress ?? ""}%`)
+                return { ...prev, lastEvent: type, logs: nextLogs, progress: { message: payload?.message, overallProgress: payload?.overallProgress, isComplete: payload?.isComplete, totalTasks: payload?.totalTasks } }
+              case "deep_progress":
+                addLog(payload?.message || "Deep research…")
+                return { ...prev, lastEvent: type, logs: nextLogs }
+              case "deep_research_complete":
+                addLog("Deep research complete.")
+                return { ...prev, lastEvent: type, logs: nextLogs }
+              case "done":
+                addLog("Done.")
+                try { es.close() } catch {}
+                esRef.current = null
+                return { ...prev, lastEvent: type, logs: nextLogs, isStreaming: false, finishedAt: Date.now(), progress: { message: "Completed", overallProgress: payload?.overallProgress, isComplete: payload?.isComplete, totalTasks: payload?.totalTasks } }
+              case "error":
+                addLog(`Error: ${payload?.message || "Unknown error"}`)
+                try { es.close() } catch {}
+                esRef.current = null
+                return { ...prev, lastEvent: type, logs: nextLogs, isStreaming: false, error: payload?.message || "Unknown error", finishedAt: Date.now() }
+              case "ping":
+              default:
+                return prev
+            }
+          })
         }
+
+        es.addEventListener('init', (ev: MessageEvent) => { try { handlePayload('init', JSON.parse(ev.data)) } catch {} })
+        es.addEventListener('plan', (ev: MessageEvent) => { try { handlePayload('plan', JSON.parse(ev.data)) } catch {} })
+        es.addEventListener('progress', (ev: MessageEvent) => { try { handlePayload('progress', JSON.parse(ev.data)) } catch {} })
+        es.addEventListener('deep_progress', (ev: MessageEvent) => { try { handlePayload('deep_progress', JSON.parse(ev.data)) } catch {} })
+        es.addEventListener('deep_research_complete', (ev: MessageEvent) => { try { handlePayload('deep_research_complete', JSON.parse(ev.data)) } catch {} })
+        es.addEventListener('done', (ev: MessageEvent) => { try { handlePayload('done', JSON.parse(ev.data)) } catch {} })
+        es.addEventListener('error', (ev: MessageEvent) => { try { handlePayload('error', JSON.parse((ev as any).data || '{}')) } catch {} })
+        es.onmessage = (ev: MessageEvent) => { // default event (e.g., deep_progress without event name)
+          try {
+            const payload = ev.data ? JSON.parse(ev.data) : null
+            const type = (payload?.type || 'progress') as PlanExecuteEventType
+            handlePayload(type, payload)
+          } catch {}
+        }
+
+        // If EventSource setup succeeds, return and let events drive state
+        return
       } catch {
-        // no-op if supabase is not available in this environment
+        // If EventSource is not available or errors during setup, fall back to POST streaming
+        if (usingEventSource && esRef.current) {
+          try { esRef.current.close() } catch {}
+          esRef.current = null
+        }
       }
+
+      // Fallback: POST + fetch streaming (existing implementation)
+      let authHeader: Record<string, string> | undefined
+      if (token) authHeader = { Authorization: `Bearer ${token}` }
 
       const res = await fetch("/api/plan-and-execute", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authHeader || {}),
-        },
+        headers: { "Content-Type": "application/json", ...(authHeader || {}) },
         body: JSON.stringify({ userQuery: q, description, maxTasks, selectedTools, useDeepResearch, maxIterations }),
         signal: controller.signal,
       })

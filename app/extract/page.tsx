@@ -456,9 +456,19 @@ export default function ExtractPage() {
       if (textCtx) parts.push(`Document Text (truncated):\n${textCtx}`)
       const context = parts.join('\n\n')
 
+      // Attach auth token for API request
+      let headers: HeadersInit = { 'Content-Type': 'application/json' }
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (token) (headers as any).Authorization = `Bearer ${token}`
+      } catch {}
+
       const res = await fetch('/api/extract/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ message: messageText, context })
       })
       // Robustly parse response: prefer JSON when available, otherwise fallback to text

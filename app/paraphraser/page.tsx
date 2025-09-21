@@ -87,7 +87,13 @@ export default function ParaphraserPage() {
       params.set('mode', mode)
       params.set('preserveLength', String(preserveLength))
       params.set('variationLevel', variationLevel)
-      // Use default "Auto" provider/model selection; no access_token in URL
+      // Attach auth token for SSE (headers cannot be set on EventSource)
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (token) params.set('access_token', token)
+      } catch {}
 
       const url = `/api/paraphraser/stream?${params.toString()}`
       const es = new EventSource(url, { withCredentials: true })

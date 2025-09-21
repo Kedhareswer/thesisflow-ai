@@ -44,6 +44,11 @@ export default function PlannerPage() {
   const planExec = usePlanAndExecute()
   const deep = useDeepSearch()
   const [planDraft, setPlanDraft] = useState<any | null>(null)
+  // Auto features must be declared before effects that reference them
+  const [applyCooldown, setApplyCooldown] = useState<number>(0)
+  const [autoDeadline, setAutoDeadline] = useState<string>("")
+  const [autoMode, setAutoMode] = useState<boolean>(true)
+  const [autoApply, setAutoApply] = useState<boolean>(false)
   const calendarData = useMemo(() => {
     return tasks
       .filter((task) => {
@@ -80,8 +85,39 @@ export default function PlannerPage() {
       trackAnalytics('plan_generated', { taskCount: planExec.plan?.tasks?.length || 0, planId: planExec.plan?.id })
       // Advance wizard to Edit step
       setWizardStep((s) => (s < 3 ? 3 : s))
+      // Auto Mode: immediately generate Gantt and save draft to server
+      if (autoMode) {
+        try { generateGanttSchedule() } catch {}
+        ;(async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession()
+            const token = session?.access_token
+            if (token && planExec.plan) {
+              await fetch('/api/planner/drafts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ plan: planExec.plan }),
+              })
+            }
+          } catch {}
+        })()
+      }
     }
   }, [planExec.plan])
+
+  // Auto-apply when stream is done, if enabled
+  useEffect(() => {
+    if (!autoMode || !autoApply) return
+    if (planExec.lastEvent !== 'done') return
+    if (applyCooldown > 0) return
+    const plan = planDraft || planExec.plan
+    if (!plan) return
+    ;(async () => {
+      try {
+        await applyPlan({ newProjectTitle: plan.title, newProjectDescription: plan.description, deadline: autoDeadline })
+      } catch {}
+    })()
+  }, [planExec.lastEvent, autoMode, autoApply, applyCooldown, planDraft, planExec.plan, autoDeadline])
 
   // Offline draft persistence (localStorage)
   useEffect(() => {
@@ -277,12 +313,9 @@ export default function PlannerPage() {
   const [autoSelectedTools, setAutoSelectedTools] = useState<string>("")
   // Phase 2 additions
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [autoDeadline, setAutoDeadline] = useState<string>("")
   const [autoDailyHours, setAutoDailyHours] = useState<number>(2)
   const [autoScheduleData, setAutoScheduleData] = useState<any[]>([])
   const [taskResources, setTaskResources] = useState<Record<string, any[]>>({})
-  // Analytics and cooldown state
-  const [applyCooldown, setApplyCooldown] = useState<number>(0)
   const [ganttSchedule, setGanttSchedule] = useState<any[]>([])
   const [ganttStartDate, setGanttStartDate] = useState<string>('')
   // Wizard & inputs
@@ -292,6 +325,7 @@ export default function PlannerPage() {
   // Server draft sync
   const [serverDraftLoaded, setServerDraftLoaded] = useState(false)
   const saveDraftTimeoutRef = useRef<any>(null)
+  // Auto mode options (moved above)
 
   const reorderTasks = (fromIndex: number, toIndex: number) => {
     setPlanDraft((prev: any) => {
@@ -1343,6 +1377,14 @@ export default function PlannerPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" className="h-4 w-4" checked={autoMode} onChange={(e) => setAutoMode(e.target.checked)} />
+                    Auto Mode
+                  </label>
+                  <label className={`flex items-center gap-2 text-sm ${!autoMode ? 'text-gray-400' : 'text-gray-700'}`}>
+                    <input type="checkbox" className="h-4 w-4" checked={autoApply} onChange={(e) => setAutoApply(e.target.checked)} disabled={!autoMode} />
+                    Auto-apply
+                  </label>
                   <Button
                     onClick={() => planExec.start({
                       userQuery: autoTopic,

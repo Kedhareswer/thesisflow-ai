@@ -119,6 +119,11 @@ export async function POST(request: NextRequest) {
 
             } else {
               // Planner generation via OpenRouter (exclusive provider for planner)
+              // Send a few progress updates while preparing and requesting the model
+              controller.enqueue(encoder.encode(`event: progress\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Preparing prompt…', overallProgress: 10 })}\n\n`))
+              controller.enqueue(encoder.encode(`event: progress\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Requesting OpenRouter model…', overallProgress: 25 })}\n\n`))
               const plan = await generatePlanWithOpenRouter({
                 topic: String(userQuery),
                 description: String(description || ''),
@@ -126,10 +131,12 @@ export async function POST(request: NextRequest) {
                 maxTasks: clampedMaxTasks,
                 signal: request.signal,
               })
-
+              controller.enqueue(encoder.encode(`event: progress\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Validating plan…', overallProgress: 80 })}\n\n`))
               controller.enqueue(encoder.encode(`event: plan\n`))
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(plan)}\n\n`))
-
+              controller.enqueue(encoder.encode(`event: progress\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Finalizing…', overallProgress: 95 })}\n\n`))
               // Done event (we don't execute here; apply happens client-side)
               const donePayload = {
                 type: 'done',
