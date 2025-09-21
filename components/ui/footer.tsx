@@ -26,11 +26,11 @@ export function Footer({ className, ...props }: FooterProps) {
           text.style.whiteSpace = "nowrap";
           text.style.display = "inline-block";
           
-          // GSAP animation
+          // GSAP animation - slower and smoother
           gsap.to(text, {
             xPercent: -100,
             repeat: -1,
-            duration: 20,
+            duration: 40,
             ease: "none",
             modifiers: {
               xPercent: gsap.utils.unitize((x: string) => parseFloat(x) % 100)
@@ -98,25 +98,9 @@ export function Footer({ className, ...props }: FooterProps) {
 
       {/* Bottom section with infinite scroll and overlaid elements */}
       <section className="relative bg-black text-white min-h-[50vh] flex flex-col">
-        {/* GSAP Infinite scrolling text - takes up most of the space */}
-        <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-          <div 
-            ref={scrollingTextRef}
-            className="scrolling-text font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none"
-            style={{ 
-              WebkitTextStroke: '2px rgba(255,107,44,0.2)',
-              fontFamily: 'IBM Plex Sans, sans-serif',
-              color: 'transparent',
-              fontSize: 'clamp(8rem, 15vw, 20rem)',
-              fontWeight: '900'
-            }}
-          />
-        </div>
-
-        {/* Overlaid elements at the bottom */}
-        <div className="absolute bottom-0 left-0 right-0 z-10">
-          {/* Social links and Join Waitlist button */}
-          <div className="container mx-auto px-6 lg:px-8 flex items-center justify-between mb-6">
+        {/* Social links and Join Waitlist button at the top */}
+        <div className="relative z-10 pt-8">
+          <div className="container mx-auto px-6 lg:px-8 flex items-center justify-between">
             <div className="flex items-center space-x-6">
               <a 
                 href="https://twitter.com/thesisflow-ai" 
@@ -155,9 +139,26 @@ export function Footer({ className, ...props }: FooterProps) {
               </Button>
             </div>
           </div>
+        </div>
 
-          {/* Copyright and logo */}
-          <div className="container mx-auto px-6 lg:px-8 pb-6">
+        {/* GSAP Infinite scrolling text - takes up most of the space */}
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center">
+          <div 
+            ref={scrollingTextRef}
+            className="scrolling-text font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none"
+            style={{ 
+              WebkitTextStroke: '2px rgba(255,107,44,0.2)',
+              fontFamily: 'IBM Plex Sans, sans-serif',
+              color: 'transparent',
+              fontSize: 'clamp(8rem, 15vw, 20rem)',
+              fontWeight: '900'
+            }}
+          />
+        </div>
+
+        {/* Copyright and logo at the bottom */}
+        <div className="relative z-10 pb-6">
+          <div className="container mx-auto px-6 lg:px-8">
             <div className="flex items-center justify-between text-sm text-white/70">
               <div className="flex items-center space-x-2">
                 <svg className="w-5 h-5 text-[#FF6B2C]" fill="currentColor" viewBox="0 0 24 24">
