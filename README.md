@@ -1,6 +1,4 @@
-<div align="center">
-
-# 🚀 ThesisFlow-AI
+# ThesisFlow-AI
 
 *Comprehensive AI-powered research platform for academic discovery, document processing, and team collaboration*
 
@@ -9,23 +7,23 @@
 [![Production](https://img.shields.io/badge/Status-Production_Ready-28a745?style=flat-square)](https://thesisflow-ai.vercel.app)
 [![Version](https://img.shields.io/badge/Version-1.0.9-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai)
 
-## 🎯 Core Features
+## Core Features
 
-| 🔍 Explorer | 📝 Writer | 📋 Planner | 👥 Collaborate |
-|-------------|-----------|-------------|------------------|
+| Explorer | Writer | Planner | Collaborate |
+|----------|--------|---------|-------------|
 | Multi-source literature search<br/>AI research assistant<br/>Deep research tools | LaTeX editor<br/>Document extraction<br/>AI writing assistance | Project management<br/>Task tracking<br/>Calendar integration | Real-time WebSocket chat<br/>Team management<br/>File sharing |
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
+    subgraph "Frontend"
         A[Next.js 15] --> B[React 19]
         B --> C[TypeScript]
         C --> D[TailwindCSS + Shadcn/UI]
     end
     
-    subgraph "Backend Services"
+    subgraph "Backend"
         E[Supabase] --> F[PostgreSQL + RLS]
         G[WebSocket Server] --> H[Socket.IO]
         I[Python Services] --> J[Literature APIs]
@@ -58,7 +56,7 @@ graph TB
     style S fill:#28a745,color:#fff
 ```
 
-## ⚡ Quick Start
+## Quick Start
 
 ```bash
 # 1. Clone and setup
@@ -76,7 +74,7 @@ node server/websocket-server.js  # WebSocket (port 3001)
 cd python && python app.py  # Literature search (port 5000)
 ```
 
-### 🔧 Required Configuration
+### Required Configuration
 
 **Essential Services:**
 - **Supabase**: Database, authentication, and storage
@@ -88,34 +86,32 @@ cd python && python app.py  # Literature search (port 5000)
 - **Stripe**: For payment processing
 - **Literature APIs**: Unpaywall, CORE, SerpAPI
 
-🌐 **Live Demo:** [thesisflow-ai.vercel.app](https://thesisflow-ai.vercel.app)
-
-</div>
+**Live Demo:** [thesisflow-ai.vercel.app](https://thesisflow-ai.vercel.app)
 
 ---
 
-## 🪙 Plans & Tokens
+## Plans & Tokens
 
 ThesisFlow-AI uses a monthly token-based usage model with two plans:
 
-- __Free__: 50 monthly tokens
-- __Pro__: 500 monthly tokens
+- **Free**: 50 monthly tokens
+- **Pro**: 500 monthly tokens
 
-__Where tokens are consumed__
+**Where tokens are consumed:**
 - AI Chat (messages and streaming)
 - Explorer (topic exploration, deep research)
 - Summarizer
 - Plan-and-Execute workflows and related AI tools
 
-__Where you can see usage__
+**Where you can see usage:**
 - Top nav mini meter: shows remaining monthly tokens with usage tooltip
 - Profile dropdown: shows current plan, monthly remaining count, and a Manage/Upgrade button
 - Plan & Analytics page (`/plan`): Token bars and usage by feature
 - Tokens page (`/tokens`): Full dashboard with recent transactions and feature costs
 
-Only two roles are recognized across the app: __free__ and __pro__. Any paid alias from the backend (e.g., professional, premium, enterprise) is normalized to `pro` on the client.
+Only two roles are recognized across the app: **free** and **pro**. Any paid alias from the backend (e.g., professional, premium, enterprise) is normalized to `pro` on the client.
 
-## 📣 Changelog
+## Changelog
 
 Stay up to date with the latest releases and improvements:
 
@@ -124,50 +120,37 @@ Stay up to date with the latest releases and improvements:
 - Atom: https://thesisflow-ai.vercel.app/changelog/atom.xml
 
 Direct links to specific versions also work, for example:
-
 - https://thesisflow-ai.vercel.app/changelog#v1.0.9
 
 ---
 
-## 📚 Table of Contents
+## Features
 
-- [🎯 Features](#-features)
-- [🏗️ Architecture](#️-architecture)
-- [⚙️ Setup Guide](#️-setup-guide)
-- [🔌 API Reference](#-api-reference)
-- [📊 Performance](#-performance)
-- [📣 Changelog](#-changelog)
-- [🤝 Contributing](#-contributing)
-
----
-
-## 🎯 Features
-
-### 🔍 Literature Explorer
+### Literature Explorer
 
 ```mermaid
 flowchart TB
-    A["🔍 Search Query"] --> B["Literature Search Service"]
+    A[Search Query] --> B[Literature Search Service]
     
-    subgraph "Core APIs (Always Available)"
-        C["OpenAlex<br/>📚 Academic Papers"]
-        D["arXiv<br/>📄 Preprints"]
-        E["CrossRef<br/>🔗 DOI Resolution"]
-        F["OpenAIRE<br/>🌐 Open Access"]
-        G["DOAJ<br/>📖 Open Journals"]
-        H["PubMed<br/>🏥 Medical"]
+    subgraph "Core APIs"
+        C[OpenAlex]
+        D[arXiv]
+        E[CrossRef]
+        F[OpenAIRE]
+        G[DOAJ]
+        H[PubMed]
     end
     
-    subgraph "Enhanced APIs (With Keys)"
-        I["Google Search<br/>🔍 Web + Scholar"]
-        J["CORE<br/>📑 Repository"]
-        K["SerpAPI<br/>⚡ Fast Scholar"]
+    subgraph "Enhanced APIs"
+        I[Google Search]
+        J[CORE]
+        K[SerpAPI]
     end
     
-    subgraph "Processing Pipeline"
-        L["Rate Limiting<br/>& Caching"]
-        M["Deduplication<br/>& Ranking"]
-        N["Citation Analysis<br/>& Metrics"]
+    subgraph "Processing"
+        L[Rate Limiting & Caching]
+        M[Deduplication & Ranking]
+        N[Citation Analysis]
     end
     
     B --> C & D & E & F & G & H
@@ -176,10 +159,10 @@ flowchart TB
     I & J & K -.-> L
     L --> M --> N
     
-    N --> O["📊 Research Results"]
-    O --> P["🤖 AI Research Assistant"]
-    O --> Q["📈 Citation Tracking"]
-    O --> R["💾 Export Options"]
+    N --> O[Research Results]
+    O --> P[AI Research Assistant]
+    O --> Q[Citation Tracking]
+    O --> R[Export Options]
     
     style B fill:#FF6B2C,color:#fff
     style L fill:#17a2b8,color:#fff
@@ -187,52 +170,52 @@ flowchart TB
 ```
 
 **Advanced Literature Search Features:**
-- **Multi-Source Integration**: 11+ academic databases and search engines
-- **Intelligent Caching**: Database + memory caching with 1-hour TTL
-- **Rate Limiting**: Per-source token bucket algorithms with exponential backoff
-- **Real-time Streaming**: Progressive results as sources respond
-- **Citation Analysis**: Forward/backward citation tracking via OpenAlex
-- **Aggregation Mode**: 2-minute window for comprehensive multi-source results
-- **Smart Fallbacks**: Automatic provider switching on failures
-- **Export Formats**: JSON, CSV, BibTeX, RIS
+- Multi-Source Integration: 11+ academic databases and search engines
+- Intelligent Caching: Database + memory caching with 1-hour TTL
+- Rate Limiting: Per-source token bucket algorithms with exponential backoff
+- Real-time Streaming: Progressive results as sources respond
+- Citation Analysis: Forward/backward citation tracking via OpenAlex
+- Aggregation Mode: 2-minute window for comprehensive multi-source results
+- Smart Fallbacks: Automatic provider switching on failures
+- Export Formats: JSON, CSV, BibTeX, RIS
 
-### 📝 Document Processing & LaTeX Writer
+### Document Processing & LaTeX Writer
 
 ```mermaid
 flowchart TB
-    subgraph "Document Extraction Pipeline"
-        A["📄 File Upload<br/>(10MB limit)"] --> B["File Type Detection"]
-        B --> C{"Extraction Method"}
+    subgraph "Document Processing"
+        A[File Upload<br/>10MB limit] --> B[File Type Detection]
+        B --> C{Extraction Method}
         
-        C -->|PDF| D["pdf-parse<br/>📑 Text + Tables"]
-        C -->|DOCX/DOC| E["mammoth.js<br/>📝 HTML Conversion"]
-        C -->|PowerPoint| F["XML Parser<br/>🎯 Slides + Notes"]
-        C -->|CSV| G["papaparse<br/>📊 Data Parsing"]
-        C -->|Images| H["Tesseract.js + Sharp<br/>👁️ OCR Processing"]
-        C -->|TXT| I["Direct Processing<br/>📋 Plain Text"]
+        C -->|PDF| D[pdf-parse<br/>Text + Tables]
+        C -->|DOCX/DOC| E[mammoth.js<br/>HTML Conversion]
+        C -->|PowerPoint| F[XML Parser<br/>Slides + Notes]
+        C -->|CSV| G[papaparse<br/>Data Parsing]
+        C -->|Images| H[Tesseract.js + Sharp<br/>OCR Processing]
+        C -->|TXT| I[Direct Processing<br/>Plain Text]
         
-        D & E & F & G & H & I --> J["Extraction Orchestrator"]
-        J --> K["Metadata Extraction"]
-        K --> L["AI Processing"]
+        D & E & F & G & H & I --> J[Extraction Orchestrator]
+        J --> K[Metadata Extraction]
+        K --> L[AI Processing]
     end
     
-    subgraph "LaTeX Writing Environment"
-        M["📝 LaTeX Editor"] --> N["Real-time Preview"]
-        N --> O["KaTeX Rendering"]
-        O --> P["Formula Display"]
+    subgraph "LaTeX Writing"
+        M[LaTeX Editor] --> N[Real-time Preview]
+        N --> O[KaTeX Rendering]
+        O --> P[Formula Display]
         
-        M --> Q["Collaborative Features"]
-        Q --> R["User Avatars"]
-        Q --> S["Real-time Sync"]
+        M --> Q[Collaborative Features]
+        Q --> R[User Avatars]
+        Q --> S[Real-time Sync]
         
-        M --> T["LaTeX Toolbar"]
-        T --> U["Sections & Formatting"]
-        T --> V["Equations & Tables"]
-        T --> W["Citations & References"]
+        M --> T[LaTeX Toolbar]
+        T --> U[Sections & Formatting]
+        T --> V[Equations & Tables]
+        T --> W[Citations & References]
     end
     
-    L --> X["AI Writing Assistant"]
-    X --> Y["LaTeX Content Generation"]
+    L --> X[AI Writing Assistant]
+    X --> Y[LaTeX Content Generation]
     Y --> M
     
     style J fill:#FF6B2C,color:#fff
@@ -252,41 +235,41 @@ flowchart TB
 | **TXT** | Direct text processing | 2-10s | NLP analysis |
 
 **LaTeX Writing Features:**
-- **Real-time Collaboration**: Multi-user editing with presence indicators
-- **Live Preview**: Split-view with instant KaTeX rendering
-- **Smart Toolbar**: LaTeX-specific commands and shortcuts
-- **AI Integration**: Generate LaTeX content from prompts
-- **Export Options**: PDF, LaTeX source, HTML
-- **Template System**: Academic paper templates
+- Real-time Collaboration: Multi-user editing with presence indicators
+- Live Preview: Split-view with instant KaTeX rendering
+- Smart Toolbar: LaTeX-specific commands and shortcuts
+- AI Integration: Generate LaTeX content from prompts
+- Export Options: PDF, LaTeX source, HTML
+- Template System: Academic paper templates
 
-### 📋 Project Management & Planning
+### Project Management & Planning
 
 ```mermaid
 flowchart TB
     subgraph "Project Structure"
-        A["📁 Projects"] --> B["📋 Tasks"]
-        B --> C["✅ Subtasks"]
-        C --> D["💬 Comments"]
+        A[Projects] --> B[Tasks]
+        B --> C[Subtasks]
+        C --> D[Comments]
     end
     
-    subgraph "Visualization Views"
-        E["📅 Calendar View<br/>date-fns integration"]
-        F["📊 Gantt Chart<br/>Timeline visualization"]
-        G["🗂️ Kanban Board<br/>Drag & drop"]
-        H["📈 Analytics<br/>Progress metrics"]
+    subgraph "Visualization"
+        E[Calendar View]
+        F[Gantt Chart]
+        G[Kanban Board]
+        H[Analytics]
     end
     
     subgraph "Team Features"
-        I["👥 Team Management"]
-        J["🔔 Notifications"]
-        K["📤 Assignments"]
-        L["⏰ Due Dates"]
+        I[Team Management]
+        J[Notifications]
+        K[Assignments]
+        L[Due Dates]
     end
     
     subgraph "Data Integration"
-        M["🗄️ Supabase Database"]
-        N["🔄 Real-time Sync"]
-        O["📊 Usage Analytics"]
+        M[Supabase Database]
+        N[Real-time Sync]
+        O[Usage Analytics]
     end
     
     A --> E & F & G & H
@@ -302,48 +285,48 @@ flowchart TB
 ```
 
 **Advanced Planning Features:**
-- **Multi-View Interface**: Calendar (date-fns), Gantt charts, Kanban boards
-- **Hierarchical Tasks**: Projects → Tasks → Subtasks → Comments
-- **Smart Scheduling**: Due date parsing and calendar integration
-- **Team Collaboration**: Role-based permissions and assignments
-- **Progress Analytics**: Completion rates, time tracking, performance metrics
-- **Notification System**: Real-time updates and deadline reminders
-- **Data Persistence**: Supabase integration with RLS policies
+- Multi-View Interface: Calendar (date-fns), Gantt charts, Kanban boards
+- Hierarchical Tasks: Projects → Tasks → Subtasks → Comments
+- Smart Scheduling: Due date parsing and calendar integration
+- Team Collaboration: Role-based permissions and assignments
+- Progress Analytics: Completion rates, time tracking, performance metrics
+- Notification System: Real-time updates and deadline reminders
+- Data Persistence: Supabase integration with RLS policies
 
-### 👥 Real-time Team Collaboration
+### Real-time Team Collaboration
 
 ```mermaid
 flowchart TB
     subgraph "WebSocket Architecture"
-        A["🌐 Socket.IO Server<br/>Port 3001"] --> B["🔐 JWT Authentication"]
-        B --> C["👥 Team Rooms"]
-        C --> D["💬 Message Broadcasting"]
+        A[Socket.IO Server<br/>Port 3001] --> B[JWT Authentication]
+        B --> C[Team Rooms]
+        C --> D[Message Broadcasting]
     end
     
     subgraph "Chat Features"
-        E["💬 Real-time Messaging"] --> F["📎 File Sharing"]
-        F --> G["@️⃣ Mentions & Notifications"]
-        G --> H["✏️ Typing Indicators"]
-        H --> I["👁️ Read Receipts"]
+        E[Real-time Messaging] --> F[File Sharing]
+        F --> G[Mentions & Notifications]
+        G --> H[Typing Indicators]
+        H --> I[Read Receipts]
     end
     
     subgraph "Presence System"
-        J["🟢 Online Status"] --> K["⏰ Last Active"]
-        K --> L["🎯 Activity Tracking"]
-        L --> M["📊 Team Analytics"]
+        J[Online Status] --> K[Last Active]
+        K --> L[Activity Tracking]
+        L --> M[Team Analytics]
     end
     
     subgraph "Team Management"
-        N["👑 Role-based Access"]
-        O["📋 Owner/Admin/Editor/Viewer"]
-        P["🔔 Notification Preferences"]
-        Q["📧 Email Integration"]
+        N[Role-based Access]
+        O[Owner/Admin/Editor/Viewer]
+        P[Notification Preferences]
+        Q[Email Integration]
     end
     
     A --> E & J & N
-    E --> R["📱 Multi-device Sync"]
-    J --> S["🔄 Cross-tab Updates"]
-    N --> T["🛡️ RLS Security"]
+    E --> R[Multi-device Sync]
+    J --> S[Cross-tab Updates]
+    N --> T[RLS Security]
     
     style A fill:#FF6B2C,color:#fff
     style E fill:#28a745,color:#fff
@@ -363,46 +346,38 @@ flowchart TB
 | **Notifications** | Database + WebSocket | Granular notification preferences |
 | **Team Management** | RLS Policies | Role-based access control |
 
-**Advanced Collaboration:**
-- **Multi-device Synchronization**: Seamless experience across devices
-- **Offline Support**: Message queuing and sync on reconnection
-- **Rate Limiting**: Per-user and per-IP protection
-- **Scalable Architecture**: Horizontal scaling with Redis (future)
-- **Security**: End-to-end encryption for sensitive data
-- **Analytics**: Team activity and engagement metrics
-
-### 🤖 AI Integration
+### AI Integration
 
 ```mermaid
 flowchart TB
     subgraph "Enhanced AI Service"
-        A["🧠 AI Provider Router"] --> B["🔑 API Key Management"]
-        B --> C["🔄 Fallback System"]
-        C --> D["📊 Usage Tracking"]
+        A[AI Provider Router] --> B[API Key Management]
+        B --> C[Fallback System]
+        C --> D[Usage Tracking]
     end
     
     subgraph "Supported Providers"
-        E["🤖 OpenAI<br/>GPT-4o, o3, GPT-4o-mini"]
-        F["🔮 Google Gemini<br/>2.5 Pro/Flash, 2.0 Flash"]
-        G["🎭 Anthropic<br/>Claude 3.5/4 Sonnet/Opus"]
-        H["⚡ Groq<br/>LLaMA 3.1/3.3, Whisper"]
-        I["🌟 Mistral AI<br/>Small/Medium/Large, Codestral"]
-        J["🚀 AIML API<br/>Multi-provider access"]
+        E[OpenAI<br/>GPT-4o, o3, GPT-4o-mini]
+        F[Google Gemini<br/>2.5 Pro/Flash, 2.0 Flash]
+        G[Anthropic<br/>Claude 3.5/4 Sonnet/Opus]
+        H[Groq<br/>LLaMA 3.1/3.3, Whisper]
+        I[Mistral AI<br/>Small/Medium/Large, Codestral]
+        J[AIML API<br/>Multi-provider access]
     end
     
     subgraph "Streaming Architecture"
-        K["📡 Server-Sent Events"] --> L["🔄 Real-time Tokens"]
-        L --> M["📈 Progress Tracking"]
-        M --> N["❤️ Heartbeat Pings"]
-        N --> O["🛑 Abort Handling"]
+        K[Server-Sent Events] --> L[Real-time Tokens]
+        L --> M[Progress Tracking]
+        M --> N[Heartbeat Pings]
+        N --> O[Abort Handling]
     end
     
     subgraph "AI Features"
-        P["💭 Research Assistant"]
-        Q["✍️ Content Generation"]
-        R["🔍 AI Content Detection"]
-        S["📝 Writing Assistance"]
-        T["🧮 Data Analysis"]
+        P[Research Assistant]
+        Q[Content Generation]
+        R[AI Content Detection]
+        S[Writing Assistance]
+        T[Data Analysis]
     end
     
     A --> E & F & G & H & I & J
@@ -425,34 +400,24 @@ flowchart TB
 | **Mistral** | Large 2411, Codestral | 128K tokens | Code, multilingual | Programming, translation |
 | **AIML** | Cross-provider | Variable | Model aggregation | Fallback, cost optimization |
 
-**Advanced AI Features:**
-- **Streaming Responses**: Server-Sent Events with 20ms token delivery
-- **Smart Fallbacks**: Automatic provider switching on failures
-- **Rate Limiting**: 50 requests/hour with intelligent backoff
-- **Context Preservation**: Full conversation history in streaming
-- **API Key Security**: Encrypted storage with Supabase
-- **Usage Analytics**: Token tracking and cost optimization
-- **AI Detection**: HuggingFace ensemble for content verification
-- **Custom Prompts**: Research-specific prompt engineering
-
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### Complete System Overview
 
 ```mermaid
 flowchart TB
-    subgraph "Frontend Layer"
+    subgraph "Frontend"
         A[Next.js 15 + React 19] --> B[Tailwind + Shadcn/UI]
         B --> C[TypeScript Components]
     end
     
     subgraph "API Routes"
-        D[/api/ai/chat/stream] --> E[AI Streaming]
-        F[/api/literature-search] --> G[Literature APIs]
-        H[/api/extract] --> I[Document Processing]
-        J[/api/collaborate/*] --> K[Team Management]
+        D[AI Chat Stream] --> E[AI Streaming]
+        F[Literature Search] --> G[Literature APIs]
+        H[Extract] --> I[Document Processing]
+        J[Collaborate] --> K[Team Management]
     end
     
     subgraph "Real-time Services"
@@ -519,7 +484,7 @@ flowchart TB
 
 ---
 
-## ⚙️ Setup Guide
+## Setup Guide
 
 ### Prerequisites
 
@@ -572,7 +537,7 @@ cd python && python app.py       # Literature search (port 5000)
 
 ⭐ = At least one AI provider required
 
-**🔒 Security Best Practices:**
+**Security Best Practices:**
 - Never commit `.env.local` to version control
 - Use different API keys for development and production
 - Rotate API keys regularly (monthly recommended)
@@ -602,7 +567,7 @@ node scripts/seed-database.js
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
 ### Core Endpoints
 
@@ -663,7 +628,7 @@ const { data, error } = await supabase
 
 ---
 
-## 📊 Performance
+## Performance
 
 ### System Metrics
 
@@ -707,7 +672,7 @@ graph LR
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
 
@@ -719,16 +684,14 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - Include JSDoc comments for functions
 
 ### Getting Help
-- 📖 [Documentation](https://github.com/Kedhareswer/thesisflow-ai/wiki)
-- 💬 [Discussions](https://github.com/Kedhareswer/thesisflow-ai/discussions)
-- 🐛 [Issues](https://github.com/Kedhareswer/thesisflow-ai/issues)
-- 📧 [Contact](mailto:support@thesisflow-ai.com)
+- [Documentation](https://github.com/Kedhareswer/thesisflow-ai/wiki)
+- [Discussions](https://github.com/Kedhareswer/thesisflow-ai/discussions)
+- [Issues](https://github.com/Kedhareswer/thesisflow-ai/issues)
+- [Contact](mailto:support@thesisflow-ai.com)
 
 ---
 
-<div align="center">
-
-### 🙏 Acknowledgments
+### Acknowledgments
 
 **Core Technologies:** Next.js • Supabase • OpenAI • Anthropic • Google AI
 
@@ -736,10 +699,8 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ---
 
-**Built with ❤️ for the research community**
+**Built with care for the research community**
 
-[🌐 Live Demo](https://thesisflow-ai.vercel.app) • [📖 Documentation](https://github.com/Kedhareswer/thesisflow-ai/wiki) • [🐛 Report Issues](https://github.com/Kedhareswer/thesisflow-ai/issues)
+[Live Demo](https://thesisflow-ai.vercel.app) • [Documentation](https://github.com/Kedhareswer/thesisflow-ai/wiki) • [Report Issues](https://github.com/Kedhareswer/thesisflow-ai/issues)
 
-**Status:** ✅ Production Ready • **Version:** 1.0.9 • **Updated:** September 2025
-
-</div>
+**Status:** Production Ready • **Version:** 1.0.9 • **Updated:** September 2025
