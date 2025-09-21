@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ErrorHandler } from '@/lib/utils/error-handler'
-import { PlanningService } from '@/lib/services/planning.service'
-import { ExecutingService, ExecutionProgress } from '@/lib/services/executing.service'
-import { DeepResearcherService, DeepResearchResult } from '@/lib/services/deep-researcher.service'
+import { generatePlanWithOpenRouter } from '@/lib/services/openrouter.service'
+import { DeepResearcherService } from '@/lib/services/deep-researcher.service'
 import { TokenMiddleware } from '@/lib/middleware/token-middleware'
 
 export async function POST(request: NextRequest) {
   try {
     // Parse JSON body for tokens context
-    const { userQuery, selectedTools = [], useDeepResearch = false, maxIterations = 4 } = await request.json()
+    const { userQuery, description = '', maxTasks = 30, selectedTools = [], useDeepResearch = false, maxIterations = 4 } = await request.json()
 
     // Validate inputs early (before token deduction)
     if (!userQuery || typeof userQuery !== 'string' || userQuery.trim().length < 3) {
@@ -31,6 +30,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    // Guardrails: clamp maxTasks
+    const clampedMaxTasks = Math.max(5, Math.min(50, Number(maxTasks) || 30))
 
     // Use token middleware with dynamic feature and requiredTokens
     const featureName = useDeepResearch ? 'deep_research' : 'plan_and_execute'
@@ -46,8 +47,6 @@ export async function POST(request: NextRequest) {
     let controller: ReadableStreamDefaultController<Uint8Array>
     let closed = false
 
-    const planningService = new PlanningService()
-    const executingService = new ExecutingService()
     const deepResearcherService = new DeepResearcherService()
 
     const stream = new ReadableStream<Uint8Array>({
@@ -119,36 +118,27 @@ export async function POST(request: NextRequest) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(deepResultPayload)}\n\n`))
 
             } else {
-              // Traditional Plan + Execute Approach
-              const plan = await planningService.generateResearchPlan(String(userQuery), selectedTools as string[])
+              // Planner generation via OpenRouter (exclusive provider for planner)
+              const plan = await generatePlanWithOpenRouter({
+                topic: String(userQuery),
+                description: String(description || ''),
+                selectedTools: selectedTools as string[],
+                maxTasks: clampedMaxTasks,
+                signal: request.signal,
+              })
 
               controller.enqueue(encoder.encode(`event: plan\n`))
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(plan)}\n\n`))
 
-              // Execute plan with streaming progress
-              let lastOverall = -1
-              const onProgress = (progress: ExecutionProgress) => {
-                if (closed) return
-                // Optional: reduce noise by only emitting when overall changes or at task boundary
-                const shouldEmit = progress.overallProgress !== lastOverall || progress.isComplete
-                if (!shouldEmit) return
-                lastOverall = progress.overallProgress
-
-                controller.enqueue(encoder.encode(`event: progress\n`))
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(progress)}\n\n`))
-              }
-
-              const finalProgress = await executingService.executePlan(plan, onProgress)
-
-              // Done event
+              // Done event (we don't execute here; apply happens client-side)
               const donePayload = {
                 type: 'done',
-                planId: finalProgress.planId,
-                totalTasks: finalProgress.totalTasks,
+                planId: plan.id,
+                totalTasks: plan.tasks?.length || 0,
                 processingTime: Date.now() - startTime,
-                resultsCount: finalProgress.results?.length || 0,
-                overallProgress: finalProgress.overallProgress,
-                isComplete: finalProgress.isComplete,
+                resultsCount: 0,
+                overallProgress: 100,
+                isComplete: true,
               }
               controller.enqueue(encoder.encode(`event: done\n`))
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(donePayload)}\n\n`))

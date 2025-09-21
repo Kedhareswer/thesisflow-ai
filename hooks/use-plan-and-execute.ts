@@ -37,6 +37,8 @@ export interface StartPlanParams {
   selectedTools?: string[]
   useDeepResearch?: boolean
   maxIterations?: number
+  description?: string
+  maxTasks?: number
 }
 
 export interface UsePlanAndExecuteOptions {
@@ -93,6 +95,8 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
     selectedTools = [],
     useDeepResearch = false,
     maxIterations = 4,
+    description,
+    maxTasks,
   }: StartPlanParams) => {
     const q = (userQuery || "").trim()
     if (q.length < 3) {
@@ -142,7 +146,7 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
           "Content-Type": "application/json",
           ...(authHeader || {}),
         },
-        body: JSON.stringify({ userQuery: q, selectedTools, useDeepResearch, maxIterations }),
+        body: JSON.stringify({ userQuery: q, description, maxTasks, selectedTools, useDeepResearch, maxIterations }),
         signal: controller.signal,
       })
 

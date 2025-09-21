@@ -90,9 +90,16 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Forbidden: not project owner' }, { status: 403 })
         }
         targetProjectId = p.id
+        // Optionally update deadline (end_date)
+        if (project?.deadline) {
+          try {
+            await admin.from('projects').update({ end_date: project.deadline }).eq('id', targetProjectId)
+          } catch {}
+        }
       } else {
         const title = project?.title || (plan?.title ? `Auto Plan - ${plan.title}` : 'Auto Plan Project')
         const description = project?.description || (plan?.description || 'Applied from Auto Planner')
+        const end_date = project?.deadline || null
         const { data: newProject, error: pErr } = await admin
           .from('projects')
           .insert({
@@ -101,6 +108,7 @@ export async function POST(request: NextRequest) {
             owner_id: userId,
             status: 'planning',
             progress: 0,
+            ...(end_date ? { end_date } : {}),
           })
           .select()
           .single()

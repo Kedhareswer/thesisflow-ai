@@ -114,13 +114,11 @@ class EnhancedAIService {
       const openai = process.env.OPENAI_API_KEY
       const anthropic = process.env.ANTHROPIC_API_KEY
       const gemini = process.env.GEMINI_API_KEY
-      const openrouter = process.env.OPENROUTER_API_KEY
 
       if (groq) keys.push({ provider: "groq", decrypted_key: groq, is_active: true, test_status: "valid" })
       if (openai) keys.push({ provider: "openai", decrypted_key: openai, is_active: true, test_status: "valid" })
       if (anthropic) keys.push({ provider: "anthropic", decrypted_key: anthropic, is_active: true, test_status: "valid" })
       if (gemini) keys.push({ provider: "gemini", decrypted_key: gemini, is_active: true, test_status: "valid" })
-      if (openrouter) keys.push({ provider: "openrouter", decrypted_key: openrouter, is_active: true, test_status: "valid" })
       return keys
     }
 
@@ -413,9 +411,6 @@ class EnhancedAIService {
 
         case "aiml":
           return await this.callAIMLAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
-
-        case "openrouter":
-          return await this.callOpenRouterAPI(apiKey, options.prompt, options.model!, maxTokens, temperature)
 
         default:
           return {
@@ -851,72 +846,6 @@ class EnhancedAIService {
       success: true,
       content,
       provider: "aiml",
-      model,
-      usage: {
-        promptTokens: data.usage?.prompt_tokens,
-        completionTokens: data.usage?.completion_tokens,
-        totalTokens: data.usage?.total_tokens,
-      },
-    }
-  }
-
-  private async callOpenRouterAPI(
-    apiKey: string,
-    prompt: string,
-    model: string,
-    maxTokens: number,
-    temperature: number,
-  ): Promise<GenerateTextResult> {
-    console.log("Enhanced AI Service: Calling OpenRouter API with:", {
-      model,
-      maxTokens,
-      temperature,
-      promptLength: prompt.length,
-    })
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "https://localhost:3000",
-        "X-Title": "AI Project Planner",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    })
-
-    console.log("Enhanced AI Service: OpenRouter API response status:", response.status)
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error("Enhanced AI Service: OpenRouter API error data:", errorData)
-      throw new Error(`OpenRouter API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
-    }
-
-    const data = await response.json()
-    console.log("Enhanced AI Service: OpenRouter API response data:", {
-      hasChoices: !!data.choices,
-      choicesLength: data.choices?.length,
-      firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
-      usage: data.usage,
-    })
-
-    const content = data.choices?.[0]?.message?.content || ""
-
-    if (!content) {
-      console.error("Enhanced AI Service: OpenRouter API returned no content!", data)
-      throw new Error("OpenRouter API returned no content")
-    }
-
-    return {
-      success: true,
-      content,
-      provider: "openrouter",
       model,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
