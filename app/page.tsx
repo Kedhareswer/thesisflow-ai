@@ -252,7 +252,7 @@ export default function HomePage() {
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]" />
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#28C840]" />
               </div>
-              <div className="relative aspect-[16/10] bg-white">
+              <div className="relative aspect-[16/10] bg-white overflow-hidden">
                 <Image
                   src="/dashboard.png"
                   alt="ThesisFlow research dashboard preview"
