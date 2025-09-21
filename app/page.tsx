@@ -72,9 +72,7 @@ export default function HomePage() {
       href: "/research-assistant",
     },
   ]
-
-  // Removed testimonials
-
+  
   // Map existing features to the new hover component input shape
   const hoverFeatures: FeatureItem[] = features.map((f) => {
     const Icon = f.icon
@@ -139,6 +137,7 @@ export default function HomePage() {
         availability: "InStock"
       }}
     >
+      <div style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
       <WebPage
         name="ThesisFlow-AI - AI-Powered Research Platform"
         description="Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals."
@@ -192,7 +191,16 @@ export default function HomePage() {
                   <div className="text-xs font-normal tracking-[0.15em] uppercase text-white/90 mb-6">
                     COMING SOON
                   </div>
-                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-normal leading-[1.1] mb-8">
+                  <h1 
+                    className="mb-8"
+                    style={{
+                      display: 'inline',
+                      fontSize: '40px',
+                      fontWeight: 300,
+                      lineHeight: '44px',
+                      color: '#fff'
+                    }}
+                  >
                     AI Research Sidekick<br />
                     Built for Big Dreamers<br />
                     Who Hate Spreadsheets
@@ -209,8 +217,15 @@ export default function HomePage() {
               </div>
 
               {/* Right content block */}
-              <div className="hidden lg:block lg:col-span-4 lg:col-start-9 text-white/90">
-                <p className="text-sm font-normal leading-relaxed">
+              <div className="hidden lg:block lg:col-span-4 lg:col-start-9">
+                <p 
+                  style={{
+                    color: '#fff',
+                    fontSize: '14px',
+                    lineHeight: '20px',
+                    textAlign: 'right'
+                  }}
+                >
                   We're putting the finishing touches on a tool that automates your research, teaches you as you go, and gives you daily insights that actually help you run your research better.
                 </p>
               </div>
@@ -230,11 +245,29 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center max-w-3xl mx-auto"
           >
-            <h2 className="text-neutral-900 tracking-tight font-medium leading-tight text-4xl sm:text-5xl md:text-6xl">
+            <h2 
+              className="text-neutral-900"
+              style={{
+                fontSize: '40px',
+                fontWeight: 300,
+                letterSpacing: '-0.8px',
+                lineHeight: '44px',
+                textAlign: 'center'
+              }}
+            >
               <span className="block">Everything You Need</span>
               <span className="block">for Research.</span>
             </h2>
-            <p className="mt-4 text-neutral-600 text-lg sm:text-xl md:text-[20px] leading-relaxed max-w-2xl mx-auto">
+            <p 
+              className="mt-4 max-w-2xl mx-auto"
+              style={{
+                color: '#0a0a0a',
+                fontSize: '14px',
+                fontWeight: 300,
+                lineHeight: '20px',
+                textAlign: 'center'
+              }}
+            >
               Comprehensive tools designed to streamline every aspect of your research workflow with AI-powered insights.
             </p>
           </motion.div>
@@ -449,6 +482,7 @@ export default function HomePage() {
       <Footer />
       
       </WebPage>
+      </div>
     </SoftwareApplication>
   )
 }
