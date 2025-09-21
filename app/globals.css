@@ -184,3 +184,17 @@ h6 {
   max-height: calc(90vh - 200px);
   overflow-y: auto;
 }
+
+/* GSAP-style infinite scroll animation */
+@keyframes gsap-scroll-infinite {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.gsap-scroll-infinite {
+  animation: gsap-scroll-infinite 20s linear infinite;
+}

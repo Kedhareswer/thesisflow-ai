@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -8,6 +10,49 @@ type FooterProps = React.ComponentProps<'footer'> & {
 };
 
 export function Footer({ className, ...props }: FooterProps) {
+  const scrollingTextRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Dynamically import GSAP to avoid SSR issues
+    const loadGSAP = async () => {
+      try {
+        const { gsap } = await import('gsap');
+        
+        if (scrollingTextRef.current) {
+          const text = scrollingTextRef.current;
+          
+          // Set up the text content and styles
+          text.innerHTML = "THESISFLOW-AI ".repeat(20);
+          text.style.whiteSpace = "nowrap";
+          text.style.display = "inline-block";
+          
+          // GSAP animation
+          gsap.to(text, {
+            xPercent: -100,
+            repeat: -1,
+            duration: 20,
+            ease: "none",
+            modifiers: {
+              xPercent: gsap.utils.unitize((x: string) => parseFloat(x) % 100)
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('GSAP not available, using CSS fallback');
+        // Fallback to CSS animation
+        if (scrollingTextRef.current) {
+          const text = scrollingTextRef.current;
+          text.innerHTML = "THESISFLOW-AI ".repeat(20);
+          text.style.whiteSpace = "nowrap";
+          text.style.display = "inline-block";
+          text.classList.add("gsap-scroll-infinite");
+        }
+      }
+    };
+
+    loadGSAP();
+  }, []);
+
   return (
     <footer
       className={cn(
@@ -51,84 +96,78 @@ export function Footer({ className, ...props }: FooterProps) {
         </div>
       </section>
 
-      {/* Bottom section with social links and infinite scroll */}
-      <section className="relative bg-black text-white py-8">
-        {/* Social links */}
-        <div className="container mx-auto px-6 lg:px-8 flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-6">
-            <a 
-              href="https://twitter.com/thesisflow-ai" 
-              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
-              aria-label="Twitter"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-            </a>
-            <a 
-              href="https://facebook.com/thesisflow-ai" 
-              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
-              aria-label="Facebook"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-            </a>
-            <a 
-              href="https://linkedin.com/company/thesisflow-ai" 
-              className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
-              aria-label="LinkedIn"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-              </svg>
-            </a>
-          </div>
-          
-          <div className="flex items-center">
-            <Button 
-              className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white border-2 border-[#FF6B2C] hover:border-[#FF6B2C]/90 px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              Join Waitlist
-            </Button>
-          </div>
+      {/* Bottom section with infinite scroll and overlaid elements */}
+      <section className="relative bg-black text-white min-h-[50vh] flex flex-col">
+        {/* GSAP Infinite scrolling text - takes up most of the space */}
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center">
+          <div 
+            ref={scrollingTextRef}
+            className="scrolling-text font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none"
+            style={{ 
+              WebkitTextStroke: '2px rgba(255,107,44,0.2)',
+              fontFamily: 'IBM Plex Sans, sans-serif',
+              color: 'transparent',
+              fontSize: 'clamp(8rem, 15vw, 20rem)',
+              fontWeight: '900'
+            }}
+          />
         </div>
 
-        {/* Infinite scrolling text */}
-        <div className="relative overflow-hidden py-8">
-          <div className="flex animate-scroll-infinite whitespace-nowrap">
-            <div 
-              className="text-[clamp(120px,20vw,300px)] font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none flex-shrink-0 pr-8"
-              style={{ 
-                WebkitTextStroke: '3px rgba(255,107,44,0.15)',
-                fontFamily: 'IBM Plex Sans, sans-serif'
-              }}
-            >
-              THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI
+        {/* Overlaid elements at the bottom */}
+        <div className="absolute bottom-0 left-0 right-0 z-10">
+          {/* Social links and Join Waitlist button */}
+          <div className="container mx-auto px-6 lg:px-8 flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-6">
+              <a 
+                href="https://twitter.com/thesisflow-ai" 
+                className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
+                aria-label="Twitter"
+              >
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </a>
+              <a 
+                href="https://facebook.com/thesisflow-ai" 
+                className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
+                aria-label="Facebook"
+              >
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+              </a>
+              <a 
+                href="https://linkedin.com/company/thesisflow-ai" 
+                className="text-white hover:text-[#FF6B2C] transition-colors duration-200"
+                aria-label="LinkedIn"
+              >
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </a>
             </div>
-            <div 
-              className="text-[clamp(120px,20vw,300px)] font-black uppercase tracking-tighter leading-none text-transparent select-none pointer-events-none flex-shrink-0 pr-8"
-              style={{ 
-                WebkitTextStroke: '3px rgba(255,107,44,0.15)',
-                fontFamily: 'IBM Plex Sans, sans-serif'
-              }}
-            >
-              THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI THESISFLOW-AI
+            
+            <div className="flex items-center">
+              <Button 
+                className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90 text-white border-2 border-[#FF6B2C] hover:border-[#FF6B2C]/90 px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                Join Waitlist
+              </Button>
             </div>
           </div>
-        </div>
 
-        {/* Copyright */}
-        <div className="container mx-auto px-6 lg:px-8 pt-8">
-          <div className="flex items-center justify-between text-sm text-white/70">
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-[#FF6B2C]" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-              <span className="font-semibold text-white">ThesisFlow-AI</span>
-            </div>
-            <div className="font-medium">
-              Copyright © 2025 ThesisFlow-AI. All Rights Reserved
+          {/* Copyright and logo */}
+          <div className="container mx-auto px-6 lg:px-8 pb-6">
+            <div className="flex items-center justify-between text-sm text-white/70">
+              <div className="flex items-center space-x-2">
+                <svg className="w-5 h-5 text-[#FF6B2C]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span className="font-semibold text-white">ThesisFlow-AI</span>
+              </div>
+              <div className="font-medium">
+                Copyright © 2025 ThesisFlow-AI. All Rights Reserved
+              </div>
             </div>
           </div>
         </div>

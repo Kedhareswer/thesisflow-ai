@@ -99,12 +99,14 @@
     "formidable-serverless": "^1.1.1",
     "framer-motion": "^12.23.12",
     "fs": "latest",
+    "gsap": "^3.13.0",
     "http": "latest",
     "http-proxy": "^1.18.1",
     "idb": "^8.0.3",
     "idb-keyval": "^6.2.2",
     "immer": "latest",
     "input-otp": "latest",
+    "isomorphic-dompurify": "latest",
     "jotai": "^2.13.1",
     "jsonwebtoken": "^9.0.2",
     "katex": "^0.16.22",
@@ -165,8 +167,7 @@
     "y-websocket": "latest",
     "yjs": "latest",
     "zod": "^3.25.76",
-    "zustand": "latest",
-    "isomorphic-dompurify": "latest"
+    "zustand": "latest"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
