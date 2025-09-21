@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { buildParaphrasePrompt } from "@/lib/services/paraphrase.service"
-import type { AIProvider } from "@/lib/ai-providers"
+import { OpenRouterClient } from "@/lib/services/openrouter.service"
 
 function sse(headers?: Record<string, string>) {
   const encoder = new TextEncoder()
@@ -51,8 +51,7 @@ export async function GET(request: NextRequest) {
       | "medium"
       | "high"
     const preserveLength = (url.searchParams.get("preserveLength") || "false") === "true"
-    const provider = (url.searchParams.get("provider") || undefined) as AIProvider | undefined
-    const model = (url.searchParams.get("model") || undefined) || undefined
+    // Provider/model are intentionally ignored to keep UI provider-agnostic.
 
     if (!text || text.trim().length === 0) {
       return new Response(JSON.stringify({ error: "Text is required" }), {
@@ -66,8 +65,6 @@ export async function GET(request: NextRequest) {
       tone: mode as any,
       variation: variationLevel as any,
       preserveLength,
-      provider,
-      model,
       userId: user.id,
     })
 
@@ -96,31 +93,78 @@ export async function GET(request: NextRequest) {
         }, heartbeatMs)
 
         try {
-          await enhancedAIService.generateTextStream({
-            prompt,
-            provider,
-            model,
-            maxTokens,
-            temperature,
-            userId: user.id,
-            onToken: (token) => send({ type: "token", token }),
-            onProgress: (p) => send({ type: "progress", ...p }),
-            onError: (err) => {
-              const errorPayload = err && typeof err === 'object'
-                ? {
-                    name: (err as any)?.name || 'Error',
-                    message: (err as any)?.message || String(err),
-                    stack: (err as any)?.stack || undefined,
-                  }
-                : { message: String(err) }
+          // Preferred path: Use OpenRouter with fallback model order (same spirit as Planner)
+          const client = new OpenRouterClient()
+          const modelsToTry = [
+            "z-ai/glm-4.5-air:free",
+            "agentica-org/deepcoder-14b-preview:free",
+            "nousresearch/deephermes-3-llama-3-8b-preview:free",
+            "nvidia/nemotron-nano-9b-v2:free",
+            "deepseek/deepseek-chat-v3.1:free",
+            "openai/gpt-oss-120b:free",
+          ]
 
-              send({ type: "error", error: errorPayload })
-            },
-            abortSignal: abortController.signal,
-          })
+          let content = ""
+          let lastErr: any
+          for (const m of modelsToTry) {
+            try {
+              // Use a single user message containing our composed prompt
+              content = await client.chatCompletion(m, [{ role: "user", content: prompt }], abortController.signal)
+              if (content) break
+            } catch (err) {
+              lastErr = err
+              continue
+            }
+          }
+
+          if (!content) {
+            throw new Error(lastErr?.message || "OpenRouter returned no content")
+          }
+
+          // Simulate token streaming by chunking the content
+          const chunks = content.split(/(\s+)/) // keep spaces
+          const total = chunks.length
+          for (let i = 0; i < chunks.length; i++) {
+            if (abortController.signal.aborted) break
+            const token = chunks[i]
+            if (token) {
+              send({ type: "token", token })
+            }
+            // lightweight progress signal
+            if (i % 20 === 0) {
+              const pct = Math.round((i / Math.max(1, total)) * 100)
+              send({ type: "progress", percentage: pct })
+            }
+            await new Promise((r) => setTimeout(r, 15))
+          }
           send({ type: "done" })
         } catch (e: any) {
-          send({ type: "error", error: e?.message || "Streaming failed" })
+          // Fallback to existing enhanced streaming path for resilience
+          try {
+            await enhancedAIService.generateTextStream({
+              prompt,
+              maxTokens,
+              temperature,
+              userId: user.id,
+              onToken: (token) => send({ type: "token", token }),
+              onProgress: (p) => send({ type: "progress", ...p }),
+              onError: (err) => {
+                const errorPayload = err && typeof err === 'object'
+                  ? {
+                      name: (err as any)?.name || 'Error',
+                      message: (err as any)?.message || String(err),
+                      stack: (err as any)?.stack || undefined,
+                    }
+                  : { message: String(err) }
+
+                send({ type: "error", error: errorPayload })
+              },
+              abortSignal: abortController.signal,
+            })
+            send({ type: "done" })
+          } catch (fallbackErr: any) {
+            send({ type: "error", error: fallbackErr?.message || e?.message || "Streaming failed" })
+          }
         } finally {
           clearInterval(heartbeat)
           try { controller.close() } catch {}

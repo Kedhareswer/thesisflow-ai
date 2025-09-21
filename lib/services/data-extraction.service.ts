@@ -1,3 +1,5 @@
+import { OpenRouterClient } from './openrouter.service'
+
 export interface ExtractionOptions {
   type: 'text' | 'tables' | 'metadata' | 'summary' | 'all';
   format?: 'json' | 'csv' | 'text' | 'markdown';
@@ -66,8 +68,16 @@ export class DataExtractionService {
 
     // Generate summary using AI
     if (options.type === 'summary' || options.type === 'all') {
-      result.summary = await this.generateSummary(text);
-      result.keyPoints = await this.extractKeyPoints(text);
+      try {
+        const sr = await this.generateSummaryWithOpenRouter(text);
+        result.summary = sr.summary;
+        result.keyPoints = sr.keyPoints;
+        (result as any).aiSummarySource = 'openrouter';
+      } catch {
+        result.summary = await this.generateSummary(text);
+        result.keyPoints = await this.extractKeyPoints(text);
+        (result as any).aiSummarySource = 'heuristic';
+      }
     }
 
     // Extract entities
@@ -160,45 +170,80 @@ export class DataExtractionService {
   }
 
   private async generateSummary(text: string): Promise<string> {
-    if (!this.HUGGINGFACE_API_KEY) {
-      // Fallback to simple extraction
-      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-      return sentences.slice(0, 3).join(' ').trim();
-    }
-
-    try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/facebook/bart-large-cnn',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.HUGGINGFACE_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            inputs: text.substring(0, 1024), // Limit input
-            parameters: {
-              max_length: 150,
-              min_length: 30
-            }
-          })
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        return (Array.isArray(result) && result.length > 0) ? result[0]?.summary_text || this.fallbackSummary(text) : this.fallbackSummary(text);
-      }
-    } catch (error) {
-      console.error('Summary generation failed:', error);
-    }
-
+    // Heuristic-only summary fallback (no external API)
+    // Take the first 2-3 sentences as a concise summary
     return this.fallbackSummary(text);
   }
 
   private fallbackSummary(text: string): string {
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
     return sentences.slice(0, 3).join(' ').trim();
+  }
+
+  private async generateSummaryWithOpenRouter(text: string): Promise<{ summary: string; keyPoints: string[] }> {
+    const client = new OpenRouterClient()
+    const system = {
+      role: 'system' as const,
+      content: [
+        'You are a careful summarization assistant for research documents.',
+        'Return ONLY valid JSON with the following TypeScript type:',
+        '{ summary: string; keyPoints: string[] }',
+        'Requirements:',
+        '- summary: 3-7 sentences capturing the main objective, method, and key findings',
+        '- keyPoints: 5-10 concise bullet points; avoid hallucinations; do not invent references',
+        '- Do not include markdown fences or extra commentary; JSON only',
+      ].join('\n'),
+    }
+
+    const context = (text || '').replace(/\r\n/g, '\n')
+    const excerpt = context.length > 8000 ? context.slice(0, 8000) : context
+    const user = {
+      role: 'user' as const,
+      content: [
+        'Summarize the following document content:',
+        '---BEGIN DOCUMENT---',
+        excerpt,
+        '---END DOCUMENT---',
+      ].join('\n'),
+    }
+
+    // Same spirit as Planner: ordered model fallback
+    const modelsToTry = [
+      'z-ai/glm-4.5-air:free',
+      'agentica-org/deepcoder-14b-preview:free',
+      'nousresearch/deephermes-3-llama-3-8b-preview:free',
+      'nvidia/nemotron-nano-9b-v2:free',
+      'deepseek/deepseek-chat-v3.1:free',
+      'openai/gpt-oss-120b:free',
+    ] as const
+
+    let lastErr: any
+    for (const model of modelsToTry) {
+      try {
+        const content = await client.chatCompletion(model, [system, user])
+        const parsed = this.parseFirstJson<{ summary?: string; keyPoints?: string[] }>(content)
+        const summary = (parsed.summary && typeof parsed.summary === 'string' && parsed.summary.trim()) || this.fallbackSummary(excerpt)
+        const keyPointsArr = Array.isArray(parsed.keyPoints) ? parsed.keyPoints.filter((s) => !!s && typeof s === 'string').slice(0, 10) : []
+        const keyPoints = keyPointsArr.length ? keyPointsArr : await this.extractKeyPoints(excerpt)
+        return { summary, keyPoints }
+      } catch (err) {
+        lastErr = err
+        continue
+      }
+    }
+
+    throw new Error(lastErr?.message || 'All OpenRouter models failed for summary')
+  }
+
+  private parseFirstJson<T = any>(text: string): T {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      const slice = text.slice(start, end + 1)
+      try { return JSON.parse(slice) } catch {}
+    }
+    try { return JSON.parse(text) } catch {}
+    throw new Error('Failed to parse JSON from OpenRouter response')
   }
 
   private async extractKeyPoints(text: string): Promise<string[]> {
