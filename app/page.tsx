@@ -251,12 +251,12 @@ export default function HomePage() {
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]" />
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#28C840]" />
               </div>
-              <div className="relative aspect-[16/10] bg-white overflow-hidden">
+              <div className="relative aspect-[16/10] bg-white">
                 <Image
                   src="/dashboard.png"
                   alt="ThesisFlow research dashboard preview"
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
                   priority={false}
                 />
