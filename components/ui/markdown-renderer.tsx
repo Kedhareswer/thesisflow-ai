@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react'
+import React, { useEffect, useId, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,6 +13,53 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+  // Lightweight Mermaid renderer without adding a package dependency.
+  // Loads Mermaid UMD from CDN at runtime and renders diagrams to SVG.
+  const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
+    const ref = useRef<HTMLDivElement>(null)
+    const reactId = useId()
+    const domId = `mermaid-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`
+
+    useEffect(() => {
+      let cancelled = false
+      const ensureMermaid = () => new Promise<void>((resolve, reject) => {
+        const w = window as any
+        if (w.mermaid) return resolve()
+        const scriptId = 'mermaid-umd-cdn'
+        let s = document.getElementById(scriptId) as HTMLScriptElement | null
+        if (!s) {
+          s = document.createElement('script')
+          s.id = scriptId
+          s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'
+          s.async = true
+          s.onload = () => resolve()
+          s.onerror = () => reject(new Error('Failed to load Mermaid'))
+          document.head.appendChild(s)
+        } else {
+          s.onload ? s.onload(null as any) : resolve()
+        }
+      })
+
+      const render = async () => {
+        try {
+          await ensureMermaid()
+          const w = window as any
+          if (!w.mermaid?.initialize) return
+          w.mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' })
+          if (cancelled || !ref.current) return
+          const { svg } = await w.mermaid.render(domId, code)
+          if (!cancelled && ref.current) ref.current.innerHTML = svg
+        } catch {
+          // Fail silently; fallback is raw code block elsewhere
+        }
+      }
+      render()
+      return () => { cancelled = true }
+    }, [code, domId])
+
+    return <div ref={ref} className="my-6 overflow-x-auto" aria-label="Mermaid Diagram" />
+  }
+
   // Parse markdown content and render as HTML with enhanced styling
   const parseMarkdown = (text: string): React.ReactElement => {
     if (!text) return <></>
@@ -372,6 +419,22 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
       i++
     }
 
+    const code = codeLines.join('\n')
+
+    if (language.toLowerCase() === 'mermaid') {
+      const el = (
+        <Card key={getNextKey()} className="my-6 overflow-hidden">
+          <div className="bg-muted/30 px-4 py-2 border-b flex items-center justify-between">
+            <Badge variant="secondary" className="text-xs font-mono">mermaid</Badge>
+          </div>
+          <CardContent className="p-0">
+            <MermaidBlock code={code} />
+          </CardContent>
+        </Card>
+      )
+      return { elements: [el], nextIndex: i + 1 }
+    }
+
     const codeElement = (
       <Card key={getNextKey()} className="my-6 overflow-hidden">
         <div className="bg-muted/30 px-4 py-2 border-b flex items-center justify-between">
@@ -382,7 +445,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         <CardContent className="p-0">
           <pre className="p-4 overflow-x-auto bg-muted/20">
             <code className="text-sm font-mono text-foreground leading-relaxed">
-              {codeLines.join('\n')}
+              {code}
             </code>
           </pre>
         </CardContent>

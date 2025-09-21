@@ -226,8 +226,10 @@ export class TokenMiddleware {
     }
     
     if (searchParams.has('quality')) {
-      const quality = searchParams.get('quality');
-      if (quality === 'high' || quality === 'deep-review') {
+      const quality = (searchParams.get('quality') || '').toLowerCase();
+      // Pass-through raw quality and map common aliases to high_quality flag
+      context.quality = quality;
+      if (quality === 'high' || quality === 'deep-review' || quality === 'enhanced') {
         context.high_quality = true;
       }
     }

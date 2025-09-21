@@ -2,7 +2,7 @@
 
 *Comprehensive AI-powered research platform for academic discovery, document processing, and team collaboration*
 
-[![License](https://img.shields.io/badge/License-MIT-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai/blob/unified/LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai/blob/master/LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/thesisflow-ai?style=flat-square&color=FF6B2C)](https://github.com/Kedhareswer/thesisflow-ai)
 [![Production](https://img.shields.io/badge/Status-Production_Ready-28a745?style=flat-square)](https://thesisflow-ai.vercel.app)
 [![Version](https://img.shields.io/badge/Version-2.1.0-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai)
@@ -828,7 +828,7 @@ pnpm build
 
 **🤖 AI Partners:** OpenAI • Google • Anthropic • Groq • Mistral • HuggingFace
 
-**📚 Academic Sources:** OpenAlex • arXiv • CrossRef • PubMed • Google Scholar
+**📚 Academic Sources:** OpenAlex • arXiv • CrossRef • PubMed • Google Scholar (API)
 
 **🎨 UI Framework:** Shadcn/UI • Radix UI • Framer Motion • Lucide Icons
 

@@ -6,7 +6,7 @@ import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown, Exte
 import Link from "next/link"
 import { useLiteratureSearch, type Paper } from "@/hooks/use-literature-search"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Response as AIDisplayResponse } from "@/src/components/ai-elements/response"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 interface TopicSuggestion {
   id: string
@@ -216,25 +216,20 @@ export default function FindTopicsPage() {
         setTopicsLoading(true)
         setTopicsError(null)
         try {
-          const titles = papers.slice(0, 30).map(p => `- ${p.title}`).join('\n')
-          const abstracts = papers.slice(0, 12).map(p => `- ${p.abstract?.slice(0, 300) || ''}`).join('\n')
-          const prompt = `You are an expert research analyst. Given the following paper titles and short abstracts, extract 10-15 concise research topics/themes. Respond ONLY as a JSON array of short strings.\n\nTITLES:\n${titles}\n\nABSTRACT SNIPPETS:\n${abstracts}\n\nReturn format example: ["Topic A", "Topic B", ...]`
-          const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-          const resp = await enhancedAIService.generateText({ prompt, temperature: 0.3, maxTokens: 600 })
-          if (resp.success) {
-            try {
-              const arr = JSON.parse(resp.content || '[]') as string[]
-              if (Array.isArray(arr) && arr.length) {
-                setTopics(arr.slice(0, 15))
-              }
-            } catch {
-              // Fallback: split by lines
-              const raw = (resp.content || '').split('\n').map(s => s.replace(/^[-•]\s*/, '').trim()).filter(Boolean)
-              setTopics(raw.slice(0, 15))
-            }
-          } else {
-            setTopicsError(resp.error || 'Failed to extract topics')
+          const raw = papers.slice(0, 30)
+          const mini = raw.map(p => ({ title: p.title, abstract: p.abstract }))
+          const limitCount = mini.length
+          const resp = await fetch(`/api/topics/extract?quality=${encodeURIComponent(qualityMode)}&limit=${limitCount}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ papers: mini }),
+          })
+          const data = await resp.json().catch(() => ({} as any))
+          if (!resp.ok || !data?.success) {
+            throw new Error(data?.error || 'Failed to extract topics')
           }
+          const arr: string[] = Array.isArray(data.topics) ? data.topics : []
+          setTopics(arr.slice(0, 15))
         } catch (e) {
           setTopicsError('AI extraction unavailable. Configure an AI provider in Settings to enable topic extraction.')
         } finally {
@@ -244,7 +239,7 @@ export default function FindTopicsPage() {
     }
   }, [literature.results, topicsLoading, topics.length])
 
-  // Manual streaming report generation
+  // Manual streaming report generation (SSE over fetch)
   const generateReport = useCallback(async () => {
     try {
       const papers = literature.results || []
@@ -262,76 +257,61 @@ export default function FindTopicsPage() {
       reportTimerRef.current = setInterval(() => {
         setReportElapsedSec(Math.floor((Date.now() - started) / 1000))
       }, 1000)
-
-      // Build enumerated sources for strict citation
-      const sourceLines = papers.map((p, idx) => {
-        const authors = (p.authors || []).join(', ')
-        const year = p.year || 'n.d.'
-        const journal = p.journal || ''
-        const doi = (p as any).doi || ''
-        const locator = doi ? `doi:${doi}` : (p.url || '')
-        return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
-      }).join('\n')
-
-      const wordsTarget = qualityMode === 'Standard' ? '1000-1500' : '1500-2200'
-      const prompt = `Write a scholarly academic review on the topic: "${searchQuery}".
-
-Use ONLY the numbered sources below. Do not invent citations or data. Cite inline with bracketed numbers [1], [2] that match the exact numbering provided. After the body, include a "References" section listing the same numbered items in order.
-
-Strict Requirements:
-- Absolutely no hallucinations. If evidence is insufficient, state limitations explicitly.
-- Preferred length: ${wordsTarget} words.
-- Use clear headings and subheadings.
-- Include multiple visual summaries using Markdown only (no external scripts). These MUST be contextually meaningful and derived strictly from the sources:
-  1) Evidence Summary Table with columns: ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation.
-  2) Key Metrics Table with columns: Metric | Value/Range | Population/Scope | Citation.
-  3) Regional Comparison Table with columns: Region | Trend/Direction | Notable Study [n].
-  4) Timeline Table with columns: Period | Milestones | Citations.
-  5) ASCII Bar Chart of Key Trends inside a fenced code block labeled "text" (no mermaid), e.g.:
-     \`\`\`text
-     Trend A |██████████ 85%
-     Trend B |███████    55%
-     \`\`\`
-  6) ASCII Line Chart (time series if years are available), labeled "text", e.g.:
-     \`\`\`text
-     2019 ▏▏▏
-     2020 ▏▏▏▏▏
-     2021 ▏▏▏▏▏▏▏
-     2022 ▏▏▏▏▏▏▏▏
-     \`\`\`
-  7) Geographic Summary Map (textual/ASCII). List regions/countries with an intensity bar using blocks (▁▃▅▇), e.g.:
-     \`\`\`text
-     North America  ▇▇▇▇  High activity [3,7]
-     Europe         ▇▇▇   Moderate [2,5]
-     Asia           ▇▇▇▇▇ Very High [1,4,6]
-     \`\`\`
-- Where data is insufficient, write "Data not available" rather than guessing.
-
-Recommended Structure:
-- Title
-- Abstract
-- Background
-- Methods (how evidence was synthesized)
-- Findings (grouped logically)
-- Visual Summaries (tables and ASCII chart as specified)
-- Limitations and Future Work
-- References
-
-Sources:\n${sourceLines}`
-
-      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-
       const controller = new AbortController()
       reportAbortRef.current = controller
-      await enhancedAIService.generateTextStream({
-        prompt,
-        temperature: 0.2,
-        maxTokens: 2000,
-        onToken: (t) => setReport((prev) => prev + t),
-        onProgress: () => {},
-        onError: (err) => setReportError(err || 'Streaming failed'),
-        abortSignal: controller.signal,
+      const sourceCount = Math.min(20, Math.max(8, papers.length))
+      const resp = await fetch(`/api/topics/report/stream?quality=${encodeURIComponent(qualityMode)}&limit=${sourceCount}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery, papers, quality: qualityMode }),
+        signal: controller.signal,
       })
+
+      if (!resp.ok || !resp.body) {
+        const errText = await resp.text().catch(() => '')
+        throw new Error(errText || 'Failed to start streaming')
+      }
+
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+      let done = false
+      while (!done) {
+        const { value, done: readerDone } = await reader.read()
+        if (readerDone) break
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+        // Parse SSE events separated by double newlines
+        let sepIndex
+        while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex)
+          buffer = buffer.slice(sepIndex + 2)
+          // Each event has lines like: event: <type>\n data: <json>
+          const lines = rawEvent.split('\n')
+          let eventType = 'message'
+          let dataLines: string[] = []
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim()
+            } else if (line.startsWith('data:')) {
+              dataLines.push(line.slice(5).trim())
+            }
+          }
+          const dataStr = dataLines.join('\n')
+          let payload: any = null
+          try { payload = dataStr ? JSON.parse(dataStr) : null } catch {}
+
+          if (eventType === 'token' && payload?.content) {
+            setReport(prev => prev + String(payload.content))
+          } else if (eventType === 'error') {
+            const msg = payload?.error || 'Streaming error'
+            throw new Error(msg)
+          } else if (eventType === 'done') {
+            done = true
+            break
+          }
+        }
+      }
     } catch (e) {
       setReportError(e instanceof Error ? e.message : 'Failed to generate report')
     } finally {
@@ -476,9 +456,7 @@ Sources:\n${sourceLines}`
               )}
               {report && (
                 <div className="rounded-lg border border-gray-200 bg-white p-4">
-                  <AIDisplayResponse className="prose max-w-none">
-                    {report}
-                  </AIDisplayResponse>
+                  <MarkdownRenderer content={report} className="prose max-w-none" />
                 </div>
               )}
             </div>

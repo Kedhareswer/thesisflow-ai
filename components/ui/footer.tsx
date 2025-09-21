@@ -26,11 +26,11 @@ export function Footer({ className, ...props }: FooterProps) {
           text.style.whiteSpace = "nowrap";
           text.style.display = "inline-block";
           
-          // GSAP animation - slower and smoother
+          // GSAP animation - slower and smoother (increase duration to slow speed)
           gsap.to(text, {
             xPercent: -100,
             repeat: -1,
-            duration: 40,
+            duration: 80,
             ease: "none",
             modifiers: {
               xPercent: gsap.utils.unitize((x: string) => parseFloat(x) % 100)

@@ -90,8 +90,18 @@ export class TokenService {
         errorMessage: data.error_message || undefined,
       };
     } catch (error) {
-      console.error('Error checking rate limit:', error);
-      throw new Error('Failed to check rate limit');
+      // IMPORTANT: Make rate-limit failures non-fatal. Return a permissive default
+      // so product features continue to work even if the RPC or database is unavailable.
+      const msg = (error as any)?.message || String(error);
+      console.warn('[token.service] checkRateLimit fallback (allow):', msg);
+      return {
+        allowed: true,
+        tokensNeeded: 1,
+        monthlyRemaining: 999999,
+        // default to one hour from now; consumers only use this when disallowed
+        resetTime: Date.now() + 3600000,
+        errorMessage: undefined,
+      };
     }
   }
 
