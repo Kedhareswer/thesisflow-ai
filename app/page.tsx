@@ -306,7 +306,7 @@ export default function HomePage() {
           >
             <div className="text-xs tracking-[0.2em] text-neutral-400 uppercase mb-4">Benefits</div>
             <h3 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight">Built for Researchers, Not Busywork.</h3>
-            <p className="mt-4 text-neutral-300 max-w-2xl mx-auto text-lg leading-relaxed">Simple, powerful tools that feel effortless—explore the platform's core capabilities.</p>
+            <p className="mt-4 text-neutral-300 max-w-2xl mx-auto text-lg leading-relaxed">Simple, powerful tools that feel effortless: explore the platform's core capabilities.</p>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             {benefitItems.map((b) => {
