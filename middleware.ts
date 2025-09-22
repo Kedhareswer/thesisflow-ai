@@ -26,7 +26,16 @@ export async function middleware(req: NextRequest) {
     "/writing-assistant",
     "/ai-assistant",
     "/profile",
-    "/settings"
+    "/settings",
+    // Sidebar navigation pages
+    "/explorer",        // Explorer - research assistant
+    "/writer",          // AI Writer
+    "/chat-pdf",        // Chat with PDF
+    "/topics",          // Find Topics
+    "/paraphraser",     // Paraphraser
+    "/citations",       // Citation Generator
+    "/extract",         // Extract Data
+    "/ai-detector"      // AI Detector
   ]
 
   // Admin routes that require admin role
@@ -40,7 +49,22 @@ export async function middleware(req: NextRequest) {
     "/forgot-password",
     "/reset-password",
     "/unauthorized",
-    "/explorer" // Explorer is public for demo purposes
+    // Marketing and informational pages
+    "/about",
+    "/pricing",
+    "/features",
+    "/contact",
+    "/privacy",
+    "/terms",
+    "/legal",
+    "/blog",
+    "/docs",
+    "/community",
+    "/careers",
+    "/partners",
+    "/affiliates",
+    "/changelog",
+    "/events"
   ]
 
   const isProtectedRoute = protectedRoutes.some((route) => req.nextUrl.pathname.startsWith(route))

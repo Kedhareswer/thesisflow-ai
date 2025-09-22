@@ -1,58 +1,86 @@
-# Bolt Researcher Hub - Custom Email Templates
+# ThesisFlow-AI - Modern Email Templates
 
-This directory contains custom email templates for Bolt Researcher Hub's authentication system. These templates provide a modern, glassmorphic experience for users during signup, login, and other authentication flows.
+This directory contains modern, professional email templates for ThesisFlow-AI's authentication and collaboration system. These templates provide a clean, accessible experience for users during signup, login, and team collaboration flows.
 
 ## 📧 Available Templates
 
-### 1. **confirmation.html** - Email Signup Confirmation
+### 1. **account-confirmation.html** - Email Signup Confirmation
 - **Purpose**: Sent when users sign up and need to verify their email
 - **Features**: 
-  - Modern glassmorphism design
-  - Hero illustration with professional imagery
-  - Feature highlights with lightning bolt icons
-  - Mobile-responsive design
+  - Modern, clean design with ThesisFlow-AI branding
+  - Feature highlights showcasing AI-powered research capabilities
+  - Mobile-responsive design with excellent email client compatibility
+  - Security notices and help sections
 
-### 2. **magic-link.html** - Magic Link Authentication
+### 2. **magic-link-login.html** - Magic Link Authentication
 - **Purpose**: Sent when users request passwordless login
 - **Features**:
-  - Clear explanation of magic links
-  - Security information with visual indicators
+  - Clear explanation of magic link security benefits
+  - Visual security features grid with icons
+  - Time-limited access messaging
   - Mobile-responsive design
 
-### 3. **recovery.html** - Password Reset
+### 3. **password-recovery.html** - Password Reset
 - **Purpose**: Sent when users request password reset
 - **Features**:
-  - Step-by-step instructions
-  - Security warnings with lock icons
-  - Red-themed CTA button for urgency
+  - Step-by-step password reset instructions
+  - Security tips and best practices
+  - Red-themed CTA button for urgency and attention
+  - Comprehensive security warnings
 
-### 4. **invite.html** - Team Invitations
-- **Purpose**: Sent when users are invited to join teams/projects
+### 4. **team-invitation.html** - Team Invitations
+- **Purpose**: Sent when users are invited to join research teams/projects
 - **Features**:
-  - Invitation details with custom data
-  - Team collaboration features
-  - Green-themed CTA button for acceptance
+  - Dynamic invitation details with team information
+  - Collaboration features showcase
+  - Green-themed CTA button for positive action
+  - Team member role and size information
+
+### 5. **change-email-address.html** - Email Change Confirmation
+- **Purpose**: Sent when users request to change their email address
+- **Features**:
+  - Clear display of old and new email addresses
+  - Step-by-step process explanation
+  - Amber-themed design for attention
+  - Security warnings and expiration notices
+
+### 6. **reset-password.html** - Password Reset Confirmation
+- **Purpose**: Sent after a successful password reset (confirmation)
+- **Features**:
+  - Success confirmation with timestamp and IP details
+  - Security recommendations and best practices
+  - Green-themed design for positive confirmation
+  - Account security tips and guidance
+
+### 7. **reauthentication.html** - Security Reauthentication
+- **Purpose**: Sent when unusual activity requires user verification
+- **Features**:
+  - Security alert with detection details
+  - Explanation of why reauthentication is needed
+  - Red-themed design for urgency
+  - Device, location, and IP information display
 
 ## 🎨 Design Features
 
-### **Modern Glassmorphism Design**
-- **Background**: Dynamic gradient background (#d5ddec to #f0f2f5)
-- **Glass Effect**: Semi-transparent white background with backdrop blur
-- **Borders**: Subtle white borders with transparency
-- **Shadows**: Soft shadows for depth and modern feel
+### **Modern Professional Design**
+- **Background**: Clean light gray (#f8fafc) with white containers
+- **Layout**: Centered 600px max-width for optimal readability
+- **Typography**: System fonts for maximum compatibility and readability
+- **Shadows**: Subtle shadows (0 2px 4px rgba(0, 0, 0, 0.04)) for depth
 
-### **Branding**
-- 🚀 Bolt Researcher Hub logo and branding
-- Professional hero illustrations from Pexels
-- Consistent typography using system fonts
-- Lightning bolt icons for feature lists
+### **ThesisFlow-AI Branding**
+- 🎯 ThesisFlow-AI logo with document icon
+- Orange brand color (#FF6B2C) for primary actions and branding
+- Consistent typography using system font stack
+- Research-focused iconography and messaging
 
 ### **Color Scheme**
-- **Primary**: Blue gradient (#4b6cb7 to #182848)
-- **Success**: Green gradient (#10b981 to #059669)
-- **Warning**: Red gradient (#dc2626 to #b91c1c)
-- **Info**: Blue accents (#0ea5e9)
-- **Text**: Dark blue (#1c2a48) and gray (#33425e)
+- **Primary Brand**: Orange (#FF6B2C) with hover state (#E55A1F)
+- **Success**: Green (#10b981) for positive actions like invitations and confirmations
+- **Warning**: Red (#dc2626) for urgent actions like password reset and security alerts
+- **Attention**: Amber (#f59e0b) for important changes like email updates
+- **Info**: Blue (#0ea5e9) for informational elements
+- **Text**: Dark (#1a1a1a) and muted gray (#6b7280) for hierarchy
 
 ### **Visual Elements**
 - **Hero Images**: High-quality professional images from Pexels
@@ -81,16 +109,22 @@ This directory contains custom email templates for Bolt Researcher Hub's authent
    - Navigate to **Authentication** → **Email Templates**
 
 2. **Update Each Template**
-   - **Confirm signup**: Copy content from `confirmation.html`
-   - **Magic link**: Copy content from `magic-link.html`
-   - **Reset password**: Copy content from `recovery.html`
-   - **Invite user**: Copy content from `invite.html`
+   - **Confirm signup**: Copy content from `account-confirmation.html`
+   - **Magic link**: Copy content from `magic-link-login.html`
+   - **Reset password**: Copy content from `password-recovery.html`
+   - **Invite user**: Copy content from `team-invitation.html`
+   - **Change email**: Copy content from `change-email-address.html`
+   - **Password reset confirmation**: Copy content from `reset-password.html`
+   - **Reauthentication**: Copy content from `reauthentication.html`
 
 3. **Update Email Subjects**
-   - Confirm signup: "Welcome to the Bolt Researcher Hub!"
-   - Magic link: "Secure Access to Your Research Hub"
-   - Reset password: "Reset Your Password - Bolt Researcher Hub"
-   - Invite user: "You've Been Invited - Bolt Researcher Hub"
+   - Confirm signup: "Confirm your account - ThesisFlow-AI"
+   - Magic link: "Secure Access to ThesisFlow-AI"
+   - Reset password: "Reset Your Password - ThesisFlow-AI"
+   - Invite user: "You've Been Invited - ThesisFlow-AI"
+   - Change email: "Confirm Email Change - ThesisFlow-AI"
+   - Password reset confirmation: "Password Reset Successful - ThesisFlow-AI"
+   - Reauthentication: "Security Alert - Reauthentication Required - ThesisFlow-AI"
 
 ### Option 2: Management API
 
@@ -106,13 +140,13 @@ curl -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "mailer_subjects_confirmation": "Welcome to the Bolt Researcher Hub!",
+    "mailer_subjects_confirmation": "Confirm your account - ThesisFlow-AI",
     "mailer_templates_confirmation_content": "<!DOCTYPE html>...",
-    "mailer_subjects_magic_link": "Secure Access to Your Research Hub",
+    "mailer_subjects_magic_link": "Secure Access to ThesisFlow-AI",
     "mailer_templates_magic_link_content": "<!DOCTYPE html>...",
-    "mailer_subjects_recovery": "Reset Your Password - Bolt Researcher Hub",
+    "mailer_subjects_recovery": "Reset Your Password - ThesisFlow-AI",
     "mailer_templates_recovery_content": "<!DOCTYPE html>...",
-    "mailer_subjects_invite": "You've Been Invited - Bolt Researcher Hub",
+    "mailer_subjects_invite": "You've Been Invited - ThesisFlow-AI",
     "mailer_templates_invite_content": "<!DOCTYPE html>..."
   }'
 ```
@@ -180,6 +214,9 @@ After applying the templates:
 2. **Test Magic Link**: Request a magic link to test login email
 3. **Test Password Reset**: Request password reset to test recovery email
 4. **Test Invitations**: Send team invitations to test invite email
+5. **Test Email Change**: Request email address change to test change confirmation
+6. **Test Password Reset Confirmation**: Complete password reset to test success email
+7. **Test Reauthentication**: Trigger security verification to test reauthentication email
 
 ## 🐛 Troubleshooting
 
@@ -206,4 +243,4 @@ If you encounter issues with the email templates:
 
 ---
 
-**Note**: These templates feature a modern glassmorphism design specifically for Bolt Researcher Hub. The design includes professional imagery, modern typography, and engaging visual elements while maintaining excellent email client compatibility. 
+**Note**: These templates feature a modern, professional design specifically for ThesisFlow-AI. The design includes clean layouts, research-focused iconography, modern typography, and engaging visual elements while maintaining excellent email client compatibility across all major email providers. 
