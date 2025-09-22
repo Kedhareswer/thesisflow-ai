@@ -46,6 +46,32 @@ try {
   throw error;
 }
 
+// Ensure server can see the auth state: sync tokens into HttpOnly cookies
+async function postAuthSync(event: string, session: Session | null) {
+  try {
+    await fetch('/api/auth/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      // keepalive helps ensure the request is delivered even during navigation
+      keepalive: true,
+      body: JSON.stringify({
+        event,
+        session: session
+          ? {
+              access_token: (session as any).access_token,
+              refresh_token: (session as any).refresh_token,
+              expires_at: (session as any).expires_at ?? null,
+              expires_in: (session as any).expires_in ?? null,
+            }
+          : null,
+      }),
+    })
+  } catch (_) {
+    // best-effort; do not block UI on sync errors
+  }
+}
+
 type SupabaseAuthContextType = {
   user: User | null
   session: Session | null
@@ -74,6 +100,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+      // Sync any existing session to HttpOnly cookies so middleware can see it
+      if (session) {
+        void postAuthSync('INITIAL_SESSION', session)
+      }
     })
 
     // Listen for auth state changes
@@ -83,6 +113,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+      // Sync cookies on every auth transition (sign in/out, token refresh)
+      void postAuthSync(_event, session)
     })
 
     return () => subscription.unsubscribe()
@@ -105,6 +137,9 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       console.log("Auth response:", { data: data ? "[DATA EXISTS]" : "[NO DATA]", error });
 
       if (error) throw error
+
+      // IMPORTANT: sync session tokens to server cookies before redirecting
+      await postAuthSync('SIGNED_IN', (data as any)?.session ?? null)
 
       toast({
         title: "Logged in successfully",
@@ -290,6 +325,9 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         const { clearAllCaches } = await import('@/lib/services/cache.service')
         clearAllCaches()
       }
+
+      // Ensure cookies are cleared server-side too
+      await postAuthSync('SIGNED_OUT', null)
 
       toast({
         title: "Logged out successfully",

@@ -28,8 +28,19 @@ export default function LoginPage() {
     try {
       await signIn(email, password)
 
-      // Handle redirect after login
-      const redirectTo = searchParams.get("redirectTo") || "/explorer"
+      // Handle redirect after login (normalize path to avoid case issues)
+      const sanitizeRedirect = (raw: string) => {
+        try {
+          const base = typeof window !== 'undefined' ? window.location.origin : 'https://local.invalid'
+          const url = new URL(raw, base)
+          // normalize pathname to lowercase for our known routes
+          url.pathname = url.pathname.toLowerCase()
+          return url.pathname + url.search + url.hash
+        } catch {
+          return (raw || '/explorer').toLowerCase()
+        }
+      }
+      const redirectTo = sanitizeRedirect(searchParams.get("redirectTo") || "/explorer")
       router.push(redirectTo)
 
       toast({
