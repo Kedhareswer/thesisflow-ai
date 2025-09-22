@@ -68,7 +68,6 @@ async function aggregateTopFromTransactions(
     requests: number
     cost: number
     error_rate: number
-    avg_latency: number
   }> = {}
 
   for (const row of rows || []) {
@@ -88,12 +87,12 @@ async function aggregateTopFromTransactions(
       }
     })()
     if (!aggregated[key]) {
-      aggregated[key] = { key, tokens: 0, requests: 0, cost: 0, error_rate: 0, avg_latency: 0 }
+      aggregated[key] = { key, tokens: 0, requests: 0, cost: 0, error_rate: 0 }
     }
     aggregated[key].tokens += Number(row.tokens_amount || 0)
     aggregated[key].requests += 1
     aggregated[key].cost += Number(row.provider_cost_usd || 0)
-    // error_rate & avg_latency not available here – keep at 0
+    // error_rate not available here – keep at 0
   }
 
   return Object.values(aggregated)
@@ -125,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     let { data, error } = await supabaseAdmin
       .from('usage_daily_mv')
-      .select(`${byCol}, tokens, requests, cost_usd, error_rate, avg_latency`)
+      .select(`${byCol}, tokens, requests, cost_usd, error_rate`)
       .eq('user_id', userId)
       .gte('day', fromUTC.toISOString())
       .lte('day', toUTC.toISOString())
@@ -135,7 +134,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to query top usage' }, { status: 500 })
     }
 
-    let rowsAgg: Array<{ key: string, tokens: number, requests: number, cost: number, error_rate: number, avg_latency: number }>
+    let rowsAgg: Array<{ key: string, tokens: number, requests: number, cost: number, error_rate: number }>
     if (!error && data && data.length > 0) {
       // Aggregate MV data by the 'by' dimension
       const aggregated: Record<string, {
@@ -144,12 +143,11 @@ export async function POST(request: NextRequest) {
         requests: number
         cost: number
         error_rate: number
-        avg_latency: number
       }> = {}
       ;(data || []).forEach((row: any) => {
         const key = String(row[byCol] || 'unknown')
         if (!aggregated[key]) {
-          aggregated[key] = { key, tokens: 0, requests: 0, cost: 0, error_rate: 0, avg_latency: 0 }
+          aggregated[key] = { key, tokens: 0, requests: 0, cost: 0, error_rate: 0 }
         }
         aggregated[key].tokens += Number(row.tokens || 0)
         aggregated[key].requests += Number(row.requests || 0)
@@ -161,10 +159,6 @@ export async function POST(request: NextRequest) {
           const newWeight = requests
           aggregated[key].error_rate = (
             (aggregated[key].error_rate * prevWeight + Number(row.error_rate || 0) * newWeight) / 
-            totalRequests
-          )
-          aggregated[key].avg_latency = (
-            (aggregated[key].avg_latency * prevWeight + Number(row.avg_latency || 0) * newWeight) / 
             totalRequests
           )
         }
@@ -193,7 +187,6 @@ export async function POST(request: NextRequest) {
         requests: Math.round(row.requests),
         cost: Number(row.cost.toFixed(4)),
         error_rate: Number((row.error_rate * 100).toFixed(2)), // Convert to percentage
-        avg_latency: Math.round(row.avg_latency),
       }))
 
     return NextResponse.json({

@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
     const selectCols = [
       'day',
       'service', 'provider', 'model', 'feature_name', 'origin', 'quality', 'per_result_bucket',
-      'tokens', 'requests', 'cost_usd', 'avg_tokens', 'p95_tokens', 'avg_latency', 'p95_latency', 'error_rate'
+      'tokens', 'requests', 'cost_usd', 'avg_tokens', 'p95_tokens', 'error_rate'
     ]
 
     let { data, error } = await supabaseAdmin
