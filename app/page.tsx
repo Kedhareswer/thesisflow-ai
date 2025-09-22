@@ -54,12 +54,6 @@ export default function HomePage() {
       href: "/planner",
     },
     {
-      icon: Lightbulb,
-      title: "AI Tools",
-      description: "One-click helpers for extraction, citation, and data prep—right where you work.",
-      href: "/ai-tools",
-    },
-    {
       icon: Users,
       title: "Collaboration Hub",
       description: "Share context, notes, and drafts without tool-switching or version chaos.",

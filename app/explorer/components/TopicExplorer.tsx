@@ -14,13 +14,12 @@ import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import Link from "next/link"
 import { useResearchTopics, useResearchContext } from "@/components/research-session-provider"
-import { OpenRouterClient } from "@/lib/services/openrouter.service"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 
-// Enhanced research service that uses OpenRouter
+// Enhanced research service that uses user API keys via EnhancedAIService
 class EnhancedResearchService {
   static async exploreTopics(
     topic: string,
@@ -38,7 +37,7 @@ class EnhancedResearchService {
       console.log("EnhancedResearchService: Starting topic exploration for:", topic)
 
       const contextPrompt = additionalContext ? `\n\nAdditional Context: ${additionalContext}` : ""
-      
+
       const prompt = `Research overview: "${topic}" | Depth: ${depth}/5${contextPrompt}
 
 ## Key Concepts
@@ -61,35 +60,23 @@ class EnhancedResearchService {
 
 ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
 
-      // Use OpenRouter with fallback model order (same as Extract Data and Paraphraser)
-      const client = new OpenRouterClient()
-      const modelsToTry = [
-        "z-ai/glm-4.5-air:free",
-        "agentica-org/deepcoder-14b-preview:free",
-        "nousresearch/deephermes-3-llama-3-8b-preview:free",
-        "nvidia/nemotron-nano-9b-v2:free",
-        "deepseek/deepseek-chat-v3.1:free",
-        "openai/gpt-oss-120b:free",
-      ]
+      // Use EnhancedAIService with user API keys (no OpenRouter)
+      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
 
-      let content = ""
-      let lastErr: any
-      for (const model of modelsToTry) {
-        try {
-          content = await client.chatCompletion(model, [{ role: "user", content: prompt }])
-          if (content) break
-        } catch (err) {
-          lastErr = err
-          continue
-        }
-      }
+      const result = await enhancedAIService.generateText({
+        prompt,
+        provider: selectedProvider,
+        model: selectedModel,
+        maxTokens: 1800,
+        temperature: 0.7,
+      })
 
-      if (!content) {
-        throw new Error(lastErr?.message || "OpenRouter returned no content")
+      if (!result.success || !result.content) {
+        throw new Error(result.error || "Failed to explore research topic. Please check your AI provider configuration.")
       }
 
       return {
-        content,
+        content: result.content,
         topic,
         depth,
         timestamp: new Date().toISOString(),
@@ -100,10 +87,8 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
       let errorMessage = "Failed to explore research topic"
 
       if (error instanceof Error) {
-        if (error.message.includes("OpenRouter API key") || error.message.includes("not configured")) {
-          errorMessage = "OpenRouter API key is not configured. Please check your environment variables."
-        } else if (error.message.includes("OpenRouter returned no content")) {
-          errorMessage = "All OpenRouter models are currently unavailable. Please try again in a few minutes."
+        if (error.message.includes("No AI providers") || error.message.includes("No valid API keys")) {
+          errorMessage = "No AI providers are configured. Please add at least one API key in Settings."
         } else if (error.message.includes("authentication") || error.message.includes("sign in")) {
           errorMessage = "Authentication error. Please sign in again to access AI features."
         } else if (error.message.includes("rate limit")) {
