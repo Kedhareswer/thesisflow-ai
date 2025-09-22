@@ -30,7 +30,9 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         if (!s) {
           s = document.createElement('script')
           s.id = scriptId
-          s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'
+          // Prefer: import('mermaid').then(...)
+          s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js'
+          // s.integrity = '<sha256-...>'; s.crossOrigin = 'anonymous';
           s.async = true
           s.onload = () => resolve()
           s.onerror = () => reject(new Error('Failed to load Mermaid'))
