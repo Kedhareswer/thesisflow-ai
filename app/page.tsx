@@ -177,13 +177,26 @@ export default function HomePage() {
 
         {/* Content overlay */}
         <div className="relative z-10 h-full min-h-[100vh] flex items-center">
-          <div className="w-full px-8">
+          <div 
+            className="w-full px-8"
+            style={{
+              alignItems: 'center',
+              backgroundColor: '#f6f6f4',
+              display: 'flex',
+              flexDirection: 'column',
+              fontFamily: 'IBM Plex Sans, sans-serif',
+              fontSize: '12px',
+              gap: '20px',
+              justifyContent: 'flex-start',
+              padding: '12px'
+            }}
+          >
             <div className="grid grid-cols-12 gap-8 items-center">
               {/* Left content block */}
               <div className="col-span-12 lg:col-span-6 text-white">
                 <div className="mb-4">
                   <div className="text-xs font-normal tracking-[0.15em] uppercase text-white/90 mb-6">
-                    COMING SOON
+                   Turn Research Chaos into Clarity with AI
                   </div>
                   <h1 
                     className="mb-8"
@@ -196,8 +209,8 @@ export default function HomePage() {
                     }}
                   >
                     AI Research Sidekick<br />
-                    Built for Big Dreamers<br />
-                    Who Hate Spreadsheets
+                    Built for Big Dreamers,<br />
+                    Smarter, Faster, Stress-Free
                   </h1>
                   <div className="mt-8">
                     <Button
@@ -412,12 +425,29 @@ export default function HomePage() {
         <div className="relative z-10 h-full min-h-[100vh] flex items-center">
           <div className="container mx-auto px-6 grid grid-cols-12 items-center">
             <div className="col-span-12 md:col-span-7 lg:col-span-6 text-white">
-              <h3 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight leading-tight">
+              <h3 
+                style={{
+                  color: '#fff',
+                  fontFamily: 'IBM Plex Sans, sans-serif',
+                  fontSize: '24px',
+                  fontWeight: 300,
+                  lineHeight: '32px',
+                  textTransform: 'uppercase'
+                }}
+              >
                 Doing research
                 <br />is hard enough—
-                <br />your tooling shouldn’t be.
+                <br />your tooling shouldn't be.
               </h3>
-              <p className="mt-4 text-lg text-white/90 max-w-xl leading-relaxed">
+              <p 
+                className="mt-4 max-w-xl"
+                style={{
+                  color: '#fff',
+                  fontFamily: 'IBM Plex Sans, sans-serif',
+                  fontSize: '14px',
+                  lineHeight: '22px'
+                }}
+              >
                 ThesisFlow handles the tedious parts—deduping, citations, summaries, and now even acts on plain‑language commands—so you can focus on discovery, writing, and breakthroughs.
               </p>
               <div className="mt-8 flex gap-4">
@@ -440,7 +470,6 @@ export default function HomePage() {
         </div>
       </section>
 
-
       {/* Testimonials Section removed for Future Use */}
 
       {/* Pricing Section */}
@@ -455,8 +484,9 @@ export default function HomePage() {
       </motion.div>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-32 bg-background">
-        <div className="max-w-5xl mx-auto px-4">
+      <section id="faq" className="relative py-32 bg-neutral-950 text-white">
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
+        <div className="max-w-5xl mx-auto px-4 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -464,8 +494,25 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-5xl font-bold text-foreground mb-6 tracking-tight">Frequently Asked Questions</h2>
-            <p className="text-2xl text-muted-foreground font-normal leading-relaxed max-w-3xl mx-auto">
+            <h2 
+              className="mb-6 tracking-tight"
+              style={{
+                color: '#fff',
+                fontFamily: 'IBM Plex Sans, sans-serif',
+                fontSize: '48px',
+                fontWeight: 'bold'
+              }}
+            >
+              FAQ
+            </h2>
+            <p 
+              className="font-normal leading-relaxed max-w-3xl mx-auto"
+              style={{
+                color: '#fff',
+                fontFamily: 'IBM Plex Sans, sans-serif',
+                fontSize: '18px'
+              }}
+            >
               Answers to common questions about ThesisFlow-AI.
             </p>
           </motion.div>
