@@ -6,7 +6,8 @@ import { Search, Loader2, Check, BarChart3, Sun, Heart, Leaf, TrendingDown, Exte
 import Link from "next/link"
 import { useLiteratureSearch, type Paper } from "@/hooks/use-literature-search"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Response as AIDisplayResponse } from "@/src/components/ai-elements/response"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 interface TopicSuggestion {
   id: string
@@ -29,6 +30,9 @@ export default function FindTopicsPage() {
   const [qualityMode, setQualityMode] = useState<'Standard' | 'Enhanced'>('Standard')
   const [timeLeft, setTimeLeft] = useState(6)
 
+  // Auth session for authenticated API calls (required by token middleware)
+  const { session } = useSupabaseAuth()
+
   // Real results via literature search. Use aggregateWindowMs to minimize API calls and avoid 429s.
   // With aggregateWindowMs > 0, the hook uses the fetch path (cache-first + aggregation) instead of SSE.
   const literature = useLiteratureSearch({ defaultLimit: 20, useSSE: true, aggregateWindowMs: 120000 })
@@ -44,6 +48,7 @@ export default function FindTopicsPage() {
   const [reportError, setReportError] = useState<string | null>(null)
   const reportAbortRef = useRef<AbortController | null>(null)
   const reportTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const reportTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [reportStartAt, setReportStartAt] = useState<number | null>(null)
   const [reportElapsedSec, setReportElapsedSec] = useState(0)
 
@@ -161,6 +166,10 @@ export default function FindTopicsPage() {
       clearInterval(reportTimerRef.current)
       reportTimerRef.current = null
     }
+    if (reportTimeoutRef.current) {
+      clearTimeout(reportTimeoutRef.current)
+      reportTimeoutRef.current = null
+    }
     if (reportAbortRef.current) {
       try { reportAbortRef.current.abort() } catch {}
       reportAbortRef.current = null
@@ -212,39 +221,82 @@ export default function FindTopicsPage() {
   useEffect(() => {
     const papers = literature.results || []
     if (papers.length >= 6 && !topicsLoading && topics.length === 0) {
+      // Create AbortController for request cancellation and timeout
+      const controller = new AbortController()
+      let timeoutId: NodeJS.Timeout | null = null
+      
       ;(async () => {
         setTopicsLoading(true)
         setTopicsError(null)
+        
         try {
-          const titles = papers.slice(0, 30).map(p => `- ${p.title}`).join('\n')
-          const abstracts = papers.slice(0, 12).map(p => `- ${p.abstract?.slice(0, 300) || ''}`).join('\n')
-          const prompt = `You are an expert research analyst. Given the following paper titles and short abstracts, extract 10-15 concise research topics/themes. Respond ONLY as a JSON array of short strings.\n\nTITLES:\n${titles}\n\nABSTRACT SNIPPETS:\n${abstracts}\n\nReturn format example: ["Topic A", "Topic B", ...]`
-          const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-          const resp = await enhancedAIService.generateText({ prompt, temperature: 0.3, maxTokens: 600 })
-          if (resp.success) {
-            try {
-              const arr = JSON.parse(resp.content || '[]') as string[]
-              if (Array.isArray(arr) && arr.length) {
-                setTopics(arr.slice(0, 15))
-              }
-            } catch {
-              // Fallback: split by lines
-              const raw = (resp.content || '').split('\n').map(s => s.replace(/^[-•]\s*/, '').trim()).filter(Boolean)
-              setTopics(raw.slice(0, 15))
-            }
-          } else {
-            setTopicsError(resp.error || 'Failed to extract topics')
+          // Set 30s timeout
+          timeoutId = setTimeout(() => {
+            controller.abort()
+          }, 30000)
+          
+          const raw = papers.slice(0, 30)
+          const mini = raw.map(p => ({ title: p.title, abstract: p.abstract }))
+          const limitCount = mini.length
+          const resp = await fetch(`/api/topics/extract?quality=${encodeURIComponent(qualityMode)}&limit=${limitCount}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+            },
+            body: JSON.stringify({ papers: mini }),
+            signal: controller.signal,
+          })
+          
+          // Clear timeout on successful response
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
           }
-        } catch (e) {
-          setTopicsError('AI extraction unavailable. Configure an AI provider in Settings to enable topic extraction.')
+          
+          const data = await resp.json().catch(() => ({} as any))
+          if (!resp.ok || !data?.success) {
+            throw new Error(data?.error || 'Failed to extract topics')
+          }
+          const arr: string[] = Array.isArray(data.topics) ? data.topics : []
+          
+          // Only update state if not aborted
+          if (!controller.signal.aborted) {
+            setTopics(arr.slice(0, 15))
+          }
+        } catch (e: any) {
+          // Handle AbortError separately (silent failure)
+          if (e.name === 'AbortError') {
+            // Request was aborted, don't update error state
+            return
+          }
+          
+          // Only update error state if not aborted
+          if (!controller.signal.aborted) {
+            setTopicsError('AI extraction unavailable. Configure an AI provider in Settings to enable topic extraction.')
+          }
         } finally {
-          setTopicsLoading(false)
+          // Clear timeout and only update loading state if not aborted
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+          }
+          if (!controller.signal.aborted) {
+            setTopicsLoading(false)
+          }
         }
       })()
+      
+      // Cleanup function
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+        controller.abort()
+      }
     }
-  }, [literature.results, topicsLoading, topics.length])
+  }, [literature.results, topicsLoading, topics.length, qualityMode, session?.access_token])
 
-  // Manual streaming report generation
+  // Manual streaming report generation (SSE over fetch)
   const generateReport = useCallback(async () => {
     try {
       const papers = literature.results || []
@@ -259,86 +311,90 @@ export default function FindTopicsPage() {
       setReportStartAt(started)
       setReportElapsedSec(0)
       if (reportTimerRef.current) clearInterval(reportTimerRef.current)
+      if (reportTimeoutRef.current) clearTimeout(reportTimeoutRef.current)
       reportTimerRef.current = setInterval(() => {
         setReportElapsedSec(Math.floor((Date.now() - started) / 1000))
       }, 1000)
-
-      // Build enumerated sources for strict citation
-      const sourceLines = papers.map((p, idx) => {
-        const authors = (p.authors || []).join(', ')
-        const year = p.year || 'n.d.'
-        const journal = p.journal || ''
-        const doi = (p as any).doi || ''
-        const locator = doi ? `doi:${doi}` : (p.url || '')
-        return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
-      }).join('\n')
-
-      const wordsTarget = qualityMode === 'Standard' ? '1000-1500' : '1500-2200'
-      const prompt = `Write a scholarly academic review on the topic: "${searchQuery}".
-
-Use ONLY the numbered sources below. Do not invent citations or data. Cite inline with bracketed numbers [1], [2] that match the exact numbering provided. After the body, include a "References" section listing the same numbered items in order.
-
-Strict Requirements:
-- Absolutely no hallucinations. If evidence is insufficient, state limitations explicitly.
-- Preferred length: ${wordsTarget} words.
-- Use clear headings and subheadings.
-- Include multiple visual summaries using Markdown only (no external scripts). These MUST be contextually meaningful and derived strictly from the sources:
-  1) Evidence Summary Table with columns: ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation.
-  2) Key Metrics Table with columns: Metric | Value/Range | Population/Scope | Citation.
-  3) Regional Comparison Table with columns: Region | Trend/Direction | Notable Study [n].
-  4) Timeline Table with columns: Period | Milestones | Citations.
-  5) ASCII Bar Chart of Key Trends inside a fenced code block labeled "text" (no mermaid), e.g.:
-     \`\`\`text
-     Trend A |██████████ 85%
-     Trend B |███████    55%
-     \`\`\`
-  6) ASCII Line Chart (time series if years are available), labeled "text", e.g.:
-     \`\`\`text
-     2019 ▏▏▏
-     2020 ▏▏▏▏▏
-     2021 ▏▏▏▏▏▏▏
-     2022 ▏▏▏▏▏▏▏▏
-     \`\`\`
-  7) Geographic Summary Map (textual/ASCII). List regions/countries with an intensity bar using blocks (▁▃▅▇), e.g.:
-     \`\`\`text
-     North America  ▇▇▇▇  High activity [3,7]
-     Europe         ▇▇▇   Moderate [2,5]
-     Asia           ▇▇▇▇▇ Very High [1,4,6]
-     \`\`\`
-- Where data is insufficient, write "Data not available" rather than guessing.
-
-Recommended Structure:
-- Title
-- Abstract
-- Background
-- Methods (how evidence was synthesized)
-- Findings (grouped logically)
-- Visual Summaries (tables and ASCII chart as specified)
-- Limitations and Future Work
-- References
-
-Sources:\n${sourceLines}`
-
-      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-
       const controller = new AbortController()
       reportAbortRef.current = controller
-      await enhancedAIService.generateTextStream({
-        prompt,
-        temperature: 0.2,
-        maxTokens: 2000,
-        onToken: (t) => setReport((prev) => prev + t),
-        onProgress: () => {},
-        onError: (err) => setReportError(err || 'Streaming failed'),
-        abortSignal: controller.signal,
+      // Overall client-side timeout: 4 minutes
+      reportTimeoutRef.current = setTimeout(() => {
+        try { controller.abort() } catch {}
+      }, 240000)
+      const sourceCount = Math.min(20, Math.max(8, papers.length))
+      const resp = await fetch(`/api/topics/report/stream?quality=${encodeURIComponent(qualityMode)}&limit=${sourceCount}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ query: searchQuery, papers, quality: qualityMode }),
+        signal: controller.signal,
       })
+
+      if (!resp.ok || !resp.body) {
+        const errText = await resp.text().catch(() => '')
+        throw new Error(errText || 'Failed to start streaming')
+      }
+
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+      let done = false
+      while (!done) {
+        const { value, done: readerDone } = await reader.read()
+        if (readerDone) break
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+        // Parse SSE events separated by double newlines
+        let sepIndex
+        while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex)
+          buffer = buffer.slice(sepIndex + 2)
+          // Each event has lines like: event: <type>\n data: <json>
+          const lines = rawEvent.split('\n')
+          let eventType = 'message'
+          let dataLines: string[] = []
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim()
+            } else if (line.startsWith('data:')) {
+              dataLines.push(line.slice(5).trim())
+            }
+          }
+          const dataStr = dataLines.join('\n')
+          let payload: any = null
+          try { payload = dataStr ? JSON.parse(dataStr) : null } catch {}
+
+          if (eventType === 'token' && payload?.content) {
+            setReport(prev => prev + String(payload.content))
+          } else if (eventType === 'error') {
+            const msg = payload?.error || 'Streaming error'
+            throw new Error(msg)
+          } else if (eventType === 'done') {
+            done = true
+            break
+          }
+        }
+      }
     } catch (e) {
-      setReportError(e instanceof Error ? e.message : 'Failed to generate report')
+      const err = e as any
+      let message = 'Failed to generate report'
+      if (err?.name === 'AbortError' || /aborted/i.test(String(err?.message))) {
+        message = 'Report generation timed out after 4 minutes. Please try again.'
+      } else if (err instanceof Error) {
+        message = err.message
+      }
+      setReportError(message)
     } finally {
       setReportLoading(false)
       if (reportTimerRef.current) {
         clearInterval(reportTimerRef.current)
         reportTimerRef.current = null
+      }
+      if (reportTimeoutRef.current) {
+        clearTimeout(reportTimeoutRef.current)
+        reportTimeoutRef.current = null
       }
     }
   }, [literature.results, qualityMode, searchQuery])
@@ -346,6 +402,7 @@ Sources:\n${sourceLines}`
   useEffect(() => {
     return () => {
       if (reportTimerRef.current) clearInterval(reportTimerRef.current)
+      if (reportTimeoutRef.current) clearTimeout(reportTimeoutRef.current)
       if (reportAbortRef.current) reportAbortRef.current.abort()
     }
   }, [])
@@ -438,9 +495,41 @@ Sources:\n${sourceLines}`
               )}
             </div>
             
-            {/* Extracted Topics - now first */}
+            {/* Insights & Next Actions - replaces Generated/Extracted Topics header */}
             <div className="mt-10">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Extracted Topics</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Insights & Next Actions</h3>
+              {/* Helpful Insights */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="font-medium text-gray-800 mb-2">Key Insights</div>
+                  {topics.length === 0 ? (
+                    <div className="text-sm text-gray-500">Insights will appear after sources are analyzed.</div>
+                  ) : (
+                    <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                      {topics.slice(0, 6).map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="font-medium text-gray-800 mb-2">Next Actions</div>
+                  <ul className="text-sm text-blue-700 space-y-2">
+                    <li>
+                      <Link href={`/explorer?deep=1&query=${encodeURIComponent(searchQuery)}`} className="hover:underline flex items-center gap-1">
+                        <Zap className="w-4 h-4" /> Deep Research in Explorer
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href={`/planner`} className="hover:underline">Create a project plan from these insights</Link>
+                    </li>
+                    <li>
+                      <button onClick={generateReport} className="text-blue-700 hover:underline">Generate a long-form report</button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              {/* Topic chips (kept for quick scanning) */}
               {topicsLoading && <div className="text-sm text-gray-600 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Analyzing sources…</div>}
               {topicsError && <div className="text-sm text-red-600 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {topicsError}</div>}
               {!topicsLoading && topics.length === 0 && (
@@ -476,9 +565,7 @@ Sources:\n${sourceLines}`
               )}
               {report && (
                 <div className="rounded-lg border border-gray-200 bg-white p-4">
-                  <AIDisplayResponse className="prose max-w-none">
-                    {report}
-                  </AIDisplayResponse>
+                  <MarkdownRenderer content={report} className="prose max-w-none" enableMermaid={false} />
                 </div>
               )}
             </div>

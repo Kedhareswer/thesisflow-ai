@@ -6,17 +6,17 @@ This guide helps you test and validate the schema.org microdata markup implement
 ## Testing Tools
 
 ### 1. Google Rich Results Test
-- **URL**: https://search.google.com/test/rich-results
+- **URL**: xxxxx
 - **Purpose**: Test how Google interprets your structured data
 - **Usage**: Enter your page URL or HTML code to see parsed structured data
 
 ### 2. Schema.org Validator
-- **URL**: https://validator.schema.org/
+- **URL**: xxxxx
 - **Purpose**: Validate schema markup against schema.org specifications
 - **Usage**: Input URL or paste HTML code for validation
 
 ### 3. Google Search Console
-- **URL**: https://search.google.com/search-console
+- **URL**: xxxxx
 - **Purpose**: Monitor structured data performance and errors
 - **Usage**: Add your site and check "Enhancements" section for structured data reports
 
@@ -24,7 +24,7 @@ This guide helps you test and validate the schema.org microdata markup implement
 
 ### 1. SoftwareApplication (Homepage)
 - **Location**: `app/page.tsx`
-- **Schema Type**: https://schema.org/SoftwareApplication
+- **Schema Type**: xxxxx
 - **Properties**:
   - name: "ThesisFlow-AI"
   - description: Platform description
@@ -35,7 +35,7 @@ This guide helps you test and validate the schema.org microdata markup implement
   - offers: Pricing details
 
 ### 2. WebPage (All Pages)
-- **Schema Type**: https://schema.org/WebPage
+- **Schema Type**: xxxxx
 - **Properties**:
   - name: Page title
   - description: Page description
@@ -45,7 +45,7 @@ This guide helps you test and validate the schema.org microdata markup implement
 
 ### 3. Product (Research Assistant)
 - **Location**: `app/research-assistant/page.tsx`
-- **Schema Type**: https://schema.org/Product
+- **Schema Type**: xxxxx
 - **Properties**:
   - name: "AI Research Assistant"
   - description: Tool description
@@ -53,7 +53,7 @@ This guide helps you test and validate the schema.org microdata markup implement
   - brand/manufacturer: "ThesisFlow-AI"
 
 ### 4. HowTo (Research Assistant)
-- **Schema Type**: https://schema.org/HowTo
+- **Schema Type**: xxxxx
 - **Properties**:
   - name: Step-by-step guide title
   - description: Process description
@@ -73,7 +73,7 @@ This guide helps you test and validate the schema.org microdata markup implement
 #### 1. Homepage Testing
 ```bash
 # Test URL (replace with your domain)
-https://thesisflow-ai.com/
+xxxxx
 
 # Expected Schema Types:
 - SoftwareApplication
@@ -84,7 +84,7 @@ https://thesisflow-ai.com/
 #### 2. Research Assistant Testing
 ```bash
 # Test URL
-https://thesisflow-ai.com/research-assistant
+xxxxx
 
 # Expected Schema Types:
 - WebPage
@@ -104,7 +104,7 @@ https://thesisflow-ai.com/research-assistant
 2. Go to Elements tab
 3. Search for schema attributes:
    - `itemscope`
-   - `itemtype="https://schema.org/..."`
+   - `itemtype="xxxxx
    - `itemprop="..."`
 
 #### 3. Structured Data Testing
@@ -175,8 +175,8 @@ Create a simple Node.js script to validate multiple pages:
 ```javascript
 // schema-test.js
 const urls = [
-  'https://thesisflow-ai.com/',
-  'https://thesisflow-ai.com/research-assistant',
+  'xxxxx
+  'xxxxx
   // Add more URLs
 ];
 
@@ -194,14 +194,14 @@ urls.forEach(url => {
 ## Resources
 
 ### Documentation
-- [Schema.org Getting Started](https://schema.org/docs/gs.html)
-- [Google Structured Data Guidelines](https://developers.google.com/search/docs/appearance/structured-data)
-- [Microdata Specification](https://html.spec.whatwg.org/multipage/microdata.html)
+- [Schema.org Getting Started](xxxxx)
+- [Google Structured Data Guidelines](xxxxx)
+- [Microdata Specification](xxxxx)
 
 ### Tools
-- [Google Rich Results Test](https://search.google.com/test/rich-results)
-- [Schema Markup Validator](https://validator.schema.org/)
-- [Structured Data Linter](http://linter.structured-data.org/)
+- [Google Rich Results Test](xxxxx)
+- [Schema Markup Validator](xxxxx)
+- [Structured Data Linter](xxxxx)
 
 ## Troubleshooting
 

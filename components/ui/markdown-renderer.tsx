@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react'
+import React, { useEffect, useId, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,9 +10,127 @@ import { CheckCircle, Circle, AlertCircle, Info, Lightbulb, Target, BookOpen, Za
 interface MarkdownRendererProps {
   content: string
   className?: string
+  enableMermaid?: boolean // Controls whether Mermaid diagrams are rendered or shown as code blocks
 }
 
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className, enableMermaid = true }: MarkdownRendererProps) {
+  // Lightweight Mermaid renderer without adding a package dependency.
+  // Loads Mermaid UMD from CDN at runtime and renders diagrams to SVG.
+  const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
+    const ref = useRef<HTMLDivElement>(null)
+    const reactId = useId()
+    const domId = `mermaid-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`
+
+    useEffect(() => {
+      let cancelled = false
+      const ensureMermaid = () => new Promise<void>((resolve, reject) => {
+        const w = window as any
+        if (w.mermaid) return resolve()
+        
+        const scriptId = 'mermaid-umd-cdn'
+        let s = document.getElementById(scriptId) as HTMLScriptElement | null
+        
+        if (!s) {
+          // Create new script element
+          s = document.createElement('script')
+          s.id = scriptId
+          // Prefer: import('mermaid').then(...)
+          s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js'
+          // s.integrity = '<sha256-...>'; s.crossOrigin = 'anonymous';
+          s.async = true
+          
+          const handleLoad = () => {
+            s!.removeEventListener('load', handleLoad)
+            s!.removeEventListener('error', handleError)
+            if (w.mermaid) {
+              resolve()
+            } else {
+              reject(new Error('Mermaid script loaded but window.mermaid not available'))
+            }
+          }
+          
+          const handleError = () => {
+            s!.removeEventListener('load', handleLoad)
+            s!.removeEventListener('error', handleError)
+            reject(new Error('Failed to load Mermaid'))
+          }
+          
+          s.addEventListener('load', handleLoad)
+          s.addEventListener('error', handleError)
+          document.head.appendChild(s)
+        } else {
+          // Script element already exists - check if Mermaid is available
+          if (w.mermaid) {
+            resolve()
+          } else {
+            // Attach listeners to existing element
+            const handleLoad = () => {
+              s!.removeEventListener('load', handleLoad)
+              s!.removeEventListener('error', handleError)
+              if (w.mermaid) {
+                resolve()
+              } else {
+                reject(new Error('Mermaid script loaded but window.mermaid not available'))
+              }
+            }
+            
+            const handleError = () => {
+              s!.removeEventListener('load', handleLoad)
+              s!.removeEventListener('error', handleError)
+              reject(new Error('Failed to load Mermaid'))
+            }
+            
+            s.addEventListener('load', handleLoad)
+            s.addEventListener('error', handleError)
+          }
+        }
+      })
+
+      const sanitizeMermaidCode = (code: string): string => {
+        // Remove potentially dangerous directives and HTML/JS content
+        return code
+          .replace(/%%\{[^}]*\}%%/g, '') // Remove config directives
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
+          .replace(/javascript:/gi, '') // Remove javascript: URLs
+          .replace(/on\w+\s*=/gi, '') // Remove event handlers
+          .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '') // Remove iframes
+          .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '') // Remove objects
+          .replace(/<embed[^>]*>/gi, '') // Remove embeds
+          .trim()
+      }
+
+      const render = async () => {
+        try {
+          await ensureMermaid()
+          const w = window as any
+          if (!w.mermaid?.initialize) return
+          
+          // Use strict security level to prevent XSS
+          w.mermaid.initialize({ 
+            startOnLoad: false, 
+            securityLevel: 'strict',
+            theme: 'default'
+          })
+          
+          if (cancelled || !ref.current) return
+          
+          // Sanitize input before rendering
+          const sanitizedCode = sanitizeMermaidCode(code)
+          if (!sanitizedCode) return // Skip empty/invalid diagrams
+          
+          const { svg } = await w.mermaid.render(domId, sanitizedCode)
+          if (!cancelled && ref.current) ref.current.innerHTML = svg
+        } catch {
+          // Fail silently; fallback is raw code block elsewhere
+        }
+      }
+      render()
+      return () => { cancelled = true }
+    }, [code, domId])
+
+    return <div ref={ref} className="my-6 overflow-x-auto" aria-label="Mermaid Diagram" />
+  }
+
   // Parse markdown content and render as HTML with enhanced styling
   const parseMarkdown = (text: string): React.ReactElement => {
     if (!text) return <></>
@@ -151,7 +269,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
       // Handle code blocks with enhanced styling
       else if (line.startsWith('```')) {
         flushList()
-        const codeElements = parseCodeBlock(lines, i, getNextKey)
+        const codeElements = parseCodeBlock(lines, i, getNextKey, enableMermaid)
         elements.push(...codeElements.elements)
         i = codeElements.nextIndex
         continue
@@ -354,7 +472,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
   }
 
   // Enhanced code block parser with language detection and better styling
-  const parseCodeBlock = (lines: string[], startIndex: number, getNextKey: () => string): { elements: React.ReactElement[], nextIndex: number } => {
+  const parseCodeBlock = (lines: string[], startIndex: number, getNextKey: () => string, enableMermaid: boolean): { elements: React.ReactElement[], nextIndex: number } => {
     const elements: React.ReactElement[] = []
     let i = startIndex + 1
     const codeLines: string[] = []
@@ -372,6 +490,42 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
       i++
     }
 
+    const code = codeLines.join('\n')
+
+    if (language.toLowerCase() === 'mermaid') {
+      if (enableMermaid) {
+        // Render interactive Mermaid diagram (loads CDN script)
+        const el = (
+          <Card key={getNextKey()} className="my-6 overflow-hidden">
+            <div className="bg-muted/30 px-4 py-2 border-b flex items-center justify-between">
+              <Badge variant="secondary" className="text-xs font-mono">mermaid</Badge>
+            </div>
+            <CardContent className="p-0">
+              <MermaidBlock code={code} />
+            </CardContent>
+          </Card>
+        )
+        return { elements: [el], nextIndex: i + 1 }
+      } else {
+        // Render as safe code block (no CDN script loading)
+        const el = (
+          <Card key={getNextKey()} className="my-6 overflow-hidden">
+            <div className="bg-muted/30 px-4 py-2 border-b flex items-center justify-between">
+              <Badge variant="secondary" className="text-xs font-mono">mermaid (disabled)</Badge>
+            </div>
+            <CardContent className="p-0">
+              <pre className="p-4 overflow-x-auto bg-muted/20">
+                <code className="text-sm font-mono text-foreground leading-relaxed">
+                  {code}
+                </code>
+              </pre>
+            </CardContent>
+          </Card>
+        )
+        return { elements: [el], nextIndex: i + 1 }
+      }
+    }
+
     const codeElement = (
       <Card key={getNextKey()} className="my-6 overflow-hidden">
         <div className="bg-muted/30 px-4 py-2 border-b flex items-center justify-between">
@@ -382,7 +536,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
         <CardContent className="p-0">
           <pre className="p-4 overflow-x-auto bg-muted/20">
             <code className="text-sm font-mono text-foreground leading-relaxed">
-              {codeLines.join('\n')}
+              {code}
             </code>
           </pre>
         </CardContent>

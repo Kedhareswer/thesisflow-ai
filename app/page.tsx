@@ -54,12 +54,6 @@ export default function HomePage() {
       href: "/planner",
     },
     {
-      icon: Lightbulb,
-      title: "AI Tools",
-      description: "One-click helpers for extraction, citation, and data prep—right where you work.",
-      href: "/ai-tools",
-    },
-    {
       icon: Users,
       title: "Collaboration Hub",
       description: "Share context, notes, and drafts without tool-switching or version chaos.",
@@ -72,9 +66,7 @@ export default function HomePage() {
       href: "/research-assistant",
     },
   ]
-
-  // Removed testimonials
-
+  
   // Map existing features to the new hover component input shape
   const hoverFeatures: FeatureItem[] = features.map((f) => {
     const Icon = f.icon
@@ -139,6 +131,7 @@ export default function HomePage() {
         availability: "InStock"
       }}
     >
+      <div style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
       <WebPage
         name="ThesisFlow-AI - AI-Powered Research Platform"
         description="Discover papers, summarize instantly, and plan projects with an all-in-one AI platform for scholars and professionals."
@@ -161,7 +154,7 @@ export default function HomePage() {
             alt="Hero background"
             fill
             priority
-            className="object-cover object-left"
+            className="object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
         </div>
@@ -192,7 +185,16 @@ export default function HomePage() {
                   <div className="text-xs font-normal tracking-[0.15em] uppercase text-white/90 mb-6">
                     COMING SOON
                   </div>
-                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-normal leading-[1.1] mb-8">
+                  <h1 
+                    className="mb-8"
+                    style={{
+                      display: 'inline',
+                      fontSize: '40px',
+                      fontWeight: 300,
+                      lineHeight: '44px',
+                      color: '#fff'
+                    }}
+                  >
                     AI Research Sidekick<br />
                     Built for Big Dreamers<br />
                     Who Hate Spreadsheets
@@ -209,8 +211,15 @@ export default function HomePage() {
               </div>
 
               {/* Right content block */}
-              <div className="hidden lg:block lg:col-span-4 lg:col-start-9 text-white/90">
-                <p className="text-sm font-normal leading-relaxed">
+              <div className="hidden lg:block lg:col-span-4 lg:col-start-9">
+                <p 
+                  style={{
+                    color: '#fff',
+                    fontSize: '14px',
+                    lineHeight: '20px',
+                    textAlign: 'right'
+                  }}
+                >
                   We're putting the finishing touches on a tool that automates your research, teaches you as you go, and gives you daily insights that actually help you run your research better.
                 </p>
               </div>
@@ -226,15 +235,33 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center max-w-3xl mx-auto"
           >
-            <h2 className="text-neutral-900 tracking-tight font-medium leading-tight text-4xl sm:text-5xl md:text-6xl">
+            <h2 
+              className="text-neutral-900"
+              style={{
+                fontSize: '40px',
+                fontWeight: 300,
+                letterSpacing: '-0.8px',
+                lineHeight: '44px',
+                textAlign: 'center'
+              }}
+            >
               <span className="block">Everything You Need</span>
               <span className="block">for Research.</span>
             </h2>
-            <p className="mt-4 text-neutral-600 text-lg sm:text-xl md:text-[20px] leading-relaxed max-w-2xl mx-auto">
+            <p 
+              className="mt-4 max-w-2xl mx-auto"
+              style={{
+                color: '#0a0a0a',
+                fontSize: '14px',
+                fontWeight: 300,
+                lineHeight: '20px',
+                textAlign: 'center'
+              }}
+            >
               Comprehensive tools designed to streamline every aspect of your research workflow with AI-powered insights.
             </p>
           </motion.div>
@@ -242,22 +269,21 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 1.2, delay: 0.2 }}
             viewport={{ once: true }}
             className="mt-12 md:mt-14 lg:mt-16"
           >
-            <div className="relative max-w-[1040px] mx-auto rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">
-              <div className="h-11 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2.5 px-5">
+            <div className="relative max-w-[1040px] mx-auto rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">              <div className="h-11 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-2.5 px-5">
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FF5F57]" />
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]" />
                 <span className="inline-block h-[10px] w-[10px] rounded-full bg-[#28C840]" />
               </div>
               <div className="relative aspect-[16/10] bg-white">
                 <Image
-                  src="/screenshots/research-dashboard-mock.svg"
+                  src="/dashboard.png"
                   alt="ThesisFlow research dashboard preview"
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
                   priority={false}
                 />
@@ -274,7 +300,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center mb-14"
           >
@@ -286,7 +312,7 @@ export default function HomePage() {
             {benefitItems.map((b) => {
               const Icon = b.icon
               return (
-                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all p-6 lg:p-7">
+                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 p-6 lg:p-7">
                   <Icon className="h-7 w-7 text-white mb-4" />
                   <div className="text-lg font-medium mb-2">{b.title}</div>
                   <p className="text-sm text-neutral-300 leading-relaxed">{b.description}</p>
@@ -303,7 +329,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center max-w-4xl mx-auto"
           >
@@ -318,13 +344,13 @@ export default function HomePage() {
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Card 1 - Students */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-500">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/students.png" 
                   alt="Students" 
                   fill 
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                  className="object-cover transition-transform duration-1000 group-hover:scale-[1.02]" 
                 />
                 <div className="absolute inset-x-0 bottom-0">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -337,13 +363,13 @@ export default function HomePage() {
             </div>
 
             {/* Card 2 - Independent Researchers */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-500">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/researchers.png" 
                   alt="Independent Researchers" 
                   fill 
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                  className="object-cover transition-transform duration-1000 group-hover:scale-[1.02]" 
                 />
                 <div className="absolute inset-x-0 bottom-0">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -356,13 +382,13 @@ export default function HomePage() {
             </div>
 
             {/* Card 3 - Research Teams & Labs */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-500">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/research_labs.png" 
                   alt="Research Teams & Labs" 
                   fill 
-                  className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" 
+                  className="object-cover transition-transform duration-1000 group-hover:scale-[1.02]" 
                 />
                 <div className="absolute inset-x-0 bottom-0">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -422,7 +448,7 @@ export default function HomePage() {
         id="pricing"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 1.2 }}
         viewport={{ once: true }}
       >
         <Pricing />
@@ -434,7 +460,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 1.2 }}
             viewport={{ once: true }}
             className="text-center mb-16"
           >
@@ -450,6 +476,7 @@ export default function HomePage() {
       <Footer />
       
       </WebPage>
+      </div>
     </SoftwareApplication>
   )
 }

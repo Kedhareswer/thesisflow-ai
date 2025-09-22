@@ -456,9 +456,19 @@ export default function ExtractPage() {
       if (textCtx) parts.push(`Document Text (truncated):\n${textCtx}`)
       const context = parts.join('\n\n')
 
-      const res = await fetch('/api/chat', {
+      // Attach auth token for API request
+      let headers: HeadersInit = { 'Content-Type': 'application/json' }
+      try {
+        const { supabase } = await import('@/integrations/supabase/client')
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (token) (headers as any).Authorization = `Bearer ${token}`
+      } catch {}
+
+      const res = await fetch('/api/extract/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ message: messageText, context })
       })
       // Robustly parse response: prefer JSON when available, otherwise fallback to text
@@ -1058,7 +1068,7 @@ export default function ExtractPage() {
                 ) : (
                   <div className="h-[620px] overflow-auto bg-white p-4">
                     <div className="prose prose-sm max-w-none">
-                      <h3 className="mb-2 font-semibold text-gray-900">Summary</h3>
+                      <h3 className="mb-2 font-semibold text-gray-900">{extractedData?.aiSummarySource === 'openrouter' ? 'AI Summary' : 'Summary'}</h3>
                       {isExtracting && (
                         <div className="space-y-3">
                           <Skeleton className="h-6 w-40" />
@@ -1074,7 +1084,12 @@ export default function ExtractPage() {
                           )}
                           {Array.isArray(extractedData.keyPoints) && extractedData.keyPoints.length > 0 && (
                             <div className="mt-4">
-                              <h4 className="mb-1 font-semibold">Key Points</h4>
+                              <h4 className="mb-1 font-semibold flex items-center gap-2">
+                                <span>Key Points</span>
+                                {extractedData?.aiSummarySource === 'openrouter' && (
+                                  <span className="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200">AI</span>
+                                )}
+                              </h4>
                               <ul className="list-disc pl-5 text-gray-700">
                                 {extractedData.keyPoints.map((p: string, idx: number) => (
                                   <li key={idx}>{p}</li>

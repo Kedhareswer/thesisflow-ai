@@ -21,7 +21,7 @@ Allow: /pricing
 Allow: /about
 Allow: /contact
 Allow: /help
-Allow: /docs
+Disallow: /docs
 Allow: /terms
 Allow: /privacy
 

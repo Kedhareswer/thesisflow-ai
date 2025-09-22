@@ -6,7 +6,7 @@ This document describes the token accounting model, relevant database objects, R
 - Token quotas are tracked per user with monthly limits only.
 - All deductions/refunds are performed atomically inside Postgres functions (RPC), eliminating race conditions.
 - Operations are idempotent when a stable `Idempotency-Key` is provided.
-- Server routes authenticate via a centralized `requireAuth` helper that accepts Bearer header, query token, or Supabase cookies.
+- Server routes authenticate via a centralized `requireAuth` helper that accepts Bearer xxxxx, query token, or Supabase cookies.
 
 ## Database Objects (public)
 
@@ -113,8 +113,8 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
 - Centralized helper: `lib/server/auth.ts` `requireAuth(request)`
   - Accepts:
     - `Authorization: Bearer <token>`
-    - Query: `?access_token=` or `?token=`
     - Supabase cookies: `sb-access-token` / `supabase-auth-token`
+- Security: JWT tokens MUST NOT be placed in URL query parameters. SSE endpoints rely on cookie-based authentication using `withCredentials: true`.
 
 ## Idempotency
 - Provide a stable `Idempotency-Key` header for retries.
@@ -124,6 +124,16 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
 ## Rate Limiting
 - `check_token_rate_limit` is invoked prior to deductions.
 - 429 includes `Retry-After` based on the `resetTime` returned by the RPC.
+
+### Fallback behavior
+- When the rate-limit RPC is unavailable, the service can return a fallback response.
+- Controlled by environment flag `RATE_LIMIT_FALLBACK_ALLOW` (default: unset/false, conservative).
+  - When `RATE_LIMIT_FALLBACK_ALLOW=true`: permissive fallback allows requests but caps `monthlyRemaining` to a safe constant (1000).
+  - When unset or `false`: conservative fallback denies requests (`allowed: false`).
+- Fallback responses include:
+  - `fallback: true`
+  - `fallbackReason: string` with the underlying error message
+  - Other fields: `allowed`, `tokensNeeded`, `monthlyRemaining`, `resetTime`
 
 ## Security
 - RLS enabled for sensitive tables (`plan_limits`, `user_usage`, etc.).

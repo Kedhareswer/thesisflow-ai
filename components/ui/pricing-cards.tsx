@@ -11,20 +11,33 @@ import { Button } from "@/components/ui/button";
 
 function Pricing() {
   return (
-    <div className="w-full py-20 lg:py-40 bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="w-full py-20 lg:py-40 bg-gradient-to-br from-background via-background to-muted/20" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
       <div className="container mx-auto px-4">
         <div className="flex text-center justify-center items-center gap-6 flex-col">
           <Badge variant="secondary" className="px-4 py-2 text-sm font-semibold bg-[#FF6B2C]/10 text-[#FF6B2C] border-[#FF6B2C]/20">
             Pricing
           </Badge>
           <div className="flex gap-4 flex-col">
-            <h2 className="text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl text-center font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+            <h2 
+              className="max-w-4xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent"
+              style={{
+                fontSize: '40px',
+                fontWeight: 300,
+                letterSpacing: '-0.8px',
+                lineHeight: '44px',
+                textAlign: 'center'
+              }}
+            >
               Choose a Plan
             </h2>
-            <p className="text-xl md:text-2xl leading-relaxed tracking-tight text-muted-foreground max-w-3xl text-center font-light">
-              Unlock the full potential of ThesisFlow-AI.
-            </p>
-            <p className="text-sm md:text-base leading-relaxed tracking-tight text-muted-foreground max-w-4xl text-center font-normal">
+            <p 
+              className="text-muted-foreground max-w-4xl text-center"
+              style={{
+                fontSize: '14px',
+                fontWeight: 300,
+                lineHeight: '20px'
+              }}
+            >
               Plans use tokens that reset <span className="font-semibold text-foreground">monthly</span>. Tokens are consumed by AI Chat, Deep Research, Summarizer, Plan-and-Execute, and related AI features.
             </p>
           </div>

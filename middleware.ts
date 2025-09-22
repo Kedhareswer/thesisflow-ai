@@ -8,6 +8,15 @@ export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/api')) {
     res.headers.set('X-Robots-Tag', 'noindex, nofollow')
   }
+
+  // Prevent indexing/caching of internal docs
+  if (req.nextUrl.pathname.startsWith('/docs')) {
+    res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+    res.headers.set('Pragma', 'no-cache')
+    res.headers.set('Referrer-Policy', 'no-referrer')
+    res.headers.set('X-Content-Type-Options', 'nosniff')
+  }
   
   // Check for Supabase session cookie
   const supabaseToken = req.cookies.get('sb-access-token')?.value ||
@@ -26,7 +35,16 @@ export async function middleware(req: NextRequest) {
     "/writing-assistant",
     "/ai-assistant",
     "/profile",
-    "/settings"
+    "/settings",
+    // Sidebar navigation pages
+    "/explorer",        // Explorer - research assistant
+    "/writer",          // AI Writer
+    "/chat-pdf",        // Chat with PDF
+    "/topics",          // Find Topics
+    "/paraphraser",     // Paraphraser
+    "/citations",       // Citation Generator
+    "/extract",         // Extract Data
+    "/ai-detector"      // AI Detector
   ]
 
   // Admin routes that require admin role
@@ -40,12 +58,42 @@ export async function middleware(req: NextRequest) {
     "/forgot-password",
     "/reset-password",
     "/unauthorized",
-    "/explorer" // Explorer is public for demo purposes
+    // Marketing and informational pages
+    "/about",
+    "/pricing",
+    "/features",
+    "/contact",
+    "/privacy",
+    "/terms",
+    "/legal",
+    "/blog",
+    "/docs",
+    "/community",
+    "/careers",
+    "/partners",
+    "/affiliates",
+    "/changelog",
+    "/events"
   ]
 
-  const isProtectedRoute = protectedRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
-  const isAdminRoute = adminRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
-  const isPublicRoute = publicRoutes.some((route) => req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(route))
+  // Boundary-aware route matching function
+  const matchesRoute = (pathname: string, route: string): boolean => {
+    if (route === "/") {
+      // Exact match for root route
+      return pathname === "/";
+    }
+    // For other routes, match exact equality or startsWith(route + "/")
+    return pathname === route || pathname.startsWith(route + "/");
+  };
+
+  const isProtectedRoute = protectedRoutes.some((route) => matchesRoute(req.nextUrl.pathname, route))
+  const isAdminRoute = adminRoutes.some((route) => matchesRoute(req.nextUrl.pathname, route))
+  const isPublicRoute = publicRoutes.some((route) => matchesRoute(req.nextUrl.pathname, route))
+
+  // Redirect authenticated users away from auth pages
+  if (hasSession && (req.nextUrl.pathname === "/login" || req.nextUrl.pathname === "/signup")) {
+    return NextResponse.redirect(new URL("/", req.url))
+  }
 
   // Allow access to public routes and static assets
   if (isPublicRoute || req.nextUrl.pathname.startsWith('/_next') || req.nextUrl.pathname.startsWith('/api/public')) {

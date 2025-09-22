@@ -112,7 +112,7 @@ export function StreamingAIMessage({
     <TooltipProvider>
       <div
         className={cn(
-          "group relative flex gap-3 px-4 py-1 hover:bg-muted/30 transition-colors border-l-2 border-l-transparent border-l-blue-500/20",
+          "group relative flex gap-3 px-4 py-1 hover:bg-muted/30 transition-colors border-l-2 border-l-blue-500/20",
           className
         )}
         onMouseEnter={() => setIsHovered(true)}

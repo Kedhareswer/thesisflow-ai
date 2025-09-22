@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import { Plus, Crown, UserPlus, Search as SearchIcon, Users, Globe, MoreHorizontal, Inbox, Sparkles, User as UserIcon, Settings as SettingsIcon } from "lucide-react"
-import { TokenMeter } from "@/components/token/token-meter"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -182,12 +181,6 @@ export function TeamSidebar(props: TeamSidebarProps) {
                   </DropdownMenuItem>
                 </DropdownMenu>
               </div>
-              {/* Mini Token Meter */}
-              {user && !isLoading && (
-                <div className="mt-3">
-                  <TokenMeter compact />
-                </div>
-              )}
             </div>
             <div className="p-4 space-y-2">
               {filtered.map((team) => (
@@ -261,27 +254,10 @@ export function TeamSidebar(props: TeamSidebarProps) {
         </CardContent>
       </Card>
 
-      {/* Footer with token chip and profile dropdown */}
+      {/* Footer with profile dropdown (token chip removed for this page) */}
       {user && !isLoading && (
         <div className="rounded-lg border bg-white p-3 shadow-sm">
           <div className="flex items-center justify-between">
-            {/* Token chip */}
-            {tokenStatus && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1 rounded-full border bg-white px-2 h-7 text-xs">
-                      <Sparkles className="h-3.5 w-3.5 text-[#FF6B2C]" />
-                      <span className="tabular-nums">{tokenStatus.monthlyRemaining}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Monthly: {tokenStatus.monthlyUsed}/{tokenStatus.monthlyLimit}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
             <DropdownMenu
               trigger={
                 <button className="relative h-9 w-9 rounded-full overflow-hidden border hover:opacity-90">

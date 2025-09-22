@@ -18,7 +18,7 @@ Allow: /contact
 Allow: /terms
 Allow: /privacy
 Allow: /help
-Allow: /docs
+Disallow: /docs/
 
 # Allow static assets
 Allow: /favicon.ico
@@ -100,7 +100,7 @@ Allow: /contact
 Allow: /terms
 Allow: /privacy
 Allow: /help
-Allow: /docs
+Disallow: /docs
 Allow: /_next/static/
 Allow: /images/
 Allow: /og-image.png

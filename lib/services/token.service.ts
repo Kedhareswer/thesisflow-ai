@@ -72,6 +72,8 @@ export class TokenService {
     monthlyRemaining: number;
     resetTime: number; // epoch ms when monthly quota resets
     errorMessage?: string;
+    fallback?: boolean; // true if this is a fallback response due to service failure
+    fallbackReason?: string; // error message that triggered the fallback
   }> {
     try {
       const { data, error } = await this.supabase.rpc('check_token_rate_limit', {
@@ -90,8 +92,36 @@ export class TokenService {
         errorMessage: data.error_message || undefined,
       };
     } catch (error) {
-      console.error('Error checking rate limit:', error);
-      throw new Error('Failed to check rate limit');
+      const msg = (error as any)?.message || String(error);
+      console.warn('[token.service] checkRateLimit fallback:', msg);
+      
+      // Environment flag to control fallback behavior (default: conservative)
+      // Set RATE_LIMIT_FALLBACK_ALLOW=true to enable permissive fallback for development/testing
+      const allowFallback = process.env.RATE_LIMIT_FALLBACK_ALLOW === 'true';
+      
+      if (allowFallback) {
+        // Permissive fallback: allow requests but with safe limits
+        return {
+          allowed: true,
+          tokensNeeded: 1,
+          monthlyRemaining: 1000, // Safe constant instead of 999999
+          resetTime: Date.now() + 3600000, // 1 hour from now
+          errorMessage: undefined,
+          fallback: true,
+          fallbackReason: msg,
+        };
+      } else {
+        // Conservative fallback: deny requests when service is unavailable
+        return {
+          allowed: false,
+          tokensNeeded: 1,
+          monthlyRemaining: 0,
+          resetTime: Date.now() + 3600000, // 1 hour from now
+          errorMessage: 'Rate limit service unavailable',
+          fallback: true,
+          fallbackReason: msg,
+        };
+      }
     }
   }
 

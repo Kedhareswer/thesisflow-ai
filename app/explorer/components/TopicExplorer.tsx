@@ -14,13 +14,12 @@ import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import Link from "next/link"
 import { useResearchTopics, useResearchContext } from "@/components/research-session-provider"
-import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 
-// Enhanced research service that uses real AI
+// Enhanced research service that uses user API keys via EnhancedAIService
 class EnhancedResearchService {
   static async exploreTopics(
     topic: string,
@@ -38,7 +37,7 @@ class EnhancedResearchService {
       console.log("EnhancedResearchService: Starting topic exploration for:", topic)
 
       const contextPrompt = additionalContext ? `\n\nAdditional Context: ${additionalContext}` : ""
-      
+
       const prompt = `Research overview: "${topic}" | Depth: ${depth}/5${contextPrompt}
 
 ## Key Concepts
@@ -61,21 +60,23 @@ class EnhancedResearchService {
 
 ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
 
-      // Use the enhanced AI service with fallback and retry logic
-      const response = await enhancedAIService.generateText({
+      // Use EnhancedAIService with user API keys (no OpenRouter)
+      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
+
+      const result = await enhancedAIService.generateText({
         prompt,
         provider: selectedProvider,
         model: selectedModel,
+        maxTokens: 1800,
         temperature: 0.7,
-        maxTokens: Math.min(depth * 600, 2000), // Adjust tokens based on depth, max 2000
       })
 
-      if (!response.success) {
-        throw new Error(response.error || "Failed to generate research overview")
+      if (!result.success || !result.content) {
+        throw new Error(result.error || "Failed to explore research topic. Please check your AI provider configuration.")
       }
 
       return {
-        content: response.content || "",
+        content: result.content,
         topic,
         depth,
         timestamp: new Date().toISOString(),
@@ -88,12 +89,8 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
       if (error instanceof Error) {
         if (error.message.includes("No AI providers") || error.message.includes("No valid API keys")) {
           errorMessage = "No AI providers are configured. Please add at least one API key in Settings."
-        } else if (error.message.includes("All AI providers failed")) {
-          errorMessage = "All AI providers are currently unavailable. Please try again in a few minutes."
         } else if (error.message.includes("authentication") || error.message.includes("sign in")) {
           errorMessage = "Authentication error. Please sign in again to access AI features."
-        } else if (error.message.includes("API key")) {
-          errorMessage = "API key error. Please check your AI provider configuration in Settings."
         } else if (error.message.includes("rate limit")) {
           errorMessage = "Rate limit exceeded. Please try again in a few minutes."
         } else if (error.message.includes("quota") || error.message.includes("billing")) {

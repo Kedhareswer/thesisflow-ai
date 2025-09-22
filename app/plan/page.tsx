@@ -15,7 +15,9 @@ import { RouteGuard } from "@/components/route-guard"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { loadStripe } from "@stripe/stripe-js"
 import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
-import UsageAnalyticsChart from "@/components/ui/usage-analytics-chart"
+import { TokenOverviewCards } from "@/components/analytics/token-overview-cards"
+import { UsageAnalyticsV2 } from "@/components/analytics/usage-analytics-v2"
+import { TopEntitiesTable } from "@/components/analytics/top-entities-table"
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
@@ -534,26 +536,22 @@ Thank you!`)
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
+            {/* Overview Cards */}
             {tokenStatus && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-medium">Token Usage</CardTitle>
-                  <CardDescription>Monthly consumption</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Monthly</span>
-                      <span className="font-medium">{tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit}</span>
-                    </div>
-                    <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
+              <TokenOverviewCards
+                monthlyUsed={tokenStatus.monthlyUsed}
+                monthlyLimit={tokenStatus.monthlyLimit}
+                monthlyRemaining={tokenStatus.monthlyRemaining}
+              />
             )}
 
-            {/* Detailed usage chart (Service / Provider / Model) */}
-            <UsageAnalyticsChart />
+            {/* Enhanced Analytics Chart */}
+            <UsageAnalyticsV2 />
+
+            {/* Top Entities Table */}
+            <TopEntitiesTable />
+
+            
           </TabsContent>
         </Tabs>
       </div>
