@@ -38,6 +38,21 @@ export class TokenMiddleware {
       const userId = user.id;
       const { featureName, context = {}, skipDeduction = false, requiredTokens } = options;
 
+      // Ensure a correlation id exists for end-to-end analytics
+      const generateCorrelationId = () => {
+        try {
+          // Prefer Web Crypto API when available
+          // @ts-ignore - global crypto may exist in Node/Edge
+          if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            // @ts-ignore
+            return crypto.randomUUID();
+          }
+        } catch {}
+        // Fallback
+        return `cid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      };
+      const correlationId = (context as any)?.correlation_id || generateCorrelationId();
+
       // Explorer-specific bypass: Assistant on Explorer tab is unlimited (user-provided keys)
       const isExplorerAssistant =
         featureName === 'ai_chat' &&
@@ -61,10 +76,10 @@ export class TokenMiddleware {
       const userAgent = request.headers.get('user-agent') || 'Unknown';
 
       // Calculate required tokens
-      const tokensNeeded = requiredTokens || await tokenService.getFeatureCost(featureName, context);
+      const tokensNeeded = requiredTokens || await tokenService.getFeatureCost(featureName, { ...context, correlation_id: correlationId });
 
       // Check rate limits
-      const rateLimit = await tokenService.checkRateLimit(userId, featureName, context);
+      const rateLimit = await tokenService.checkRateLimit(userId, featureName, { ...context, correlation_id: correlationId });
       
       if (!rateLimit.allowed) {
         return NextResponse.json(
@@ -95,7 +110,7 @@ export class TokenMiddleware {
           userId,
           featureName,
           tokensNeeded,
-          context,
+          { ...context, correlation_id: correlationId },
           clientIP,
           userAgent
         );
@@ -120,6 +135,7 @@ export class TokenMiddleware {
         // Add token usage headers to response
         response.headers.set('X-Tokens-Used', tokensNeeded.toString());
         response.headers.set('X-Tokens-Remaining-Monthly', rateLimit.monthlyRemaining.toString());
+        response.headers.set('X-Correlation-Id', correlationId);
         
         if (transactionId) {
           response.headers.set('X-Token-Transaction-ID', transactionId);
@@ -134,7 +150,7 @@ export class TokenMiddleware {
             userId,
             featureName,
             tokensNeeded,
-            { ...context, refund_reason: 'handler_error', original_transaction: transactionId }
+            { ...context, correlation_id: correlationId, refund_reason: 'handler_error', original_transaction: transactionId }
           );
         }
         
@@ -237,8 +253,10 @@ export class TokenMiddleware {
     // Pass through optional flags for selective bypass
     const origin = searchParams.get('origin');
     const feature = searchParams.get('feature');
+    const cid = searchParams.get('correlation_id') || searchParams.get('cid');
     if (origin) context.origin = origin;
     if (feature) context.feature = feature;
+    if (cid) context.correlation_id = cid;
 
     return context;
   }
