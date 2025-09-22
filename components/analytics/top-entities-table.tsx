@@ -83,7 +83,69 @@ export function TopEntitiesTable({ className, dateRange }: TopEntitiesTableProps
       }
       
       const json = (await resp.json()) as TopResponse;
-      setData(json);
+
+      // Normalization helpers
+      const normProvider = (k: string) => {
+        const s = (k || '').toLowerCase();
+        if (s.includes('openrouter') || s === 'or' || s === 'router') return 'Nova';
+        if (s.includes('openai')) return 'OpenAI';
+        if (s.includes('anthropic')) return 'Anthropic';
+        if (s.includes('gemini') || s.includes('google')) return 'Gemini';
+        if (s.includes('groq')) return 'Groq';
+        if (s === 'aiml' || s.includes('aiml')) return 'AIML';
+        return k || 'unknown';
+      };
+      const modelFamily = (k: string) => {
+        const s = (k || '').toLowerCase();
+        if (s.includes('gpt') || s.includes('o3') || s.includes('4o')) return 'gpt';
+        if (s.includes('claude')) return 'claude';
+        if (s.includes('llama')) return 'llama';
+        if (s.includes('gemini')) return 'gemini';
+        if (s.includes('mixtral')) return 'mixtral';
+        if (s.includes('qwen')) return 'qwen';
+        if (s.includes('deepseek')) return 'deepseek';
+        if (s.includes('glm')) return 'glm';
+        if (s.includes('nemotron')) return 'nemotron';
+        if (s.includes('gemma')) return 'gemma';
+        if (s.includes('mistral')) return 'mistral';
+        return s || 'unknown';
+      };
+
+      // Collapse rows by normalized key if needed
+      if (json?.rows?.length) {
+        const normalizeKey = (k: string) => (by === 'provider' ? normProvider(k) : by === 'model' ? modelFamily(k) : k);
+        const agg: Record<string, TopRow> = {};
+        json.rows.forEach((row) => {
+          const nk = normalizeKey(row.key);
+          if (!agg[nk]) {
+            agg[nk] = { key: nk, tokens: 0, requests: 0, cost: 0, error_rate: 0, avg_latency: 0 };
+          }
+          const prev = agg[nk];
+          // Sum additive metrics
+          prev.tokens += Number(row.tokens || 0);
+          prev.requests += Number(row.requests || 0);
+          prev.cost += Number(row.cost || 0);
+          // Weighted averages by new total requests
+          const totalReqBefore = prev.requests - Number(row.requests || 0);
+          const req = Number(row.requests || 0);
+          if (prev.requests > 0 && req >= 0) {
+            prev.error_rate = ((prev.error_rate * totalReqBefore) + (Number(row.error_rate || 0) * req)) / Math.max(prev.requests, 1);
+            prev.avg_latency = ((prev.avg_latency * totalReqBefore) + (Number(row.avg_latency || 0) * req)) / Math.max(prev.requests, 1);
+          }
+        });
+        const rows = Object.values(agg).map(r => ({
+          ...r,
+          tokens: Math.round(r.tokens),
+          requests: Math.round(r.requests),
+          cost: Number(r.cost.toFixed(4)),
+          error_rate: Number(r.error_rate.toFixed(2)),
+          avg_latency: Math.round(r.avg_latency),
+        }));
+        setData({ ...json, rows });
+      } else {
+        setData(json);
+      }
+      
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {

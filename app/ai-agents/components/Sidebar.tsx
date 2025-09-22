@@ -7,7 +7,6 @@ import { PenLine, MessageSquare, Search, RefreshCcw, Quote, Database, ShieldChec
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { TokenMeter } from "@/components/token/token-meter"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -107,10 +106,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto">
 
-        {/* Mini Token Meter */}
-        <div className="px-3 pb-2">
-          <TokenMeter compact />
-        </div>
 
         {/* Nav */}
         <nav className="px-1">

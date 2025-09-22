@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useLiteratureSearch, type Paper } from "@/hooks/use-literature-search"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 interface TopicSuggestion {
   id: string
@@ -28,6 +29,9 @@ export default function FindTopicsPage() {
   const [searchMode, setSearchMode] = useState<'search' | 'results'>('search')
   const [qualityMode, setQualityMode] = useState<'Standard' | 'Enhanced'>('Standard')
   const [timeLeft, setTimeLeft] = useState(6)
+
+  // Auth session for authenticated API calls (required by token middleware)
+  const { session } = useSupabaseAuth()
 
   // Real results via literature search. Use aggregateWindowMs to minimize API calls and avoid 429s.
   // With aggregateWindowMs > 0, the hook uses the fetch path (cache-first + aggregation) instead of SSE.
@@ -221,7 +225,10 @@ export default function FindTopicsPage() {
           const limitCount = mini.length
           const resp = await fetch(`/api/topics/extract?quality=${encodeURIComponent(qualityMode)}&limit=${limitCount}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+            },
             body: JSON.stringify({ papers: mini }),
           })
           const data = await resp.json().catch(() => ({} as any))
@@ -262,7 +269,10 @@ export default function FindTopicsPage() {
       const sourceCount = Math.min(20, Math.max(8, papers.length))
       const resp = await fetch(`/api/topics/report/stream?quality=${encodeURIComponent(qualityMode)}&limit=${sourceCount}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ query: searchQuery, papers, quality: qualityMode }),
         signal: controller.signal,
       })
@@ -418,9 +428,41 @@ export default function FindTopicsPage() {
               )}
             </div>
             
-            {/* Extracted Topics - now first */}
+            {/* Insights & Next Actions - replaces Generated/Extracted Topics header */}
             <div className="mt-10">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Extracted Topics</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Insights & Next Actions</h3>
+              {/* Helpful Insights */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="font-medium text-gray-800 mb-2">Key Insights</div>
+                  {topics.length === 0 ? (
+                    <div className="text-sm text-gray-500">Insights will appear after sources are analyzed.</div>
+                  ) : (
+                    <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                      {topics.slice(0, 6).map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="font-medium text-gray-800 mb-2">Next Actions</div>
+                  <ul className="text-sm text-blue-700 space-y-2">
+                    <li>
+                      <Link href={`/explorer?deep=1&query=${encodeURIComponent(searchQuery)}`} className="hover:underline flex items-center gap-1">
+                        <Zap className="w-4 h-4" /> Deep Research in Explorer
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href={`/planner`} className="hover:underline">Create a project plan from these insights</Link>
+                    </li>
+                    <li>
+                      <button onClick={generateReport} className="text-blue-700 hover:underline">Generate a long-form report</button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              {/* Topic chips (kept for quick scanning) */}
               {topicsLoading && <div className="text-sm text-gray-600 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Analyzing sources…</div>}
               {topicsError && <div className="text-sm text-red-600 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {topicsError}</div>}
               {!topicsLoading && topics.length === 0 && (

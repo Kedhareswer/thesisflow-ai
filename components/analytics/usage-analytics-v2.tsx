@@ -106,6 +106,49 @@ export function UsageAnalyticsV2({ className }: UsageAnalyticsV2Props) {
       }
       
       const json = (await resp.json()) as AnalyticsV2Response;
+
+      // Normalization helpers
+      const normProvider = (k: string) => {
+        const s = (k || '').toLowerCase();
+        if (s.includes('openrouter') || s === 'or' || s === 'router') return 'Nova';
+        if (s.includes('openai')) return 'OpenAI';
+        if (s.includes('anthropic')) return 'Anthropic';
+        if (s.includes('gemini') || s.includes('google')) return 'Gemini';
+        if (s.includes('groq')) return 'Groq';
+        if (s === 'aiml' || s.includes('aiml')) return 'AIML';
+        return k || 'unknown';
+      };
+      const modelFamily = (k: string) => {
+        const s = (k || '').toLowerCase();
+        if (s.includes('gpt') || s.includes('o3') || s.includes('4o')) return 'gpt';
+        if (s.includes('claude')) return 'claude';
+        if (s.includes('llama')) return 'llama';
+        if (s.includes('gemini')) return 'gemini';
+        if (s.includes('mixtral')) return 'mixtral';
+        if (s.includes('qwen')) return 'qwen';
+        if (s.includes('deepseek')) return 'deepseek';
+        if (s.includes('glm')) return 'glm';
+        if (s.includes('nemotron')) return 'nemotron';
+        if (s.includes('gemma')) return 'gemma';
+        if (s.includes('mistral')) return 'mistral';
+        return s || 'unknown';
+      };
+
+      // If dimension is provider/model, collapse series by normalized key
+      if (json && (dimension === 'provider' || dimension === 'model')) {
+        const normalize = (k: string) => (dimension === 'provider' ? normProvider(k) : modelFamily(k));
+        const collapsedSeries: Record<string, number[]> = {};
+        const collapsedTotals: Record<string, number> = {};
+        Object.entries(json.series).forEach(([key, arr]) => {
+          const nk = normalize(key);
+          if (!collapsedSeries[nk]) collapsedSeries[nk] = Array(arr.length).fill(0);
+          arr.forEach((v, i) => { collapsedSeries[nk][i] += v || 0; });
+          collapsedTotals[nk] = (collapsedTotals[nk] || 0) + (json.totals[key] || 0);
+        });
+        json.series = collapsedSeries;
+        json.totals = collapsedTotals;
+      }
+
       setData(json);
       
       // Auto-select top 5 series by total

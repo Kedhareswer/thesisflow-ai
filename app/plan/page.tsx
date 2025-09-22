@@ -15,7 +15,6 @@ import { RouteGuard } from "@/components/route-guard"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { loadStripe } from "@stripe/stripe-js"
 import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
-import UsageAnalyticsChart from "@/components/ui/usage-analytics-chart"
 import { TokenOverviewCards } from "@/components/analytics/token-overview-cards"
 import { UsageAnalyticsV2 } from "@/components/analytics/usage-analytics-v2"
 import { TopEntitiesTable } from "@/components/analytics/top-entities-table"
@@ -552,16 +551,7 @@ Thank you!`)
             {/* Top Entities Table */}
             <TopEntitiesTable />
 
-            {/* Legacy Chart (for comparison) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Legacy Analytics</CardTitle>
-                <CardDescription>Original usage chart (for comparison)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <UsageAnalyticsChart />
-              </CardContent>
-            </Card>
+            
           </TabsContent>
         </Tabs>
       </div>
