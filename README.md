@@ -13,7 +13,7 @@
 |-------------|-----------|-------------|----------------|
 | **Multi-source literature search**<br/>• 11+ academic databases<br/>• AI research assistant with streaming<br/>• Deep research with real-time results<br/>• Citation analysis & export | **LaTeX collaborative editor**<br/>• Real-time preview with KaTeX<br/>• Multi-format document extraction<br/>• AI writing assistance<br/>• OCR for images & scanned docs | **AI-powered project management**<br/>• Intelligent task generation<br/>• Gantt charts & calendar views<br/>• Team assignments & tracking<br/>• Progress analytics | **Real-time team collaboration**<br/>• WebSocket-powered chat<br/>• File sharing & mentions<br/>• Presence indicators<br/>• Role-based permissions |
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ```mermaid
 graph TB
@@ -65,7 +65,7 @@ graph TB
     style X fill:#17a2b8,color:#fff
 ```
 
-## ⚡ Quick Start
+## Quick Start
 
 ```bash
 # 1. Clone and setup
@@ -85,7 +85,7 @@ node server/websocket-server.js  # WebSocket collaboration (port 3001)
 cd python && python app.py      # Enhanced search APIs (port 5000)
 ```
 
-### 🔧 Required Configuration
+### Required Configuration
 
 **Essential Services:**
 - **Supabase**: Database, authentication, file storage, and RLS policies
@@ -133,7 +133,6 @@ Track your token consumption across the platform:
 - **Profile Menu**: Current plan status and upgrade options
 - **Plan & Analytics** (`/plan`): Detailed usage charts by feature
 - **Token Dashboard** (`/tokens`): Transaction history and cost analysis
-
 *Tokens reset monthly and unused tokens don't roll over. Upgrade anytime for immediate access to additional tokens.*
 
 ## 📋 Changelog
@@ -185,7 +184,7 @@ flowchart TB
     C & D & E & F & G & H --> N
     I & J & K & L & M --> N
     N --> O --> P --> Q
-    
+
     Q --> R[Streaming Chat Interface]
     Q --> S[Export & Citation Tools]
     Q --> T[Topic Deep Dive]
@@ -334,7 +333,7 @@ flowchart TB
 - **Hierarchical Structure**: Projects → Tasks → Subtasks → Comments with full nesting
 - **Real-time Sync**: Live updates across all team members and devices
 
-### 👥 Real-time Team Collaboration
+### Real-time Team Collaboration
 
 ```mermaid
 flowchart TB
@@ -465,7 +464,7 @@ flowchart TB
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### Complete Platform Overview
 
@@ -842,8 +841,6 @@ pnpm build
 [![Documentation](https://img.shields.io/badge/📚_Documentation-GitHub_Wiki-28a745?style=for-the-badge)](https://github.com/Kedhareswer/thesisflow-ai/wiki)
 [![Report Issues](https://img.shields.io/badge/🐛_Report_Issues-GitHub-17a2b8?style=for-the-badge)](https://github.com/Kedhareswer/thesisflow-ai/issues)
 
-**Status:** ✅ Production Ready • **Version:** 2.1.0 • **Updated:** January 2025
-
 *Empowering researchers worldwide with AI-powered tools for discovery, collaboration, and innovation.*
 
-</div>
+**Status:** Production Ready • **Version:** 1.0.9 • **Updated:** September 2025
