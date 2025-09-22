@@ -48,6 +48,7 @@ export default function FindTopicsPage() {
   const [reportError, setReportError] = useState<string | null>(null)
   const reportAbortRef = useRef<AbortController | null>(null)
   const reportTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const reportTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [reportStartAt, setReportStartAt] = useState<number | null>(null)
   const [reportElapsedSec, setReportElapsedSec] = useState(0)
 
@@ -165,6 +166,10 @@ export default function FindTopicsPage() {
       clearInterval(reportTimerRef.current)
       reportTimerRef.current = null
     }
+    if (reportTimeoutRef.current) {
+      clearTimeout(reportTimeoutRef.current)
+      reportTimeoutRef.current = null
+    }
     if (reportAbortRef.current) {
       try { reportAbortRef.current.abort() } catch {}
       reportAbortRef.current = null
@@ -261,11 +266,16 @@ export default function FindTopicsPage() {
       setReportStartAt(started)
       setReportElapsedSec(0)
       if (reportTimerRef.current) clearInterval(reportTimerRef.current)
+      if (reportTimeoutRef.current) clearTimeout(reportTimeoutRef.current)
       reportTimerRef.current = setInterval(() => {
         setReportElapsedSec(Math.floor((Date.now() - started) / 1000))
       }, 1000)
       const controller = new AbortController()
       reportAbortRef.current = controller
+      // Overall client-side timeout: 4 minutes
+      reportTimeoutRef.current = setTimeout(() => {
+        try { controller.abort() } catch {}
+      }, 240000)
       const sourceCount = Math.min(20, Math.max(8, papers.length))
       const resp = await fetch(`/api/topics/report/stream?quality=${encodeURIComponent(qualityMode)}&limit=${sourceCount}`, {
         method: 'POST',
@@ -323,12 +333,23 @@ export default function FindTopicsPage() {
         }
       }
     } catch (e) {
-      setReportError(e instanceof Error ? e.message : 'Failed to generate report')
+      const err = e as any
+      let message = 'Failed to generate report'
+      if (err?.name === 'AbortError' || /aborted/i.test(String(err?.message))) {
+        message = 'Report generation timed out after 4 minutes. Please try again.'
+      } else if (err instanceof Error) {
+        message = err.message
+      }
+      setReportError(message)
     } finally {
       setReportLoading(false)
       if (reportTimerRef.current) {
         clearInterval(reportTimerRef.current)
         reportTimerRef.current = null
+      }
+      if (reportTimeoutRef.current) {
+        clearTimeout(reportTimeoutRef.current)
+        reportTimeoutRef.current = null
       }
     }
   }, [literature.results, qualityMode, searchQuery])
@@ -336,6 +357,7 @@ export default function FindTopicsPage() {
   useEffect(() => {
     return () => {
       if (reportTimerRef.current) clearInterval(reportTimerRef.current)
+      if (reportTimeoutRef.current) clearTimeout(reportTimeoutRef.current)
       if (reportAbortRef.current) reportAbortRef.current.abort()
     }
   }, [])
