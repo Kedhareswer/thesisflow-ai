@@ -52,6 +52,113 @@ function isAdditiveMetric(metric: Metric) {
   return metric === 'tokens' || metric === 'requests' || metric === 'cost'
 }
 
+// Map feature_name -> service grouping (kept in sync with scripts/usage-analytics-schema.sql)
+function mapService(featureName?: string): string {
+  const f = (featureName || '').toLowerCase()
+  if (f.includes('literature')) return 'explorer'
+  if (f.includes('summary') || f.includes('summar')) return 'summarizer'
+  if (f.includes('assistant') || f.includes('chat')) return 'ai_assistant'
+  if (f.includes('generation') || f.includes('write')) return 'ai_writing'
+  return 'other'
+}
+
+// Derive per_result_bucket from context value
+function toPerResultBucket(val: any): string {
+  const n = typeof val === 'string' ? parseInt(val, 10) : typeof val === 'number' ? val : NaN
+  if (!Number.isFinite(n)) return 'unknown'
+  if (n >= 1 && n <= 5) return '1-5'
+  if (n >= 6 && n <= 10) return '6-10'
+  if (n >= 11 && n <= 20) return '11-20'
+  if (n >= 21 && n <= 50) return '21-50'
+  if (n > 50) return '51+'
+  return 'unknown'
+}
+
+// Fallback aggregator: when usage_daily_mv has not been refreshed yet (or returns 0 rows),
+// compute additive metrics (tokens, requests, cost) in Node from token_transactions.
+async function aggregateFromTransactions(
+  supabaseAdmin: any,
+  userId: string,
+  from: Date,
+  to: Date,
+  metric: Metric,
+  dimension: Dimension
+) {
+  // Only support additive metrics in fallback; non-additive are not necessary for the simplified UI
+  if (!isAdditiveMetric(metric)) return null
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('token_transactions')
+    .select('created_at, feature_name, operation_context, tokens_amount, provider_cost_usd, operation_type, success')
+    .eq('user_id', userId)
+    .gte('created_at', from.toISOString())
+    .lt('created_at', new Date(to.getTime() + 24 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('[analytics/v2] fallback query error', error)
+    return null
+  }
+
+  const dayKeys = daysBetween(from, to)
+  const indexByDay = new Map(dayKeys.map((d, i) => [d, i]))
+
+  const series: Record<string, number[]> = {}
+  const totals: Record<string, number> = {}
+  const totalPerDay: number[] = Array(dayKeys.length).fill(0)
+
+  for (const row of rows || []) {
+    if ((row.operation_type || '').toLowerCase() !== 'deduct') continue
+    const day = new Date(row.created_at).toISOString().slice(0, 10)
+    const idx = indexByDay.get(day)
+    if (idx === undefined) continue
+
+    let ctx: any = {}
+    try {
+      ctx = typeof row.operation_context === 'string' ? JSON.parse(row.operation_context) : (row.operation_context || {})
+    } catch {
+      ctx = row.operation_context || {}
+    }
+
+    const dimKey = (() => {
+      switch (dimension) {
+        case 'service':
+          return mapService(row.feature_name)
+        case 'provider':
+          return String((ctx.provider ?? 'other')).toLowerCase()
+        case 'model':
+          return String((ctx.model ?? 'other')).toLowerCase()
+        case 'feature':
+          return String(row.feature_name || 'unknown')
+        case 'origin':
+          return String((ctx.origin ?? '')).toLowerCase() || 'unknown'
+        case 'quality':
+          return String((ctx.quality ?? '')).toLowerCase() || 'unknown'
+        case 'per_result_bucket':
+          return toPerResultBucket(ctx.per_result)
+        default:
+          return 'unknown'
+      }
+    })()
+
+    const value = (() => {
+      if (metric === 'tokens') return Number(row.tokens_amount || 0)
+      if (metric === 'requests') return 1
+      if (metric === 'cost') return Number(row.provider_cost_usd || 0)
+      return 0
+    })()
+
+    if (!series[dimKey]) series[dimKey] = Array(dayKeys.length).fill(0)
+    series[dimKey][idx] += value
+    totals[dimKey] = (totals[dimKey] || 0) + value
+    totalPerDay[idx] += value
+  }
+
+  const totalMetric = totalPerDay.reduce((a, b) => a + b, 0)
+
+  return { dayKeys, series, totals, totalPerDay, totalMetric }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate environment and create Supabase admin client
@@ -80,14 +187,22 @@ export async function POST(request: NextRequest) {
 
     const dayKeys = daysBetween(from, to)
 
+    // Try to ensure the MV has data. Note: our SQL function uses CONCURRENTLY and may fail inside a transaction;
+    // so we ignore any error here and continue with a safe fallback if needed.
+    try {
+      await supabaseAdmin.rpc('refresh_usage_daily_mv')
+    } catch (e) {
+      // best-effort only
+    }
+
     // Build select string
     const selectCols = [
       'day',
       'service', 'provider', 'model', 'feature_name', 'origin', 'quality', 'per_result_bucket',
-      'tokens', 'requests', 'cost_usd', 'avg_tokens', 'p95_tokens', 'avg_latency', 'p95_latency', 'error_rate'
+      'tokens', 'requests', 'cost_usd', 'avg_tokens', 'p95_tokens', 'error_rate'
     ]
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('usage_daily_mv')
       .select(selectCols.join(','))
       .eq('user_id', userId)
@@ -95,9 +210,10 @@ export async function POST(request: NextRequest) {
       .lte('day', to.toISOString())
       .order('day', { ascending: true })
 
+    // When MV query fails or returns no rows, fall back to computing from token_transactions for additive metrics
     if (error) {
       console.error('[analytics/v2] query error', error)
-      return NextResponse.json({ error: 'Failed to query usage' }, { status: 500 })
+      data = null as any
     }
 
     const dimCol = dimension === 'feature' ? 'feature_name' : dimension
@@ -136,7 +252,63 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Build total overlay
+    // If MV yielded no rows, attempt fallback aggregation from token_transactions
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      const fallback = await aggregateFromTransactions(supabaseAdmin, userId, from, to, metric, dimension)
+      if (fallback) {
+        let { dayKeys: fkDays, series: fkSeries, totals: fkTotals, totalPerDay: fkTotalPerDay, totalMetric: fkTotalMetric } = fallback
+
+        // Optional cumulative
+        if (cumulative) {
+          const cum = (arr: number[]) => arr.map((v => (cum.s = (cum.s || 0) + v))) as any
+          cum.s = 0; const t1 = cum([...fkTotalPerDay])
+          Object.keys(fkSeries).forEach((k) => { cum.s = 0; fkSeries[k] = cum([...fkSeries[k]]) })
+          for (let i = 0; i < fkTotalPerDay.length; i++) fkTotalPerDay[i] = t1[i]
+        }
+
+        // Optional compare (fallback, additive metrics only)
+        let previous: any = undefined
+        if (compare) {
+          const ms = startOfDayUTC(to).getTime() - startOfDayUTC(from).getTime() + 24*60*60*1000
+          const prevTo = new Date(startOfDayUTC(from).getTime() - 24*60*60*1000)
+          const prevFrom = new Date(prevTo.getTime() - ms + 24*60*60*1000)
+          const prevAgg = await aggregateFromTransactions(supabaseAdmin, userId, prevFrom, prevTo, metric, dimension)
+          if (prevAgg) {
+            let { dayKeys: pDays, series: pSeries, totals: pTotals, totalPerDay: pTotalPerDay, totalMetric: pTotalMetric } = prevAgg
+            if (cumulative) {
+              const cum = (arr: number[]) => arr.map((v => (cum.s = (cum.s || 0) + v))) as any
+              cum.s = 0; const t1 = cum([...pTotalPerDay])
+              Object.keys(pSeries).forEach((k) => { cum.s = 0; pSeries[k] = cum([...pSeries[k]]) })
+              for (let i = 0; i < pTotalPerDay.length; i++) pTotalPerDay[i] = t1[i]
+            }
+            previous = {
+              from: startOfDayUTC(prevFrom).toISOString(),
+              to: startOfDayUTC(prevTo).toISOString(),
+              days: pDays,
+              series: pSeries,
+              totals: pTotals,
+              totalMetric: pTotalMetric,
+              totalPerDay: pTotalPerDay,
+            }
+          }
+        }
+
+        return NextResponse.json({
+          from: startOfDayUTC(from).toISOString(),
+          to: startOfDayUTC(to).toISOString(),
+          days: fkDays,
+          series: fkSeries,
+          totals: fkTotals,
+          totalMetric: fkTotalMetric,
+          totalPerDay: fkTotalPerDay,
+          metric,
+          dimension,
+          previous,
+        })
+      }
+    }
+
+    // Build total overlay from MV path
     const totalPerDay: number[] = Array(dayKeys.length).fill(0)
     if (isAdditiveMetric(metric)) {
       Object.values(series).forEach((arr) => {

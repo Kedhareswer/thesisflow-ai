@@ -21,28 +21,32 @@ export function Footer({ className, ...props }: FooterProps) {
         if (scrollingTextRef.current) {
           const text = scrollingTextRef.current;
           
-          // Set up the text content and styles
-          text.innerHTML = "THESISFLOW-AI ".repeat(20);
+          // Set up the text content and styles for infinite scroll
+          const textContent = "@THESISFLOW-AI ";
+          text.innerHTML = textContent.repeat(50); // More repetitions for true infinite scroll
           text.style.whiteSpace = "nowrap";
           text.style.display = "inline-block";
           
-          // GSAP animation - slower and smoother (increase duration to slow speed)
-          gsap.to(text, {
-            xPercent: -100,
-            repeat: -1,
-            duration: 160,
-            ease: "none",
-            modifiers: {
-              xPercent: gsap.utils.unitize((x: string) => parseFloat(x) % 100)
+          // Calculate the width of one repetition for seamless loop
+          const singleTextWidth = text.scrollWidth / 50;
+          
+          // GSAP animation - true infinite scroll with seamless loop
+          gsap.fromTo(text, 
+            { x: 0 }, 
+            {
+              x: -singleTextWidth,
+              repeat: -1,
+              duration: 20, // Adjust speed as needed
+              ease: "none"
             }
-          });
+          );
         }
       } catch (error) {
         console.warn('GSAP not available, using CSS fallback');
         // Fallback to CSS animation
         if (scrollingTextRef.current) {
           const text = scrollingTextRef.current;
-          text.innerHTML = "THESISFLOW-AI ".repeat(20);
+          text.innerHTML = "@THESISFLOW-AI ".repeat(50);
           text.style.whiteSpace = "nowrap";
           text.style.display = "inline-block";
           text.classList.add("gsap-scroll-infinite");
@@ -150,7 +154,7 @@ export function Footer({ className, ...props }: FooterProps) {
               WebkitTextStroke: '2px rgba(255,107,44,0.2)',
               fontFamily: 'IBM Plex Sans, sans-serif',
               color: 'transparent',
-              fontSize: 'clamp(8rem, 15vw, 20rem)',
+              fontSize: 'clamp(120px, 20vw, 300px)',
               fontWeight: '900'
             }}
           />

@@ -82,9 +82,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Header row with brand + toggle */}
       <div className="flex items-center gap-2 px-3 py-3">
-        <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-orange-400 to-orange-600 text-[11px] font-bold text-white">
-          T
-        </div>
         {!collapsed && <span className="text-sm font-semibold text-gray-900">ThesisFlow-AI</span>}
         <button
           aria-label="Toggle sidebar"
