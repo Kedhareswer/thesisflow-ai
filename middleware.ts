@@ -8,6 +8,15 @@ export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/api')) {
     res.headers.set('X-Robots-Tag', 'noindex, nofollow')
   }
+
+  // Prevent indexing/caching of internal docs
+  if (req.nextUrl.pathname.startsWith('/docs')) {
+    res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+    res.headers.set('Pragma', 'no-cache')
+    res.headers.set('Referrer-Policy', 'no-referrer')
+    res.headers.set('X-Content-Type-Options', 'nosniff')
+  }
   
   // Check for Supabase session cookie
   const supabaseToken = req.cookies.get('sb-access-token')?.value ||

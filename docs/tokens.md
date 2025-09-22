@@ -6,7 +6,7 @@ This document describes the token accounting model, relevant database objects, R
 - Token quotas are tracked per user with monthly limits only.
 - All deductions/refunds are performed atomically inside Postgres functions (RPC), eliminating race conditions.
 - Operations are idempotent when a stable `Idempotency-Key` is provided.
-- Server routes authenticate via a centralized `requireAuth` helper that accepts Bearer header, query token, or Supabase cookies.
+- Server routes authenticate via a centralized `requireAuth` helper that accepts Bearer xxxxx, query token, or Supabase cookies.
 
 ## Database Objects (public)
 
@@ -113,7 +113,7 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
 - Centralized helper: `lib/server/auth.ts` `requireAuth(request)`
   - Accepts:
     - `Authorization: Bearer <token>`
-    - Query: `?access_token=` or `?token=`
+    - Query: `?access_token: xxxxx or `?token: xxxxx
     - Supabase cookies: `sb-access-token` / `supabase-auth-token`
 
 ## Idempotency
