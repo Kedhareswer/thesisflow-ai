@@ -177,20 +177,7 @@ export default function HomePage() {
 
         {/* Content overlay */}
         <div className="relative z-10 h-full min-h-[100vh] flex items-center">
-          <div 
-            className="w-full px-8"
-            style={{
-              alignItems: 'center',
-              backgroundColor: '#f6f6f4',
-              display: 'flex',
-              flexDirection: 'column',
-              fontFamily: 'IBM Plex Sans, sans-serif',
-              fontSize: '12px',
-              gap: '20px',
-              justifyContent: 'flex-start',
-              padding: '12px'
-            }}
-          >
+          <div className="w-full px-8">
             <div className="grid grid-cols-12 gap-8 items-center">
               {/* Left content block */}
               <div className="col-span-12 lg:col-span-6 text-white">
@@ -423,33 +410,13 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
         </div>
         <div className="relative z-10 h-full min-h-[100vh] flex items-center">
-          <div className="container mx-auto px-6 grid grid-cols-12 items-center">
+          <div className="container mx-auto px-6 grid grid-cols-12 items-center gap-8">
             <div className="col-span-12 md:col-span-7 lg:col-span-6 text-white">
-              <h3 
-                style={{
-                  color: '#fff',
-                  fontFamily: 'IBM Plex Sans, sans-serif',
-                  fontSize: '24px',
-                  fontWeight: 300,
-                  lineHeight: '32px',
-                  textTransform: 'uppercase'
-                }}
-              >
-                Doing research
-                <br />is hard enough—
-                <br />your tooling shouldn't be.
+              <h3 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight leading-tight">
+                Your research
+                <br />deserves clarity,
+                <br />not clutter.
               </h3>
-              <p 
-                className="mt-4 max-w-xl"
-                style={{
-                  color: '#fff',
-                  fontFamily: 'IBM Plex Sans, sans-serif',
-                  fontSize: '14px',
-                  lineHeight: '22px'
-                }}
-              >
-                ThesisFlow handles the tedious parts—deduping, citations, summaries, and now even acts on plain‑language commands—so you can focus on discovery, writing, and breakthroughs.
-              </p>
               <div className="mt-8 flex gap-4">
                 <Button
                   className={glassBtn}
@@ -465,6 +432,33 @@ export default function HomePage() {
                   See the Planner
                 </Button>
               </div>
+            </div>
+            
+            {/* Right side content */}
+            <div className="col-span-12 md:col-span-5 lg:col-span-4 lg:col-start-9 text-white">
+              <h4 
+                style={{
+                  color: '#fff',
+                  fontFamily: 'IBM Plex Sans, sans-serif',
+                  fontSize: '24px',
+                  fontWeight: 300,
+                  lineHeight: '32px',
+                  textTransform: 'uppercase',
+                  marginBottom: '16px'
+                }}
+              >
+                From citations to summaries to automating tedious cleanup
+              </h4>
+              <p 
+                style={{
+                  color: '#fff',
+                  fontFamily: 'IBM Plex Sans, sans-serif',
+                  fontSize: '14px',
+                  lineHeight: '22px'
+                }}
+              >
+                ThesisFlow does the heavy lifting so you can spend more time thinking, writing, and making real progress.
+              </p>
             </div>
           </div>
         </div>
@@ -484,7 +478,7 @@ export default function HomePage() {
       </motion.div>
 
       {/* FAQ Section */}
-      <section id="faq" className="relative py-32 bg-neutral-950 text-white">
+      <section id="faq" className="relative bg-neutral-950 text-white py-32">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
         <div className="max-w-5xl mx-auto px-4 relative z-10">
           <motion.div
@@ -494,25 +488,8 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 
-              className="mb-6 tracking-tight"
-              style={{
-                color: '#fff',
-                fontFamily: 'IBM Plex Sans, sans-serif',
-                fontSize: '48px',
-                fontWeight: 'bold'
-              }}
-            >
-              FAQ
-            </h2>
-            <p 
-              className="font-normal leading-relaxed max-w-3xl mx-auto"
-              style={{
-                color: '#fff',
-                fontFamily: 'IBM Plex Sans, sans-serif',
-                fontSize: '18px'
-              }}
-            >
+            <h2 className="text-5xl font-bold text-white mb-6 tracking-tight">Frequently Asked Questions</h2>
+            <p className="text-2xl text-neutral-300 font-normal leading-relaxed max-w-3xl mx-auto">
               Answers to common questions about ThesisFlow-AI.
             </p>
           </motion.div>
