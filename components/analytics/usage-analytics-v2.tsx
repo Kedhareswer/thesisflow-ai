@@ -61,8 +61,14 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
 };
 
 const toDateStr = (iso: string) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  // Parse YYYY-MM-DD string to avoid timezone issues
+  const [year, month, day] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric",
+    timeZone: "UTC"
+  });
 };
 
 export interface UsageAnalyticsV2Props {
@@ -88,8 +94,18 @@ export function UsageAnalyticsV2({ className }: UsageAnalyticsV2Props) {
     setError(null);
     try {
       const body: any = { metric, dimension, compare, cumulative };
-      if (dateRange?.from) body.from = dateRange.from.toISOString();
-      if (dateRange?.to) body.to = dateRange.to.toISOString();
+      
+      // Normalize date range to full-day UTC boundaries to ensure consistent server bucketing
+      if (dateRange?.from) {
+        const fromCopy = new Date(dateRange.from);
+        fromCopy.setUTCHours(0, 0, 0, 0);
+        body.from = fromCopy.toISOString();
+      }
+      if (dateRange?.to) {
+        const toCopy = new Date(dateRange.to);
+        toCopy.setUTCHours(23, 59, 59, 999);
+        body.to = toCopy.toISOString();
+      }
       
       const resp = await fetch("/api/usage/analytics/v2", {
         method: "POST",
@@ -318,8 +334,17 @@ export function UsageAnalyticsV2({ className }: UsageAnalyticsV2Props) {
               <Badge
                 key={key}
                 variant={selectedKeys.includes(key) ? "default" : "outline"}
-                className="cursor-pointer"
+                className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedKeys.includes(key)}
                 onClick={() => toggleKey(key)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleKey(key);
+                  }
+                }}
               >
                 <span
                   className="inline-block w-2 h-2 rounded-full mr-2"

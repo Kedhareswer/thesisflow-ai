@@ -1,55 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { OpenRouterClient, type ChatMessage } from '@/lib/services/openrouter.service'
+import type { ChatMessage } from '@/lib/ai-providers'
 import { withTokenValidation, TokenMiddleware } from '@/lib/middleware/token-middleware'
 import { tokenService } from '@/lib/services/token.service'
-
-interface Paper {
-  id: string
-  title: string
-  authors: string[]
-  abstract: string
-  year: string
-  journal: string
-  url: string
-  citations: number
-  source: string
-  doi?: string
-}
-
-function enumerateSources(papers: Paper[]): string {
-  return papers.map((p, idx) => {
-    const authors = (p.authors || []).join(', ')
-    const year = p.year || 'n.d.'
-    const journal = p.journal || ''
-    const doi = p.doi || ''
-    const locator = doi ? `doi:${doi}` : (p.url || '')
-    return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
-  }).join('\n')
-}
-
-async function tryModels(models: string[], messages: ChatMessage[], signal?: AbortSignal): Promise<string> {
-  const client = new OpenRouterClient()
-  let lastErr: any
-  for (const model of models) {
-    try {
-      const content = await client.chatCompletion(model, messages, signal)
-      if (content) return content
-    } catch (e) {
-      lastErr = e
-      continue
-    }
-  }
-  throw new Error(lastErr?.message || 'All OpenRouter models failed')
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
-    promise
-      .then((val) => { clearTimeout(timer); resolve(val) })
-      .catch((err) => { clearTimeout(timer); reject(err) })
-  })
-}
+import { enumerateSources, tryModels, withTimeout, type Paper } from '@/lib/utils/sources'
 
 export const POST = withTokenValidation(
   'topics_report',

@@ -312,7 +312,7 @@ export default function HomePage() {
             {benefitItems.map((b) => {
               const Icon = b.icon
               return (
-                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-600 p-6 lg:p-7">
+                <div key={b.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 p-6 lg:p-7">
                   <Icon className="h-7 w-7 text-white mb-4" />
                   <div className="text-lg font-medium mb-2">{b.title}</div>
                   <p className="text-sm text-neutral-300 leading-relaxed">{b.description}</p>
@@ -344,7 +344,7 @@ export default function HomePage() {
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Card 1 - Students */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-600">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg hover:shadow-xl transition-all duration-500">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/students.png" 
@@ -363,7 +363,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 2 - Independent Researchers */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-600">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg hover:shadow-xl transition-all duration-500">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/researchers.png" 
@@ -382,7 +382,7 @@ export default function HomePage() {
             </div>
 
             {/* Card 3 - Research Teams & Labs */}
-            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-600">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-green-100 shadow-lg hover:shadow-xl transition-all duration-500">
               <div className="relative aspect-[4/3]">
                 <Image 
                   src="/research_labs.png" 

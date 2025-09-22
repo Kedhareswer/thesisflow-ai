@@ -221,10 +221,20 @@ export default function FindTopicsPage() {
   useEffect(() => {
     const papers = literature.results || []
     if (papers.length >= 6 && !topicsLoading && topics.length === 0) {
+      // Create AbortController for request cancellation and timeout
+      const controller = new AbortController()
+      let timeoutId: NodeJS.Timeout | null = null
+      
       ;(async () => {
         setTopicsLoading(true)
         setTopicsError(null)
+        
         try {
+          // Set 30s timeout
+          timeoutId = setTimeout(() => {
+            controller.abort()
+          }, 30000)
+          
           const raw = papers.slice(0, 30)
           const mini = raw.map(p => ({ title: p.title, abstract: p.abstract }))
           const limitCount = mini.length
@@ -235,21 +245,56 @@ export default function FindTopicsPage() {
               ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
             },
             body: JSON.stringify({ papers: mini }),
+            signal: controller.signal,
           })
+          
+          // Clear timeout on successful response
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
+          }
+          
           const data = await resp.json().catch(() => ({} as any))
           if (!resp.ok || !data?.success) {
             throw new Error(data?.error || 'Failed to extract topics')
           }
           const arr: string[] = Array.isArray(data.topics) ? data.topics : []
-          setTopics(arr.slice(0, 15))
-        } catch (e) {
-          setTopicsError('AI extraction unavailable. Configure an AI provider in Settings to enable topic extraction.')
+          
+          // Only update state if not aborted
+          if (!controller.signal.aborted) {
+            setTopics(arr.slice(0, 15))
+          }
+        } catch (e: any) {
+          // Handle AbortError separately (silent failure)
+          if (e.name === 'AbortError') {
+            // Request was aborted, don't update error state
+            return
+          }
+          
+          // Only update error state if not aborted
+          if (!controller.signal.aborted) {
+            setTopicsError('AI extraction unavailable. Configure an AI provider in Settings to enable topic extraction.')
+          }
         } finally {
-          setTopicsLoading(false)
+          // Clear timeout and only update loading state if not aborted
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+          }
+          if (!controller.signal.aborted) {
+            setTopicsLoading(false)
+          }
         }
       })()
+      
+      // Cleanup function
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+        controller.abort()
+      }
     }
-  }, [literature.results, topicsLoading, topics.length])
+  }, [literature.results, topicsLoading, topics.length, qualityMode, session?.access_token])
 
   // Manual streaming report generation (SSE over fetch)
   const generateReport = useCallback(async () => {
@@ -520,7 +565,7 @@ export default function FindTopicsPage() {
               )}
               {report && (
                 <div className="rounded-lg border border-gray-200 bg-white p-4">
-                  <MarkdownRenderer content={report} className="prose max-w-none" />
+                  <MarkdownRenderer content={report} className="prose max-w-none" enableMermaid={false} />
                 </div>
               )}
             </div>

@@ -322,6 +322,9 @@ export default function PlannerPage() {
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1)
   const [autoDescription, setAutoDescription] = useState<string>("")
   const [autoMaxTasks, setAutoMaxTasks] = useState<number>(20)
+  // Controlled state for apply form inputs
+  const [newProjectTitle, setNewProjectTitle] = useState<string>("")
+  const [newProjectDescription, setNewProjectDescription] = useState<string>("")
   // Server draft sync
   const [serverDraftLoaded, setServerDraftLoaded] = useState(false)
   const saveDraftTimeoutRef = useRef<any>(null)
@@ -415,6 +418,21 @@ export default function PlannerPage() {
       } catch {}
     })()
   }, [planDraft, serverDraftLoaded])
+
+  // Cleanup timeout on component unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (saveDraftTimeoutRef.current) {
+        clearTimeout(saveDraftTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Sync controlled form inputs with planDraft changes
+  useEffect(() => {
+    setNewProjectTitle(planDraft?.title || "")
+    setNewProjectDescription(planDraft?.description || "")
+  }, [planDraft?.title, planDraft?.description])
 
   const estimatedMinutesFromString = (s?: string): number => {
     if (!s) return 60
@@ -1449,9 +1467,29 @@ export default function PlannerPage() {
                       key={t.id}
                       className="border rounded-md p-3 bg-white"
                       draggable
-                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(idx)) }}
+                      data-task-index={idx}
+                      onDragStart={(e) => { 
+                        e.dataTransfer.setData('text/plain', String(idx))
+                        e.dataTransfer.setData('application/x-task-index', String(idx))
+                      }}
                       onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => { e.preventDefault(); const from = parseInt(e.dataTransfer.getData('text/plain')); if (!Number.isNaN(from)) reorderTasks(from, idx) }}
+                      onDrop={(e) => { 
+                        e.preventDefault()
+                        // Safely parse and validate the dragged index
+                        const rawData = e.dataTransfer.getData('application/x-task-index') || e.dataTransfer.getData('text/plain')
+                        const fromIndex = Number(rawData)
+                        
+                        // Strict validation: must be integer, finite, and within valid range
+                        if (!Number.isInteger(fromIndex) || !isFinite(fromIndex)) return
+                        
+                        const tasksLength = (planDraft?.tasks || []).length
+                        if (fromIndex < 0 || fromIndex >= tasksLength || idx < 0 || idx >= tasksLength) return
+                        
+                        // Additional safety: ensure indices are different
+                        if (fromIndex !== idx) {
+                          reorderTasks(fromIndex, idx)
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs text-gray-500">#{idx + 1}</div>
@@ -1640,19 +1678,52 @@ export default function PlannerPage() {
                           key={item.taskId}
                           className="flex items-center gap-3 p-2 border rounded bg-white hover:bg-gray-50 cursor-move"
                           draggable
+                          data-task-id={item.taskId}
+                          data-gantt-type="gantt"
                           onDragStart={(e) => {
-                            e.dataTransfer.setData('text/plain', JSON.stringify({ taskId: item.taskId, type: 'gantt' }))
+                            // Use safer data transfer methods
+                            e.dataTransfer.setData('application/x-gantt-task-id', item.taskId)
+                            e.dataTransfer.setData('application/x-gantt-type', 'gantt')
+                            // Fallback for compatibility
+                            e.dataTransfer.setData('text/plain', `gantt:${item.taskId}`)
                           }}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => {
                             e.preventDefault()
-                            try {
-                              const data = JSON.parse(e.dataTransfer.getData('text/plain'))
-                              if (data.type === 'gantt' && data.taskId !== item.taskId) {
-                                // Simple reorder: move dropped task to this position's start date
-                                moveTaskInGantt(data.taskId, item.startDate)
+                            
+                            // Safely extract drag data without JSON.parse
+                            const draggedTaskId = e.dataTransfer.getData('application/x-gantt-task-id')
+                            const draggedType = e.dataTransfer.getData('application/x-gantt-type')
+                            
+                            // Fallback parsing for text/plain with strict validation
+                            let taskId = draggedTaskId
+                            let type = draggedType
+                            
+                            if (!taskId || !type) {
+                              const fallbackData = e.dataTransfer.getData('text/plain')
+                              if (fallbackData && fallbackData.startsWith('gantt:')) {
+                                const parts = fallbackData.split(':')
+                                if (parts.length === 2 && parts[0] === 'gantt') {
+                                  taskId = parts[1]
+                                  type = 'gantt'
+                                }
                               }
-                            } catch {}
+                            }
+                            
+                            // Strict validation: ensure taskId is safe and type is correct
+                            if (!taskId || !type || type !== 'gantt') return
+                            
+                            // Validate taskId format (should be alphanumeric/UUID-like)
+                            if (!/^[a-zA-Z0-9_-]+$/.test(taskId)) return
+                            
+                            // Ensure we're not dropping on the same task
+                            if (taskId !== item.taskId) {
+                              // Verify the taskId exists in our gantt schedule before moving
+                              const taskExists = ganttSchedule.some(scheduleItem => scheduleItem.taskId === taskId)
+                              if (taskExists) {
+                                moveTaskInGantt(taskId, item.startDate)
+                              }
+                            }
                           }}
                         >
                           <div className="text-xs text-gray-500 w-8">#{idx + 1}</div>
@@ -1747,19 +1818,28 @@ export default function PlannerPage() {
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-1">
                     <Label>New Project Title</Label>
-                    <Input defaultValue={planDraft?.title || ''} id="apply-new-title" />
+                    <Input 
+                      value={newProjectTitle} 
+                      onChange={(e) => setNewProjectTitle(e.target.value)}
+                      placeholder="Enter project title..."
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label>New Project Description</Label>
-                    <Input defaultValue={planDraft?.description || ''} id="apply-new-desc" />
+                    <Input 
+                      value={newProjectDescription} 
+                      onChange={(e) => setNewProjectDescription(e.target.value)}
+                      placeholder="Enter project description..."
+                    />
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button 
                     onClick={() => {
-                      const titleEl = document.getElementById('apply-new-title') as HTMLInputElement | null
-                      const descEl = document.getElementById('apply-new-desc') as HTMLInputElement | null
-                      applyPlan({ newProjectTitle: titleEl?.value || planDraft?.title, newProjectDescription: descEl?.value || planDraft?.description })
+                      applyPlan({ 
+                        newProjectTitle: newProjectTitle || planDraft?.title, 
+                        newProjectDescription: newProjectDescription || planDraft?.description 
+                      })
                     }}
                     disabled={applyCooldown > 0}
                   >

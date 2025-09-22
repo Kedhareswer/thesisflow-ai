@@ -40,6 +40,11 @@ This guide orients onboarding developers to the UI structure, key pages, and hoo
   - Stop on `done`; show errors on `error`
 - Required event names: `init`, `progress`, `token`, `error`, `done`, `ping`
 
+### Mermaid rendering security
+- The Markdown renderer uses Mermaid for diagrams and enforces `securityLevel: 'strict'`.
+- Input is sanitized before rendering (removes `%%{ }%%` config directives, `<script>` tags, event handlers, javascript: URLs, and dangerous embeds).
+- Do not attempt to inject raw HTML/JS or unsafe Mermaid directives; such content will be stripped.
+
 ## State and UI patterns
 - Keep derived state minimal and local to each page/component
 - Show explicit loading and error states (spinners, banners)

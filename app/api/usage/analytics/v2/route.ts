@@ -6,10 +6,21 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Create Supabase admin client with proper environment validation
+function createSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl) {
+    throw new Error('Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL')
+  }
+  
+  if (!serviceRoleKey) {
+    throw new Error('Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY')
+  }
+  
+  return createClient(supabaseUrl, serviceRoleKey)
+}
 
 type Metric = 'tokens' | 'requests' | 'cost' | 'avg_tokens' | 'p95_tokens' | 'avg_latency' | 'p95_latency'
 type Dimension = 'service' | 'provider' | 'model' | 'feature' | 'origin' | 'quality' | 'per_result_bucket'
@@ -43,6 +54,18 @@ function isAdditiveMetric(metric: Metric) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate environment and create Supabase admin client
+    let supabaseAdmin
+    try {
+      supabaseAdmin = createSupabaseAdmin()
+    } catch (envError: any) {
+      console.error('[analytics/v2] Environment validation failed:', envError.message)
+      return NextResponse.json(
+        { error: 'Server configuration error: Missing required environment variables' }, 
+        { status: 500 }
+      )
+    }
+
     const auth = await requireAuth(request)
     if ('error' in auth) return auth.error
     const userId = auth.user.id
@@ -179,20 +202,43 @@ export async function POST(request: NextRequest) {
             pTotalPerDay[i] = pDayWeight[i] > 0 ? pDayWeighted[i] / pDayWeight[i] : 0
           }
         }
+        // Calculate previous period totalMetric correctly
+        let prevTotalMetric: number
+        if (isAdditiveMetric(metric)) {
+          // For additive metrics, sum the daily totals
+          prevTotalMetric = pTotalPerDay.reduce((a, b) => a + b, 0)
+        } else {
+          // For non-additive metrics, compute weighted average across entire range
+          const prevTotalNumerator = pDayWeighted.reduce((a, b) => a + b, 0)
+          const prevTotalDenominator = pDayWeight.reduce((a, b) => a + b, 0)
+          prevTotalMetric = prevTotalDenominator > 0 ? prevTotalNumerator / prevTotalDenominator : 0
+        }
+        
         previous = {
           from: prevFrom.toISOString(),
           to: prevTo.toISOString(),
           days: prevDays,
           series: pSeries,
           totals: pTotals,
-          totalMetric: pTotalPerDay.reduce((a, b) => a + b, 0),
+          totalMetric: prevTotalMetric,
           totalPerDay: pTotalPerDay,
         }
       }
     }
 
     const totalsByKey: Record<string, number> = totals
-    const totalMetric = totalPerDay.reduce((a, b) => a + b, 0)
+    
+    // Calculate totalMetric correctly for both additive and non-additive metrics
+    let totalMetric: number
+    if (isAdditiveMetric(metric)) {
+      // For additive metrics, sum the daily totals
+      totalMetric = totalPerDay.reduce((a, b) => a + b, 0)
+    } else {
+      // For non-additive metrics, compute weighted average across entire range
+      const totalNumerator = dayWeightedValueSum.reduce((a, b) => a + b, 0)
+      const totalDenominator = dayWeightSum.reduce((a, b) => a + b, 0)
+      totalMetric = totalDenominator > 0 ? totalNumerator / totalDenominator : 0
+    }
 
     return NextResponse.json({
       from: startOfDayUTC(from).toISOString(),

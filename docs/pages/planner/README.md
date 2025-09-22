@@ -10,9 +10,11 @@
 - Convert a research query into an actionable plan and schedule with trackable tasks.
 
 ## How it works
-- Starts streaming with `usePlanAndExecute.start({ userQuery, ... })` which first tries EventSource to `GET /api/plan-and-execute/stream?access_token: xxxxx and falls back to `POST /api/plan-and-execute` with manual stream parsing.
+- Starts streaming with `usePlanAndExecute.start({ userQuery, ... })` which first tries EventSource to `GET /api/plan-and-execute/stream` with cookie authentication and falls back to `POST /api/plan-and-execute` with manual stream parsing.
+- Authentication is handled via Authorization header (`Bearer <token>`) or HttpOnly cookies. Since native EventSource cannot send custom headers, the implementation uses either an EventSource polyfill that supports headers or a fetch-based streaming fallback that can set the Authorization header when using the POST endpoint.
 - Hook exposes `lastEvent`, `progress`, `plan`, `logs`, `isStreaming`, and supports `stop/reset`.
 - Page computes schedule blocks and persists server drafts to `/api/planner/drafts` (when configured) with Supabase auth header.
+- Implements buffer overflow protection (1MB limit) to prevent memory leaks from malformed streams.
 
 ## APIs & Integrations
 - Streaming: `/api/plan-and-execute/stream` (not found in this repo snapshot; the hook expects this endpoint), SSE events include `init`, `plan`, `progress`, `deep_progress`, `deep_research_complete`, `done`, `error`.
@@ -26,6 +28,9 @@
 
 ## Security Practices
 - Idempotency keys for apply (`idempotencyKey`), explicit rate-limit handling with Retry-After.
+- Input validation: `maxIterations` clamped to 1-5, `description` type-checked, prevents runaway workloads.
+- Buffer overflow protection in streaming hook (1MB limit) prevents memory exhaustion attacks.
+- Controlled React state for form inputs (no direct DOM access via getElementById).
 - Use of server drafts `public.planner_drafts` for cross-device continuity (see migration `supabase/migrations/20250921113000_create_planner_drafts.sql`).
 
 ## Data Storage
@@ -53,7 +58,7 @@ sequenceDiagram
   participant S as /api/plan-and-execute/stream
 
   UI->>HK: start(userQuery,...)
-  HK->>S: EventSource connect (access_token)
+  HK->>S: EventSource connect (withCredentials: true)
   S-->>HK: init/plan/progress/.../done
   HK-->>UI: update plan/progress/logs
 ```

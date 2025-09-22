@@ -242,6 +242,10 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ""
+      
+      // Buffer size protection to prevent memory leaks
+      const MAX_BUFFER_SIZE = 1024 * 1024 // 1MB limit for safety
+      let bufferOverflowCount = 0
 
       const flushBlock = (block: string) => {
         // Parse a single SSE block (separated by \n\n)
@@ -329,20 +333,54 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
       while (true) {
         const { value, done } = await reader.read()
         if (done) break
+        
         const chunk = decoder.decode(value, { stream: true })
+        
+        // Check buffer size before appending to prevent memory leaks
+        if (buffer.length + chunk.length > MAX_BUFFER_SIZE) {
+          bufferOverflowCount++
+          
+          // Log error and abort stream to prevent memory exhaustion
+          const errorMsg = `Buffer overflow detected (${buffer.length + chunk.length} bytes > ${MAX_BUFFER_SIZE} limit). Aborting stream to prevent memory leak.`
+          setState((s) => ({ 
+            ...s, 
+            isStreaming: false, 
+            error: errorMsg, 
+            finishedAt: Date.now(),
+            logs: [...s.logs, `Error: ${errorMsg}`]
+          }))
+          
+          // Clean up and abort
+          try { reader.cancel() } catch {}
+          buffer = "" // Reset buffer
+          throw new Error(errorMsg)
+        }
+        
         buffer += chunk
 
         // Split on double newlines for complete SSE events
         const parts = buffer.split(/\n\n/)
         buffer = parts.pop() || ""
+        
+        // Additional safety: if remaining buffer is still too large after splitting, truncate it
+        if (buffer.length > MAX_BUFFER_SIZE / 2) {
+          const truncateMsg = `Buffer fragment too large (${buffer.length} bytes), truncating to prevent memory leak`
+          setState((s) => ({ ...s, logs: [...s.logs, `Warning: ${truncateMsg}`] }))
+          buffer = buffer.slice(-MAX_BUFFER_SIZE / 4) // Keep only the last quarter
+        }
+        
         for (const part of parts) {
           flushBlock(part)
         }
       }
 
-      // Flush any remaining block
+      // Flush any remaining block (with size check for safety)
       if (buffer.trim().length > 0) {
-        flushBlock(buffer)
+        if (buffer.length <= MAX_BUFFER_SIZE) {
+          flushBlock(buffer)
+        } else {
+          setState((s) => ({ ...s, logs: [...s.logs, `Warning: Discarding oversized final buffer (${buffer.length} bytes)`] }))
+        }
       }
 
       setState((s) => ({ ...s, isStreaming: false, finishedAt: Date.now() }))
@@ -350,7 +388,9 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
       if (controller.signal.aborted) return
       setState((s) => ({ ...s, isStreaming: false, error: err?.message || String(err), finishedAt: Date.now(), logs: [...s.logs, `Error: ${err?.message || String(err)}`] }))
     } finally {
+      // Clean up resources and reset buffer references
       abortRef.current = null
+      // Note: buffer is function-scoped and will be garbage collected
     }
   }, [onEvent])
 

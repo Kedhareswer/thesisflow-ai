@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TokenMiddleware } from '@/lib/middleware/token-middleware'
 import { getSupabaseAdmin } from '@/lib/server/supabase-admin'
-
+import { logApiEvent } from '@/lib/server/logger'
 import { createHash } from 'crypto'
 
 // Utilities
@@ -90,8 +90,71 @@ export async function POST(request: NextRequest) {
         // Optionally update deadline (end_date)
         if (project?.deadline) {
           try {
-            await admin.from('projects').update({ end_date: project.deadline }).eq('id', targetProjectId)
-          } catch {}
+            const { error: deadlineErr } = await admin
+              .from('projects')
+              .update({ end_date: project.deadline })
+              .eq('id', targetProjectId)
+
+            if (deadlineErr) {
+              const msg = 'Failed to update project deadline (end_date)'
+              // Structured log with context
+              logApiEvent({
+                route: '/api/planner/apply',
+                user_id: userId,
+                feature: 'planner_apply',
+                idempotency_key: jobKey,
+                success: false,
+                elapsed_ms: 0,
+                status: 500,
+                error: msg,
+                extra: {
+                  projectId: targetProjectId,
+                  attemptedDeadline: project.deadline,
+                  supabase: {
+                    code: (deadlineErr as any)?.code ?? null,
+                    details: (deadlineErr as any)?.details ?? null,
+                    hint: (deadlineErr as any)?.hint ?? null,
+                    message: deadlineErr.message,
+                  },
+                },
+                ts: new Date().toISOString(),
+              })
+              // eslint-disable-next-line no-console
+              console.error('[planner/apply] Failed to update project deadline', {
+                projectId: targetProjectId,
+                attemptedDeadline: project.deadline,
+                error: deadlineErr,
+              })
+              throw new Error(`${msg}: ${deadlineErr.message || String(deadlineErr)}`)
+            }
+          } catch (err: any) {
+            // Ensure error is not swallowed; include context and original error details
+            const msg = 'Error updating project deadline (end_date)'
+            logApiEvent({
+              route: '/api/planner/apply',
+              user_id: userId,
+              feature: 'planner_apply',
+              idempotency_key: jobKey,
+              success: false,
+              elapsed_ms: 0,
+              status: 500,
+              error: msg,
+              extra: {
+                projectId: targetProjectId,
+                attemptedDeadline: project.deadline,
+                originalError: err?.message || String(err),
+              },
+              ts: new Date().toISOString(),
+            })
+            // eslint-disable-next-line no-console
+            console.error('[planner/apply] Error updating project deadline', {
+              projectId: targetProjectId,
+              attemptedDeadline: project.deadline,
+              error: err,
+            })
+            // No additional rollback necessary here since this occurs before any task/subtask insertions.
+            throw err
+          }
         }
       } else {
         const title = project?.title || (plan?.title ? `Auto Plan - ${plan.title}` : 'Auto Plan Project')

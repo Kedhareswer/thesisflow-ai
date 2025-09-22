@@ -13,21 +13,23 @@
 
 ## How it works
 - Client page with `Tabs`. Active tab state and optional initial `query` from URL.
-- Assistant tab uses `ResearchAssistant.tsx`, which streams AI chat via `AIProviderService.streamChat()` using EventSource to `GET /api/ai/chat/stream`.
-- `AIProviderService.streamChat()` attaches Supabase auth token as a query param and forwards `origin=explorer&feature=assistant` to enable middleware bypass for free exploration.
+- Assistant tab uses `ResearchAssistant.tsx`, which streams AI chat via `AIProviderService.streamChat()` using secure authentication methods.
+- Authentication uses one of these secure approaches: (1) fetch-based SSE client (ReadableStream + eventsource parser) with Authorization header, (2) HttpOnly, SameSite=strict session cookies, or (3) short-lived one-time SSE tokens minted server-side. The middleware bypass for `origin=explorer&feature=assistant` is forwarded safely without exposing tokens in URLs.
 
 ## APIs & Integrations
 - SSE: `app/api/ai/chat/stream/route.ts` (auth via `withTokenValidation('ai_chat', ...)`, SSE events `init`, `token`, `progress`, `done`, `error`, `ping`) with provider fallback.
-- Token Middleware: `lib/middleware/token-middleware.ts` bypasses deduction only for `ai_chat` when `origin=explorer` and `feature=assistant`.
+- Token Middleware: `lib/middleware/token-middleware.ts` bypasses token deduction (billing) only for `ai_chat` when `origin=explorer` and `feature=assistant`; authentication, quotas, and rate limits still apply to prevent abuse.
 - Client Service: `lib/ai-providers.ts` for SSE and provider/model selection.
 
 ## Authentication and Authorization
 - Page is protected by `middleware.ts` (`/explorer`).
-- SSE route authenticates via Supabase access token in query string; `withTokenValidation()` enforces tokens and rate limits unless explorer bypass applies.
+- SSE route authenticates via HTTP-only cookies using `withCredentials: true` (no tokens in query string); `withTokenValidation()` enforces tokens and rate limits unless explorer bypass applies.
 
 ## Security Practices
-- No secrets in client. SSE uses `access_token` query and server-side validation.
-- Long-running connections send `ping` heartbeats every 15s to maintain stability.
+- Authentication tokens are never exposed in URLs (query params expose tokens via logs, referers, etc.).
+- Recommended authentication methods: Authorization header (Bearer token), secure HttpOnly SameSite cookies, or short-lived tokens with refresh flows.
+- Server-side validation occurs for all requests regardless of authentication method.
+- Long-running connections send `ping` heartbeats every 15s to maintain stability and detect disconnections.
 
 ## Data Storage
 - Session/ideas stored in in-memory state and `ResearchSessionProvider`.
@@ -58,7 +60,7 @@ sequenceDiagram
   participant MW as TokenMiddleware
   participant AI as enhanced-ai-service
 
-  UI->>S: EventSource connect (provider, model, access_token, origin=explorer, feature=assistant)
+  UI->>S: EventSource connect (provider, model, origin=explorer, feature=assistant) withCredentials: true
   S->>MW: withTokenValidation('ai_chat', context)
   MW-->>S: bypass deduction (explorer assistant)
   S-->>UI: event:init

@@ -1,6 +1,5 @@
 import type { ResearchPlan, ResearchTask } from "./planning.service"
-
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string }
+import type { ChatMessage } from "../ai-providers"
 
 const OPENROUTER_API_URL = process.env.OPENROUTER_API_URL || "https://openrouter.ai/api/v1/chat/completions"
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
@@ -11,7 +10,7 @@ const OPENROUTER_MODELS = [
   "agentica-org/deepcoder-14b-preview:free",
   "nousresearch/deephermes-3-llama-3-8b-preview:free",
   "nvidia/nemotron-nano-9b-v2:free",
-  "deepseek/deepseek-chat-v3.1:free",
+  "deepseek/deepseek-chat-v3-0324:free",
   "openai/gpt-oss-120b:free",
 ]
 

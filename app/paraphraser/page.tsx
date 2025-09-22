@@ -81,19 +81,14 @@ export default function ParaphraserPage() {
       // Streaming via SSE (always on)
       setStreamProgress(0)
 
-      // Build EventSource URL (cookie-based auth with withCredentials)
+      // Build EventSource URL (rely on cookie-based auth with withCredentials)
       const params = new URLSearchParams()
       params.set('text', inputText)
       params.set('mode', mode)
       params.set('preserveLength', String(preserveLength))
       params.set('variationLevel', variationLevel)
-      // Attach auth token for SSE (headers cannot be set on EventSource)
-      try {
-        const { supabase } = await import('@/integrations/supabase/client')
-        const { data: { session } } = await supabase.auth.getSession()
-        const token = session?.access_token
-        if (token) params.set('access_token', token)
-      } catch {}
+      // Note: JWTs should never be placed in query params for security reasons
+      // Using withCredentials for cookie-based authentication instead
 
       const url = `/api/paraphraser/stream?${params.toString()}`
       const es = new EventSource(url, { withCredentials: true })

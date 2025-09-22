@@ -149,13 +149,15 @@ export async function GET(request: NextRequest) {
               onToken: (token) => send({ type: "token", token }),
               onProgress: (p) => send({ type: "progress", ...p }),
               onError: (err) => {
+                // Sanitize error payload to prevent leaking internal details
                 const errorPayload = err && typeof err === 'object'
                   ? {
                       name: (err as any)?.name || 'Error',
-                      message: (err as any)?.message || String(err),
-                      stack: (err as any)?.stack || undefined,
+                      message: (err as any)?.message || 'An error occurred during processing',
+                      // Only include stack trace in development mode
+                      ...(process.env.NODE_ENV === 'development' && (err as any)?.stack ? { stack: (err as any).stack } : {}),
                     }
-                  : { message: String(err) }
+                  : { message: String(err) || 'An error occurred during processing' }
 
                 send({ type: "error", error: errorPayload })
               },
@@ -163,7 +165,9 @@ export async function GET(request: NextRequest) {
             })
             send({ type: "done" })
           } catch (fallbackErr: any) {
-            send({ type: "error", error: fallbackErr?.message || e?.message || "Streaming failed" })
+            // Sanitize fallback error to prevent leaking internal details
+            const sanitizedError = fallbackErr?.message || e?.message || "Streaming failed"
+            send({ type: "error", error: sanitizedError })
           }
         } finally {
           clearInterval(heartbeat)

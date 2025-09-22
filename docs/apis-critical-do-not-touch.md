@@ -89,7 +89,9 @@ This document lists API and system contracts that must remain stable. Breaking t
 
 ## 10) Auth & Protected Routes
 - Middleware: `middleware.ts` guards protected routes; do not remove protections or change cookie names used by Supabase auth
-- Server-side helpers must continue to accept auth from headers, cookies, and query params where documented (SSE compatibility)
+- Server-side helpers must continue to accept auth from headers and cookies (SSE compatibility)
+- **Security**: JWT tokens should NOT be placed in query parameters (use cookies/headers only)
+- Cookie consent handling: URL-decode cookie values before JSON parsing to handle encoded preferences
 
 ## 11) Backward compatibility policy
 - When adding fields to SSE payloads, only EXTEND payloads; do not rename or remove existing fields

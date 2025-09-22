@@ -24,6 +24,8 @@ This directory contains onboarding-focused documentation for new contributors. S
 - SSE event names used across the app: `init`, `progress`, `token`, `error`, `done`, `ping`
 - Streaming routes must explicitly refund tokens on error/abort
 - Literature search implements rate limits with `Retry-After` handling in the UI
+- **Security**: JWT tokens never in query params, cookie-based auth for SSE, input validation on all routes
+- Buffer overflow protection (1MB) in streaming hooks prevents memory exhaustion
 
 ## Where to start coding
 - Topics SSE UI: `app/topics/page.tsx`

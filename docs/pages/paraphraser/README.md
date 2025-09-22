@@ -9,16 +9,17 @@
 - Quickly rewrite text preserving meaning with clearly surfaced changes.
 
 ## How it works
-- Always-on SSE streaming via `EventSource` to `/api/paraphraser/stream?text=...&mode=...&preserveLength=...&variationLevel=...&access_token: xxxxx
+- Always-on SSE streaming via `EventSource` to `/api/paraphraser/stream?text=...&mode=...&preserveLength=...&variationLevel=...`
+- Uses cookie-based authentication with `withCredentials: true` (no JWT tokens in query params)
 - Tracks progress percentage and token chunks; stop button closes the EventSource.
 - UI supports copying, using output as input, and highlighting changes.
 
 ## APIs & Integrations
-- Expected SSE: `/api/paraphraser/stream` (referenced in code). Note: route not found in current repository—this page assumes it exists in your environment.
+- SSE endpoint: `/api/paraphraser/stream` with OpenRouter fallback models for reliable text generation
 
 ## Authentication and Authorization
 - Page protected by `middleware.ts` (`/paraphraser`).
-- SSE is expected to authenticate via `access_token` query param.
+- SSE authenticates via HTTP-only cookies (secure, no JWT exposure in URLs).
 
 ## Security Practices
 - Client limits input to 500 words for performance; SSE timeout/error handled client-side.
@@ -46,7 +47,7 @@ sequenceDiagram
   participant UI as paraphraser/page.tsx
   participant S as /api/paraphraser/stream
 
-  UI->>S: EventSource connect (query with text/mode/access_token)
+  UI->>S: EventSource connect (query with text/mode, withCredentials: true)
   S-->>UI: onmessage {type:token|progress|done|error}
   UI-->>UI: render output/diff
 ```

@@ -21,14 +21,14 @@ export async function GET(request: NextRequest) {
       if (error) {
         if ((error as any)?.message?.toLowerCase?.().includes('relation') || (error as any)?.code === '42P01') {
           // Table does not exist
-          return NextResponse.json({ error: 'planner_drafts table not found' }, { status: 404 })
+          return NextResponse.json({ error: 'planner_drafts table not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } })
         }
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: error.message }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
       }
 
-      return NextResponse.json({ drafts: data || [] })
+      return NextResponse.json({ drafts: data || [] }, { headers: { 'Cache-Control': 'no-store' } })
     } catch (e: any) {
-      return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+      return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
     }
   })
 }
@@ -36,10 +36,32 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   return TokenMiddleware.withTokens(request, { featureName: 'planner_drafts', requiredTokens: 0 }, async (userId) => {
     try {
-      const body = await request.json().catch(() => ({}))
+      // Enforce payload size limit to prevent oversized JSON bodies
+      const MAX_PAYLOAD_SIZE = 1_000_000; // 1MB limit
+      
+      // First check Content-Length header if present
+      const contentLength = request.headers.get('content-length');
+      if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_SIZE) {
+        return NextResponse.json({ error: 'Payload too large' }, { status: 413, headers: { 'Cache-Control': 'no-store' } });
+      }
+      
+      // Read request text and validate size before parsing
+      const requestText = await request.text();
+      if (requestText.length > MAX_PAYLOAD_SIZE) {
+        return NextResponse.json({ error: 'Payload too large' }, { status: 413, headers: { 'Cache-Control': 'no-store' } });
+      }
+      
+      // Parse JSON safely
+      let body;
+      try {
+        body = JSON.parse(requestText);
+      } catch (parseError) {
+        return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+      }
+      
       const plan = body?.plan
       if (!plan || typeof plan !== 'object') {
-        return NextResponse.json({ error: 'Invalid plan payload' }, { status: 400 })
+        return NextResponse.json({ error: 'Invalid plan payload' }, { status: 400, headers: { 'Cache-Control': 'no-store' } })
       }
 
       const admin = getSupabaseAdmin() as any
@@ -52,14 +74,14 @@ export async function PUT(request: NextRequest) {
       if (error) {
         if ((error as any)?.message?.toLowerCase?.().includes('relation') || (error as any)?.code === '42P01') {
           // Table does not exist
-          return NextResponse.json({ error: 'planner_drafts table not found' }, { status: 404 })
+          return NextResponse.json({ error: 'planner_drafts table not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } })
         }
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: error.message }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
       }
 
-      return NextResponse.json({ ok: true, id: data?.id, updated_at: data?.updated_at })
+      return NextResponse.json({ ok: true, id: data?.id, updated_at: data?.updated_at }, { headers: { 'Cache-Control': 'no-store' } })
     } catch (e: any) {
-      return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500 })
+      return NextResponse.json({ error: e?.message || 'Unexpected error' }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
     }
   })
 }

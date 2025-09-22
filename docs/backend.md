@@ -62,11 +62,17 @@ See additional endpoints in `app/api/` for citations, humanize/paraphraser, proj
   - Stream routes: explicitly compute context and call `tokenService.refundTokens()` on error/abort
 - Service: `lib/services/token.service.ts`
   - Wraps RPC calls: `deduct_user_tokens`, `refund_user_tokens`, `check_token_rate_limit`, etc.
+  - Rate-limit fallback behavior (service unavailable) is environment-gated via `RATE_LIMIT_FALLBACK_ALLOW` (default: unset/false):
+    - When `true` (dev/test only): permissive fallback allows requests with a safe cap (e.g., `monthlyRemaining = 1000`)
+    - When `false`/unset: conservative fallback denies requests (`allowed = false`)
+    - Fallback responses include `fallback: true` and `fallbackReason` for observability
 
 ## Error handling & provider fallback
 - AI chat streaming (`app/api/ai/chat/stream/route.ts`) implements provider/model fallback on unsupported/400 errors
 - Topics report streaming emits `error` SSE with human-readable messages, then cleans up
 - Literature search route surfaces rate-limit headers and descriptive errors
+- SSE error payloads sanitized: stack traces only in development mode, no internal details in production
+- Input validation: `maxIterations` clamped (1-5), `description` type-checked to prevent runaway workloads
 
 ## Supporting Node services
 - `server/websocket-server.js`

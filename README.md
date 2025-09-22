@@ -390,7 +390,7 @@ flowchart TB
 | **Team Administration** | RLS + JWT + Role Engine | Enterprise-grade | Fine-grained permissions, audit trails |
 
 **🔐 Enterprise Security:**
-- **End-to-end Encryption**: All messages and files encrypted in transit and at rest
+- **Encryption in transit (TLS) and at rest**: All data encrypted during transmission and storage
 - **Row Level Security**: Database-level access control with Supabase RLS
 - **JWT Authentication**: Secure token-based authentication with refresh tokens
 - **Audit Logging**: Complete activity tracking for compliance and security
@@ -458,7 +458,7 @@ flowchart TB
 - **Streaming Conversations**: Real-time token-by-token responses with progress tracking
 - **Context Preservation**: Full conversation history maintained across sessions
 - **Intelligent Fallbacks**: Automatic provider switching on failures or rate limits
-- **Reasoning Display**: Live AI thinking process visualization during complex tasks
+- **Progress & Intermediate Steps**: Live progress updates and intermediate outputs during complex tasks
 - **Multi-Modal Processing**: Text, images, documents, and data analysis
 - **Cost Optimization**: Smart model selection based on task complexity and budget
 - **OpenRouter Integration**: Access to 100+ models through unified API

@@ -1,66 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withTokenValidation, TokenMiddleware } from '@/lib/middleware/token-middleware'
-import { OpenRouterClient, type ChatMessage } from '@/lib/services/openrouter.service'
+import type { ChatMessage } from '@/lib/ai-providers'
 import { tokenService } from '@/lib/services/token.service'
+import { enumerateSources, tryModels, withTimeout, type Paper } from '@/lib/utils/sources'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-interface Paper {
-  id: string
-  title: string
-  authors: string[]
-  abstract: string
-  year: string
-  journal: string
-  url: string
-  citations: number
-  source: string
-  doi?: string
-}
-
-function enumerateSources(papers: Paper[]): string {
-  return papers.map((p, idx) => {
-    const authors = (p.authors || []).join(', ')
-    const year = p.year || 'n.d.'
-    const journal = p.journal || ''
-    const doi = p.doi || ''
-    const locator = doi ? `doi:${doi}` : (p.url || '')
-    return `${idx + 1}. ${authors ? authors + '. ' : ''}${year}. ${p.title}${journal ? `. ${journal}` : ''}${locator ? `. ${locator}` : ''}`
-  }).join('\n')
-}
-
-async function tryModels(models: string[], messages: ChatMessage[], signal?: AbortSignal): Promise<string> {
-  const client = new OpenRouterClient()
-  let lastErr: any
-  for (const model of models) {
-    try {
-      const content = await client.chatCompletion(model, messages, signal)
-      if (content) return content
-    } catch (e) {
-      lastErr = e
-      continue
-    }
-  }
-  throw new Error(lastErr?.message || 'All OpenRouter models failed')
-}
-
-// Timeout wrapper for stage-level time limits
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
-    promise
-      .then((val) => {
-        clearTimeout(timer)
-        resolve(val)
-      })
-      .catch((err) => {
-        clearTimeout(timer)
-        reject(err)
-      })
-  })
-}
 
 export const POST = withTokenValidation(
   'topics_report',
@@ -111,27 +57,48 @@ export const POST = withTokenValidation(
       const analysisBudgetMs = 90_000
       const synthesisBudgetMs = 120_000
 
+      let interval: NodeJS.Timeout
+      let abort: () => void
+      let streamController: ReadableStreamDefaultController<Uint8Array>
+
+      // Centralized cleanup function
+      const cleanup = async (reason: 'client_abort' | 'consumer_cancel' | 'stream_error' | 'success') => {
+        if (closed) return
+        closed = true
+        
+        // Clear heartbeat interval
+        if (interval) clearInterval(interval)
+        
+        // Remove abort listener
+        if (abort) request.signal.removeEventListener('abort', abort)
+        
+        // Close controller safely
+        if (streamController) {
+          try { streamController.close() } catch {}
+        }
+        
+        // Issue refund if needed (not for success)
+        if (reason !== 'success') {
+          await maybeRefund(reason)
+        }
+      }
+
       const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
+          streamController = controller
+          
           // Init event
           controller.enqueue(encoder.encode(`event: init\n`))
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`))
 
           // Heartbeat
-          const interval = setInterval(() => {
+          interval = setInterval(() => {
             if (closed) return
             controller.enqueue(encoder.encode(`event: ping\n`))
             controller.enqueue(encoder.encode(`data: {}\n\n`))
           }, 15000)
 
-          const abort = () => {
-            if (closed) return
-            closed = true
-            clearInterval(interval)
-            // Refund on client abort (no completion)
-            void maybeRefund('client_abort')
-            try { controller.close() } catch {}
-          }
+          abort = () => cleanup('client_abort')
           request.signal.addEventListener('abort', abort)
 
           try {
@@ -169,10 +136,13 @@ export const POST = withTokenValidation(
             ].join('\n')
 
             // Stream content as tokens
+            // Convert to array of Unicode code points to avoid splitting surrogate pairs
+            const codePoints = Array.from(finalDoc)
             const chunkSize = 48
-            for (let i = 0; i < finalDoc.length; i += chunkSize) {
+            for (let i = 0; i < codePoints.length; i += chunkSize) {
               if (closed) break
-              const piece = finalDoc.slice(i, i + chunkSize)
+              const chunk = codePoints.slice(i, i + chunkSize)
+              const piece = chunk.join('')
               controller.enqueue(encoder.encode(`event: token\n`))
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: piece })}\n\n`))
               // Small delay for smoother UX
@@ -182,23 +152,19 @@ export const POST = withTokenValidation(
             // Done event
             controller.enqueue(encoder.encode(`event: done\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ processingTime: Date.now() - startTime })}\n\n`))
-            clearInterval(interval)
             succeeded = true
-            try { controller.close() } catch {}
-            closed = true
+            await cleanup('success')
 
           } catch (err: any) {
             if (closed) return
             controller.enqueue(encoder.encode(`event: error\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: err?.message || 'Stream error' })}\n\n`))
-            // Attempt token refund on error
-            await maybeRefund('stream_error')
-            clearInterval(interval)
-            try { controller.close() } catch {}
-            closed = true
+            await cleanup('stream_error')
           }
         },
-        cancel() { closed = true },
+        cancel() { 
+          void cleanup('consumer_cancel')
+        },
       })
 
       return new NextResponse(stream, {

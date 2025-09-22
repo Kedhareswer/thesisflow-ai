@@ -24,10 +24,12 @@ export async function readCookieConsent(): Promise<CookieConsentState> {
   let prefs = DEFAULT_COOKIE_PREFS;
   if (prefsRaw) {
     try {
-      const parsed = JSON.parse(prefsRaw) as Partial<CookiePrefs>;
+      // URL-decode the cookie value before parsing JSON
+      const decodedPrefs = decodeURIComponent(prefsRaw);
+      const parsed = JSON.parse(decodedPrefs) as Partial<CookiePrefs>;
       prefs = normalizePrefs(parsed);
     } catch {
-      // fall back to defaults
+      // fall back to defaults if decoding or parsing fails
       prefs = DEFAULT_COOKIE_PREFS;
     }
   }

@@ -90,7 +90,7 @@ sequenceDiagram
     participant P as ai-providers.ts
     participant OR as OpenRouter
 
-    UI->>C: GET (SSE) with query params
+    UI->>C: EventSource connect (withCredentials: true; cookie auth)
     C->>P: Generate with primary model
     alt Model unsupported / 400
       P->>OR: Try next fallback

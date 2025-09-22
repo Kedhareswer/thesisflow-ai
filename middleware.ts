@@ -76,9 +76,24 @@ export async function middleware(req: NextRequest) {
     "/events"
   ]
 
-  const isProtectedRoute = protectedRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
-  const isAdminRoute = adminRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
-  const isPublicRoute = publicRoutes.some((route) => req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(route))
+  // Boundary-aware route matching function
+  const matchesRoute = (pathname: string, route: string): boolean => {
+    if (route === "/") {
+      // Exact match for root route
+      return pathname === "/";
+    }
+    // For other routes, match exact equality or startsWith(route + "/")
+    return pathname === route || pathname.startsWith(route + "/");
+  };
+
+  const isProtectedRoute = protectedRoutes.some((route) => matchesRoute(req.nextUrl.pathname, route))
+  const isAdminRoute = adminRoutes.some((route) => matchesRoute(req.nextUrl.pathname, route))
+  const isPublicRoute = publicRoutes.some((route) => matchesRoute(req.nextUrl.pathname, route))
+
+  // Redirect authenticated users away from auth pages
+  if (hasSession && (req.nextUrl.pathname === "/login" || req.nextUrl.pathname === "/signup")) {
+    return NextResponse.redirect(new URL("/", req.url))
+  }
 
   // Allow access to public routes and static assets
   if (isPublicRoute || req.nextUrl.pathname.startsWith('/_next') || req.nextUrl.pathname.startsWith('/api/public')) {

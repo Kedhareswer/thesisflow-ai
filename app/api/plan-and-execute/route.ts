@@ -20,6 +20,19 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    
+    // Validate description type
+    if (description !== null && description !== undefined && typeof description !== 'string') {
+      const validationError = ErrorHandler.processError('description must be a string', {
+        operation: 'plan-and-execute-validation',
+        userId: 'unknown',
+      })
+      return NextResponse.json(
+        ErrorHandler.formatErrorResponse(validationError),
+        { status: 400 }
+      )
+    }
+    
     if (!Array.isArray(selectedTools) || selectedTools.some(t => typeof t !== 'string')) {
       const validationError = ErrorHandler.processError('selectedTools must be an array of strings', {
         operation: 'plan-and-execute-validation',
@@ -30,8 +43,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    // Guardrails: clamp maxTasks
+    
+    // Guardrails: clamp inputs to safe ranges
     const clampedMaxTasks = Math.max(5, Math.min(50, Number(maxTasks) || 30))
+    const clampedMaxIterations = Math.max(1, Math.min(Number(maxIterations) || 1, 5))
 
     // Use token middleware with dynamic feature and requiredTokens
     const featureName = useDeepResearch ? 'deep_research' : 'plan_and_execute'
@@ -39,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     return TokenMiddleware.withTokens(
       request,
-      { featureName, requiredTokens, context: { max_iterations: maxIterations } },
+      { featureName, requiredTokens, context: { max_iterations: clampedMaxIterations } },
       async (userId: string): Promise<NextResponse> => {
         // 5) Prepare SSE stream
     const startTime = Date.now()
@@ -61,7 +76,7 @@ export async function POST(request: NextRequest) {
           type: 'init',
           userId,
           useDeepResearch,
-          maxIterations: useDeepResearch ? maxIterations : 0,
+          maxIterations: useDeepResearch ? clampedMaxIterations : 0,
           tokenFeature: featureName,
           tokensCharged: requiredTokens,
         }
@@ -101,7 +116,7 @@ export async function POST(request: NextRequest) {
               const deepResult = await deepResearcherService.conductDeepResearch(
                 String(userQuery),
                 '', // initialContext
-                maxIterations,
+                clampedMaxIterations,
                 userId,
                 onDeepProgress
               )
