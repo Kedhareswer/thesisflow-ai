@@ -30,7 +30,7 @@ export function Footer({ className, ...props }: FooterProps) {
           gsap.to(text, {
             xPercent: -100,
             repeat: -1,
-            duration: 80,
+            duration: 160,
             ease: "none",
             modifiers: {
               xPercent: gsap.utils.unitize((x: string) => parseFloat(x) % 100)
