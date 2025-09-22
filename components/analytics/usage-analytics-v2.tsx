@@ -11,8 +11,9 @@ import { useSupabaseAuth } from "@/components/supabase-auth-provider";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 
-type Metric = 'tokens' | 'requests' | 'cost' | 'avg_tokens' | 'p95_tokens' | 'avg_latency' | 'p95_latency';
-type Dimension = 'service' | 'provider' | 'model' | 'feature' | 'origin' | 'quality' | 'per_result_bucket';
+// Simplified metric/dimension set – only what is useful to users
+type Metric = 'tokens' | 'requests' | 'cost';
+type Dimension = 'service' | 'provider' | 'model';
 
 interface AnalyticsV2Response {
   from: string;
@@ -43,21 +44,13 @@ const COLORS = [
 const METRIC_LABELS: Record<Metric, string> = {
   tokens: 'Tokens',
   requests: 'Requests',
-  cost: 'Cost ($)',
-  avg_tokens: 'Avg Tokens',
-  p95_tokens: 'P95 Tokens',
-  avg_latency: 'Avg Latency (ms)',
-  p95_latency: 'P95 Latency (ms)',
+  cost: 'Cost ($)'
 };
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
   service: 'Service',
   provider: 'Provider',
-  model: 'Model',
-  feature: 'Feature',
-  origin: 'Origin',
-  quality: 'Quality',
-  per_result_bucket: 'Results Range',
+  model: 'Model'
 };
 
 const toDateStr = (iso: string) => {
@@ -126,7 +119,8 @@ export function UsageAnalyticsV2({ className }: UsageAnalyticsV2Props) {
       // Normalization helpers
       const normProvider = (k: string) => {
         const s = (k || '').toLowerCase();
-        if (s.includes('openrouter') || s === 'or' || s === 'router') return 'Nova';
+        if (s.includes('openrouter') || s === 'or' || s === 'router') return 'NOVA';
+        if (s.includes('nova')) return 'NOVA';
         if (s.includes('openai')) return 'OpenAI';
         if (s.includes('anthropic')) return 'Anthropic';
         if (s.includes('gemini') || s.includes('google')) return 'Gemini';
@@ -136,18 +130,18 @@ export function UsageAnalyticsV2({ className }: UsageAnalyticsV2Props) {
       };
       const modelFamily = (k: string) => {
         const s = (k || '').toLowerCase();
-        if (s.includes('gpt') || s.includes('o3') || s.includes('4o')) return 'gpt';
-        if (s.includes('claude')) return 'claude';
-        if (s.includes('llama')) return 'llama';
-        if (s.includes('gemini')) return 'gemini';
-        if (s.includes('mixtral')) return 'mixtral';
-        if (s.includes('qwen')) return 'qwen';
-        if (s.includes('deepseek')) return 'deepseek';
-        if (s.includes('glm')) return 'glm';
-        if (s.includes('nemotron')) return 'nemotron';
-        if (s.includes('gemma')) return 'gemma';
-        if (s.includes('mistral')) return 'mistral';
-        return s || 'unknown';
+        if (s.includes('gpt') || s.includes('o3') || s.includes('4o')) return 'GPT';
+        if (s.includes('claude')) return 'Claude';
+        if (s.includes('llama')) return 'Llama';
+        if (s.includes('gemini')) return 'Gemini';
+        if (s.includes('mixtral')) return 'Mixtral';
+        if (s.includes('qwen')) return 'Qwen';
+        if (s.includes('deepseek')) return 'DeepSeek';
+        if (s.includes('glm')) return 'GLM';
+        if (s.includes('nemotron')) return 'Nemotron';
+        if (s.includes('gemma')) return 'Gemma';
+        if (s.includes('mistral')) return 'Mistral';
+        return 'Other';
       };
 
       // If dimension is provider/model, collapse series by normalized key

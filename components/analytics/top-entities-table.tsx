@@ -87,7 +87,7 @@ export function TopEntitiesTable({ className, dateRange }: TopEntitiesTableProps
       // Normalization helpers
       const normProvider = (k: string) => {
         const s = (k || '').toLowerCase();
-        if (s.includes('openrouter') || s === 'or' || s === 'router') return 'Nova';
+        if (s.includes('openrouter') || s === 'or' || s === 'router') return 'NOVA';
         if (s.includes('openai')) return 'OpenAI';
         if (s.includes('anthropic')) return 'Anthropic';
         if (s.includes('gemini') || s.includes('google')) return 'Gemini';
@@ -291,28 +291,6 @@ export function TopEntitiesTable({ className, dateRange }: TopEntitiesTableProps
                       <SortIcon field="cost" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 font-semibold"
-                      onClick={() => handleSort('error_rate')}
-                    >
-                      Error %
-                      <SortIcon field="error_rate" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 font-semibold"
-                      onClick={() => handleSort('avg_latency')}
-                    >
-                      Avg Latency (ms)
-                      <SortIcon field="avg_latency" />
-                    </Button>
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -335,22 +313,7 @@ export function TopEntitiesTable({ className, dateRange }: TopEntitiesTableProps
                     <TableCell className="text-right font-mono">
                       ${row.cost.toFixed(4)}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      <span className={cn(
-                        row.error_rate > 5 ? "text-red-600" : 
-                        row.error_rate > 1 ? "text-yellow-600" : "text-green-600"
-                      )}>
-                        {row.error_rate.toFixed(1)}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      <span className={cn(
-                        row.avg_latency > 5000 ? "text-red-600" : 
-                        row.avg_latency > 2000 ? "text-yellow-600" : "text-green-600"
-                      )}>
-                        {row.avg_latency.toLocaleString()}
-                      </span>
-                    </TableCell>
+                    {/* Error % and Avg Latency cells removed */}
                   </TableRow>
                 ))}
               </TableBody>
