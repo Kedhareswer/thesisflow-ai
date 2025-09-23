@@ -151,16 +151,16 @@ export function ResearchHeroWithCards({
                 <Image
                   src="/assistant.png"
                   alt="AI Assistant"
-                  width={150}
-                  height={150}
+                  width={640}
+                  height={640}
                   className="hero-reveal__parallax-assistant"
                   priority={false}
                 />
                 <Image
                   src="/ai.png"
                   alt="AI Technology"
-                  width={120}
-                  height={120}
+                  width={480}
+                  height={480}
                   className="hero-reveal__parallax-ai"
                   priority={false}
                 />
@@ -255,22 +255,28 @@ export function ResearchHeroWithCards({
           .hero-reveal__parallax {
             position: absolute;
             z-index: 0;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 120vh;
+            pointer-events: none;
           }
 
           .hero-reveal__parallax-assistant {
             position: absolute;
-            left: -100px;
-            top: -400px;
-            opacity: 0.8;
-            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+            left: -460px; /* shift to left of center */
+            top: -420px;  /* start higher so it "falls" into frame */
+            opacity: 0.98;
+            filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
           }
 
           .hero-reveal__parallax-ai {
             position: absolute;
-            left: 400px;
+            left: 520px; /* shift to right of center */
             top: -300px;
-            opacity: 0.7;
-            filter: blur(1px) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+            opacity: 0.95;
+            filter: blur(1px) drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
           }
 
           @media (max-width: 768px) {
@@ -280,15 +286,15 @@ export function ResearchHeroWithCards({
             }
             
             .hero-reveal__parallax-assistant {
-              left: -50px;
-              top: -200px;
-              transform: scale(0.7);
+              left: -160px;
+              top: -180px;
+              transform: scale(0.8);
             }
             
             .hero-reveal__parallax-ai {
-              left: 200px;
-              top: -150px;
-              transform: scale(0.6);
+              left: 180px;
+              top: -140px;
+              transform: scale(0.75);
             }
           }
         `}</style>
