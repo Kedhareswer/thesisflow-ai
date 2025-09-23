@@ -229,7 +229,7 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Animated Text Reveal Section */}
+      {/* Animated Research Split Reveal */}
       <AnimatedTextReveal text="RESEARCH" />
 
       {/* Light Showcase Section - 'Everything You Need for Research' */}

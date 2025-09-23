@@ -1,102 +1,146 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
-import { gsap } from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import React, { useLayoutEffect, useRef } from "react"
 
-// Register ScrollTrigger plugin
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger)
-}
+// Split clip-path GSAP ScrollTrigger animation that pins and scrubs with scroll
+// Renders two identical text layers (top/bottom) and animates their clip-paths
+// and opposite Y translations to create a split reveal effect on scroll.
+// Usage: <AnimatedTextReveal text="RESEARCH" />
 
-interface AnimatedTextRevealProps {
-  text: string
+export function AnimatedTextReveal({
+  text = "RESEARCH",
+  className = "",
+}: {
+  text?: string
   className?: string
-}
+}) {
+  const containerRef = useRef<HTMLElement | null>(null)
+  const topRef = useRef<HTMLDivElement | null>(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
 
-export function AnimatedTextReveal({ text, className = "" }: AnimatedTextRevealProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const topTextRef = useRef<HTMLDivElement>(null)
-  const bottomTextRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    let ctx: any | null = null
+    let killed = false
 
-  useEffect(() => {
-    if (!containerRef.current || !topTextRef.current || !bottomTextRef.current) return
+    const setup = async () => {
+      // Dynamically import GSAP and ScrollTrigger to avoid SSR issues
+      const gsapModule = await import("gsap")
+      const ScrollTriggerModule = await import("gsap/dist/ScrollTrigger")
+      const gsap: any = (gsapModule as any).gsap || (gsapModule as any).default || gsapModule
+      const ScrollTrigger: any = (ScrollTriggerModule as any).ScrollTrigger || (ScrollTriggerModule as any).default
+      gsap.registerPlugin(ScrollTrigger)
 
-    const container = containerRef.current
-    const topText = topTextRef.current
-    const bottomText = bottomTextRef.current
+      if (!containerRef.current || !topRef.current || !bottomRef.current || killed) return
 
-    // Create timeline
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: container,
-        start: "top center",
-        end: "bottom center",
-        scrub: true,
-        pin: true,
-        pinSpacing: true,
-      }
-    })
+      const container = containerRef.current
+      const top = topRef.current
+      const bottom = bottomRef.current
 
-    // Initial state - both texts fully visible
-    gsap.set([topText, bottomText], {
-      clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
-    })
+      ctx = gsap.context(() => {
+        // Initial state: fully visible (no split)
+        gsap.set([top, bottom], {
+          clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
+          y: 0,
+          willChange: "clip-path, transform",
+        })
 
-    // Animation - split reveal effect
-    tl.to(topText, {
-      clipPath: "polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%)",
-      y: -50,
-      ease: "power4.inOut",
-      duration: 1
-    })
-    .to(bottomText, {
-      clipPath: "polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%)",
-      y: 50,
-      ease: "power4.inOut",
-      duration: 1
-    }, 0) // Start at the same time as topText
+        // Timeline with ScrollTrigger pin + scrub
+        const tl = gsap.timeline({
+          defaults: { ease: "power4.inOut" },
+          scrollTrigger: {
+            trigger: container,
+            start: "top top",
+            end: "+=120%",
+            scrub: true,
+            pin: true,
+            anticipatePin: 1,
+            fastScrollEnd: true,
+          },
+        })
+
+        // Split into top and bottom halves and push apart
+        tl.to(
+          top,
+          {
+            clipPath: "polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%)",
+            y: "-10vw",
+          },
+          0
+        ).to(
+          bottom,
+          {
+            clipPath: "polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%)",
+            y: "10vw",
+          },
+          0
+        )
+      }, container)
+    }
+
+    void setup()
 
     return () => {
-      ScrollTrigger.getAll().forEach(trigger => trigger.kill())
+      killed = true
+      try {
+        ctx?.revert()
+      } catch {}
     }
   }, [])
 
   return (
-    <section 
-      ref={containerRef}
-      className={`relative min-h-screen flex items-center justify-center bg-neutral-950 text-white overflow-hidden ${className}`}
+    <section
+      ref={containerRef as any}
+      className={[
+        "relative h-[100vh] w-full overflow-hidden bg-neutral-950 text-white flex items-center justify-center",
+        className,
+      ].join(" ")}
+      aria-label={`${text} animated split headline`}
     >
-      {/* Background gradient */}
-      <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_50%,rgba(255,107,44,0.15),transparent)]" />
-      
-      {/* Container for both text elements */}
-      <div className="relative z-10 text-center">
-        {/* Top half text */}
+      {/* Single semantic heading for accessibility */}
+      <h2 className="sr-only">{text}</h2>
+
+      {/* Text layers */}
+      <div className="relative w-full max-w-[1400px] px-4">
+        {/* Shared text styles */}
         <div
-          ref={topTextRef}
-          className="absolute inset-0 flex items-center justify-center"
+          ref={topRef}
+          aria-hidden
+          className="pointer-events-none select-none absolute inset-0 flex items-center justify-center"
           style={{
-            clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+            lineHeight: 1,
+            fontWeight: 800,
+            letterSpacing: "-0.04em",
+            fontSize: "clamp(64px, 18vw, 260px)",
+            textTransform: "uppercase",
           }}
         >
-          <h2 className="text-8xl md:text-9xl lg:text-[12rem] font-bold tracking-tight leading-none select-none">
-            {text}
-          </h2>
+          {text}
         </div>
-        
-        {/* Bottom half text */}
         <div
-          ref={bottomTextRef}
-          className="flex items-center justify-center"
+          ref={bottomRef}
+          aria-hidden
+          className="pointer-events-none select-none absolute inset-0 flex items-center justify-center"
           style={{
-            clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)"
+            lineHeight: 1,
+            fontWeight: 800,
+            letterSpacing: "-0.04em",
+            fontSize: "clamp(64px, 18vw, 260px)",
+            textTransform: "uppercase",
           }}
         >
-          <h2 className="text-8xl md:text-9xl lg:text-[12rem] font-bold tracking-tight leading-none select-none">
-            {text}
-          </h2>
+          {text}
         </div>
+
+        {/* A subtle background gradient glow for depth */}
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(60% 50% at 50% 50%, rgba(255,107,44,0.15), transparent)",
+            filter: "blur(20px)",
+          }}
+        />
       </div>
     </section>
   )
