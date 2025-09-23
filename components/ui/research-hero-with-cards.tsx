@@ -167,8 +167,8 @@ export function ResearchHeroWithCards({
             color:rgb(224, 218, 218);
             display: flex;
             font-family: 'IBM Plex Sans', sans-serif;
-            font-size: clamp(3.125rem, 12.61vw + -0.138rem, 15.625rem);
-            line-height: clamp(4.688rem, 15.763vw + 0.609rem, 20.313rem);
+            font-size: clamp(2rem, 8vw, 15.625rem);
+            line-height: clamp(2.5rem, 10vw, 20.313rem);
             font-weight: 900;
             justify-content: center;
             left: 0;
@@ -177,6 +177,7 @@ export function ResearchHeroWithCards({
             top: 0;
             will-change: transform;
             z-index: 1;
+            padding: 0 1rem;
           }
 
           .hero-reveal_split {
@@ -250,8 +251,19 @@ export function ResearchHeroWithCards({
 
           @media (max-width: 768px) {
             .hero-reveal__header {
-              font-size: clamp(2rem, 8vw, 8rem);
-              line-height: clamp(2.5rem, 10vw, 10rem);
+              font-size: clamp(1.5rem, 6vw, 6rem);
+              line-height: clamp(2rem, 8vw, 8rem);
+              padding: 0 0.5rem;
+            }
+            
+            .hero-reveal__content {
+              margin-top: -40vh;
+              padding: 0 1rem;
+            }
+            
+            .hero-reveal__content-inner {
+              max-width: 100%;
+              padding: 0 0.5rem;
             }
             
             .hero-reveal__parallax-assistant {
@@ -264,6 +276,18 @@ export function ResearchHeroWithCards({
               left: 180px;
               top: -140px;
               transform: scale(0.75);
+            }
+          }
+          
+          @media (max-width: 480px) {
+            .hero-reveal__header {
+              font-size: clamp(1.2rem, 5vw, 4rem);
+              line-height: clamp(1.5rem, 6vw, 5rem);
+              padding: 0 0.25rem;
+            }
+            
+            .hero-reveal__content {
+              margin-top: -30vh;
             }
           }
         `}</style>
