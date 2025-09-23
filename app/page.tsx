@@ -15,6 +15,7 @@ import { SoftwareApplication, WebPage } from "@/components/schema/microdata-sche
 // Removed PixelTrail and screen-size hooks in favor of static hero background image
 import { Footer } from "@/components/ui/footer"
 import { ResearchHeroWithCards } from "@/components/ui/research-hero-with-cards"
+import StatsCarouselCount from "@/src/components/ui/statscarousel"
 
 // metadata moved to app/seo/root-metadata.ts
 
@@ -78,31 +79,31 @@ export default function HomePage() {
     }
   })
 
-  // Benefits content for dark band (mirrors reference, customized for research)
+  // Benefits content for dark band (customized for ThesisFlow-AI)
   const benefitItems = [
     {
-      icon: MessageSquare,
-      title: "Chat-to-Action Command Center",
+      icon: Search,
+      title: "Multi‑Source Research Discovery",
       description:
-        "Tell ThesisFlow what you need—‘Compile related work on diffusion models’—and it kicks off retrieval, deduping, summaries, and a project plan.",
+        "Search OpenAlex, arXiv, CrossRef and more—rank, dedupe and bookmark the right papers fast.",
     },
     {
-      icon: Zap,
-      title: "Instant, Accurate Organization",
+      icon: FileText,
+      title: "One‑Click Summaries & Tables",
       description:
-        "We auto‑categorize papers, notes, and citations in real time and learn your taxonomy—so everything stays where you expect it.",
+        "Extract structured insights—abstracts, key claims, tables, and entities—from PDFs, DOCX, PPT and images (OCR).",
     },
     {
-      icon: BarChart3,
-      title: "Research Planning That Works",
+      icon: Calendar,
+      title: "Plans that Stay in Sync",
       description:
-        "As your work evolves, timelines and milestones update automatically—clear views of what’s next and what’s at risk.",
+        "Tasks, Gantt, and milestones auto‑update as your work evolves—stay clear on what's next.",
     },
     {
-      icon: Share2,
-      title: "Seamless Advisor & Team Sharing",
+      icon: Users,
+      title: "Seamless Collaboration",
       description:
-        "Invite co‑authors, advisors, or teammates with one click. Set granular permission levels; keep context without version chaos.",
+        "Share context, assign tasks, and get advisor feedback—without version chaos.",
     },
   ]
 
@@ -234,6 +235,30 @@ export default function HomePage() {
       <div className="z-1">
         <ResearchHeroWithCards text="RESEARCH" />
       </div>
+
+      {/* Stats Carousel Section */}
+      <section className="relative bg-white py-16 sm:py-20 md:py-24 lg:py-28 z-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2 }}
+            viewport={{ once: true }}
+            className="flex justify-center"
+          >
+            <StatsCarouselCount
+              title="POWER YOUR RESEARCH WITH THESISFLOW‑AI"
+              stats={[
+                { value: 5, suffix: "K+", label: "Papers summarized and extracted" },
+                { value: 10, suffix: "x", label: "Faster literature review workflow" },
+                { value: 99, suffix: "%", label: "Uptime across core features" },
+              ]}
+              className="max-w-md"
+              cardClassName=""
+            />
+          </motion.div>
+        </div>
+      </section>
 
       {/* Light Showcase Section - 'Everything You Need for Research' */}
       <section className="relative isolate bg-[#F7F6F3] py-16 sm:py-20 md:py-28 lg:py-36 z-0">

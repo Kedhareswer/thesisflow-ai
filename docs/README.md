@@ -8,17 +8,18 @@ This directory contains onboarding-focused documentation for new contributors. S
 1. `about.md` — What the product does and where the pieces live
 2. `idea.md` — Problem, solution, differentiators
 3. `purpose.md` — Goals, success metrics, non-goals
-4. `branding.md` — Voice, tone, and UI/UX guidance
-5. `coding-language.md` — TypeScript conventions and SSE contracts
-6. `tech-stack.md` — Tech map across frontend, backend, DB, AI
-7. `design-architecture.md` — Module boundaries, data flow, timeouts, tokens
-8. `frontend.md` — Pages, hooks, SSE consumption patterns
-9. `backend.md` — API taxonomy, streaming, middleware, servers
-10. `integrations.md` — Supabase, OpenRouter, search, Stripe, Render
-11. `apis-critical-do-not-touch.md` — Contracts you must not break
-12. `sequences-and-flows.md` — Mermaid diagrams for key flows
-13. `database-schema.md` — Tables, columns, functions, and migrations
-14. `tokens.md` — Token system details (pre-existing)
+4. `branding.md` — Voice, tone, and comprehensive UI/UX guidance
+5. `design-principles.md` — Research-first design philosophy and component standards
+6. `coding-language.md` — TypeScript conventions and SSE contracts
+7. `tech-stack.md` — Tech map across frontend, backend, DB, AI
+8. `design-architecture.md` — Module boundaries, data flow, timeouts, tokens
+9. `frontend.md` — Pages, hooks, SSE consumption patterns, component library
+10. `backend.md` — API taxonomy, streaming, middleware, servers
+11. `integrations.md` — Supabase, OpenRouter, search, Stripe, Render
+12. `apis-critical-do-not-touch.md` — Contracts you must not break
+13. `sequences-and-flows.md` — Mermaid diagrams for key flows
+14. `database-schema.md` — Tables, columns, functions, and migrations
+15. `tokens.md` — Token system details (pre-existing)
 
 ## Quick facts
 - SSE event names used across the app: `init`, `progress`, `token`, `error`, `done`, `ping`

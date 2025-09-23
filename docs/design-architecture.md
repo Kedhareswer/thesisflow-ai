@@ -13,6 +13,8 @@ See diagrams in `docs/sequences-and-flows.md`.
 ## Module boundaries
 - UI (`app/`, `components/`, `src/components/ai-elements/`)
   - Server/client components, route-level layouts, page compositions
+  - Component library in `components/ui/` with shadcn/ui patterns
+  - Homepage showcases: `ResearchHeroWithCards`, `StatsCarouselCount`, research stacking cards
   - Hooks in `hooks/**` (e.g., `use-literature-search.ts`, `use-chat-socket.ts`)
 - API (`app/api/**`)
   - App Router route handlers (REST/SSE)

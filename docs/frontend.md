@@ -5,18 +5,24 @@ This guide orients onboarding developers to the UI structure, key pages, and hoo
 ## App structure
 - Pages: `app/**/page.tsx` (Next.js App Router)
 - Shared UI: `components/**`, `src/components/ai-elements/`
-- Styles: `styles/globals.css` and Tailwind utilities
-- Static assets: `public/`
+- Component library: `components/ui/` for reusable design patterns
+- Styles: `styles/globals.css` and Tailwind utilities with IBM Plex Sans font family
+- Static assets: `public/` including product screenshots for homepage showcases
 
 ## Key pages
-- Topics Explorer: `app/topics/page.tsx`
+- **Homepage**: `app/page.tsx`
+  - Marketing landing with research hero animation, stacking cards, stats carousel
+  - Features actual product screenshots in scroll-triggered animations
+  - Uses `ResearchHeroWithCards`, `StatsCarouselCount` components with IBM Plex Sans typography
+- **Topics Explorer**: `app/topics/page.tsx`
   - Implements literature search, source listing, and scholarly report generation
   - Consumes SSE from `app/api/topics/report/stream/route.ts` via manual `ReadableStream` parsing
   - Enforces a client-side timeout with `AbortController` and cleans up intervals/signals
-- Explorer/Research Assistant: `app/explorer/components/ResearchAssistant.tsx`
+- **Explorer/Research Assistant**: `app/explorer/components/ResearchAssistant.tsx`
   - Uses `EventSource` to consume SSE from AI chat streaming
-- Paraphraser and Extract flows
-  - Paraphraser UI under `app/paraphraser/`
+  - Integrated AI elements for reasoning, sources, tasks, tools, and citations
+- **Paraphraser and Extract flows**
+  - Paraphraser UI under `app/paraphraser/` with streaming-only interface
   - Extract flows under `app/extract*` and related components in `components/`
 
 ## Hooks
