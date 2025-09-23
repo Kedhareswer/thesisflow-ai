@@ -142,11 +142,7 @@ export function AnimatedTextReveal({
         .hero-reveal__header {
           align-items: center;
           background-color: #ffffff;
-          background-image: url('/background.png');
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          color: #ffffff;
+          color: #000000;
           display: flex;
           font-family: 'IBM Plex Sans', sans-serif;
           font-size: clamp(3.125rem, 12.61vw + -0.138rem, 15.625rem);
@@ -168,6 +164,10 @@ export function AnimatedTextReveal({
           justify-content: center;
           position: relative;
           width: 100%;
+          background-image: url('/background.png');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
         }
 
         .hero-reveal_split_item {
@@ -177,6 +177,10 @@ export function AnimatedTextReveal({
           justify-content: center;
           min-height: 100vh;
           width: 100%;
+          background-image: url('/background.png');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
         }
 
         .hero-reveal_split_item:nth-child(1) {
@@ -195,6 +199,8 @@ export function AnimatedTextReveal({
         .c-wide-text {
           margin: 0;
           font-family: 'IBM Plex Sans', sans-serif;
+          color: #ffffff;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .hero-reveal__content {
