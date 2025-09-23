@@ -81,6 +81,8 @@ export default function StatsCarouselCount({
     { value: 5, suffix: "K+", label: "Papers summarized and extracted" },
     { value: 10, suffix: "x", label: "Faster literature review workflow" },
     { value: 99, suffix: "%", label: "Uptime across core features" },
+    { value: 50, suffix: "K+", label: "Research hours saved" },
+    { value: 25, suffix: "+", label: "AI models available" },
   ];
 
   const initialStats = (stats ?? defaultStats).map((s, i) => ({
@@ -185,41 +187,41 @@ export default function StatsCarouselCount({
 
   return (
     <section
-      className={`py-20 px-4 w-full max-w-md mx-auto text-center relative h-[500px] z-[40] ${className}`}
+      className={`py-20 px-4 w-full max-w-2xl mx-auto text-center relative h-[600px] z-[40] ${className}`}
     >
-      <h2 className="text-lg font-bold text-black dark:text-white mb-12" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+      <h2 className="text-xl font-bold text-white dark:text-black mb-16" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
         {title ?? "POWER YOUR RESEARCH WITH THESISFLOW‑AI"}
       </h2>
 
-      <div className="relative h-[300px]">
+      <div className="relative h-[400px]">
         <AnimatePresence>
           {items.map((stat, index) => {
-            const baseY = index * 20;
-            const scale = 1 - index * 0.05;
+            const baseY = index * 25;
+            const scale = 1 - index * 0.03;
             const isTopCard = index === 0;
             const bottomIndex = items.length - 1;
-            const bottomScale = 1 - bottomIndex * 0.05;
+            const bottomScale = 1 - bottomIndex * 0.03;
 
             let animate = { x: 0, y: baseY, scale };
 
             if (!isDragMode) {
               if (isTopCard && phase === "down") {
-                animate = { x: 0, y: baseY + 150, scale: 0.8 };
+                animate = { x: 0, y: baseY + 200, scale: 0.75 };
               }
               if (!isTopCard && phase === "stackUp") {
-                animate = { x: 0, y: baseY - 20, scale };
+                animate = { x: 0, y: baseY - 30, scale };
               }
               if (isTopCard && phase === "stackUp") {
-                animate = { x: 0, y: baseY + 150, scale: 0.8 };
+                animate = { x: 0, y: baseY + 200, scale: 0.75 };
               }
               if (isTopCard && phase === "upReenter") {
-                animate = { x: 0, y: bottomIndex * 20, scale: bottomScale };
+                animate = { x: 0, y: bottomIndex * 25, scale: bottomScale };
               }
             }
 
             const zIndex = !isDragMode && phase === "upReenter" && isTopCard
               ? 0
-              : Math.max(0, Math.min(40, 40 - index));
+              : Math.max(0, Math.min(50, 50 - index));
 
             const shouldAutoAnimate = !isDragMode &&
               stat.id === activeTopId &&
@@ -237,9 +239,9 @@ export default function StatsCarouselCount({
                 className="absolute left-0 right-0 mx-auto w-full touch-none"
                 style={{ zIndex }}
                 animate={animate}
-                transition={{ duration: 0.6, ease: "easeInOut" }}
+                transition={{ duration: 0.8, ease: "easeInOut" }}
                 drag={isDragMode && isTopCard ? "y" : false}
-                dragConstraints={{ top: 0, bottom: 150 }}
+                dragConstraints={{ top: 0, bottom: 200 }}
                 dragElastic={0.3}
                 onDragEnd={handleDragEnd}
                 whileHover={isDragMode && isTopCard ? { scale: 1.02, cursor: "grab" } : {}}
@@ -247,7 +249,7 @@ export default function StatsCarouselCount({
                 dragTransition={{ bounceStiffness: 300, bounceDamping: 30 }}
               >
                 <div
-                  className={`flex flex-col items-center justify-center rounded-xl border border-neutral-800 p-6 bg-neutral-950 dark:border-neutral-200 dark:bg-neutral-50 shadow-lg ${isDragMode && isTopCard ? "hover:shadow-xl transition-shadow duration-200" : ""} ${cardClassName}`}
+                  className={`flex flex-col items-center justify-center rounded-xl border border-neutral-200 p-8 bg-white dark:border-neutral-800 dark:bg-neutral-900 shadow-lg ${isDragMode && isTopCard ? "hover:shadow-xl transition-shadow duration-200" : ""} ${cardClassName}`}
                 >
                   {shouldAutoAnimate ? (
                     <StatsCarousel
@@ -265,16 +267,16 @@ export default function StatsCarouselCount({
                       trigger={triggerCounter}
                     />
                   ) : shouldShowZero ? (
-                    <div className="text-5xl font-extrabold text-white dark:text-black" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                    <div className="text-6xl font-extrabold text-black dark:text-white" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                       0{stat.suffix}
                     </div>
                   ) : (
-                    <div className="text-5xl font-extrabold text-white dark:text-black" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                    <div className="text-6xl font-extrabold text-black dark:text-white" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                       {stat.value}
                       {stat.suffix}
                     </div>
                   )}
-                  <p className="text-xs text-neutral-400 dark:text-neutral-800 mt-2 text-center uppercase tracking-wide" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-3 text-center uppercase tracking-wide" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                     {stat.label}
                   </p>
                 </div>

@@ -237,8 +237,9 @@ export default function HomePage() {
       </div>
 
       {/* Stats Carousel Section */}
-      <section className="relative bg-white py-16 sm:py-20 md:py-24 lg:py-28 z-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <section className="relative bg-neutral-950 text-white py-16 sm:py-20 md:py-24 lg:py-28 z-0">
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -253,57 +254,9 @@ export default function HomePage() {
                 { value: 10, suffix: "x", label: "Faster literature review workflow" },
                 { value: 99, suffix: "%", label: "Uptime across core features" },
               ]}
-              className="max-w-md"
+              className="max-w-2xl"
               cardClassName=""
             />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Light Showcase Section - 'Everything You Need for Research' */}
-      <section className="relative isolate bg-[#F7F6F3] py-16 sm:py-20 md:py-28 lg:py-36 z-0">
-        <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_60%_at_50%_40%,black,transparent)] bg-black/5"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2 }}
-            viewport={{ once: true }}
-            className="text-center max-w-3xl mx-auto"
-          >
-            <h2 className="text-neutral-900 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-light tracking-tight leading-tight">
-              <span className="block">Everything You Need</span>
-              <span className="block">for Research.</span>
-            </h2>
-            <p className="mt-4 max-w-2xl mx-auto text-neutral-800 text-sm sm:text-base leading-relaxed">
-              Comprehensive tools designed to streamline every aspect of your research workflow with AI-powered insights.
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2, delay: 0.2 }}
-            viewport={{ once: true }}
-            className="mt-8 sm:mt-12 md:mt-14 lg:mt-16"
-          >
-            <div className="relative max-w-[1040px] mx-auto rounded-[12px] sm:rounded-[24px] bg-white ring-1 ring-black/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.20)] sm:shadow-[0_32px_64px_-20px_rgba(0,0,0,0.30)] overflow-hidden">
-              <div className="h-8 sm:h-11 bg-gradient-to-b from-neutral-100 to-neutral-50 border-b border-black/10 flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5">
-                <span className="inline-block h-[8px] w-[8px] sm:h-[10px] sm:w-[10px] rounded-full bg-[#FF5F57]" />
-                <span className="inline-block h-[8px] w-[8px] sm:h-[10px] sm:w-[10px] rounded-full bg-[#FEBC2E]" />
-                <span className="inline-block h-[8px] w-[8px] sm:h-[10px] sm:w-[10px] rounded-full bg-[#28C840]" />
-              </div>
-              <div className="relative aspect-[16/10] bg-white">
-                <Image
-                  src="/dashboard.png"
-                  alt="ThesisFlow research dashboard preview"
-                  fill
-                  className="object-contain"
-                  sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
-                  priority={false}
-                />
-              </div>
-            </div>
           </motion.div>
         </div>
       </section>
