@@ -36,12 +36,12 @@ const researchFeatures = [
     icon: <Users className="w-6 h-6 text-white" />,
   },
   {
-    title: 'Automated Pipelines',
+    title: 'Collaborate with Your Team',
     description:
-      'Automate repetitive steps—ingest, summarize, tag and export—using reusable workflows that run on your data, not ours.',
-    image: 'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?w=800&auto=format&fit=crop&q=80',
+      'Integrate with your favorite collaboration tools to streamline research collaboration. Share your workspace with team members, assign tasks, and track progress.',
+    image: 'https://images.unsplash.com/photo-1549035956-f9942cb731af?w=800&auto=format&fit=crop&q=80',
     color: '#F59E0B',
-    icon: <Zap className="w-6 h-6 text-white" />,
+    icon: <Users className="w-6 h-6 text-white" />,
   },
 ];
 
