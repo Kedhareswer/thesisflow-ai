@@ -1,6 +1,64 @@
-# Frontend
+# Frontend Architecture
 
-This guide orients onboarding developers to the UI structure, key pages, and hooks.
+## Overview
+ThesisFlow-AI uses Next.js 14 with TypeScript, React, and Tailwind CSS for a modern, responsive frontend experience.
+
+## Key Technologies
+- **Next.js 14**: App Router, Server Components, API Routes
+- **React 18**: Hooks, Context, Suspense
+- **TypeScript**: Full type safety
+- **Tailwind CSS**: Utility-first styling
+- **Framer Motion**: Animations and transitions
+- **Lucide React**: Icon system
+- **Shadcn/ui**: Component library
+
+## Component Architecture
+
+### Layout System
+- `app/layout.tsx`: Root layout with providers
+- `components/ui/`: Reusable UI components
+- `components/`: Feature-specific components
+- `components/support/`: Support chat system components
+
+### State Management
+- React Context for global state
+- Local state with useState/useReducer
+- Custom hooks for shared logic
+- localStorage for client-side persistence
+
+### Styling Approach
+- Tailwind utility classes
+- CSS modules for complex components
+- Design system tokens
+- Responsive design patterns
+- ThesisFlow-AI brand colors (#FF6B2C)
+
+## New Components (Support Chat System)
+
+### Support Widget (`components/support/SupportWidget.tsx`)
+- Home-page-only floating action button
+- Lazy-loaded panel for performance
+- Deep-link support for external navigation
+- Unread indicator for broadcasts
+
+### Support Panel (`components/support/SupportPanel.tsx`)
+- Full chat interface with message history
+- Thumbs up/down feedback system
+- Quick reply chips for common actions
+- Privacy controls (clear, export, delete)
+- Broadcast banner system
+
+### Changelog Info Widget (`components/changelog/InfoWidget.tsx`)
+- Latest release highlights
+- Deep-link CTA to support chat
+- Dismissible with localStorage persistence
+
+## Performance Optimizations
+- Code splitting with dynamic imports
+- Image optimization with Next.js Image
+- Font optimization
+- Bundle analysis and optimization
+- Support chat lazy loading to avoid LCP impact
 
 ## App structure
 - Pages: `app/**/page.tsx` (Next.js App Router)

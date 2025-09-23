@@ -4,22 +4,24 @@ This directory contains onboarding-focused documentation for new contributors. S
 
 - Supabase project URL: xxxxx
 
-## Recommended reading order
-1. `about.md` — What the product does and where the pieces live
-2. `idea.md` — Problem, solution, differentiators
-3. `purpose.md` — Goals, success metrics, non-goals
-4. `branding.md` — Voice, tone, and comprehensive UI/UX guidance
-5. `design-principles.md` — Research-first design philosophy and component standards
-6. `coding-language.md` — TypeScript conventions and SSE contracts
-7. `tech-stack.md` — Tech map across frontend, backend, DB, AI
-8. `design-architecture.md` — Module boundaries, data flow, timeouts, tokens
-9. `frontend.md` — Pages, hooks, SSE consumption patterns, component library
-10. `backend.md` — API taxonomy, streaming, middleware, servers
-11. `integrations.md` — Supabase, OpenRouter, search, Stripe, Render
-12. `apis-critical-do-not-touch.md` — Contracts you must not break
-13. `sequences-and-flows.md` — Mermaid diagrams for key flows
-14. `database-schema.md` — Tables, columns, functions, and migrations
-15. `tokens.md` — Token system details (pre-existing)
+## Documentation Structure
+
+- **[About](./about.md)** - Project overview and mission
+- **[Purpose](./purpose.md)** - Core objectives and goals
+- **[Idea](./idea.md)** - Original concept and vision
+- **[Branding](./branding.md)** - Brand guidelines and identity
+- **[Coding Language](./coding-language.md)** - Development standards
+- **[Tech Stack](./tech-stack.md)** - Technology choices
+- **[Design Architecture](./design-architecture.md)** - System architecture
+- **[Frontend](./frontend.md)** - Frontend architecture
+- **[Backend](./backend.md)** - Backend architecture
+- **[Components Guide](./components-guide.md)** - Component architecture and usage
+- **[Support Chat System](./support-chat-system.md)** - Support chat implementation
+- **[Integrations](./integrations.md)** - Third-party integrations
+- **[APIs Critical](./apis-critical-do-not-touch.md)** - Critical API documentation
+- **[Sequences and Flows](./sequences-and-flows.md)** - User flows and processes
+- **[Database Schema](./database-schema.md)** - Database structure
+- **[Tokens](./tokens.md)** - Token system documentation
 
 ## Quick facts
 - SSE event names used across the app: `init`, `progress`, `token`, `error`, `done`, `ping`

@@ -70,8 +70,17 @@ See diagrams in `docs/sequences-and-flows.md`.
 
 ## Rate limits & aggregation
 - Literature search rate limit: `public.check_literature_search_rate_limit`
-- Hook aggregation window: `hooks/use-literature-search.ts` via `aggregateWindowMs`
-- UI surfaces 429 state with Retry-After countdown; backend mirrors headers
+
+## Component Structure
+
+### Core Components
+- **Research Assistant**: AI-powered chat interface
+- **Literature Search**: Multi-source paper discovery
+- **Project Planner**: Task management with Gantt charts
+- **Data Extraction**: PDF/document analysis
+- **Collaboration Hub**: Team workspace
+- **LaTeX Writer**: Document editing with real-time preview
+- **Support Chat System**: Deterministic help system (home page only)
 
 ## Supabase schema highlights
 - URL: xxxxx

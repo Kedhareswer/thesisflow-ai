@@ -1,0 +1,25 @@
+{
+  "intent": "greeting",
+  "responses": [
+    {
+      "id": "welcome",
+      "text": "Hi there! 👋 Welcome to ThesisFlow-AI Support. I'm here to help you with questions about our research platform.",
+      "quickReplies": [
+        { "text": "Pricing & Plans", "intent": "pricing" },
+        { "text": "Token Usage", "intent": "tokens" },
+        { "text": "Features Overview", "intent": "about" },
+        { "text": "What's New?", "intent": "changelog" }
+      ]
+    },
+    {
+      "id": "return_user",
+      "text": "Welcome back! How can I assist you with ThesisFlow-AI today?",
+      "quickReplies": [
+        { "text": "Check Token Usage", "intent": "tokens" },
+        { "text": "Latest Updates", "intent": "changelog" },
+        { "text": "Feature Help", "intent": "navigation" },
+        { "text": "Contact Support", "intent": "contact" }
+      ]
+    }
+  ]
+}

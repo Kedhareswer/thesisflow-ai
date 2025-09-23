@@ -15,7 +15,12 @@ import { SoftwareApplication, WebPage } from "@/components/schema/microdata-sche
 // Removed PixelTrail and screen-size hooks in favor of static hero background image
 import { Footer } from "@/components/ui/footer"
 import { ResearchHeroWithCards } from "@/components/ui/research-hero-with-cards"
-import StatsCarouselCount from "@/src/components/ui/statscarousel"
+import dynamic from "next/dynamic"
+
+// Lazy load Support Widget to avoid affecting LCP
+const SupportWidget = dynamic(() => import("@/components/support/SupportWidget"), {
+  ssr: false
+})
 
 // metadata moved to app/seo/root-metadata.ts
 
@@ -236,31 +241,6 @@ export default function HomePage() {
         <ResearchHeroWithCards text="RESEARCH" />
       </div>
 
-      {/* Stats Carousel Section */}
-      <section className="relative bg-neutral-950 text-white py-16 sm:py-20 md:py-24 lg:py-28 z-0">
-        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2 }}
-            viewport={{ once: true }}
-            className="flex justify-center"
-          >
-            <StatsCarouselCount
-              title="POWER YOUR RESEARCH WITH THESISFLOW‑AI"
-              stats={[
-                { value: 5, suffix: "K+", label: "Papers summarized and extracted" },
-                { value: 10, suffix: "x", label: "Faster literature review workflow" },
-                { value: 99, suffix: "%", label: "Uptime across core features" },
-              ]}
-              className="max-w-2xl"
-              cardClassName=""
-            />
-          </motion.div>
-        </div>
-      </section>
-
       {/* Benefits Section (Dark) */}
       <section className="relative bg-neutral-950 text-white py-16 sm:py-20 md:py-28 lg:py-36 z-1">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
@@ -450,6 +430,9 @@ export default function HomePage() {
       </section>
       {/* Footer */}
       <Footer />
+      
+      {/* Support Widget - Only on home page */}
+      <SupportWidget />
       
       </WebPage>
       </div>

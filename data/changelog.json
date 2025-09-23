@@ -1,6 +1,24 @@
 [
   {
-    "version": "v2.1.0",
+    "version": "v2.0.2",
+    "date": "2025-09-24",
+    "title": "Support Chat System - Intelligent Help at Your Fingertips",
+    "description": "Introducing a smart, deterministic support chat system that appears exclusively on the home page. Get instant answers about ThesisFlow-AI features, pricing, tokens, and navigation without waiting for human support.",
+    "items": [
+      "Home-only support chat bubble with intelligent intent classification",
+      "Deterministic AI responses covering pricing, tokens, features, and navigation",
+      "Quick reply chips for common questions and contextual follow-ups",
+      "Conversation persistence with privacy controls (clear, export, delete)",
+      "Thumbs up/down feedback system for continuous improvement",
+      "Changelog integration widget with 'Ask Support about this release' CTA",
+      "Deep-link support for external navigation to prefilled chat sessions",
+      "Broadcast system for announcements within chat interface",
+      "Complete knowledge base covering all platform features and help topics"
+    ],
+    "button": { "url": "/", "text": "Try Support Chat" }
+  },
+  {
+    "version": "v2.0.1",
     "date": "2025-09-17",
     "title": "Monthly Token System + Plan & Analytics Updates",
     "description": "Introduced a unified monthly token system that powers AI features. Updated Home pricing section and the Plan & Analytics page to clearly show token allowances and live usage.",

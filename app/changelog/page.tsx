@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Changelog1, type ChangelogEntry } from "@/components/ui/changelog-1";
 import changelogData from "@/data/changelog.json";
 import { useState, useMemo } from "react";
+import InfoWidget from "@/components/changelog/InfoWidget";
 
 export default function ChangelogPage() {
   const allEntries = changelogData as ChangelogEntry[];
@@ -122,6 +123,11 @@ export default function ChangelogPage() {
         </div>
       </section>
 
+
+      {/* Info Widget */}
+      <div className="container mx-auto px-4">
+        <InfoWidget />
+      </div>
 
       {/* Changelog Section */}
       <div id="updates" className="container mx-auto px-4 mt-12">

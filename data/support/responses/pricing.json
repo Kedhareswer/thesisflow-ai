@@ -1,0 +1,14 @@
+{
+  "intent": "pricing",
+  "responses": [
+    {
+      "id": "pricing_overview",
+      "text": "ThesisFlow-AI offers flexible pricing plans:\n\n**Free Plan** 🆓\n• 1,000 monthly tokens\n• Access to all core features\n• Community support\n\n**Pro Plan** ⭐ $19/month\n• 10,000 monthly tokens\n• Priority support\n• Advanced features\n• Export capabilities\n\nTokens are used for AI-powered features like research assistance, extraction, and planning.",
+      "quickReplies": [
+        { "text": "Token Usage Details", "intent": "tokens" },
+        { "text": "Upgrade to Pro", "action": "external_link", "url": "/pricing" },
+        { "text": "Free vs Pro Comparison", "intent": "pricing_comparison" }
+      ]
+    }
+  ]
+}
