@@ -147,7 +147,7 @@ export default function HomePage() {
         ]}
       >
       {/* Hero Section - exact match to reference image */}
-      <main className="relative min-h-[102vh] overflow-hidden">
+      <main className="relative min-h-[102vh] overflow-hidden z-0">
         {/* Background image */}
         <div className="absolute inset-0">
           <Image
@@ -230,10 +230,12 @@ export default function HomePage() {
       </main>
 
       {/* Research Hero with Stacking Cards */}
-      <ResearchHeroWithCards text="RESEARCH" />
+      <div className="z-1">
+        <ResearchHeroWithCards text="RESEARCH" />
+      </div>
 
       {/* Light Showcase Section - 'Everything You Need for Research' */}
-      <section className="relative isolate bg-[#F7F6F3] py-28 md:py-32 lg:py-36">
+      <section className="relative isolate bg-[#F7F6F3] py-28 md:py-32 lg:py-36 z-0">
         <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_60%_at_50%_40%,black,transparent)] bg-black/5"></div>
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
@@ -298,7 +300,7 @@ export default function HomePage() {
       </section>
 
       {/* Benefits Section (Dark) */}
-      <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36">
+      <section className="relative bg-neutral-950 text-white py-28 md:py-32 lg:py-36 z-1">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <motion.div
@@ -328,7 +330,7 @@ export default function HomePage() {
       </section>
 
       {/* Who We Serve Section - Pixel Perfect Match to Reference */}
-      <section className="py-28 md:py-32 lg:py-36 bg-white">
+      <section className="py-28 md:py-32 lg:py-36 bg-white z-0">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -408,7 +410,7 @@ export default function HomePage() {
       </section>
 
       {/* Image Band: Doing research is hard enough */}
-      <section className="relative min-h-[100vh] overflow-hidden">
+      <section className="relative min-h-[100vh] overflow-hidden z-1">
         <div className="absolute inset-0">
           <Image src="/research.png" alt="Research band" fill className="object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
@@ -477,12 +479,13 @@ export default function HomePage() {
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.2 }}
         viewport={{ once: true }}
+        className="z-0"
       >
         <Pricing />
       </motion.div>
 
       {/* FAQ Section */}
-      <section id="faq" className="relative bg-neutral-950 text-white py-32">
+      <section id="faq" className="relative bg-neutral-950 text-white py-32 z-1">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
         <div className="max-w-5xl mx-auto px-4 relative z-10">
           <motion.div

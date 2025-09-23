@@ -37,7 +37,7 @@ const CustomAccordionTrigger = React.forwardRef<
 		>
 			<div className="flex items-center gap-4">
 				<HelpCircle className="h-5 w-5 text-white/80" />
-				<span className="text-lg font-medium text-white tracking-wide">
+				<span className="text-sm font-medium text-white tracking-wide">
 					{children}
 				</span>
 			</div>
@@ -64,7 +64,7 @@ const CustomAccordionContent = React.forwardRef<
 	>
 		<div className="mt-4 ml-14">
 			<div className="flex items-start gap-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-md transition-all">
-				<span className="flex-1 text-md leading-relaxed text-white/90">{children}</span>
+				<span className="flex-1 text-xs leading-relaxed text-white/90">{children}</span>
 				<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/20 transition-transform hover:scale-105">
 					<MessageCircle className="h-5 w-5 text-white" />
 				</div>
@@ -98,29 +98,9 @@ export const faqs = [
       'We support multiple providers including OpenAI (e.g., GPT‑4o, GPT‑4o‑mini), Anthropic (Claude 3.5), Google Gemini (1.5/2.5), Groq (Llama 3.1/3.3, Gemma), and Mistral (small/medium/large). Model availability depends on your configured keys.',
   },
   {
-    question: 'Do I need my own API keys?',
-    answer:
-      'You can use your own provider keys for full control and model choice. Keys are stored securely and can be validated via the built‑in “Test API Key” function. Some deployments may include default keys for trial usage.',
-  },
-  {
     question: 'Is my data private and secure?',
     answer:
       'Yes. We use secure server‑side APIs, do not train models on your data, and integrate with Supabase for authentication and storage. Uploaded files are processed for extraction and summarization; you control what is saved to your workspace.',
-  },
-  {
-    question: 'Does chat and summarization stream in real time?',
-    answer:
-      'Yes. The AI chat and plan‑and‑execute routes use Server‑Sent Events (SSE) for token‑by‑token streaming with heartbeat and abort handling for reliability.',
-  },
-  {
-    question: 'Are there any rate limits?',
-    answer:
-      'Reasonable limits apply to protect service stability (e.g., AI chat streaming ~50 requests/hour by default). Project owners can tune limits in the backend configuration or database RPC policies.',
-  },
-  {
-    question: 'How does the Planner help with research projects?',
-    answer:
-      'Planner lets you create projects, tasks, and subtasks, visualize schedules on Calendar and Gantt, manage work on Kanban, and track analytics like progress and task status — all synced with your workspace.',
   },
   {
     question: 'Can I export results?',
