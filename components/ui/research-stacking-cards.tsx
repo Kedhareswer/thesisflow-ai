@@ -52,11 +52,10 @@ export const ResearchCard = ({
     >
       <motion.div
         style={{
-          backgroundColor: color,
           scale,
           top: `calc(-5vh + ${i * 25}px)`,
         }}
-        className={`flex flex-col relative -top-[25%] h-[450px] w-[70%] rounded-xl p-10 origin-top shadow-2xl`}
+        className={`glass flex flex-col relative -top-[25%] h-[450px] w-[70%] p-10 origin-top`}
       >
         <div className="flex items-center gap-4 mb-6">
           <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
@@ -107,6 +106,16 @@ const ResearchStackingCards = forwardRef<HTMLElement, ResearchStackingCardsProps
   return (
     <ReactLenis root>
       <main className='bg-black' ref={container}>
+        <style jsx global>{`
+          .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+          }
+        `}</style>
         <section className='text-white h-[70vh] w-full bg-neutral-950 grid place-content-center relative overflow-hidden'>
           {/* Grid pattern background */}
           <div className='absolute bottom-0 left-0 right-0 top-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:54px_54px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]'></div>
@@ -150,11 +159,8 @@ const ResearchStackingCards = forwardRef<HTMLElement, ResearchStackingCardsProps
         </section>
 
         <footer className='group bg-neutral-950 py-20'>
-          <h1 className='text-[12vw] translate-y-10 leading-[100%] uppercase font-bold text-center bg-gradient-to-r from-[#FF6B2C] via-orange-400 to-[#FF6B2C] bg-clip-text text-transparent transition-all ease-linear'>
-            ThesisFlow
-          </h1>
           <div className='bg-black h-32 relative z-10 grid place-content-center text-xl rounded-tr-full rounded-tl-full'>
-            <p className="text-white/60 font-medium">AI-Powered Research Platform</p>
+            {/* Footer content removed as requested */}
           </div>
         </footer>
       </main>
