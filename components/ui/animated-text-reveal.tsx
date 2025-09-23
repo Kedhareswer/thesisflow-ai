@@ -126,7 +126,7 @@ export function AnimatedTextReveal({
               {/* Parallax elements can be added here */}
             </div>
             <div className="hero-reveal__content-p">
-              {/* Content can be added here */}
+              {/* Research Stacking Cards will be rendered here */}
             </div>
           </div>
         </div>
