@@ -146,25 +146,7 @@ export function ResearchHeroWithCards({
 
           <div className="hero-reveal__content">
             <div className="hero-reveal__content-inner">
-              <div className="hero-reveal__parallax">
-                {/* Parallax AI Images - Alice in Wonderland style */}
-                <Image
-                  src="/assistant.png"
-                  alt="AI Assistant"
-                  width={640}
-                  height={640}
-                  className="hero-reveal__parallax-assistant"
-                  priority={false}
-                />
-                <Image
-                  src="/ai.png"
-                  alt="AI Technology"
-                  width={480}
-                  height={480}
-                  className="hero-reveal__parallax-ai"
-                  priority={false}
-                />
-              </div>
+              <div className="hero-reveal__parallax"></div>
               <div className="hero-reveal__content-p">
                 {/* This space is for the transition to stacking cards */}
               </div>
@@ -181,7 +163,7 @@ export function ResearchHeroWithCards({
 
           .hero-reveal__header {
             align-items: center;
-            background-color: #FF6B2C;
+            background-color: rgb(242, 238, 210);
             color:rgb(224, 218, 218);
             display: flex;
             font-family: 'IBM Plex Sans', sans-serif;
@@ -253,6 +235,7 @@ export function ResearchHeroWithCards({
           }
 
           .hero-reveal__parallax {
+            display: none; /* disabled here to avoid duplication; parallax images are rendered in ResearchStackingCards header */
             position: absolute;
             z-index: 0;
             top: 0;
@@ -263,21 +246,7 @@ export function ResearchHeroWithCards({
             pointer-events: none;
           }
 
-          .hero-reveal__parallax-assistant {
-            position: absolute;
-            left: -460px; /* shift to left of center */
-            top: -420px;  /* start higher so it "falls" into frame */
-            opacity: 0.98;
-            filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
-          }
-
-          .hero-reveal__parallax-ai {
-            position: absolute;
-            left: 520px; /* shift to right of center */
-            top: -300px;
-            opacity: 0.95;
-            filter: blur(1px) drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
-          }
+          /* parallax assistant/ai styles removed here */
 
           @media (max-width: 768px) {
             .hero-reveal__header {
