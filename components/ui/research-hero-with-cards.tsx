@@ -88,6 +88,27 @@ export function ResearchHeroWithCards({
         { y: '30%', ease: 'power3.inOut' },
         0
       )
+
+      // Parallax scroll animations for images (Alice in Wonderland style)
+      const parallaxScrollBySpeed = (selector: string, speed: number = 1) => {
+        const el = element.querySelector(selector) as HTMLElement
+        if (!el) return
+
+        gsap.to(el, {
+          yPercent: (speed - 1) * 100,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: element,
+            start: 'top top',
+            end: `+=${contentHeight * 3}`,
+            scrub: true
+          }
+        })
+      }
+
+      // Apply different scroll speeds to create parallax effect
+      parallaxScrollBySpeed('.hero-reveal__parallax-assistant', 8)
+      parallaxScrollBySpeed('.hero-reveal__parallax-ai', 12)
     }
 
     void setupAnimation()
@@ -126,27 +147,23 @@ export function ResearchHeroWithCards({
           <div className="hero-reveal__content">
             <div className="hero-reveal__content-inner">
               <div className="hero-reveal__parallax">
-                {/* Parallax AI Images */}
-                <div className="parallax-image parallax-image-1">
-                  <Image
-                    src="/assistant.png"
-                    alt="AI Assistant"
-                    width={120}
-                    height={120}
-                    className="floating-image"
-                    priority={false}
-                  />
-                </div>
-                <div className="parallax-image parallax-image-2">
-                  <Image
-                    src="/ai.png"
-                    alt="AI Technology"
-                    width={100}
-                    height={100}
-                    className="floating-image"
-                    priority={false}
-                  />
-                </div>
+                {/* Parallax AI Images - Alice in Wonderland style */}
+                <Image
+                  src="/assistant.png"
+                  alt="AI Assistant"
+                  width={150}
+                  height={150}
+                  className="hero-reveal__parallax-assistant"
+                  priority={false}
+                />
+                <Image
+                  src="/ai.png"
+                  alt="AI Technology"
+                  width={120}
+                  height={120}
+                  className="hero-reveal__parallax-ai"
+                  priority={false}
+                />
               </div>
               <div className="hero-reveal__content-p">
                 {/* This space is for the transition to stacking cards */}
@@ -238,44 +255,22 @@ export function ResearchHeroWithCards({
           .hero-reveal__parallax {
             position: absolute;
             z-index: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
           }
 
-          .parallax-image {
+          .hero-reveal__parallax-assistant {
             position: absolute;
-            opacity: 0.7;
+            left: -100px;
+            top: -400px;
+            opacity: 0.8;
             filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
           }
 
-          .parallax-image-1 {
-            top: 20%;
-            left: -10%;
-            animation: float1 6s ease-in-out infinite;
-          }
-
-          .parallax-image-2 {
-            top: 60%;
-            right: -5%;
-            animation: float2 8s ease-in-out infinite;
-          }
-
-          .floating-image {
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 8px;
-          }
-
-          @keyframes float1 {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(2deg); }
-          }
-
-          @keyframes float2 {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-15px) rotate(-2deg); }
+          .hero-reveal__parallax-ai {
+            position: absolute;
+            left: 400px;
+            top: -300px;
+            opacity: 0.7;
+            filter: blur(1px) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
           }
 
           @media (max-width: 768px) {
@@ -284,20 +279,16 @@ export function ResearchHeroWithCards({
               line-height: clamp(2.5rem, 10vw, 10rem);
             }
             
-            .parallax-image-1 {
-              top: 15%;
-              left: -15%;
-              transform: scale(0.8);
-            }
-            
-            .parallax-image-2 {
-              top: 70%;
-              right: -10%;
+            .hero-reveal__parallax-assistant {
+              left: -50px;
+              top: -200px;
               transform: scale(0.7);
             }
             
-            .floating-image {
-              padding: 4px;
+            .hero-reveal__parallax-ai {
+              left: 200px;
+              top: -150px;
+              transform: scale(0.6);
             }
           }
         `}</style>
