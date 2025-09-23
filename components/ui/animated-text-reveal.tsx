@@ -1,10 +1,9 @@
 "use client"
 
-import React, { useLayoutEffect, useRef } from "react"
+import React, { useEffect, useRef } from "react"
 
 // Split clip-path GSAP ScrollTrigger animation that pins and scrubs with scroll
-// Renders two identical text layers (top/bottom) and animates their clip-paths
-// and opposite Y translations to create a split reveal effect on scroll.
+// Based on hero-reveal pattern with proper HTML structure and clip-path animations
 // Usage: <AnimatedTextReveal text="RESEARCH" />
 
 export function AnimatedTextReveal({
@@ -14,134 +13,217 @@ export function AnimatedTextReveal({
   text?: string
   className?: string
 }) {
-  const containerRef = useRef<HTMLElement | null>(null)
-  const topRef = useRef<HTMLDivElement | null>(null)
-  const bottomRef = useRef<HTMLDivElement | null>(null)
+  const heroRevealRef = useRef<HTMLElement | null>(null)
 
-  useLayoutEffect(() => {
-    let ctx: any | null = null
-    let killed = false
-
-    const setup = async () => {
+  useEffect(() => {
+    const setupAnimation = async () => {
       // Dynamically import GSAP and ScrollTrigger to avoid SSR issues
-      const gsapModule = await import("gsap")
-      const ScrollTriggerModule = await import("gsap/dist/ScrollTrigger")
-      const gsap: any = (gsapModule as any).gsap || (gsapModule as any).default || gsapModule
-      const ScrollTrigger: any = (ScrollTriggerModule as any).ScrollTrigger || (ScrollTriggerModule as any).default
-      gsap.registerPlugin(ScrollTrigger)
+      const { gsap } = await import("gsap")
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger")
+      
+      if (typeof window !== "undefined") {
+        gsap.registerPlugin(ScrollTrigger)
+      }
 
-      if (!containerRef.current || !topRef.current || !bottomRef.current || killed) return
+      if (!heroRevealRef.current) return
 
-      const container = containerRef.current
-      const top = topRef.current
-      const bottom = bottomRef.current
+      const element = heroRevealRef.current
+      const heroBox = element.querySelector('.hero-reveal__header') as HTMLElement
+      const heroHeadings = element.querySelectorAll('.hero-reveal_split_item')
+      const contentEl = element.querySelector('.hero-reveal__content') as HTMLElement
 
-      ctx = gsap.context(() => {
-        // Initial state: fully visible (no split)
-        gsap.set([top, bottom], {
-          clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
-          y: 0,
-          willChange: "clip-path, transform",
-        })
+      if (!heroBox || !contentEl || heroHeadings.length < 2) return
 
-        // Timeline with ScrollTrigger pin + scrub
-        const tl = gsap.timeline({
-          defaults: { ease: "power4.inOut" },
+      const heroBoxHeight = heroBox.offsetHeight
+      const contentHeight = contentEl.offsetHeight
+
+      // Content scroll up animation
+      gsap
+        .timeline({
           scrollTrigger: {
-            trigger: container,
-            start: "top top",
-            end: "+=120%",
-            scrub: true,
-            pin: true,
-            anticipatePin: 1,
-            fastScrollEnd: true,
-          },
+            trigger: element,
+            start: 'top top',
+            end: `+=${heroBoxHeight > contentHeight ? heroBoxHeight : contentHeight}`,
+            scrub: true
+          }
         })
+        .fromTo(contentEl, { y: '50%' }, { y: '0%', ease: 'none' }, 0.2)
 
-        // Split into top and bottom halves and push apart
-        tl.to(
-          top,
-          {
-            clipPath: "polygon(0% 0%, 100% 0%, 100% 50%, 0% 50%)",
-            y: "-10vw",
-          },
-          0
-        ).to(
-          bottom,
-          {
-            clipPath: "polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%)",
-            y: "10vw",
-          },
-          0
-        )
-      }, container)
+      // Main timeline with pin and scrub
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: element,
+          start: 'top top',
+          end: `+=${heroBoxHeight > contentHeight ? heroBoxHeight : contentHeight}`,
+          scrub: true,
+          pin: true
+        }
+      })
+
+      // Main clipPath animation
+      tl.fromTo(
+        heroBox,
+        {
+          clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%, 0 50%, 100% 50%, 100% 100%, 0 100%)'
+        },
+        {
+          clipPath: 'polygon(0 0, 100% 0, 100% 0%, 0 0%, 0 100%, 100% 100%, 100% 100%, 0 100%)',
+          duration: 0.4,
+          ease: 'power4.inOut'
+        }
+      )
+
+      // Split animations for child items
+      tl.fromTo(
+        heroHeadings[0],
+        { y: '0%' },
+        { y: '-30%', ease: 'power3.inOut' },
+        0
+      )
+
+      tl.fromTo(
+        heroHeadings[1],
+        { y: '0%' },
+        { y: '30%', ease: 'power3.inOut' },
+        0
+      )
     }
 
-    void setup()
+    void setupAnimation()
 
+    // Cleanup function
     return () => {
-      killed = true
-      try {
-        ctx?.revert()
-      } catch {}
+      const { ScrollTrigger } = require("gsap/ScrollTrigger")
+      ScrollTrigger.getAll().forEach((trigger: any) => trigger.kill())
     }
   }, [])
 
   return (
     <section
-      ref={containerRef as any}
-      className={[
-        "relative h-[100vh] w-full overflow-hidden bg-neutral-950 text-white flex items-center justify-center",
-        className,
-      ].join(" ")}
-      aria-label={`${text} animated split headline`}
+      ref={heroRevealRef as any}
+      className={`hero-reveal ${className}`}
+      style={{
+        backgroundColor: '#000000',
+        position: 'relative',
+        minHeight: '100vh'
+      }}
     >
-      {/* Single semantic heading for accessibility */}
-      <h2 className="sr-only">{text}</h2>
+      <article>
+        <header className="hero-reveal__header">
+          <div className="hero-reveal_split">
+            <div className="hero-reveal_split_item">
+              <p className="c-wide-text -split">{text}</p>
+            </div>
+            <div className="hero-reveal_split_item" aria-hidden="true">
+              <p className="c-wide-text -split" aria-hidden="true">{text}</p>
+            </div>
+          </div>
+        </header>
 
-      {/* Text layers */}
-      <div className="relative w-full max-w-[1400px] px-4">
-        {/* Shared text styles */}
-        <div
-          ref={topRef}
-          aria-hidden
-          className="pointer-events-none select-none absolute inset-0 flex items-center justify-center"
-          style={{
-            lineHeight: 1,
-            fontWeight: 800,
-            letterSpacing: "-0.04em",
-            fontSize: "clamp(64px, 18vw, 260px)",
-            textTransform: "uppercase",
-          }}
-        >
-          {text}
+        <div className="hero-reveal__content">
+          <div className="hero-reveal__content-inner">
+            <div className="hero-reveal__parallax">
+              {/* Parallax elements can be added here */}
+            </div>
+            <div className="hero-reveal__content-p">
+              {/* Content can be added here */}
+            </div>
+          </div>
         </div>
-        <div
-          ref={bottomRef}
-          aria-hidden
-          className="pointer-events-none select-none absolute inset-0 flex items-center justify-center"
-          style={{
-            lineHeight: 1,
-            fontWeight: 800,
-            letterSpacing: "-0.04em",
-            fontSize: "clamp(64px, 18vw, 260px)",
-            textTransform: "uppercase",
-          }}
-        >
-          {text}
-        </div>
+      </article>
 
-        {/* A subtle background gradient glow for depth */}
-        <div
-          aria-hidden
-          className="absolute inset-0 -z-10"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 50% 50%, rgba(255,107,44,0.15), transparent)",
-            filter: "blur(20px)",
-          }}
-        />
-      </div>
+      <style jsx>{`
+        .hero-reveal {
+          background-color: #000000;
+          position: relative;
+          min-height: 100vh !important;
+        }
+
+        .hero-reveal__header {
+          align-items: center;
+          background-color: #ffffff;
+          color: #000000;
+          display: flex;
+          font-family: 'IBM Plex Sans', sans-serif;
+          font-size: clamp(3.125rem, 12.61vw + -0.138rem, 15.625rem);
+          line-height: clamp(4.688rem, 15.763vw + 0.609rem, 20.313rem);
+          font-weight: 900;
+          justify-content: center;
+          left: 0;
+          min-height: 100vh;
+          position: relative;
+          top: 0;
+          will-change: transform;
+          z-index: 1;
+        }
+
+        .hero-reveal_split {
+          align-items: center;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          position: relative;
+          width: 100%;
+        }
+
+        .hero-reveal_split_item {
+          align-items: center;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          min-height: 100vh;
+          width: 100%;
+        }
+
+        .hero-reveal_split_item:nth-child(1) {
+          -webkit-clip-path: inset(0 0 calc(50% - 1px) 0);
+          clip-path: inset(0 0 calc(50% - 1px) 0);
+        }
+
+        .hero-reveal_split_item:nth-child(2) {
+          -webkit-clip-path: inset(calc(50% - 1px) 0 0 0);
+          clip-path: inset(calc(50% - 1px) 0 0 0);
+          left: 0;
+          position: absolute;
+          top: 0;
+        }
+
+        .c-wide-text {
+          margin: 0;
+          font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .hero-reveal__content {
+          color: #ffffff;
+          display: flex;
+          justify-content: center;
+          padding: 0;
+          position: relative;
+          margin-top: -60vh;
+        }
+
+        .hero-reveal__content-inner {
+          max-width: 31.25rem;
+          position: relative;
+          padding: 0 1rem;
+        }
+
+        .hero-reveal__content-p {
+          padding-bottom: 8rem;
+        }
+
+        .hero-reveal__parallax {
+          position: absolute;
+          z-index: 0;
+        }
+
+        @media (max-width: 768px) {
+          .hero-reveal__header {
+            font-size: clamp(2rem, 8vw, 8rem);
+            line-height: clamp(2.5rem, 10vw, 10rem);
+          }
+        }
+      `}</style>
     </section>
   )
 }
