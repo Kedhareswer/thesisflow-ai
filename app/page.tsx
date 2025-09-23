@@ -14,6 +14,7 @@ import { AccordionComponent } from "@/components/ui/faq-accordion"
 import { SoftwareApplication, WebPage } from "@/components/schema/microdata-schema"
 // Removed PixelTrail and screen-size hooks in favor of static hero background image
 import { Footer } from "@/components/ui/footer"
+import { AnimatedTextReveal } from "@/components/ui/animated-text-reveal"
 
 // metadata moved to app/seo/root-metadata.ts
 
@@ -227,6 +228,9 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+
+      {/* Animated Text Reveal Section */}
+      <AnimatedTextReveal text="RESEARCH" />
 
       {/* Light Showcase Section - 'Everything You Need for Research' */}
       <section className="relative isolate bg-[#F7F6F3] py-28 md:py-32 lg:py-36">
