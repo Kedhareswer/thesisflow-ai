@@ -54,6 +54,8 @@ export const ResearchCard = ({
         style={{
           scale,
           top: `calc(-5vh + ${i * 25}px)`,
+          background: `linear-gradient(135deg, ${color}20, ${color}10)`,
+          borderColor: `${color}40`,
         }}
         className={`glass flex flex-col relative -top-[25%] h-[450px] w-[70%] p-10 origin-top`}
       >
@@ -108,12 +110,11 @@ const ResearchStackingCards = forwardRef<HTMLElement, ResearchStackingCardsProps
       <main className='bg-black' ref={container}>
         <style jsx global>{`
           .glass {
-            background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid;
             border-radius: 16px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
           }
         `}</style>
         <section className='text-white h-[70vh] w-full bg-neutral-950 grid place-content-center relative overflow-hidden'>
@@ -157,12 +158,6 @@ const ResearchStackingCards = forwardRef<HTMLElement, ResearchStackingCardsProps
             );
           })}
         </section>
-
-        <footer className='group bg-neutral-950 py-20'>
-          <div className='bg-black h-32 relative z-10 grid place-content-center text-xl rounded-tr-full rounded-tl-full'>
-            {/* Footer content removed as requested */}
-          </div>
-        </footer>
       </main>
     </ReactLenis>
   );

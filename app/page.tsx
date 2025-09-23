@@ -147,7 +147,7 @@ export default function HomePage() {
         ]}
       >
       {/* Hero Section - exact match to reference image */}
-      <main className="relative min-h-[150vh] overflow-hidden">
+      <main className="relative min-h-[102vh] overflow-hidden">
         {/* Background image */}
         <div className="absolute inset-0">
           <Image

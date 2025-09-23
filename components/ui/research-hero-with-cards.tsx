@@ -143,8 +143,8 @@ export function ResearchHeroWithCards({
 
           .hero-reveal__header {
             align-items: center;
-            background-color: #ffffff;
-            color: #000000;
+            background-color: #FF6B2C;
+            color: #ffffff;
             display: flex;
             font-family: 'IBM Plex Sans', sans-serif;
             font-size: clamp(3.125rem, 12.61vw + -0.138rem, 15.625rem);
