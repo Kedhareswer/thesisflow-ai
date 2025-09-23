@@ -143,7 +143,7 @@ export function ResearchHeroWithCards({
 
           .hero-reveal__header {
             align-items: center;
-            background-color: #4E2806;
+            background-color: #6C3C0B;
             color:rgb(224, 218, 218);
             display: flex;
             font-family: 'IBM Plex Sans', sans-serif;

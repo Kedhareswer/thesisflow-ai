@@ -5,7 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 // Removed unused Card imports
-import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Clock, Target, MessageSquare, Share2, BarChart3 } from "lucide-react"
+import { Search, FileText, Calendar, Users, Bot, Lightbulb, ArrowRight, Zap, Clock, Target, MessageSquare, Share2, BarChart3, ExternalLink } from "lucide-react"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Pricing } from "@/components/ui/pricing-cards"
 import { FeaturesSectionWithHoverEffects, type FeatureItem } from "@/components/ui/feature-section-with-hover-effects"
@@ -213,6 +213,18 @@ export default function HomePage() {
 
               {/* Right content block */}
               <div className="hidden lg:block lg:col-span-4 lg:col-start-9">
+                <div className="text-right mb-4">
+                  <Link 
+                    href="/changelog"
+                    className="group inline-flex items-center gap-2 text-white/80 hover:text-white transition-all duration-300 text-sm"
+                  >
+                    <span className="relative">
+                      changelog
+                      <span className="absolute bottom-0 left-0 w-0 h-px bg-white transition-all duration-300 group-hover:w-full"></span>
+                    </span>
+                    <ExternalLink className="h-3 w-3 opacity-0 -translate-x-1 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
+                  </Link>
+                </div>
                 <p 
                   style={{
                     color: '#fff',
