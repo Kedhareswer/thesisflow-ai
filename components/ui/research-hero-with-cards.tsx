@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from "react"
+import Image from "next/image"
 import { ResearchStackingDemo } from "@/components/ui/research-stacking-demo"
 
 // Combined component that shows the RESEARCH text reveal followed by stacking cards
@@ -125,7 +126,27 @@ export function ResearchHeroWithCards({
           <div className="hero-reveal__content">
             <div className="hero-reveal__content-inner">
               <div className="hero-reveal__parallax">
-                {/* Parallax elements can be added here */}
+                {/* Parallax AI Images */}
+                <div className="parallax-image parallax-image-1">
+                  <Image
+                    src="/assistant.png"
+                    alt="AI Assistant"
+                    width={120}
+                    height={120}
+                    className="floating-image"
+                    priority={false}
+                  />
+                </div>
+                <div className="parallax-image parallax-image-2">
+                  <Image
+                    src="/ai.png"
+                    alt="AI Technology"
+                    width={100}
+                    height={100}
+                    className="floating-image"
+                    priority={false}
+                  />
+                </div>
               </div>
               <div className="hero-reveal__content-p">
                 {/* This space is for the transition to stacking cards */}
@@ -143,7 +164,7 @@ export function ResearchHeroWithCards({
 
           .hero-reveal__header {
             align-items: center;
-            background-color: #6C3C0B;
+            background-color: #FF6B2C;
             color:rgb(224, 218, 218);
             display: flex;
             font-family: 'IBM Plex Sans', sans-serif;
@@ -217,12 +238,66 @@ export function ResearchHeroWithCards({
           .hero-reveal__parallax {
             position: absolute;
             z-index: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+          }
+
+          .parallax-image {
+            position: absolute;
+            opacity: 0.7;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+          }
+
+          .parallax-image-1 {
+            top: 20%;
+            left: -10%;
+            animation: float1 6s ease-in-out infinite;
+          }
+
+          .parallax-image-2 {
+            top: 60%;
+            right: -5%;
+            animation: float2 8s ease-in-out infinite;
+          }
+
+          .floating-image {
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 8px;
+          }
+
+          @keyframes float1 {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(2deg); }
+          }
+
+          @keyframes float2 {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(-2deg); }
           }
 
           @media (max-width: 768px) {
             .hero-reveal__header {
               font-size: clamp(2rem, 8vw, 8rem);
               line-height: clamp(2.5rem, 10vw, 10rem);
+            }
+            
+            .parallax-image-1 {
+              top: 15%;
+              left: -15%;
+              transform: scale(0.8);
+            }
+            
+            .parallax-image-2 {
+              top: 70%;
+              right: -10%;
+              transform: scale(0.7);
+            }
+            
+            .floating-image {
+              padding: 4px;
             }
           }
         `}</style>
