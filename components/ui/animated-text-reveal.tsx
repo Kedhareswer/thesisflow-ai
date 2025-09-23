@@ -135,14 +135,18 @@ export function AnimatedTextReveal({
       <style jsx>{`
         .hero-reveal {
           background-color: #000000;
+          background-image: url('/background.png');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
           position: relative;
           min-height: 100vh !important;
         }
 
         .hero-reveal__header {
           align-items: center;
-          background-color: #ffffff;
-          color: #000000;
+          background-color: transparent;
+          color: #ffffff;
           display: flex;
           font-family: 'IBM Plex Sans', sans-serif;
           font-size: clamp(3.125rem, 12.61vw + -0.138rem, 15.625rem);

@@ -105,14 +105,6 @@ const ResearchStackingCards = forwardRef<HTMLElement, ResearchStackingCardsProps
     offset: ['start start', 'end end'],
   });
 
-  // Parallax translations for header images (progress scoped to header only)
-  const headerRef = useRef<HTMLElement | null>(null);
-  const { scrollYProgress: headerProgress } = useScroll({
-    target: headerRef,
-    offset: ['start start', 'end start'],
-  });
-  const yAssistant = useTransform(headerProgress, [0, 1], [0, -220]);
-  const yAI = useTransform(headerProgress, [0, 1], [0, -300]);
 
   return (
     <ReactLenis root>
@@ -126,26 +118,12 @@ const ResearchStackingCards = forwardRef<HTMLElement, ResearchStackingCardsProps
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
           }
         `}</style>
-        <section ref={headerRef as any} className='text-white h-[70vh] w-full bg-neutral-950 grid place-content-center relative overflow-hidden'>
+        <section className='text-white h-[70vh] w-full bg-neutral-950 grid place-content-center relative overflow-hidden'>
           {/* Grid pattern background */}
           <div className='absolute bottom-0 left-0 right-0 top-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:54px_54px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]'></div>
           
           {/* Orange gradient overlay */}
           <div className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,107,44,0.12),transparent)]" />
-
-          {/* Parallax images (within the black header area) */}
-          <motion.img
-            src="/assistant.png"
-            alt="AI Assistant"
-            className="pointer-events-none select-none hidden md:block"
-            style={{ position: 'absolute', width: 720, height: 'auto', top: '8%', left: '5%', zIndex: 5, y: yAssistant }}
-          />
-          <motion.img
-            src="/ai.png"
-            alt="AI diagram"
-            className="pointer-events-none select-none hidden md:block"
-            style={{ position: 'absolute', width: 600, height: 'auto', top: '18%', right: '5%', zIndex: 5, filter: 'blur(1px)', y: yAI }}
-          />
 
           <div className="relative z-10 text-center max-w-4xl mx-auto px-6">
             <h1 className='2xl:text-7xl text-5xl px-8 font-bold text-center tracking-tight leading-[120%] mb-6'>
