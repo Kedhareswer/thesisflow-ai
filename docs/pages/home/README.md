@@ -3,9 +3,10 @@
 - Source: `app/page.tsx`
 
 ## What is here
-- Marketing-focused landing with hero, benefits, target audiences, pricing and FAQ.
+- Marketing-focused landing with hero, research stacking cards, stats carousel, benefits, target audiences, pricing and FAQ.
 - Buttons route to protected pages like `/explorer` and `/planner`.
-- Uses `Footer`, `Pricing`, `FeaturesSectionWithHoverEffects`, `AccordionComponent` components.
+- Uses `Footer`, `Pricing`, `FeaturesSectionWithHoverEffects`, `AccordionComponent`, `ResearchHeroWithCards`, `StatsCarouselCount` components.
+- Features actual ThesisFlow-AI product screenshots in stacking card animations.
 
 ## Why it is used
 - Entry point to introduce ThesisFlow-AI and funnel authenticated users into core tools.
@@ -14,6 +15,10 @@
 - Client component with Next.js App Router.
 - Uses `useSupabaseAuth()` to check session and `useRouter()` to push protected links via `handleProtectedAction()`.
 - Image backgrounds via `next/image` and subtle Framer Motion animations.
+- **Research Hero Section**: GSAP-powered text reveal animation with "RESEARCH" text split
+- **Stacking Cards**: Scroll-triggered animations showcasing 5 key features with actual product screenshots
+- **Stats Carousel**: Animated counter component displaying ThesisFlow-AI metrics (papers processed, workflow acceleration, uptime)
+- **Benefits Section**: Customized for research workflows with multi-source discovery, extraction, planning, and collaboration
 
 ## Authentication and Authorization
 - The page itself is public.

@@ -1,0 +1,15 @@
+{
+  "intent": "navigation",
+  "responses": [
+    {
+      "id": "navigation_help",
+      "text": "**Getting Around ThesisFlow-AI** 🧭\n\nHere's how to navigate our platform:\n\n🔍 **Research Explorer** (`/explorer`) - Search and discover papers\n📋 **Project Planner** (`/planner`) - Plan your research timeline\n✍️ **LaTeX Writer** (`/writer`) - Collaborative document editing\n📄 **Data Extraction** (`/extract`) - Analyze PDFs and documents\n🤝 **Collaboration** (`/collaborate`) - Team workspace\n📊 **Plan & Analytics** (`/plan`) - Usage tracking and insights\n\n**Quick Tips:**\n• Use the sidebar navigation to switch between tools\n• Check your token usage in the top navigation bar\n• Access settings via your profile menu",
+      "quickReplies": [
+        { "text": "Try Research Explorer", "action": "external_link", "url": "/explorer" },
+        { "text": "See Project Planner", "action": "external_link", "url": "/planner" },
+        { "text": "Token Usage Guide", "intent": "tokens" },
+        { "text": "Getting Started Tips", "intent": "onboarding" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "intent": "changelog",
+  "responses": [
+    {
+      "id": "latest_updates",
+      "text": "**Latest Updates** 🚀\n\nHere's what's new in ThesisFlow-AI:\n\n• **Enhanced Research Assistant** - Improved conversation context and faster responses\n• **LaTeX Writer** - Real-time collaborative editing with KaTeX math rendering\n• **Token System Optimization** - Monthly-only limits for better planning\n• **UI/UX Improvements** - Faster loading and better accessibility\n• **Security Enhancements** - Improved authentication and data protection\n\nWe ship updates regularly to improve your research workflow.",
+      "quickReplies": [
+        { "text": "View Full Changelog", "action": "external_link", "url": "/changelog" },
+        { "text": "Try New Features", "action": "external_link", "url": "/explorer" },
+        { "text": "Report Issues", "intent": "contact" }
+      ]
+    }
+  ]
+}

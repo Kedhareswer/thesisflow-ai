@@ -1,0 +1,14 @@
+{
+  "intent": "features_explorer",
+  "responses": [
+    {
+      "id": "explorer_overview",
+      "text": "**Research Explorer** 🔍\n\nYour gateway to academic discovery:\n\n**Multi-Source Search:**\n• OpenAlex, arXiv, CrossRef integration\n• Smart deduplication and ranking\n• Citation-based relevance scoring\n\n**Key Features:**\n• Literature search with advanced filters\n• Paper bookmarking and collections\n• AI-powered research assistance\n• Topic exploration and idea generation\n• Deep research with live sources\n\n**Best For:**\n• Finding seminal papers in your field\n• Literature reviews and surveys\n• Discovering research gaps\n• Building comprehensive bibliographies",
+      "quickReplies": [
+        { "text": "Try Explorer Now", "action": "external_link", "url": "/explorer" },
+        { "text": "Token Usage", "intent": "tokens" },
+        { "text": "Other Features", "intent": "about" }
+      ]
+    }
+  ]
+}

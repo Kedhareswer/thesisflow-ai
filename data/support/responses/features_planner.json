@@ -1,0 +1,14 @@
+{
+  "intent": "features_planner",
+  "responses": [
+    {
+      "id": "planner_overview",
+      "text": "**Project Planner** 📋\n\nAI-powered research project management:\n\n**Smart Planning:**\n• AI-generated task breakdowns\n• Automatic timeline estimation\n• Dependency mapping\n• Milestone tracking\n\n**Visual Tools:**\n• Interactive Gantt charts\n• Calendar integration\n• Progress visualization\n• Conflict detection\n\n**Collaboration:**\n• Team task assignment\n• Shared project timelines\n• Real-time updates\n• Progress notifications\n\n**Perfect For:**\n• Thesis and dissertation planning\n• Research project management\n• Grant proposal timelines\n• Team coordination",
+      "quickReplies": [
+        { "text": "Try Planner Now", "action": "external_link", "url": "/planner" },
+        { "text": "Token Costs", "intent": "tokens" },
+        { "text": "Collaboration Features", "intent": "features_collaborate" }
+      ]
+    }
+  ]
+}

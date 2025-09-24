@@ -1,0 +1,28 @@
+{
+  "intent": "greeting",
+  "responses": [
+    {
+      "id": "welcome",
+      "text": "Hi there! 👋 I'm Nova, your support assistant. I'm here to help you with questions about our research platform.",
+      "quickReplies": [
+        { "text": "Pricing & Plans", "intent": "pricing" },
+        { "text": "Features Overview", "intent": "about" },
+        { "text": "What's New?", "intent": "changelog" },
+        { "text": "Report an Issue", "intent": "ticket" },
+        { "text": "Give Feedback", "intent": "feedback" },
+        { "text": "Contact Support", "intent": "contact" }
+      ]
+    },
+    {
+      "id": "return_user",
+      "text": "Welcome back! I'm Nova, What can I assist you with today?",
+      "quickReplies": [
+        { "text": "Latest Updates", "intent": "changelog" },
+        { "text": "Feature Help", "intent": "navigation" },
+        { "text": "Report an Issue", "intent": "ticket" },
+        { "text": "Give Feedback", "intent": "feedback" },
+        { "text": "Contact Support", "intent": "contact" }
+      ]
+    }
+  ]
+}

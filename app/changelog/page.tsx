@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Changelog1, type ChangelogEntry } from "@/components/ui/changelog-1";
 import changelogData from "@/data/changelog.json";
 import { useState, useMemo } from "react";
+import InfoWidget from "@/components/changelog/InfoWidget";
 
 export default function ChangelogPage() {
   const allEntries = changelogData as ChangelogEntry[];
@@ -33,13 +34,13 @@ export default function ChangelogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
       <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>
       {/* Header */}
       <header className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 font-mono">
+          <Link href="/" className="flex items-center gap-2">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FF6B2C]/10 text-[#FF6B2C]">
               <Megaphone className="h-4 w-4" />
             </span>
@@ -47,7 +48,7 @@ export default function ChangelogPage() {
           </Link>
 
           {/* Nav */}
-          <nav className="hidden md:flex items-center space-x-8 font-mono text-sm text-muted-foreground">
+          <nav className="hidden md:flex items-center space-x-8 text-sm text-muted-foreground">
             <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
             <Link href="/explorer" className="hover:text-foreground transition-colors">Explorer</Link>
             <Link href="/planner" className="hover:text-foreground transition-colors">Planner</Link>
@@ -60,7 +61,7 @@ export default function ChangelogPage() {
               href="/chat"
               className={cn(
                 buttonVariants({ size: "sm" }),
-                "rounded-none font-mono bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
+                "rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
               )}
             >
               Open App <ArrowRight className="ml-2 h-4 w-4" />
@@ -77,7 +78,7 @@ export default function ChangelogPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="font-mono text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl text-white"
+            className="text-4xl font-bold leading-tight tracking-tight md:text-6xl lg:text-7xl text-white"
           >
             ThesisFlow Changelog
           </motion.h1>
@@ -112,7 +113,7 @@ export default function ChangelogPage() {
               href="#updates"
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "rounded-none font-mono bg-white hover:bg-white/90 text-black"
+                "rounded-none bg-white hover:bg-white/90 text-black"
               )}
             >
               See latest updates <ArrowRight className="ml-2 h-4 w-4" />
@@ -122,6 +123,11 @@ export default function ChangelogPage() {
         </div>
       </section>
 
+
+      {/* Info Widget */}
+      <div className="container mx-auto px-4">
+        <InfoWidget />
+      </div>
 
       {/* Changelog Section */}
       <div id="updates" className="container mx-auto px-4 mt-12">
@@ -138,7 +144,7 @@ export default function ChangelogPage() {
               onClick={() => setVisibleCount((c) => Math.min(c + PAGE_SIZE, allEntries.length))}
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "rounded-none font-mono bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
+                "rounded-none bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
               )}
             >
               Load more
@@ -152,7 +158,7 @@ export default function ChangelogPage() {
 
 function FeatureLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-[#FF6B2C]/10 px-3 py-1 font-mono text-xs text-[#FF6B2C]">
+    <div className="inline-flex items-center gap-2 rounded-full bg-[#FF6B2C]/10 px-3 py-1 text-xs text-[#FF6B2C]">
       {icon}
       <span>{label}</span>
     </div>
@@ -161,7 +167,7 @@ function FeatureLabel({ icon, label }: { icon: React.ReactNode; label: string })
 
 function FeatureLabelWhite({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 font-mono text-xs text-white backdrop-blur-sm">
+    <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs text-white backdrop-blur-sm">
       {icon}
       <span>{label}</span>
     </div>
@@ -177,7 +183,7 @@ function FeatureCard({ title, description }: { title: string; description: strin
       transition={{ duration: 0.4 }}
       className="rounded-lg border bg-background p-8"
     >
-      <h3 className="font-mono text-lg font-semibold leading-tight">{title}</h3>
+      <h3 className="text-lg font-semibold leading-tight">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
     </motion.div>
   );

@@ -1,0 +1,105 @@
+{
+  "intents": [
+    {
+      "name": "greeting",
+      "keywords": ["hello", "hi", "hey", "good morning", "good afternoon", "good evening", "start", "begin"],
+      "confidence": 0.8,
+      "priority": 1
+    },
+    {
+      "name": "pricing",
+      "keywords": ["price", "pricing", "cost", "plan", "plans", "subscription", "free", "pro", "premium", "billing", "payment"],
+      "confidence": 0.9,
+      "priority": 2
+    },
+    {
+      "name": "tokens",
+      "keywords": ["token", "tokens", "limit", "limits", "usage", "monthly", "quota", "allowance", "remaining"],
+      "confidence": 0.9,
+      "priority": 2
+    },
+    {
+      "name": "features_explorer",
+      "keywords": ["explorer", "research", "search", "papers", "literature", "find papers", "discover"],
+      "confidence": 0.8,
+      "priority": 3
+    },
+    {
+      "name": "features_planner",
+      "keywords": ["planner", "planning", "project", "timeline", "tasks", "gantt", "schedule"],
+      "confidence": 0.8,
+      "priority": 3
+    },
+    {
+      "name": "features_writer",
+      "keywords": ["writer", "writing", "latex", "document", "editor", "compose"],
+      "confidence": 0.8,
+      "priority": 3
+    },
+    {
+      "name": "features_extract",
+      "keywords": ["extract", "extraction", "pdf", "summarize", "summary", "data extraction"],
+      "confidence": 0.8,
+      "priority": 3
+    },
+    {
+      "name": "models",
+      "keywords": ["model", "models", "ai model", "gpt", "claude", "gemini", "openai", "anthropic"],
+      "confidence": 0.7,
+      "priority": 4
+    },
+    {
+      "name": "account",
+      "keywords": ["account", "login", "signup", "register", "profile", "settings"],
+      "confidence": 0.8,
+      "priority": 3
+    },
+    {
+      "name": "changelog",
+      "keywords": ["changelog", "updates", "new", "what's new", "latest", "version", "release"],
+      "confidence": 0.9,
+      "priority": 2
+    },
+    {
+      "name": "navigation",
+      "keywords": ["how to", "where", "navigate", "find", "go to", "access", "open"],
+      "confidence": 0.6,
+      "priority": 5
+    },
+    {
+      "name": "contact",
+      "keywords": ["contact", "support", "help", "email", "reach out", "get in touch", "assistance", "contact support"],
+      "confidence": 0.8,
+      "priority": 3
+    },
+    {
+      "name": "ticket",
+      "keywords": ["ticket", "raise ticket", "rise ticket", "create ticket", "support ticket", "bug", "issue", "problem", "report issue", "raise a ticket", "submit ticket", "report bug", "report problem"],
+      "confidence": 0.95,
+      "priority": 2
+    },
+    {
+      "name": "feedback",
+      "keywords": ["feedback", "suggestion", "improve", "improvement", "feature request", "enhancement", "idea", "recommend", "opinion", "review", "rate", "rating"],
+      "confidence": 0.9,
+      "priority": 2
+    },
+    {
+      "name": "about",
+      "keywords": ["about", "what is", "thesisflow", "thesis flow", "platform", "company"],
+      "confidence": 0.7,
+      "priority": 4
+    }
+  ],
+  "synonyms": {
+    "thesisflow": ["thesis flow", "thesisflow-ai", "thesis flow ai"],
+    "pricing": ["cost", "price", "billing", "payment"],
+    "tokens": ["credits", "usage", "quota", "allowance"],
+    "explorer": ["research", "search", "discovery"],
+    "planner": ["planning", "project management", "timeline"],
+    "writer": ["writing", "editor", "compose"],
+    "extract": ["extraction", "summarize", "analyze"],
+    "ticket": ["raise ticket", "support ticket", "bug", "issue", "problem", "report", "report issue"],
+    "feedback": ["suggestion", "improve", "improvement", "feature request", "enhancement", "idea", "recommend", "opinion"]
+  }
+}

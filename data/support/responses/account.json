@@ -1,0 +1,15 @@
+{
+  "intent": "account",
+  "responses": [
+    {
+      "id": "account_help",
+      "text": "**Account & Authentication** 👤\n\n**Getting Started:**\n• Sign up with email or Google/GitHub\n• Verify your email address\n• Complete your profile setup\n\n**Account Management:**\n• Update profile: Click your avatar → Settings\n• Change password: Profile Settings → Security\n• View usage: Check the token meter in navigation\n• Billing: Profile Settings → Subscription\n\n**Troubleshooting:**\n• Forgot password? Use the reset link on login page\n• Email not verified? Check spam folder\n• Login issues? Try clearing browser cache",
+      "quickReplies": [
+        { "text": "Login Issues", "intent": "login_help" },
+        { "text": "Check My Usage", "action": "external_link", "url": "/plan" },
+        { "text": "Billing Questions", "intent": "pricing" },
+        { "text": "Contact Support", "intent": "contact" }
+      ]
+    }
+  ]
+}

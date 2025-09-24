@@ -1,0 +1,16 @@
+{
+  "intent": "contact",
+  "responses": [
+    {
+      "id": "contact_options",
+      "text": "**Get in Touch** 📧\n\nNeed more help? Here are your options:\n\n• **Email Support**: support@thesisflow-ai.com\n• **Response Time**: Usually within 24 hours\n• **Best For**: Technical issues, billing questions, feature requests\n\n**Before contacting:**\n• Check our feature-specific help guides\n• Include your account email and describe the issue clearly",
+      "quickReplies": [
+        { "text": "Raise a Ticket", "intent": "ticket" },
+        { "text": "Email Support", "action": "external_link", "url": "mailto:support@thesisflow-ai.com?subject=ThesisFlow-AI%20Support%20Request" },
+        { "text": "Copy Support Email", "action": "custom", "data": { "type": "copy", "text": "support@thesisflow-ai.com" } },
+        { "text": "Feature Guides", "intent": "navigation" },
+        { "text": "Account Issues", "intent": "account" }
+      ]
+    }
+  ]
+}

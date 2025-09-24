@@ -180,9 +180,75 @@ sequenceDiagram
     WS-->>UI: Broadcast presence/events
 ```
 
+## Support Chat System (NEW)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant H as Home Page
+    participant SW as SupportWidget
+    participant SP as SupportPanel
+    participant SE as SupportEngine
+    participant KB as Knowledge Base
+    participant LS as localStorage
+
+    U->>H: Visit home page
+    H->>SW: Mount SupportWidget (lazy)
+    U->>SW: Click support bubble
+    SW->>SP: Dynamic import + open panel
+    SP->>SE: Initialize conversation
+    SE->>KB: Load greeting intent
+    KB-->>SE: Welcome response + quick replies
+    SE-->>SP: Display greeting
+    SP-->>U: Show welcome message
+
+    U->>SP: Type question
+    SP->>SE: Analyze intent
+    SE->>KB: Match keywords to intent
+    KB-->>SE: Intent classification + confidence
+    SE->>KB: Load response template
+    KB-->>SE: Response + quick replies
+    SE-->>SP: Generated response
+    SP-->>U: Display answer
+    SP->>LS: Persist conversation
+
+    U->>SP: Rate response (thumbs up/down)
+    SP->>LS: Store feedback
+    U->>SP: Click quick reply
+    SP->>SE: Process quick reply intent
+    SE-->>SP: Follow-up response
+```
+
+## Changelog Deep-Link Flow (NEW)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant CL as Changelog Page
+    participant IW as InfoWidget
+    participant H as Home Page
+    participant SW as SupportWidget
+    participant SP as SupportPanel
+
+    U->>CL: Visit /changelog
+    CL->>IW: Mount InfoWidget
+    IW->>IW: Load latest release from changelog.json
+    IW-->>U: Show release highlights
+    U->>IW: Click "Ask Support about this release"
+    IW->>H: Navigate to /?support=open&prefill=Tell me about vX.Y.Z
+    H->>SW: Mount SupportWidget
+    SW->>SW: Parse URL params (support=open, prefill=message)
+    SW->>SP: Auto-open panel with prefilled message
+    SP-->>U: Chat opens with version question ready
+    U->>SP: Send or modify prefilled message
+    SP->>SP: Process as normal support conversation
+```
+
 ## References
 - SSE routes: `app/api/ai/chat/stream/route.ts`, `app/api/topics/report/stream/route.ts`, `app/api/plan-and-execute/route.ts`
 - Hooks: `hooks/use-literature-search.ts`, `hooks/use-chat-socket.ts`, `hooks/use-plan-and-execute.ts`
-- Services: `lib/services/literature-search.service.ts`, `lib/services/openrouter.service.ts`, `lib/services/topic-report-agents.ts`, `lib/services/file-extraction/*`, `lib/services/planning.service.ts`, `lib/services/executing.service.ts`, `lib/services/token.service.ts`
+- Services: `lib/services/literature-search.service.ts`, `lib/services/openrouter.service.ts`, `lib/services/topic-report-agents.ts`, `lib/services/file-extraction/*`, `lib/services/planning.service.ts`, `lib/services/executing.service.ts`, `lib/services/token.service.ts`, `lib/services/support-engine.ts`
+- Support Components: `components/support/SupportWidget.tsx`, `components/support/SupportPanel.tsx`, `components/changelog/InfoWidget.tsx`
+- Knowledge Base: `data/support/intents.json`, `data/support/responses/*.json`
 - Middleware: `lib/middleware/token-middleware.ts`
 - Supabase URL: xxxxx

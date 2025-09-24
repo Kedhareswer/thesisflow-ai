@@ -1,0 +1,15 @@
+{
+  "intent": "about",
+  "responses": [
+    {
+      "id": "platform_overview",
+      "text": "**ThesisFlow-AI** is an all-in-one research platform designed to accelerate your academic work:\n\n🔍 **Research Explorer** - Multi-source paper discovery and literature review\n📋 **Project Planner** - AI-powered task planning with Gantt charts\n✍️ **LaTeX Writer** - Collaborative document editing with real-time preview\n📄 **Data Extraction** - Smart PDF/document analysis and summarization\n🤝 **Collaboration Hub** - Team workspace with real-time sync\n\nBuilt for students, researchers, and academic teams who want to focus on thinking, not busywork.",
+      "quickReplies": [
+        { "text": "Try Research Explorer", "action": "external_link", "url": "/explorer" },
+        { "text": "See Project Planner", "action": "external_link", "url": "/planner" },
+        { "text": "Pricing & Plans", "intent": "pricing" },
+        { "text": "Getting Started Guide", "intent": "navigation" }
+      ]
+    }
+  ]
+}
