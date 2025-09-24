@@ -14,6 +14,75 @@ function createSupabaseAdmin() {
   if (!supabaseUrl) {
     throw new Error('Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL')
   }
+
+// Aggregate from usage_events for additive metrics (tokens, requests, cost)
+async function aggregateFromUsageEventsOnly(
+  supabaseAdmin: any,
+  userId: string,
+  from: Date,
+  to: Date,
+  metric: Metric,
+  dimension: Dimension,
+  dayKeys: string[]
+) {
+  if (!isAdditiveMetric(metric)) return { series: {}, totals: {}, totalPerDay: Array(dayKeys.length).fill(0) }
+
+  const indexByDay = new Map(dayKeys.map((d, i) => [d, i]))
+  const series: Record<string, number[]> = {}
+  const totals: Record<string, number> = {}
+  const totalPerDay: number[] = Array(dayKeys.length).fill(0)
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('usage_events')
+    .select('created_at, feature_name, provider, model, api_key_owner, api_key_provider, tokens_charged, provider_cost_usd')
+    .eq('user_id', userId)
+    .gte('created_at', from.toISOString())
+    .lt('created_at', new Date(to.getTime() + 24 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    return { series, totals, totalPerDay }
+  }
+
+  for (const row of rows || []) {
+    const day = new Date(row.created_at).toISOString().slice(0, 10)
+    const idx = indexByDay.get(day)
+    if (idx === undefined) continue
+
+    const dimKey = (() => {
+      switch (dimension) {
+        case 'service':
+          return mapService(row.feature_name)
+        case 'provider':
+          return String((row.provider ?? 'other')).toLowerCase()
+        case 'model':
+          return String((row.model ?? 'other')).toLowerCase()
+        case 'feature':
+          return mapFeatureCanonical(row.feature_name)
+        case 'api_key_owner':
+          return String((row.api_key_owner ?? 'unknown')).toLowerCase()
+        case 'api_key_provider':
+          return String((row.api_key_provider ?? row.provider ?? 'unknown')).toLowerCase()
+        default:
+          return 'unknown'
+      }
+    })()
+
+    const value = (() => {
+      if (metric === 'tokens') return Number(row.tokens_charged || 0)
+      if (metric === 'requests') return 1
+      if (metric === 'cost') return Number(row.provider_cost_usd || 0)
+      return 0
+    })()
+
+    if (!series[dimKey]) series[dimKey] = Array(dayKeys.length).fill(0)
+    series[dimKey][idx] += value
+    totals[dimKey] = (totals[dimKey] || 0) + value
+    totalPerDay[idx] += value
+  }
+
+  return { series, totals, totalPerDay }
+}
   
   if (!serviceRoleKey) {
     throw new Error('Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY')
@@ -23,7 +92,7 @@ function createSupabaseAdmin() {
 }
 
 type Metric = 'tokens' | 'requests' | 'cost' | 'avg_tokens' | 'p95_tokens' | 'avg_latency' | 'p95_latency'
-type Dimension = 'service' | 'provider' | 'model' | 'feature' | 'origin' | 'quality' | 'per_result_bucket'
+type Dimension = 'service' | 'provider' | 'model' | 'feature' | 'origin' | 'quality' | 'per_result_bucket' | 'api_key_owner' | 'api_key_provider'
 
 function startOfDayUTC(d: Date) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
@@ -53,13 +122,43 @@ function isAdditiveMetric(metric: Metric) {
 }
 
 // Map feature_name -> service grouping (kept in sync with scripts/usage-analytics-schema.sql)
+// Canonical feature taxonomy mapping
+function mapFeatureCanonical(raw?: string): string {
+  const f = (raw || '').toLowerCase()
+  // Explorer family
+  if (f.includes('explorer_assistant') || (f.includes('ai_chat') && f.includes('explorer'))) return 'explorer_assistant'
+  if (f.includes('explorer_explore') || f.includes('literature_search') || f.includes('explore')) return 'explorer_explore'
+  if (f.includes('explorer_ideas') || f.includes('ideas')) return 'explorer_ideas'
+  // Planner & Deep research
+  if (f.includes('plan_and_execute')) return 'plan_and_execute'
+  if (f.includes('deep_research')) return 'deep_research'
+  if (f.includes('planner_apply')) return 'planner_apply'
+  // Writer / Paraphraser / Extract
+  if (f.includes('writer')) return 'writer'
+  if (f.includes('paraphraser') || f.includes('paraphrase')) return 'paraphraser'
+  if (f.includes('extract')) return 'extract_data'
+  // Topics / Citations / Chat PDF / Detector
+  if (f.includes('topics_report') || (f.includes('topics') && f.includes('report'))) return 'topics_report'
+  if (f.includes('topics_extract') || (f.includes('topics') && f.includes('extract'))) return 'topics_extract'
+  if (f.includes('citations') || f.includes('citation')) return 'citations'
+  if (f.includes('chat_pdf') || (f.includes('chat') && f.includes('pdf'))) return 'chat_pdf'
+  if (f.includes('ai_detector') || f.includes('detector')) return 'ai_detector'
+  // Default: treat as unknown instead of 'other' to make unmapped events visible
+  return 'unknown'
+}
+
 function mapService(featureName?: string): string {
-  const f = (featureName || '').toLowerCase()
-  if (f.includes('literature')) return 'explorer'
-  if (f.includes('summary') || f.includes('summar')) return 'summarizer'
-  if (f.includes('assistant') || f.includes('chat')) return 'ai_assistant'
-  if (f.includes('generation') || f.includes('write')) return 'ai_writing'
-  return 'other'
+  const feature = mapFeatureCanonical(featureName)
+  if (feature.startsWith('explorer_')) return 'explorer'
+  if (feature === 'plan_and_execute' || feature === 'deep_research' || feature === 'planner_apply') return 'planner'
+  if (feature === 'writer') return 'ai_writing'
+  if (feature === 'paraphraser') return 'paraphraser'
+  if (feature === 'extract_data') return 'extract'
+  if (feature === 'topics_extract' || feature === 'topics_report') return 'topics'
+  if (feature === 'citations') return 'citations'
+  if (feature === 'chat_pdf') return 'chat_pdf'
+  if (feature === 'ai_detector') return 'ai_detector'
+  return 'unknown'
 }
 
 // Derive per_result_bucket from context value
@@ -129,13 +228,17 @@ async function aggregateFromTransactions(
         case 'model':
           return String((ctx.model ?? 'other')).toLowerCase()
         case 'feature':
-          return String(row.feature_name || 'unknown')
+          return mapFeatureCanonical(row.feature_name)
         case 'origin':
           return String((ctx.origin ?? '')).toLowerCase() || 'unknown'
         case 'quality':
           return String((ctx.quality ?? '')).toLowerCase() || 'unknown'
         case 'per_result_bucket':
           return toPerResultBucket(ctx.per_result)
+        case 'api_key_owner':
+          return String((ctx.api_key_owner ?? ctx.apiKeyOwner ?? 'unknown')).toLowerCase()
+        case 'api_key_provider':
+          return String((ctx.api_key_provider ?? ctx.apiKeyProvider ?? ctx.provider ?? 'unknown')).toLowerCase()
         default:
           return 'unknown'
       }

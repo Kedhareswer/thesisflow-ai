@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tokenService } from '@/lib/services/token.service';
 import { requireAuth } from '@/lib/server/auth';
+import { getSupabaseAdmin } from '@/lib/server/supabase-admin';
 
 export interface TokenMiddlewareOptions {
   featureName: string;
@@ -65,6 +66,26 @@ export class TokenMiddleware {
         // annotate headers to make it explicit no tokens were used
         response.headers.set('X-Tokens-Used', '0');
         response.headers.set('X-Explorer-Bypass', 'assistant');
+        // Log zero-cost usage-only events to usage_events (no duplicate token counting)
+        try {
+          const admin = getSupabaseAdmin();
+          const provider = (context as any)?.provider ?? null;
+          const model = (context as any)?.model ?? null;
+          const apiKeyOwner = (context as any)?.api_key_owner ?? (context as any)?.apiKeyOwner ?? null;
+          const apiKeyProvider = (context as any)?.api_key_provider ?? (context as any)?.apiKeyProvider ?? null;
+          await admin.from('usage_events').insert({
+            user_id: userId,
+            feature_name: featureName,
+            provider,
+            model,
+            api_key_owner: apiKeyOwner,
+            api_key_provider: apiKeyProvider,
+            tokens_charged: 0,
+          });
+        } catch (e) {
+          // non-fatal
+        }
+
         return response;
       }
 
