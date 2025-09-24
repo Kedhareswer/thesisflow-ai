@@ -53,9 +53,16 @@ export class SupportEngine {
   /**
    * Analyze user input and determine intent (enhanced for better automation)
    */
-  analyzeIntent(input: string): { intent: string; confidence: number } {
+  analyzeIntent(input: string, conversationState?: ConversationState): { intent: string; confidence: number } {
     const normalizedInput = this.normalizeText(input)
     const words = normalizedInput.split(/\s+/)
+    
+    const hasAnyUserMessage = Array.isArray(conversationState?.messages)
+      ? conversationState!.messages.some(m => m.role === 'user')
+      : false
+    const hasGreetedBefore = Array.isArray(conversationState?.messages)
+      ? conversationState!.messages.some(m => m.role === 'assistant' && (m.intent === 'greeting' || /welcome|hello|hi/i.test(m.content)))
+      : false
     
     let bestMatch = { intent: 'unknown', confidence: 0 }
 
@@ -103,18 +110,18 @@ export class SupportEngine {
       }
     }
 
-    // Better fallback logic
+    // Better fallback logic with conversation awareness
     if (bestMatch.confidence < 0.2) {
-      // Check for common greeting patterns
-      if (/^(hi|hello|hey|start|begin)$/i.test(normalizedInput)) {
+      // If it's clearly a greeting and we haven't greeted yet, allow greeting
+      if (/^(hi|hello|hey|start|begin)$/i.test(normalizedInput) && !hasAnyUserMessage && !hasGreetedBefore) {
         return { intent: 'greeting', confidence: 0.9 }
       }
-      // Check for help patterns
-      if (/help|assist|support/i.test(normalizedInput)) {
+      // Help patterns map to contact intent
+      if (/\b(help|assist|support|problem|issue|bug)\b/i.test(normalizedInput)) {
         return { intent: 'contact', confidence: 0.8 }
       }
-      // Default fallback
-      return { intent: 'greeting', confidence: 0.5 }
+      // Otherwise, avoid repeating greeting; steer to unknown/navigation for clarification
+      return { intent: 'unknown', confidence: 0.4 }
     }
 
     return bestMatch

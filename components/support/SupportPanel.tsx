@@ -113,6 +113,24 @@ function SupportPanel({
     // Don't re-initialize if we already have messages
     if (messages.length > 0) return
 
+    // If a saved conversation exists, restore it instead of greeting again
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('support:conversation:v1') : null
+      if (saved) {
+        const data = JSON.parse(saved)
+        const savedMessages = Array.isArray(data?.messages) ? data.messages : []
+        if (savedMessages.length > 0) {
+          setMessages(savedMessages)
+          setConversationState(prev => ({
+            ...prev,
+            ...(data?.conversationState || {}),
+            messages: savedMessages
+          }))
+          return
+        }
+      }
+    } catch {}
+
     // Get automated welcome response
     const welcomeResponse = supportEngine.generateResponse('greeting', '', conversationState)
 
@@ -149,7 +167,7 @@ function SupportPanel({
 
     // Analyze intent and generate response
     try {
-      const { intent, confidence } = supportEngine.analyzeIntent(messageContent)
+      const { intent, confidence } = supportEngine.analyzeIntent(messageContent, conversationState)
       
       const updatedState: ConversationState = {
         ...conversationState,

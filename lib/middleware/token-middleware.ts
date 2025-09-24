@@ -75,8 +75,8 @@ export class TokenMiddleware {
         '127.0.0.1';
       const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-      // Calculate required tokens
-      const tokensNeeded = requiredTokens || await tokenService.getFeatureCost(featureName, { ...context, correlation_id: correlationId });
+      // Calculate required tokens. IMPORTANT: respect explicit 0 using nullish coalescing
+      const tokensNeeded = (requiredTokens ?? await tokenService.getFeatureCost(featureName, { ...context, correlation_id: correlationId }));
 
       // Check rate limits
       const rateLimit = await tokenService.checkRateLimit(userId, featureName, { ...context, correlation_id: correlationId });
@@ -103,9 +103,9 @@ export class TokenMiddleware {
         );
       }
 
-      // Deduct tokens if not skipping
+      // Deduct tokens if not skipping and tokensNeeded > 0
       let transactionId: string | undefined;
-      if (!skipDeduction) {
+      if (!skipDeduction && tokensNeeded > 0) {
         const deductResult = await tokenService.deductTokens(
           userId,
           featureName,
@@ -133,9 +133,10 @@ export class TokenMiddleware {
         const response = await handler(userId);
         
         // Add token usage headers to response
-        response.headers.set('X-Tokens-Used', tokensNeeded.toString());
+        response.headers.set('X-Tokens-Used', Math.max(0, tokensNeeded).toString());
         response.headers.set('X-Tokens-Remaining-Monthly', rateLimit.monthlyRemaining.toString());
         response.headers.set('X-Correlation-Id', correlationId);
+        response.headers.set('X-Feature-Name', featureName);
         
         if (transactionId) {
           response.headers.set('X-Token-Transaction-ID', transactionId);
@@ -145,7 +146,7 @@ export class TokenMiddleware {
 
       } catch (handlerError) {
         // If handler fails and we deducted tokens, refund them
-        if (transactionId && !skipDeduction) {
+        if (transactionId && !skipDeduction && tokensNeeded > 0) {
           await tokenService.refundTokens(
             userId,
             featureName,
@@ -257,6 +258,15 @@ export class TokenMiddleware {
     if (origin) context.origin = origin;
     if (feature) context.feature = feature;
     if (cid) context.correlation_id = cid;
+
+    // Idempotency: accept from header or query param (idempotencyKey|idem)
+    const idemHeader = request.headers.get('idempotency-key');
+    const idemQuery = searchParams.get('idempotencyKey') || searchParams.get('idem');
+    const idem = (idemHeader || idemQuery || '').trim();
+    if (idem) {
+      context.idempotency_key = idem; // snake_case for analytics or future functions
+      context.idempotencyKey = idem;  // camelCase for existing DB functions
+    }
 
     return context;
   }
