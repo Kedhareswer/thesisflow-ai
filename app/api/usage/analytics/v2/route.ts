@@ -14,76 +14,6 @@ function createSupabaseAdmin() {
   if (!supabaseUrl) {
     throw new Error('Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL')
   }
-
-// Aggregate from usage_events for additive metrics (tokens, requests, cost)
-async function aggregateFromUsageEventsOnly(
-  supabaseAdmin: any,
-  userId: string,
-  from: Date,
-  to: Date,
-  metric: Metric,
-  dimension: Dimension,
-  dayKeys: string[]
-) {
-  if (!isAdditiveMetric(metric)) return { series: {}, totals: {}, totalPerDay: Array(dayKeys.length).fill(0) }
-
-  const indexByDay = new Map(dayKeys.map((d, i) => [d, i]))
-  const series: Record<string, number[]> = {}
-  const totals: Record<string, number> = {}
-  const totalPerDay: number[] = Array(dayKeys.length).fill(0)
-
-  const { data: rows, error } = await supabaseAdmin
-    .from('usage_events')
-    .select('created_at, feature_name, provider, model, api_key_owner, api_key_provider, tokens_charged, provider_cost_usd')
-    .eq('user_id', userId)
-    .gte('created_at', from.toISOString())
-    .lt('created_at', new Date(to.getTime() + 24 * 60 * 60 * 1000).toISOString())
-    .order('created_at', { ascending: true })
-
-  if (error) {
-    return { series, totals, totalPerDay }
-  }
-
-  for (const row of rows || []) {
-    const day = new Date(row.created_at).toISOString().slice(0, 10)
-    const idx = indexByDay.get(day)
-    if (idx === undefined) continue
-
-    const dimKey = (() => {
-      switch (dimension) {
-        case 'service':
-          return mapService(row.feature_name)
-        case 'provider':
-          return String((row.provider ?? 'other')).toLowerCase()
-        case 'model':
-          return String((row.model ?? 'other')).toLowerCase()
-        case 'feature':
-          return mapFeatureCanonical(row.feature_name)
-        case 'api_key_owner':
-          return String((row.api_key_owner ?? 'unknown')).toLowerCase()
-        case 'api_key_provider':
-          return String((row.api_key_provider ?? row.provider ?? 'unknown')).toLowerCase()
-        default:
-          return 'unknown'
-      }
-    })()
-
-    const value = (() => {
-      if (metric === 'tokens') return Number(row.tokens_charged || 0)
-      if (metric === 'requests') return 1
-      if (metric === 'cost') return Number(row.provider_cost_usd || 0)
-      return 0
-    })()
-
-    if (!series[dimKey]) series[dimKey] = Array(dayKeys.length).fill(0)
-    series[dimKey][idx] += value
-    totals[dimKey] = (totals[dimKey] || 0) + value
-    totalPerDay[idx] += value
-  }
-
-  return { series, totals, totalPerDay }
-}
-  
   if (!serviceRoleKey) {
     throw new Error('Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY')
   }
@@ -171,6 +101,75 @@ function toPerResultBucket(val: any): string {
   if (n >= 21 && n <= 50) return '21-50'
   if (n > 50) return '51+'
   return 'unknown'
+}
+
+// Aggregate from usage_events for additive metrics (tokens, requests, cost)
+async function aggregateFromUsageEventsOnly(
+  supabaseAdmin: any,
+  userId: string,
+  from: Date,
+  to: Date,
+  metric: Metric,
+  dimension: Dimension,
+  dayKeys: string[]
+) {
+  if (!isAdditiveMetric(metric)) return { series: {} as Record<string, number[]>, totals: {} as Record<string, number>, totalPerDay: Array(dayKeys.length).fill(0) as number[] }
+
+  const indexByDay = new Map(dayKeys.map((d, i) => [d, i]))
+  const series: Record<string, number[]> = {}
+  const totals: Record<string, number> = {}
+  const totalPerDay: number[] = Array(dayKeys.length).fill(0)
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('usage_events')
+    .select('created_at, feature_name, provider, model, api_key_owner, api_key_provider, tokens_charged, provider_cost_usd')
+    .eq('user_id', userId)
+    .gte('created_at', from.toISOString())
+    .lt('created_at', new Date(to.getTime() + 24 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    return { series, totals, totalPerDay }
+  }
+
+  for (const row of (rows || []) as any[]) {
+    const day = new Date(row.created_at).toISOString().slice(0, 10)
+    const idx = indexByDay.get(day)
+    if (idx === undefined) continue
+
+    const dimKey = (() => {
+      switch (dimension) {
+        case 'service':
+          return mapService(row.feature_name)
+        case 'provider':
+          return String((row.provider ?? 'unknown')).toLowerCase()
+        case 'model':
+          return String((row.model ?? 'unknown')).toLowerCase()
+        case 'feature':
+          return mapFeatureCanonical(row.feature_name)
+        case 'api_key_owner':
+          return String((row.api_key_owner ?? 'unknown')).toLowerCase()
+        case 'api_key_provider':
+          return String((row.api_key_provider ?? row.provider ?? 'unknown')).toLowerCase()
+        default:
+          return 'unknown'
+      }
+    })()
+
+    const value = (() => {
+      if (metric === 'tokens') return Number(row.tokens_charged || 0)
+      if (metric === 'requests') return 1
+      if (metric === 'cost') return Number(row.provider_cost_usd || 0)
+      return 0
+    })()
+
+    if (!series[dimKey]) series[dimKey] = Array(dayKeys.length).fill(0)
+    series[dimKey][idx] += value
+    totals[dimKey] = (totals[dimKey] || 0) + value
+    totalPerDay[idx] += value
+  }
+
+  return { series, totals, totalPerDay }
 }
 
 // Fallback aggregator: when usage_daily_mv has not been refreshed yet (or returns 0 rows),
@@ -337,7 +336,20 @@ export async function POST(request: NextRequest) {
       const idx = indexByDay.get(day)
       if (idx === undefined) return
 
-      const key = String(row[dimCol] || 'unknown')
+      const key = (() => {
+        switch (dimension) {
+          case 'service':
+            return mapService(row.feature_name)
+          case 'feature':
+            return mapFeatureCanonical(row.feature_name)
+          case 'provider':
+            return String((row.provider ?? 'unknown')).toLowerCase()
+          case 'model':
+            return String((row.model ?? 'unknown')).toLowerCase()
+          default:
+            return String(row[dimCol] || 'unknown')
+        }
+      })()
       const val: number = Number(row[metricCol] ?? 0)
 
       if (!series[key]) series[key] = Array(dayKeys.length).fill(0)
@@ -361,15 +373,30 @@ export async function POST(request: NextRequest) {
       if (fallback) {
         let { dayKeys: fkDays, series: fkSeries, totals: fkTotals, totalPerDay: fkTotalPerDay, totalMetric: fkTotalMetric } = fallback
 
-        // Optional cumulative
+        // Merge usage_events into fallback (additive metrics only)
+        if (isAdditiveMetric(metric)) {
+          const usageAgg = await aggregateFromUsageEventsOnly(supabaseAdmin, userId, from, to, metric, dimension, fkDays)
+          Object.entries(usageAgg.series).forEach(([k, arr]) => {
+            const nums = arr as number[]
+            if (!fkSeries[k]) fkSeries[k] = Array(fkDays.length).fill(0)
+            nums.forEach((v: number, i: number) => { fkSeries[k][i] += v })
+          })
+          Object.entries(usageAgg.totals).forEach(([k, v]) => {
+            fkTotals[k] = (fkTotals[k] || 0) + (v as number)
+          })
+          usageAgg.totalPerDay.forEach((v: number, i: number) => { fkTotalPerDay[i] += v })
+          fkTotalMetric += usageAgg.totalPerDay.reduce((a: number, b: number) => a + b, 0)
+        }
+
+        // Optional cumulative (after merging)
         if (cumulative) {
           const cum = (arr: number[]) => arr.map((v => (cum.s = (cum.s || 0) + v))) as any
           cum.s = 0; const t1 = cum([...fkTotalPerDay])
-          Object.keys(fkSeries).forEach((k) => { cum.s = 0; fkSeries[k] = cum([...fkSeries[k]]) })
+          Object.keys(fkSeries).forEach((k) => { cum.s = 0; fkSeries[k] = cum([...(fkSeries[k] || [])]) })
           for (let i = 0; i < fkTotalPerDay.length; i++) fkTotalPerDay[i] = t1[i]
         }
 
-        // Optional compare (fallback, additive metrics only)
+        // Optional compare (fallback, additive metrics only). Merge usage_events for previous period too.
         let previous: any = undefined
         if (compare) {
           const ms = startOfDayUTC(to).getTime() - startOfDayUTC(from).getTime() + 24*60*60*1000
@@ -378,10 +405,23 @@ export async function POST(request: NextRequest) {
           const prevAgg = await aggregateFromTransactions(supabaseAdmin, userId, prevFrom, prevTo, metric, dimension)
           if (prevAgg) {
             let { dayKeys: pDays, series: pSeries, totals: pTotals, totalPerDay: pTotalPerDay, totalMetric: pTotalMetric } = prevAgg
+            if (isAdditiveMetric(metric)) {
+              const prevUsage = await aggregateFromUsageEventsOnly(supabaseAdmin, userId, prevFrom, prevTo, metric, dimension, pDays)
+              Object.entries(prevUsage.series).forEach(([k, arr]) => {
+                const nums = arr as number[]
+                if (!pSeries[k]) pSeries[k] = Array(pDays.length).fill(0)
+                nums.forEach((v: number, i: number) => { pSeries[k][i] += v })
+              })
+              Object.entries(prevUsage.totals).forEach(([k, v]) => {
+                pTotals[k] = (pTotals[k] || 0) + (v as number)
+              })
+              prevUsage.totalPerDay.forEach((v: number, i: number) => { pTotalPerDay[i] += v })
+              pTotalMetric += prevUsage.totalPerDay.reduce((a: number, b: number) => a + b, 0)
+            }
             if (cumulative) {
               const cum = (arr: number[]) => arr.map((v => (cum.s = (cum.s || 0) + v))) as any
               cum.s = 0; const t1 = cum([...pTotalPerDay])
-              Object.keys(pSeries).forEach((k) => { cum.s = 0; pSeries[k] = cum([...pSeries[k]]) })
+              Object.keys(pSeries).forEach((k) => { cum.s = 0; pSeries[k] = cum([...(pSeries[k] || [])]) })
               for (let i = 0; i < pTotalPerDay.length; i++) pTotalPerDay[i] = t1[i]
             }
             previous = {
@@ -411,12 +451,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Build total overlay from MV path
-    const totalPerDay: number[] = Array(dayKeys.length).fill(0)
+    // Optionally merge usage_events (additive metrics only)
+    let totalPerDay: number[] = Array(dayKeys.length).fill(0)
     if (isAdditiveMetric(metric)) {
-      Object.values(series).forEach((arr) => {
-        arr.forEach((v, i) => { totalPerDay[i] += v })
+      // Merge MV series into totals
+      Object.values(series).forEach((arr: number[]) => {
+        arr.forEach((v: number, i: number) => { totalPerDay[i] += v })
       })
+
+      const usageAgg = await aggregateFromUsageEventsOnly(supabaseAdmin, userId, from, to, metric, dimension, dayKeys)
+      // Merge usage_events series and totals
+      Object.entries(usageAgg.series).forEach(([k, arr]) => {
+        const nums = arr as number[]
+        if (!series[k]) series[k] = Array(dayKeys.length).fill(0)
+        nums.forEach((v: number, i: number) => { series[k][i] += v })
+      })
+      Object.entries(usageAgg.totals).forEach(([k, v]) => {
+        totals[k] = (totals[k] || 0) + (v as number)
+      })
+      usageAgg.totalPerDay.forEach((v: number, i: number) => { totalPerDay[i] += v })
     } else {
       // Compute weighted average where possible
       for (let i = 0; i < totalPerDay.length; i++) {

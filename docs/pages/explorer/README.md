@@ -39,6 +39,10 @@
 - Assistant tab: bypass (no deduction) via `TokenMiddleware` explorer rule.
 - Other explorer actions may deduct depending on feature context (see `docs/tokens.md`).
 
+### Analytics
+- Even when the Assistant bypasses billing, usage is still recorded for analytics with `tokens_charged = 0` in `public.usage_events`. This ensures Explorer activity is visible in charts without affecting token balances.
+- The analytics API (`/api/usage/analytics/v2`) supports dimensions: `service`, `feature`, `provider`, `model`, `api_key_owner`, `api_key_provider`. Providers are normalized so OpenRouter-based entries show as `NOVA` in the UI.
+
 ## Middleware
 - `middleware.ts` protects `/explorer`.
 - `withTokenValidation()` on SSE endpoint; explorer bypass condition is explicit in code.

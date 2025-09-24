@@ -71,6 +71,18 @@ See diagrams in `docs/sequences-and-flows.md`.
 ## Rate limits & aggregation
 - Literature search rate limit: `public.check_literature_search_rate_limit`
 
+## Analytics & Taxonomy
+- Canonical feature taxonomy (examples): `explorer_assistant`, `explorer_explore`, `explorer_ideas`, `plan_and_execute`, `deep_research`, `planner_apply`, `writer`, `paraphraser`, `extract_data`, `topics_extract`, `topics_report`, `citations`, `chat_pdf`, `ai_detector`.
+- Zero-cost usage is still recorded to ensure visibility in analytics (e.g., Explorer Assistant bypass). These entries are written to `public.usage_events` with `tokens_charged = 0`.
+- Data sources:
+  - `token_transactions` (additive metrics for deduct rows)
+  - `usage_events` (zero-cost or non-deducted usage)
+- Aggregation:
+  - Materialized view `usage_daily_mv` aggregates by day and dimensions (service, provider, model, feature_name, etc.).
+  - The Analytics API (`/api/usage/analytics/v2`) merges `usage_daily_mv` with aggregated `usage_events` at request time for additive metrics (Tokens, Requests, Cost). Non-additive metrics are derived from the MV only.
+- Dimensions supported by the API/UI: `service`, `feature`, `provider`, `model`, `api_key_owner` (user/system), `api_key_provider` (openrouter, openai, etc.).
+- Providers are normalized in the UI so OpenRouter-based entries display as `NOVA`; model names are grouped into families (GPT, Claude, Llama, Gemini, Mixtral, Qwen, DeepSeek, GLM, Nemotron, Gemma, Mistral, Other).
+
 ## Component Structure
 
 ### Core Components

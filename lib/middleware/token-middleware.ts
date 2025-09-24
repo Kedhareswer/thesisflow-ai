@@ -162,6 +162,27 @@ export class TokenMiddleware {
         if (transactionId) {
           response.headers.set('X-Token-Transaction-ID', transactionId);
         }
+        // Log zero-cost usage-only events (no duplicate token counting). This covers free/zero-cost features.
+        if (!transactionId && tokensNeeded <= 0) {
+          try {
+            const admin = getSupabaseAdmin();
+            const provider = (context as any)?.provider ?? null;
+            const model = (context as any)?.model ?? null;
+            const apiKeyOwner = (context as any)?.api_key_owner ?? (context as any)?.apiKeyOwner ?? null;
+            const apiKeyProvider = (context as any)?.api_key_provider ?? (context as any)?.apiKeyProvider ?? null;
+            await admin.from('usage_events').insert({
+              user_id: userId,
+              feature_name: featureName,
+              provider,
+              model,
+              api_key_owner: apiKeyOwner,
+              api_key_provider: apiKeyProvider,
+              tokens_charged: 0,
+            });
+          } catch (e) {
+            // non-fatal
+          }
+        }
 
         return response;
 

@@ -16,3 +16,4 @@ This section documents each primary page in the application with truthful, code-
 - Profile: `docs/pages/profile/README.md`
 - Settings: `docs/pages/settings/README.md`
 - Tokens: `docs/pages/tokens/README.md`
+- Analytics: `docs/pages/analytics/README.md`
