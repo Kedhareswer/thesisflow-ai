@@ -1,0 +1,15 @@
+{
+  "intent": "feedback",
+  "responses": [
+    {
+      "id": "feedback_collection",
+      "text": "I'm Nova, and I'd love to hear your feedback! 💡 Your suggestions help us improve. Please share:\n\n• **What you like** about the platform\n• **What could be better** or missing features\n• **Specific improvements** you'd like to see\n• **Screenshots** if you have visual feedback\n\nYou can type your feedback below or use the detailed feedback form:",
+      "quickReplies": [
+        { "text": "Send Detailed Feedback", "action": "external_link", "url": "mailto:feedback@thesisflow-ai.com?subject=User%20Feedback%20-%20ThesisFlow-AI&body=Hi%20ThesisFlow%20team,%0A%0AHere's%20my%20feedback:%0A%0AWhat%20I%20like:%0A-%20%0A%0AWhat%20could%20be%20improved:%0A-%20%0A%0AFeature%20requests:%0A-%20%0A%0AAdditional%20comments:%0A%0A%0AThank%20you!" },
+        { "text": "Copy Feedback Email", "action": "custom", "data": { "type": "copy", "text": "feedback@thesisflow-ai.com" } },
+        { "text": "Quick Feedback Template", "action": "custom", "data": { "type": "prefill", "text": "[Feedback]\nWhat I like: \nWhat could be improved: \nFeature request: \nScreenshots: (attach or describe)\nOverall rating: ⭐⭐⭐⭐⭐" } },
+        { "text": "Report a Bug Instead", "intent": "ticket" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "intent": "unknown",
+  "responses": [
+    {
+      "id": "unknown_fallback",
+      "text": "I'm Nova, and I'm not sure I understand that question, but I'm here to help! Let me suggest some common topics:",
+      "quickReplies": [
+        { "text": "Pricing & Plans", "intent": "pricing" },
+        { "text": "Features Overview", "intent": "about" },
+        { "text": "Report Issue", "intent": "ticket" },
+        { "text": "Give Feedback", "intent": "feedback" },
+        { "text": "Contact Support", "intent": "contact" }
+      ]
+    }
+  ]
+}

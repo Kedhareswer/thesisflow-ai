@@ -1,4 +1,5 @@
 import intentsData from '@/data/support/intents.json'
+import { supportResponsesMap } from '@/lib/services/support-responses'
 
 export interface Intent {
   name: string
@@ -50,7 +51,7 @@ export class SupportEngine {
   }
 
   /**
-   * Analyze user input and determine intent
+   * Analyze user input and determine intent (enhanced for better automation)
    */
   analyzeIntent(input: string): { intent: string; confidence: number } {
     const normalizedInput = this.normalizeText(input)
@@ -58,14 +59,21 @@ export class SupportEngine {
     
     let bestMatch = { intent: 'unknown', confidence: 0 }
 
+    // Enhanced keyword matching with phrase detection
     for (const intent of this.intents) {
       let score = 0
       let matchCount = 0
 
-      // Check direct keyword matches
+      // Check direct keyword matches with phrase priority
       for (const keyword of intent.keywords) {
-        if (normalizedInput.includes(keyword.toLowerCase())) {
-          score += 1
+        const keywordLower = keyword.toLowerCase()
+        if (normalizedInput.includes(keywordLower)) {
+          // Give higher score for exact phrase matches
+          if (keywordLower.includes(' ') && normalizedInput.includes(keywordLower)) {
+            score += 2 // Phrase match bonus
+          } else {
+            score += 1
+          }
           matchCount++
         }
       }
@@ -85,9 +93,9 @@ export class SupportEngine {
         }
       }
 
-      // Calculate confidence based on matches and intent priority
+      // Enhanced confidence calculation
       const confidence = matchCount > 0 
-        ? (score / intent.keywords.length) * intent.confidence * (1 / intent.priority)
+        ? Math.min(1.0, (score / Math.max(1, intent.keywords.length)) * intent.confidence * (1 / intent.priority))
         : 0
 
       if (confidence > bestMatch.confidence) {
@@ -95,8 +103,17 @@ export class SupportEngine {
       }
     }
 
-    // Fallback to greeting for very short inputs
-    if (bestMatch.confidence < 0.3 && words.length <= 2) {
+    // Better fallback logic
+    if (bestMatch.confidence < 0.2) {
+      // Check for common greeting patterns
+      if (/^(hi|hello|hey|start|begin)$/i.test(normalizedInput)) {
+        return { intent: 'greeting', confidence: 0.9 }
+      }
+      // Check for help patterns
+      if (/help|assist|support/i.test(normalizedInput)) {
+        return { intent: 'contact', confidence: 0.8 }
+      }
+      // Default fallback
       return { intent: 'greeting', confidence: 0.5 }
     }
 
@@ -104,16 +121,16 @@ export class SupportEngine {
   }
 
   /**
-   * Generate response based on intent and conversation state
+   * Generate response based on intent and conversation state (synchronous for instant responses)
    */
-  async generateResponse(
+  generateResponse(
     intent: string, 
     input: string, 
     conversationState: ConversationState
-  ): Promise<SupportResponse> {
+  ): SupportResponse {
     try {
       // Load response templates for this intent
-      const responses = await this.loadResponseTemplates(intent)
+      const responses = this.loadResponseTemplates(intent)
       
       if (!responses || responses.length === 0) {
         return this.getFallbackResponse(intent)
@@ -131,22 +148,23 @@ export class SupportEngine {
   }
 
   /**
-   * Load response templates for an intent
+   * Load response templates for an intent (synchronous for instant responses)
    */
-  private async loadResponseTemplates(intent: string): Promise<SupportResponse[]> {
+  private loadResponseTemplates(intent: string): SupportResponse[] {
     if (this.responseCache.has(intent)) {
       return this.responseCache.get(intent)!
     }
 
-    try {
-      const module = await import(`@/data/support/responses/${intent}.json`)
-      const responses = module.default?.responses || module.responses || []
+    // Use static map for instant loading
+    const entry = (supportResponsesMap as any)[intent]
+    if (entry) {
+      const responses = entry.responses || entry.default?.responses || []
       this.responseCache.set(intent, responses)
       return responses
-    } catch (error) {
-      console.warn(`No response template found for intent: ${intent}`)
-      return []
     }
+
+    console.warn(`No response template found for intent: ${intent}`)
+    return []
   }
 
   /**
@@ -203,7 +221,8 @@ export class SupportEngine {
       quickReplies: [
         { text: "Pricing & Plans", intent: "pricing" },
         { text: "Feature Overview", intent: "about" },
-        { text: "Token Usage", intent: "tokens" },
+        { text: "Report Issue", intent: "ticket" },
+        { text: "Give Feedback", intent: "feedback" },
         { text: "Contact Support", intent: "contact" }
       ]
     }
@@ -246,8 +265,10 @@ export class SupportEngine {
     const baseReplies: QuickReply[] = [
       { text: "Pricing", intent: "pricing" },
       { text: "Features", intent: "about" },
-      { text: "Token Usage", intent: "tokens" },
-      { text: "What's New?", intent: "changelog" }
+      { text: "What's New?", intent: "changelog" },
+      { text: "Report Issue", intent: "ticket" },
+      { text: "Give Feedback", intent: "feedback" },
+      { text: "Contact Support", intent: "contact" }
     ]
 
     // Customize based on current intent
@@ -269,6 +290,25 @@ export class SupportEngine {
           { text: "Try Explorer", action: "external_link", url: "/explorer" },
           { text: "See Planner", action: "external_link", url: "/planner" },
           { text: "Pricing", intent: "pricing" }
+        ]
+      case 'contact':
+        return [
+          { text: "Report an Issue", intent: "ticket" },
+          { text: "Give Feedback", intent: "feedback" },
+          { text: "Email Support", action: "external_link", url: "mailto:support@thesisflow-ai.com?subject=ThesisFlow-AI%20Support%20Request" },
+          { text: "Copy Support Email", action: "custom", data: { type: 'copy', text: 'support@thesisflow-ai.com' } }
+        ]
+      case 'ticket':
+        return [
+          { text: "Email with Screenshots", action: "external_link", url: "mailto:support@thesisflow-ai.com?subject=Issue%20Report%20-%20ThesisFlow-AI&body=Hi%20ThesisFlow%20team,%0A%0AIssue%20Description:%0A%0ASteps%20to%20reproduce:%0A1.%20%0A2.%20%0A3.%20%0A%0AExpected%20behavior:%0A%0AActual%20behavior:%0A%0ABrowser/Device:%0A%0AScreenshots:%20(please%20attach)%0A%0AAdditional%20info:%0A%0AThank%20you!" },
+          { text: "Copy Support Email", action: "custom", data: { type: 'copy', text: 'support@thesisflow-ai.com' } },
+          { text: "Detailed Issue Template", action: "custom", data: { type: 'prefill', text: "[Issue Report]\n🐛 Problem: \n📱 Device/Browser: \n📅 When: \n🔄 Steps to reproduce:\n1. \n2. \n3. \n\n✅ Expected: \n❌ Actual: \n📷 Screenshots: (attach to email)\n💬 Additional details: " } }
+        ]
+      case 'feedback':
+        return [
+          { text: "Send Detailed Feedback", action: "external_link", url: "mailto:feedback@thesisflow-ai.com?subject=User%20Feedback%20-%20ThesisFlow-AI&body=Hi%20ThesisFlow%20team,%0A%0AHere's%20my%20feedback:%0A%0AWhat%20I%20like:%0A-%20%0A%0AWhat%20could%20be%20improved:%0A-%20%0A%0AFeature%20requests:%0A-%20%0A%0AAdditional%20comments:%0A%0A%0AThank%20you!" },
+          { text: "Copy Feedback Email", action: "custom", data: { type: 'copy', text: 'feedback@thesisflow-ai.com' } },
+          { text: "Quick Feedback Template", action: "custom", data: { type: 'prefill', text: "[Feedback]\nWhat I like: \nWhat could be improved: \nFeature request: \nScreenshots: (attach or describe)\nOverall rating: ⭐⭐⭐⭐⭐" } }
         ]
       default:
         return baseReplies

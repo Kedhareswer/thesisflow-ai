@@ -110,7 +110,7 @@ export default function SupportWidget({ className }: SupportWidgetProps) {
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6B2C] focus-visible:ring-offset-2",
             isOpen && "scale-0 opacity-0"
           )}
-          aria-label="Open support chat"
+          aria-label="Chat with Nova"
         >
           <MessageCircle className="h-6 w-6" />
           {hasUnread && (
@@ -134,11 +134,11 @@ export default function SupportWidget({ className }: SupportWidgetProps) {
             // Mobile: bottom sheet
             "bottom-0 left-0 right-0 md:bottom-6 md:right-6 md:left-auto",
             // Desktop: positioned panel
-            "md:w-96 md:max-h-[600px]",
+            "md:w-96 h-[600px] md:h-[600px]",
             // Animation
             "animate-in slide-in-from-bottom-4 md:slide-in-from-right-4"
           )}>
-            <div className="bg-white rounded-t-lg md:rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-t-lg md:rounded-lg shadow-2xl border border-gray-200 overflow-hidden h-full">
               {/* Close button for mobile */}
               <div className="md:hidden flex justify-end p-2 border-b">
                 <Button

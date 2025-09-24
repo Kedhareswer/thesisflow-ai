@@ -68,9 +68,21 @@
     },
     {
       "name": "contact",
-      "keywords": ["contact", "support", "help", "email", "reach out", "get in touch", "assistance"],
+      "keywords": ["contact", "support", "help", "email", "reach out", "get in touch", "assistance", "contact support"],
       "confidence": 0.8,
       "priority": 3
+    },
+    {
+      "name": "ticket",
+      "keywords": ["ticket", "raise ticket", "rise ticket", "create ticket", "support ticket", "bug", "issue", "problem", "report issue", "raise a ticket", "submit ticket", "report bug", "report problem"],
+      "confidence": 0.95,
+      "priority": 2
+    },
+    {
+      "name": "feedback",
+      "keywords": ["feedback", "suggestion", "improve", "improvement", "feature request", "enhancement", "idea", "recommend", "opinion", "review", "rate", "rating"],
+      "confidence": 0.9,
+      "priority": 2
     },
     {
       "name": "about",
@@ -86,6 +98,8 @@
     "explorer": ["research", "search", "discovery"],
     "planner": ["planning", "project management", "timeline"],
     "writer": ["writing", "editor", "compose"],
-    "extract": ["extraction", "summarize", "analyze"]
+    "extract": ["extraction", "summarize", "analyze"],
+    "ticket": ["raise ticket", "support ticket", "bug", "issue", "problem", "report", "report issue"],
+    "feedback": ["suggestion", "improve", "improvement", "feature request", "enhancement", "idea", "recommend", "opinion"]
   }
 }

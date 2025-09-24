@@ -36,6 +36,7 @@ function SupportPanel({
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   // Initialize conversation and handle prefill
   useEffect(() => {
@@ -51,8 +52,34 @@ function SupportPanel({
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
   }, [messages])
+
+  // Prevent background scroll when scrolling in chat
+  useEffect(() => {
+    const messagesContainer = messagesContainerRef.current
+    if (!messagesContainer) return
+
+    const handleWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainer
+      const isScrollingUp = e.deltaY < 0
+      const isScrollingDown = e.deltaY > 0
+      const isAtTop = scrollTop === 0
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1
+
+      // Prevent background scroll when:
+      // - Scrolling up and not at top
+      // - Scrolling down and not at bottom
+      if ((isScrollingUp && !isAtTop) || (isScrollingDown && !isAtBottom)) {
+        e.stopPropagation()
+      }
+    }
+
+    messagesContainer.addEventListener('wheel', handleWheel, { passive: false })
+    return () => messagesContainer.removeEventListener('wheel', handleWheel)
+  }, [])
 
   // Load conversation from localStorage
   useEffect(() => {
@@ -82,14 +109,17 @@ function SupportPanel({
     }
   }, [messages, conversationState])
 
-  const initializeConversation = async () => {
+  const initializeConversation = () => {
     // Don't re-initialize if we already have messages
     if (messages.length > 0) return
+
+    // Get automated welcome response
+    const welcomeResponse = supportEngine.generateResponse('greeting', '', conversationState)
 
     const welcomeMessage: Message = {
       id: `msg_${Date.now()}`,
       role: 'assistant',
-      content: "Hi there! 👋 Welcome to ThesisFlow-AI Support. I'm here to help you with questions about our research platform.",
+      content: welcomeResponse.text,
       timestamp: new Date(),
       intent: 'greeting'
     }
@@ -127,10 +157,11 @@ function SupportPanel({
         activeIntent: intent
       }
 
-      // Simulate typing delay
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200))
+      // Generate instant response
+      const response = supportEngine.generateResponse(intent, messageContent, updatedState)
 
-      const response = await supportEngine.generateResponse(intent, messageContent, updatedState)
+      // Minimal typing delay for natural feel
+      await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300))
       
       const assistantMessage: Message = {
         id: `msg_${Date.now()}`,
@@ -163,7 +194,7 @@ function SupportPanel({
       const errorMessage: Message = {
         id: `msg_${Date.now()}`,
         role: 'assistant',
-        content: "I'm sorry, I encountered an error. Please try again or contact support@thesisflow-ai.com for assistance.",
+        content: "I'm Nova, and I'm sorry - I encountered an error. Please try again or contact support@thesisflow-ai.com for assistance.",
         timestamp: new Date()
       }
       
@@ -182,6 +213,41 @@ function SupportPanel({
         (window as any).gtag('event', 'support_quick_reply_external', {
           event_category: 'support',
           event_label: reply.url
+        })
+      }
+    } else if (reply.action === 'custom' && reply.data) {
+      const { type, text } = reply.data as { type: 'copy' | 'prefill'; text: string }
+      if (type === 'copy' && text) {
+        try {
+          navigator.clipboard.writeText(text)
+          const assistantMessage: Message = {
+            id: `msg_${Date.now()}`,
+            role: 'assistant',
+            content: `Copied to clipboard: ${text}`,
+            timestamp: new Date(),
+            intent: 'contact'
+          }
+          setMessages(prev => [...prev, assistantMessage])
+        } catch (e) {
+          const assistantMessage: Message = {
+            id: `msg_${Date.now()}`,
+            role: 'assistant',
+            content: `Please copy this email: ${text}`,
+            timestamp: new Date(),
+            intent: 'contact'
+          }
+          setMessages(prev => [...prev, assistantMessage])
+        }
+      }
+      if (type === 'prefill' && text) {
+        setInputValue(text)
+        setTimeout(() => inputRef.current?.focus(), 50)
+      }
+      // Analytics
+      if (typeof window !== 'undefined' && (window as any).gtag) {
+        (window as any).gtag('event', 'support_quick_reply_custom', {
+          event_category: 'support',
+          event_label: type
         })
       }
     } else if (reply.intent) {
@@ -266,18 +332,18 @@ function SupportPanel({
   }
 
   return (
-    <div className="flex flex-col h-full max-h-[600px] md:max-h-[600px]">
+    <div className="flex flex-col h-[600px] max-h-[600px] md:h-[600px] md:max-h-[600px]">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-[#FF6B2C] text-white text-sm">
-              TS
+              N
             </AvatarFallback>
           </Avatar>
           <div>
-            <div className="font-medium text-sm">ThesisFlow Support</div>
-            <div className="text-xs text-gray-500">We typically reply in minutes</div>
+            <div className="font-medium text-sm">Nova - ThesisFlow Support</div>
+            <div className="text-xs text-gray-500">AI Assistant • Instant responses</div>
           </div>
         </div>
         
@@ -333,7 +399,10 @@ function SupportPanel({
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 overscroll-contain"
+      >
         {messages.map((message) => (
           <div
             key={message.id}
@@ -345,7 +414,7 @@ function SupportPanel({
             {message.role === 'assistant' && (
               <Avatar className="h-6 w-6 mt-1">
                 <AvatarFallback className="bg-[#FF6B2C] text-white text-xs">
-                  TS
+                  N
                 </AvatarFallback>
               </Avatar>
             )}
@@ -395,7 +464,7 @@ function SupportPanel({
           <div className="flex gap-3 justify-start">
             <Avatar className="h-6 w-6 mt-1">
               <AvatarFallback className="bg-[#FF6B2C] text-white text-xs">
-                TS
+                N
               </AvatarFallback>
             </Avatar>
             <div className="bg-gray-100 rounded-lg px-3 py-2">
@@ -440,7 +509,7 @@ function SupportPanel({
                 handleSendMessage()
               }
             }}
-            placeholder="Type your message..."
+            placeholder="Ask Nova anything..."
             className="flex-1"
             disabled={isTyping}
           />

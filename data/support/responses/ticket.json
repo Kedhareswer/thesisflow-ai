@@ -1,0 +1,15 @@
+{
+  "intent": "ticket",
+  "responses": [
+    {
+      "id": "ticket_start",
+      "text": "I'm Nova, and I'll help you report an issue! 🐛 To provide the best support, please include:\n\n• **Clear description** of the problem\n• **Steps to reproduce** (if it's a bug)\n• **Screenshots or screen recordings** (very helpful!)\n• **Browser/device** you're using\n• **When it happened** (date/time)\n\nChoose how you'd like to report:",
+      "quickReplies": [
+        { "text": "Email with Screenshots", "action": "external_link", "url": "mailto:support@thesisflow-ai.com?subject=Issue%20Report%20-%20ThesisFlow-AI&body=Hi%20ThesisFlow%20team,%0A%0AIssue%20Description:%0A%0ASteps%20to%20reproduce:%0A1.%20%0A2.%20%0A3.%20%0A%0AExpected%20behavior:%0A%0AActual%20behavior:%0A%0ABrowser/Device:%0A%0AScreenshots:%20(please%20attach)%0A%0AAdditional%20info:%0A%0AThank%20you!" },
+        { "text": "Copy Support Email", "action": "custom", "data": { "type": "copy", "text": "support@thesisflow-ai.com" } },
+        { "text": "Detailed Issue Template", "action": "custom", "data": { "type": "prefill", "text": "[Issue Report]\n🐛 Problem: \n📱 Device/Browser: \n📅 When: \n🔄 Steps to reproduce:\n1. \n2. \n3. \n\n✅ Expected: \n❌ Actual: \n📷 Screenshots: (attach to email)\n💬 Additional details: " } },
+        { "text": "Give Feedback Instead", "intent": "feedback" }
+      ]
+    }
+  ]
+}
