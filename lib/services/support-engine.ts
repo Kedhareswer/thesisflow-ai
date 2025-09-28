@@ -241,6 +241,7 @@ export class SupportEngine {
   private normalizeText(text: string): string {
     return text
       .toLowerCase()
+      .replace(/[\u2019']/g, '')
       .replace(/[^\w\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()

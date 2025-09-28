@@ -401,7 +401,7 @@ function SupportPanel({
         <div className="p-3 bg-blue-50 border-b border-blue-200 text-sm">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <div className="font-medium text-blue-900">🚀 New release v1.3 shipped</div>
+              <div className="font-medium text-blue-900">🚀 New release v2.02 shipped</div>
               <div className="text-blue-700">Enhanced Research Assistant with better context understanding</div>
             </div>
             <Button
