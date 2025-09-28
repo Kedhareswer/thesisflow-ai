@@ -1,21 +1,30 @@
-"use client"
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
-import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react'
+import { Upload, FileText, Table, Users, Download, X, Eye, Maximize, Minimize, MessageSquare, Settings, Zap, CheckCircle2, AlertCircle, Trash2, ChevronDown, MoreHorizontal, Send, Sparkles } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import { supabase } from '@/integrations/supabase/client'
+import { Sidebar } from '../../components/sidebar'
+import { useToast } from '@/hooks/use-toast'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/components/ui/use-toast'
-import { Skeleton } from '@/components/ui/skeleton'
-import Link from 'next/link'
-import Sidebar from '@/app/ai-agents/components/Sidebar'
-import { Search, Sparkles, ChevronDown, MoreHorizontal, Send } from 'lucide-react'
-import type { RecentExtraction } from '@/lib/services/extractions-store'
-import { fetchRecentExtractions, fetchExtractionWithChats, saveChatMessage, deleteExtraction, clearAllExtractions } from '@/lib/services/extractions-store'
+import { fetchRecentExtractions, fetchExtractionWithChats, saveChatMessage, deleteExtraction, clearAllExtractions, RecentExtraction } from '@/lib/services/extractions-store'
+
+// Extract Data v2 components (Phase 0)
+import { WorkspacePanel } from './components/workspace-panel'
+import { FileView } from './components/viewer-tabs/file-view'
+import { SummaryView } from './components/viewer-tabs/summary-view'
+import { TablesView } from './components/viewer-tabs/tables-view'
+import { EntitiesView } from './components/viewer-tabs/entities-view'
+import { CitationsView } from './components/viewer-tabs/citations-view'
+import { RawJsonView } from './components/viewer-tabs/raw-json-view'
+import { InsightsRail } from './components/insights-rail'
+import { ChatDock } from './components/chat-dock'
+import { useExtractionStream } from '@/hooks/use-extraction-stream'
+import { useExtractChatStream } from '@/hooks/use-extract-chat-stream'
+import { ChatMessage as StreamChatMessage } from '@/lib/types/extract-stream'
 
 interface ChatMessage {
   id: string
@@ -111,6 +120,12 @@ export default function ExtractPage() {
   const [showEntities, setShowEntities] = useState(true)
   const [recentExtractions, setRecentExtractions] = useState<RecentExtraction[]>([])
   const [activeExtractionId, setActiveExtractionId] = useState<string | null>(null)
+
+  // Extract Data v2 state (Phase 0)
+  const isV2Enabled = process.env.NEXT_PUBLIC_EXTRACT_V2_ENABLED === 'true'
+  const [activeViewerTab, setActiveViewerTab] = useState<'file' | 'summary' | 'tables' | 'entities' | 'citations' | 'raw'>('file')
+  const extractionStream = useExtractionStream()
+  const chatStream = useExtractChatStream()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
