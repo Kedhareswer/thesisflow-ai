@@ -1,8 +1,3 @@
-/**
- * Extract Data v2 - New redesigned page (Phase 0 scaffold)
- * Access via /extract-v2 or set NEXT_PUBLIC_EXTRACT_V2_ENABLED=true
- */
-
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
@@ -10,6 +5,8 @@ import Link from 'next/link'
 import { Sidebar } from '../../components/sidebar'
 import { useToast } from '@/hooks/use-toast'
 import { fetchRecentExtractions, fetchExtractionWithChats, saveChatMessage, deleteExtraction, clearAllExtractions, RecentExtraction } from '@/lib/services/extractions-store'
+import { SkipLink, ProgressAnnouncer, useKeyboardNavigation, announceToScreenReader } from '../extract/components/accessibility-helpers'
+import { SafeTextProcessor, PerformanceMonitor } from '@/lib/utils/performance-utils'
 
 // Extract Data v2 components
 import { WorkspacePanel } from '../extract/components/workspace-panel'
@@ -32,9 +29,19 @@ export default function ExtractV2Page() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [recentExtractions, setRecentExtractions] = useState<RecentExtraction[]>([])
   const [activeViewerTab, setActiveViewerTab] = useState<'file' | 'summary' | 'tables' | 'entities' | 'citations' | 'raw'>('file')
+  
+  // Accessibility: Keyboard navigation for viewer tabs
+  const viewerTabs = ['file', 'summary', 'tables', 'entities', 'citations', 'raw']
+  useKeyboardNavigation(
+    viewerTabs, 
+    activeViewerTab, 
+    (tab) => setActiveViewerTab(tab as typeof activeViewerTab),
+    true
+  )
   const [supportedExtensions, setSupportedExtensions] = useState<string[]>(['pdf', 'docx', 'doc', 'csv', 'txt', 'pptx'])
   const [extractedData, setExtractedData] = useState<any>(null)
   const [isExtracting, setIsExtracting] = useState(false)
+  const [extractionResults, setExtractionResults] = useState<Map<string, any>>(new Map())
   
   // File preview state (reused from original)
   const [previewType, setPreviewType] = useState<'none' | 'pdf' | 'image' | 'text' | 'csv' | 'unsupported'>('none')
@@ -57,6 +64,36 @@ export default function ExtractV2Page() {
     loadRecent()
   }, [])
 
+  // Sync extraction stream state with UI
+  useEffect(() => {
+    setIsExtracting(extractionStream.state.isStreaming)
+    
+    // Aggregate data from all files for the current active file
+    const currentFileId = extractionStream.state.files[0]?.fileId
+    
+    if (currentFileId) {
+      const currentInsight = extractionStream.state.insights.find(i => i.fileId === currentFileId)
+      const currentTables = extractionStream.state.tables.find(t => t.fileId === currentFileId)
+      const currentEntities = extractionStream.state.entities.find(e => e.fileId === currentFileId)
+      const currentCitations = extractionStream.state.citations.find(c => c.fileId === currentFileId)
+      
+      // Build aggregated extracted data
+      setExtractedData({
+        summary: currentInsight?.summary || '',
+        keyPoints: currentInsight?.keyPoints || [],
+        tables: currentTables?.data || [],
+        entities: currentEntities?.data || [],
+        citations: currentCitations?.data || [],
+        metadata: {
+          wordCount: 0, // TODO: Extract from parse event
+          pageCount: 0, // TODO: Extract from parse event
+          fileType: selectedFiles[0]?.type,
+          fileSize: selectedFiles[0]?.size,
+        }
+      })
+    }
+  }, [extractionStream.state, selectedFiles])
+
   const loadRecent = async () => {
     const recent = await fetchRecentExtractions(10)
     setRecentExtractions(recent)
@@ -76,9 +113,12 @@ export default function ExtractV2Page() {
     const accepted = picked.filter(f => f.size <= MAX_BYTES)
     setSelectedFiles(prev => [...prev, ...accepted])
     
-    // Phase 0: Start mock extraction stream
+    // Phase 1: Start real extraction stream
     if (accepted.length > 0) {
-      extractionStream.start(accepted)
+      extractionStream.start(accepted, {
+        extractionType: 'summary',
+        ocrEnabled: false, // TODO: Add OCR toggle to UI
+      })
     }
   }, [toast, extractionStream])
 
@@ -119,14 +159,21 @@ export default function ExtractV2Page() {
     }
   }
 
-  const handleSendMessage = (message: string) => {
+  const handleSendMessage = (message: string, options?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  }) => {
     const chatMessages: StreamChatMessage[] = [
       ...chatStream.state.messages,
       { role: 'user', content: message }
     ]
     chatStream.send(chatMessages, { 
       sessionId: extractionStream.state.sessionId,
-      fileId: extractionStream.state.files[0]?.fileId 
+      fileId: extractionStream.state.files[0]?.fileId,
+      extractionId: extractionStream.state.files[0]?.extractionId,
+      ...options
     })
   }
 
@@ -142,9 +189,22 @@ export default function ExtractV2Page() {
 
   return (
     <div className="flex min-h-screen bg-[#F8F9FA]">
+      {/* Skip Links for Accessibility */}
+      <SkipLink href="#main-content">Skip to main content</SkipLink>
+      <SkipLink href="#viewer-tabs">Skip to document viewer</SkipLink>
+      <SkipLink href="#chat-section">Skip to chat</SkipLink>
+
+      {/* Progress Announcer for Screen Readers */}
+      <ProgressAnnouncer 
+        progress={extractionStream.state.files[0]?.progress || 0}
+        phase={extractionStream.state.files[0]?.phase || 'queued'}
+        message={extractionStream.state.timeline[extractionStream.state.timeline.length - 1]?.message}
+      />
+
+      {/* Sidebar (same as AI Agents) */}
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <div className="flex min-h-screen flex-1 flex-col">
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
+        <main id="main-content" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8" role="main">
           {/* Breadcrumb */}
           <div className="mb-4 text-sm text-gray-500">
             <Link href="/" className="hover:text-gray-700">Home</Link>
@@ -189,7 +249,12 @@ export default function ExtractV2Page() {
               <div className="rounded-lg border border-gray-200 bg-white">
                 {/* Tab Navigation */}
                 <div className="border-b border-gray-200">
-                  <nav className="flex space-x-8 px-4" aria-label="Tabs">
+                  <nav 
+                    className="flex space-x-8 px-4" 
+                    aria-label="Document viewer tabs"
+                    role="tablist"
+                    id="viewer-tabs"
+                  >
                     {[
                       { key: 'file', label: 'File View' },
                       { key: 'summary', label: 'Summary' },
@@ -201,7 +266,11 @@ export default function ExtractV2Page() {
                       <button
                         key={tab.key}
                         onClick={() => setActiveViewerTab(tab.key as any)}
-                        className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
+                        role="tab"
+                        aria-selected={activeViewerTab === tab.key}
+                        aria-controls={`${tab.key}-panel`}
+                        tabIndex={activeViewerTab === tab.key ? 0 : -1}
+                        className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
                           activeViewerTab === tab.key
                             ? 'border-orange-500 text-orange-600'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
@@ -253,7 +322,7 @@ export default function ExtractV2Page() {
                     <EntitiesView entities={extractedData?.entities} />
                   )}
                   {activeViewerTab === 'citations' && (
-                    <CitationsView citations={[]} />
+                    <CitationsView citations={extractedData?.citations || []} />
                   )}
                   {activeViewerTab === 'raw' && (
                     <RawJsonView 
@@ -272,25 +341,26 @@ export default function ExtractV2Page() {
                 overallProgress={extractionStream.state.files[0]?.progress || 0}
                 insights={extractionStream.state.insights}
                 timeline={extractionStream.state.timeline}
+                sessionId={extractionStream.state.sessionId}
+                showTimelineReplay={true}
                 metrics={{
                   filesProcessed: extractionStream.state.files.filter(f => f.phase === 'completed').length,
                   totalFiles: extractionStream.state.files.length,
                   tablesFound: extractedData?.tables?.length,
                   entitiesFound: extractedData?.entities?.length,
-                  ocrEnabled: false,
+                  ocrEnabled: false, // TODO: Add OCR toggle
                 }}
               />
             </div>
           </div>
-
-          {/* Bottom: Chat Dock */}
-          <div className="mt-6">
+          <div className="mt-6" id="chat-section">
             <ChatDock
               messages={chatStream.state.messages}
               currentResponse={chatStream.state.currentResponse}
               isStreaming={chatStream.state.isStreaming}
               onSendMessage={handleSendMessage}
               onAbort={chatStream.abort}
+              usage={chatStream.state.usage}
             />
           </div>
         </main>

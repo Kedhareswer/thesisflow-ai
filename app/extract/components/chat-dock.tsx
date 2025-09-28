@@ -13,8 +13,14 @@ interface ChatDockProps {
   messages: ChatMessage[];
   currentResponse: string;
   isStreaming: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, options?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  }) => void;
   onAbort: () => void;
+  usage?: { tokens?: number };
 }
 
 export function ChatDock({
@@ -23,12 +29,19 @@ export function ChatDock({
   isStreaming,
   onSendMessage,
   onAbort,
+  usage,
 }: ChatDockProps) {
   const [currentMessage, setCurrentMessage] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Advanced settings state
+  const [provider, setProvider] = useState('auto');
+  const [model, setModel] = useState('auto');
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(2000);
 
   // Suggestion chips (reuse from existing page)
   const suggestions = [
@@ -48,7 +61,12 @@ export function ChatDock({
 
   const handleSend = () => {
     if (!currentMessage.trim() || isStreaming) return;
-    onSendMessage(currentMessage.trim());
+    onSendMessage(currentMessage.trim(), {
+      provider: provider === 'auto' ? undefined : provider,
+      model: model === 'auto' ? undefined : model,
+      temperature,
+      maxTokens,
+    });
     setCurrentMessage('');
   };
 
@@ -60,7 +78,12 @@ export function ChatDock({
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    onSendMessage(suggestion);
+    onSendMessage(suggestion, {
+      provider: provider === 'auto' ? undefined : provider,
+      model: model === 'auto' ? undefined : model,
+      temperature,
+      maxTokens,
+    });
   };
 
   return (
@@ -96,12 +119,94 @@ export function ChatDock({
       {/* Advanced Settings Drawer */}
       {showAdvanced && (
         <div className="border-b border-gray-200 bg-gray-50 p-4">
-          <div className="text-sm text-gray-600">
-            <div className="mb-2 font-medium">Advanced Settings</div>
-            <div className="text-xs text-gray-500">
-              Provider/Model selection and cost preview will be available in Phase 3.
+          <div className="text-sm">
+            <div className="mb-3 font-medium text-gray-900">Advanced Settings</div>
+            
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* Provider Selection */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Provider
+                </label>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="auto">Auto (Recommended)</option>
+                  <option value="openrouter">OpenRouter</option>
+                </select>
+              </div>
+
+              {/* Model Selection */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Model
+                </label>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="auto">Auto (Recommended)</option>
+                  <option value="z-ai/glm-4.5-air:free">GLM-4.5 Air</option>
+                  <option value="agentica-org/deepcoder-14b-preview:free">DeepCoder 14B</option>
+                  <option value="nousresearch/deephermes-3-llama-3-8b-preview:free">DeepHermes 3</option>
+                  <option value="nvidia/nemotron-nano-9b-v2:free">Nemotron Nano</option>
+                  <option value="deepseek/deepseek-chat-v3.1:free">DeepSeek Chat</option>
+                  <option value="openai/gpt-oss-120b:free">GPT-OSS 120B</option>
+                </select>
+              </div>
+
+              {/* Temperature */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Temperature: {temperature}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={temperature}
+                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>Focused</span>
+                  <span>Creative</span>
+                </div>
+              </div>
+
+              {/* Max Tokens */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Max Tokens
+                </label>
+                <select
+                  value={maxTokens}
+                  onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value={1000}>1,000 (Short)</option>
+                  <option value={2000}>2,000 (Medium)</option>
+                  <option value={4000}>4,000 (Long)</option>
+                  <option value={8000}>8,000 (Very Long)</option>
+                </select>
+              </div>
             </div>
-            {/* TODO Phase 3: Add provider/model selector, temperature, cost preview */}
+
+            {/* Usage Stats */}
+            {usage && usage.tokens && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="text-xs text-gray-600">
+                  <span className="font-medium">Last response:</span> ~{usage.tokens} tokens
+                  <span className="ml-2 text-gray-500">
+                    (≈${((usage.tokens / 1000) * 0.001).toFixed(4)} estimated cost)
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

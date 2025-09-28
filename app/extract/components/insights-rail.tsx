@@ -6,6 +6,7 @@
 import React from 'react';
 import { CheckCircle, Clock, AlertCircle, ChevronRight, Activity } from 'lucide-react';
 import { ExtractPhase } from '@/lib/types/extract-stream';
+import { TimelineReplay } from './timeline-replay';
 
 interface InsightsRailProps {
   // Progress data
@@ -36,6 +37,10 @@ interface InsightsRailProps {
     entitiesFound?: number;
     ocrEnabled?: boolean;
   };
+  
+  // Phase 2: Timeline replay
+  sessionId?: string;
+  showTimelineReplay?: boolean;
 }
 
 export function InsightsRail({
@@ -44,6 +49,8 @@ export function InsightsRail({
   insights,
   timeline,
   metrics,
+  sessionId,
+  showTimelineReplay = false,
 }: InsightsRailProps) {
   const phases: Array<{ key: ExtractPhase; label: string; description: string }> = [
     { key: 'uploading', label: 'Uploading', description: 'Preparing files' },
@@ -189,35 +196,45 @@ export function InsightsRail({
 
       {/* Activity Timeline */}
       <div className="flex-1 overflow-hidden p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Activity Timeline</h3>
-          {timeline.length > 5 && (
-            <button className="text-xs text-orange-600 hover:text-orange-700">
-              View all
-            </button>
-          )}
-        </div>
-        
-        {recentEvents.length > 0 ? (
-          <div className="space-y-3 overflow-y-auto">
-            {recentEvents.map((event, index) => (
-              <div key={index} className="flex items-start gap-3">
-                <div className="mt-1 flex-shrink-0">
-                  <Activity className="h-3 w-3 text-gray-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm text-gray-900">{event.message}</div>
-                  <div className="text-xs text-gray-500">
-                    {event.timestamp.toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {showTimelineReplay && sessionId ? (
+          <TimelineReplay 
+            sessionId={sessionId} 
+            isLive={currentPhase !== 'completed' && currentPhase !== 'failed'}
+            maxEvents={20}
+          />
         ) : (
-          <div className="text-sm text-gray-500">
-            Activity will appear here as processing begins.
-          </div>
+          <>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Activity Timeline</h3>
+              {timeline.length > 5 && (
+                <button className="text-xs text-orange-600 hover:text-orange-700">
+                  View all
+                </button>
+              )}
+            </div>
+            
+            {recentEvents.length > 0 ? (
+              <div className="space-y-3 overflow-y-auto">
+                {recentEvents.map((event, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="mt-1 flex-shrink-0">
+                      <Activity className="h-3 w-3 text-gray-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-gray-900">{event.message}</div>
+                      <div className="text-xs text-gray-500">
+                        {event.timestamp.toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">
+                Activity will appear here as processing begins.
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

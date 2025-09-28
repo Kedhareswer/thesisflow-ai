@@ -158,11 +158,38 @@ export interface ExtractionStreamState {
     summary: string;
     keyPoints: string[];
   }>;
+  tables: Array<{
+    fileId: string;
+    count: number;
+    data: Array<{
+      id: string;
+      headers: string[];
+      rows: string[][];
+    }>;
+  }>;
+  entities: Array<{
+    fileId: string;
+    count: number;
+    data: Array<{
+      type: string;
+      value: string;
+      count: number;
+    }>;
+  }>;
+  citations: Array<{
+    fileId: string;
+    data: Array<{
+      kind: 'doi' | 'url' | 'ref';
+      value: string;
+      title?: string;
+    }>;
+  }>;
   timeline: Array<{
     timestamp: Date;
     fileId?: string;
     phase: ExtractPhase;
     message: string;
+    data?: any; // Additional event data for replay
   }>;
   error?: string;
 }
