@@ -1,0 +1,14 @@
+{
+  "intent": "features_writer",
+  "responses": [
+    {
+      "id": "writer_overview",
+      "text": "**AI Writer (LaTeX-first)** ✍️\\n\\nCraft academic-ready content with live LaTeX preview and collaboration.\\n\\n**Highlights:**\\n• Real-time LaTeX rendering (KaTeX)\\n• Sections, tables, equations toolbar\\n• Collaborative editing with cursors\\n• AI assistance for abstracts, tables, and citations\\n• Split / full preview modes\\n\\n**Great for:** literature reviews, method write-ups, tables, and formula-heavy drafts.",
+      "quickReplies": [
+        { "text": "Open Writer", "action": "external_link", "url": "/writer" },
+        { "text": "Pricing", "intent": "pricing" },
+        { "text": "Token Usage", "intent": "tokens" }
+      ]
+    }
+  ]
+}

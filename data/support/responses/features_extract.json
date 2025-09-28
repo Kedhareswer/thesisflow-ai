@@ -1,0 +1,14 @@
+{
+  "intent": "features_extract",
+  "responses": [
+    {
+      "id": "extract_overview",
+      "text": "**Extract Data** 🧩\n\nTurn PDFs, DOCX, PPTX, CSV, and images into structured data.\n\n**Capabilities:**\n• Text + metadata extraction (PDF, DOCX, PPTX, CSV, TXT)\n• OCR for images (Tesseract.js)\n• Table and entity extraction\n• AI summaries and structured output (JSON/CSV/Markdown/Text)\n• Progress tracking and error handling\n\n**Great for:** scanned docs, tables, datasets, and research artifacts.",
+      "quickReplies": [
+        { "text": "Open Extract", "action": "external_link", "url": "/extract" },
+        { "text": "Token Usage", "intent": "tokens" },
+        { "text": "Pricing", "intent": "pricing" }
+      ]
+    }
+  ]
+}

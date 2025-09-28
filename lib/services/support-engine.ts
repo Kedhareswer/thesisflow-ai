@@ -66,7 +66,28 @@ export class SupportEngine {
     
     let bestMatch = { intent: 'unknown', confidence: 0 }
 
-    // Enhanced keyword matching with phrase detection
+    // 1) Strong exact-match heuristic for short inputs (one or two words)
+    const shortInput = normalizedInput.length <= 20 && words.length <= 3
+    // Fast path: map very common single-word intents directly
+    if (shortInput) {
+      if (/^features?$/.test(normalizedInput)) {
+        return { intent: 'about', confidence: 0.9 }
+      }
+      if (/^(pricing|price|plans|plan|cost|billing|payment)$/.test(normalizedInput)) {
+        return { intent: 'pricing', confidence: 0.95 }
+      }
+      if (/^(token|tokens|usage|quota|allowance|token usage)$/.test(normalizedInput)) {
+        return { intent: 'tokens', confidence: 0.95 }
+      }
+      if (/^(bug|issue|problem|ticket)$/.test(normalizedInput)) {
+        return { intent: 'ticket', confidence: 0.95 }
+      }
+      if (/^(feedback|suggestion|review|rating)$/.test(normalizedInput)) {
+        return { intent: 'feedback', confidence: 0.95 }
+      }
+    }
+
+    // 2) Enhanced keyword matching with phrase detection and exact token boosts
     for (const intent of this.intents) {
       let score = 0
       let matchCount = 0
@@ -82,6 +103,10 @@ export class SupportEngine {
             score += 1
           }
           matchCount++
+          // Additional boost for exact whole-input match
+          if (normalizedInput === keywordLower) {
+            score += 3
+          }
         }
       }
 
@@ -92,17 +117,24 @@ export class SupportEngine {
             // Find if canonical form matches any intent keywords
             for (const intentKeyword of intent.keywords) {
               if (intentKeyword.toLowerCase() === canonical.toLowerCase()) {
-                score += 0.8
+                score += 1.2
                 matchCount++
+                // Additional boost for exact synonym match
+                if (normalizedInput === synonym.toLowerCase()) {
+                  score += 2.5
+                }
               }
             }
           }
         }
       }
 
-      // Enhanced confidence calculation
-      const confidence = matchCount > 0 
-        ? Math.min(1.0, (score / Math.max(1, intent.keywords.length)) * intent.confidence * (1 / intent.priority))
+      // 3) Enhanced confidence calculation (less punitive for large keyword lists)
+      // Normalize by a soft factor instead of total keywords to avoid under-confidence on short queries
+      const softNorm = 3 // ~3 signals to reach high confidence
+      const priorityAttenuation = Math.max(0.7, 1 - (intent.priority - 1) * 0.05) // small effect
+      const confidence = matchCount > 0
+        ? Math.min(1.0, (score / softNorm) * intent.confidence * priorityAttenuation)
         : 0
 
       if (confidence > bestMatch.confidence) {
@@ -110,8 +142,8 @@ export class SupportEngine {
       }
     }
 
-    // Better fallback logic with conversation awareness
-    if (bestMatch.confidence < 0.2) {
+    // 4) Better fallback logic with conversation awareness
+    if (bestMatch.confidence < 0.15) {
       // If it's clearly a greeting and we haven't greeted yet, allow greeting
       if (/^(hi|hello|hey|start|begin)$/i.test(normalizedInput) && !hasAnyUserMessage && !hasGreetedBefore) {
         return { intent: 'greeting', confidence: 0.9 }
