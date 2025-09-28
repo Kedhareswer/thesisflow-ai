@@ -8,6 +8,8 @@ import { useLiteratureSearch, type Paper } from "@/hooks/use-literature-search"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
+import { upsertSession, computeMetrics } from "@/lib/services/topics-session.store"
+import { useTopicsFind } from "@/hooks/use-topics-find"
 
 interface TopicSuggestion {
   id: string
@@ -29,6 +31,8 @@ export default function FindTopicsPage() {
   const [searchMode, setSearchMode] = useState<'search' | 'results'>('search')
   const [qualityMode, setQualityMode] = useState<'Standard' | 'Enhanced'>('Standard')
   const [timeLeft, setTimeLeft] = useState(6)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [activeClusterId, setActiveClusterId] = useState<string | null>(null)
 
   // Auth session for authenticated API calls (required by token middleware)
   const { session } = useSupabaseAuth()
@@ -51,6 +55,22 @@ export default function FindTopicsPage() {
   const reportTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [reportStartAt, setReportStartAt] = useState<number | null>(null)
   const [reportElapsedSec, setReportElapsedSec] = useState(0)
+
+  // Streaming pipeline for sources/insights (SSE)
+  const topicsFind = useTopicsFind()
+
+  // Derived research metrics for right-rail (fallback when streaming metrics unavailable)
+  const fallbackMetrics = useMemo(() => computeMetrics(searchQuery, literature.results || []), [searchQuery, literature.results])
+  const liveMetrics = topicsFind.metrics ?? fallbackMetrics
+
+  const isLive = (topicsFind.items?.length || 0) > 0
+  const liveItemsFiltered = useMemo(() => {
+    if (!isLive) return [] as Array<{ title: string; url: string; snippet?: string; source: string; year?: number | string }>
+    if (!activeClusterId) return topicsFind.items
+    const c = topicsFind.clusters?.find((cc) => cc.id === activeClusterId)
+    if (!c) return topicsFind.items
+    return c.indices.map((i) => topicsFind.items[i]).filter(Boolean)
+  }, [isLive, topicsFind.items, topicsFind.clusters, activeClusterId])
 
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0')
@@ -174,8 +194,20 @@ export default function FindTopicsPage() {
       try { reportAbortRef.current.abort() } catch {}
       reportAbortRef.current = null
     }
+    // New local session id for persistence
+    try {
+      const newId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : String(Date.now())
+      setSessionId(newId)
+    } catch { setSessionId(String(Date.now())) }
+
     setIsSearching(true)
     setSearchMode('results')
+    // Start streaming pipeline (parallel to literature search)
+    try { topicsFind.reset() } catch {}
+    try {
+      const limitStart = qualityMode === 'Standard' ? 10 : 20
+      topicsFind.start({ q: query, limit: limitStart, quality: qualityMode })
+    } catch {}
     
     // Simulate countdown
     const interval = setInterval(() => {
@@ -220,7 +252,7 @@ export default function FindTopicsPage() {
   // When results are available, compute topics via AI (best-effort)
   useEffect(() => {
     const papers = literature.results || []
-    if (papers.length >= 6 && !topicsLoading && topics.length === 0) {
+    if (papers.length >= 6 && !topicsLoading && topics.length === 0 && (topicsFind.topics?.length || 0) === 0) {
       // Create AbortController for request cancellation and timeout
       const controller = new AbortController()
       let timeoutId: NodeJS.Timeout | null = null
@@ -295,6 +327,30 @@ export default function FindTopicsPage() {
       }
     }
   }, [literature.results, topicsLoading, topics.length, qualityMode, session?.access_token])
+
+  // Sync topics from streaming insights when available
+  useEffect(() => {
+    if ((topicsFind.topics?.length || 0) > 0) {
+      setTopics((topicsFind.topics || []).slice(0, 15))
+      setTopicsError(null)
+    }
+  }, [topicsFind.topics])
+
+  // Persist session snapshot whenever major parts change
+  useEffect(() => {
+    if (!sessionId || !searchQuery) return
+    const results = literature.results || []
+    if (results.length === 0) return
+    upsertSession({
+      id: sessionId,
+      query: searchQuery,
+      createdAt: Date.now(),
+      quality: qualityMode,
+      results,
+      topics,
+      metrics: liveMetrics,
+    })
+  }, [sessionId, searchQuery, literature.results, topics, qualityMode, liveMetrics])
 
   // Manual streaming report generation (SSE over fetch)
   const generateReport = useCallback(async () => {
@@ -424,6 +480,7 @@ export default function FindTopicsPage() {
                 <span className="text-gray-900">{searchQuery}</span>
               </div>
               <div className="flex items-center space-x-4">
+                <Link href="/topics/library" className="text-sm text-blue-600 hover:underline">Library</Link>
                 <div className="flex bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setQualityMode('Standard')}
@@ -456,43 +513,70 @@ export default function FindTopicsPage() {
 
           {/* Main Content */}
           <div className="px-6 py-8">
-            <div className="max-w-2xl">
-              <p className="text-gray-700 mb-2">
-                Getting topics and sources for '{searchQuery}'.
-              </p>
-              <div className="text-sm text-gray-600 mb-6 flex items-center gap-2">
-                { (isSearching || literature.isLoading) && <Loader2 className="w-4 h-4 animate-spin" /> }
-                { literature.isLoading ? 'Searching…' : `Done${literature.results.length ? ` • ${literature.results.length} results` : ''}` }
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 max-w-2xl">
+                <p className="text-gray-700 mb-2">
+                  Getting topics and sources for '{searchQuery}'.
+                </p>
+                <div className="text-sm text-gray-600 mb-6 flex items-center gap-2">
+                  { (isSearching || literature.isLoading) && <Loader2 className="w-4 h-4 animate-spin" /> }
+                  { literature.isLoading ? 'Searching…' : `Done${literature.results.length ? ` • ${literature.results.length} results` : ''}` }
+                </div>
+
+                {/* Progress Steps - hide when report is finished */}
+                {(!report || reportLoading) && (
+                  <div className="space-y-3">
+                    {searchProgress.map((step, index) => (
+                      <div key={index} className="flex items-center space-x-3">
+                        {step.status === 'completed' && (
+                          <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        {step.status === 'current' && (
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                          </div>
+                        )}
+                        {step.status === 'pending' && (
+                          <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
+                        )}
+                        <span className={`text-sm ${
+                          step.status === 'completed' ? 'text-gray-900' : 
+                          step.status === 'current' ? 'text-gray-900' : 'text-gray-400'
+                        }`}>
+                          {step.step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Progress Steps - hide when report is finished */}
-              {(!report || reportLoading) && (
-                <div className="space-y-3">
-                  {searchProgress.map((step, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      {step.status === 'completed' && (
-                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                      {step.status === 'current' && (
-                        <div className="w-5 h-5 flex items-center justify-center">
-                          <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                        </div>
-                      )}
-                      {step.status === 'pending' && (
-                        <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
-                      )}
-                      <span className={`text-sm ${
-                        step.status === 'completed' ? 'text-gray-900' : 
-                        step.status === 'current' ? 'text-gray-900' : 'text-gray-400'
-                      }`}>
-                        {step.step}
-                      </span>
-                    </div>
-                  ))}
+              {/* Right rail: Research Metrics & Key Insights */}
+              <aside className="lg:col-span-1">
+                <div className="rounded-lg border border-gray-200 bg-white p-4 mb-4">
+                  <div className="font-semibold text-gray-900 mb-2">Research Metrics</div>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <div className="flex items-center justify-between"><span>Relevance</span><span>{Math.round(liveMetrics.relevance * 100)}%</span></div>
+                    <div className="flex items-center justify-between"><span>Source Diversity</span><span>{Math.round(liveMetrics.diversity * 100)}%</span></div>
+                    <div className="flex items-center justify-between"><span>Coverage</span><span>{Math.round(liveMetrics.coverage * 100)}%</span></div>
+                    <div className="flex items-center justify-between"><span>Sources</span><span>{liveMetrics.sources}</span></div>
+                  </div>
                 </div>
-              )}
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="font-semibold text-gray-900 mb-2">Key Insights</div>
+                  {topics.length === 0 ? (
+                    <div className="text-sm text-gray-500">Insights will appear after analysis.</div>
+                  ) : (
+                    <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                      {topics.slice(0, 5).map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </aside>
             </div>
             
             {/* Insights & Next Actions - replaces Generated/Extracted Topics header */}
@@ -570,6 +654,38 @@ export default function FindTopicsPage() {
               )}
             </div>
 
+            {/* Topic Clusters (Live) */}
+            {topicsFind.clusters && topicsFind.clusters.length > 0 && (
+              <div className="mt-10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900">Topic Clusters</h3>
+                  <div className="text-xs text-gray-500">live</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setActiveClusterId(null)}
+                    className={`px-3 py-1 rounded-full border text-sm ${
+                      activeClusterId === null ? 'bg-blue-50 border-blue-200 text-blue-700' : 'border-gray-200 bg-white text-gray-700'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {topicsFind.clusters.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setActiveClusterId(c.id)}
+                      className={`px-3 py-1 rounded-full border text-sm ${
+                        activeClusterId === c.id ? 'bg-blue-50 border-blue-200 text-blue-700' : 'border-gray-200 bg-white text-gray-700'
+                      }`}
+                      title={`${c.size} sources`}
+                    >
+                      {c.label} <span className="text-gray-400">({c.size})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Sources - moved to bottom */}
             <div className="mt-10">
               <div className="flex items-center justify-between mb-3">
@@ -580,7 +696,7 @@ export default function FindTopicsPage() {
                   </Link>
                 </div>
               </div>
-              {literature.error && (
+              {literature.error && !isLive && (
                 <div className="flex items-center gap-2 text-red-600 text-sm mb-3">
                   <AlertTriangle className="w-4 h-4" />
                   {literature.error}
@@ -598,32 +714,60 @@ export default function FindTopicsPage() {
                   )}
                 </div>
               )}
-              {literature.results.length === 0 && !literature.isLoading ? (
-                <div className="text-gray-500 text-sm">No sources found. Try another query.</div>
+              {isLive ? (
+                liveItemsFiltered.length === 0 && !topicsFind.isLoading ? (
+                  <div className="text-gray-500 text-sm">No live sources yet.</div>
+                ) : (
+                  <div className="grid gap-4">
+                    {liveItemsFiltered.map((p, idx) => (
+                      <Card key={`${p.url}-${idx}`}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base">
+                            <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 flex items-start gap-2">
+                              {p.title}
+                              <ExternalLink className="w-4 h-4 mt-1 text-gray-400" />
+                            </a>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0 text-sm text-gray-600">
+                          {p.snippet && <p className="line-clamp-3 mb-2">{p.snippet}</p>}
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                            {p.year && <span>{p.year}</span>}
+                            {p.source && <span className="uppercase">{p.source}</span>}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )
               ) : (
-                <div className="grid gap-4">
-                  {literature.results.map((p: Paper) => (
-                    <Card key={`${p.id}-${p.url}`}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base">
-                          <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 flex items-start gap-2">
-                            {p.title}
-                            <ExternalLink className="w-4 h-4 mt-1 text-gray-400" />
-                          </a>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-0 text-sm text-gray-600">
-                        {p.abstract && <p className="line-clamp-3 mb-2">{p.abstract}</p>}
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                          {p.journal && <span>{p.journal}</span>}
-                          {p.year && <span>{p.year}</span>}
-                          {p.authors?.length ? <span>{p.authors.slice(0,3).join(', ')}{p.authors.length>3?' et al.':''}</span> : null}
-                          {p.source && <span className="uppercase">{p.source}</span>}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                literature.results.length === 0 && !literature.isLoading ? (
+                  <div className="text-gray-500 text-sm">No sources found. Try another query.</div>
+                ) : (
+                  <div className="grid gap-4">
+                    {literature.results.map((p: Paper) => (
+                      <Card key={`${p.id}-${p.url}`}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base">
+                            <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 flex items-start gap-2">
+                              {p.title}
+                              <ExternalLink className="w-4 h-4 mt-1 text-gray-400" />
+                            </a>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0 text-sm text-gray-600">
+                          {p.abstract && <p className="line-clamp-3 mb-2">{p.abstract}</p>}
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                            {p.journal && <span>{p.journal}</span>}
+                            {p.year && <span>{p.year}</span>}
+                            {p.authors?.length ? <span>{p.authors.slice(0,3).join(', ')}{p.authors.length>3?' et al.':''}</span> : null}
+                            {p.source && <span className="uppercase">{p.source}</span>}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )
               )}
             </div>
             {/* duplicate sections removed */}
