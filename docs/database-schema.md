@@ -71,6 +71,23 @@ Notes
   - `created_at timestamptz` DEFAULT `now()`
 - Purpose: audit trail and analytics for token operations.
 
+### public.usage_events
+- PK: `id uuid` DEFAULT `gen_random_uuid()`
+- Columns
+  - `user_id uuid`
+  - `feature_name text`
+  - `provider text`, `model text`
+  - `api_key_owner text` CHECK (`api_key_owner` IN ('user','system'))
+  - `api_key_provider text`
+  - `tokens_charged int` DEFAULT `0` CHECK (`tokens_charged` >= 0)
+  - `provider_cost_usd numeric`
+  - `created_at timestamptz` DEFAULT `now()`
+- Indexes
+  - `(user_id, created_at)`
+  - `(feature_name)`
+  - `(provider, model)`
+- Purpose: records usage-only events, including zero-cost flows (e.g., Explorer Assistant bypass). Complements `token_transactions` by making non-deducted usage visible in analytics.
+
 ### public.user_usage
 - PK: composite (`user_id`, `feature_name`)
 - Columns
@@ -296,6 +313,7 @@ Notes
 
 ## Views
 - `public.users` — security invoker view that exposes limited user fields.
+- `public.usage_daily_mv` — materialized view that aggregates additive metrics from `token_transactions` (deduct rows) by day and dimensions (service, provider, model, feature_name, etc.). The Analytics API (`/api/usage/analytics/v2`) merges this MV with aggregated `usage_events` at request time to include zero-cost usage. Non-additive metrics (like averages) are computed from the MV only.
 
 ---
 

@@ -137,6 +137,8 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
 
     try {
       // Try GET + EventSource first for robust streaming
+      // For SSE (EventSource), avoid including access tokens in URL.
+      // We rely on same-origin cookies (withCredentials: true) for auth.
       let token: string | undefined
       try {
         const { supabase } = await import("@/integrations/supabase/client")
@@ -151,7 +153,7 @@ export function usePlanAndExecute(options: UsePlanAndExecuteOptions = {}) {
       if (selectedTools && selectedTools.length) usp.set('selectedTools', selectedTools.join(','))
       usp.set('useDeepResearch', String(!!useDeepResearch))
       usp.set('maxIterations', String(maxIterations))
-      if (token) usp.set('access_token', token)
+      // Do NOT append access_token to query params. Tokens in URLs can leak via logs/referrers.
 
       let usingEventSource = false
       try {

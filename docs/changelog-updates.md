@@ -174,9 +174,34 @@ The system uses a modular knowledge base that can be easily expanded:
 4. Deploy updates
 
 ### Performance Impact
-- **Bundle Size**: ~50KB total (engine + templates + UI)
 - **LCP Impact**: Zero (lazy loaded)
 - **Runtime Performance**: Instant responses (no API calls)
 - **Memory Usage**: Minimal (localStorage only)
 
 This implementation provides a solid foundation for user support while maintaining the high performance and user experience standards of ThesisFlow-AI.
+
+---
+
+## v2.2.1 - Analytics v2 Improvements (2025-09-24)
+
+### Summary
+- Eliminated ambiguous “Other” buckets by introducing a canonical feature taxonomy and consistent mapping.
+- Ensured zero-cost usage (e.g., Explorer Assistant bypass) is recorded for visibility without affecting billing.
+- Added dimensions for API key ownership and provider to improve attribution and auditing.
+
+### Backend
+- Added `public.usage_events` table to record usage-only events (including `tokens_charged = 0`).
+- Extended analytics API `/api/usage/analytics/v2` to:
+  - Canonicalize feature names and return `unknown` for unmapped cases.
+  - Merge additive metrics from `usage_events` with the materialized view `usage_daily_mv`.
+  - Support dimensions: `service`, `feature`, `provider`, `model`, `api_key_owner`, `api_key_provider`.
+
+### Middleware
+- Token middleware logs zero-cost usage events after successful handler execution when no deduction occurs and for Explorer Assistant bypass.
+
+### UI
+- Usage Analytics UI now supports new dimensions and continues to normalize OpenRouter-based providers as `NOVA` with model family grouping (GPT, Claude, Llama, Gemini, Mixtral, Qwen, DeepSeek, GLM, Nemotron, Gemma, Mistral, Other).
+
+### Docs
+- Updated `docs/database-schema.md`, `docs/design-architecture.md`, `docs/tokens.md`, `docs/pages/explorer/README.md`.
+- Added `docs/pages/analytics/README.md` and listed it in `docs/pages/README.md`.

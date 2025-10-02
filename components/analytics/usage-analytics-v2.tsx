@@ -11,9 +11,9 @@ import { useSupabaseAuth } from "@/components/supabase-auth-provider";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 
-// Simplified metric/dimension set – only what is useful to users
+// Simplified metric set, expanded dimensions per analytics v2 API
 type Metric = 'tokens' | 'requests' | 'cost';
-type Dimension = 'service' | 'provider' | 'model';
+type Dimension = 'service' | 'provider' | 'model' | 'feature' | 'api_key_owner' | 'api_key_provider';
 
 interface AnalyticsV2Response {
   from: string;
@@ -50,7 +50,10 @@ const METRIC_LABELS: Record<Metric, string> = {
 const DIMENSION_LABELS: Record<Dimension, string> = {
   service: 'Service',
   provider: 'Provider',
-  model: 'Model'
+  model: 'Model',
+  feature: 'Feature',
+  api_key_owner: 'Key Owner',
+  api_key_provider: 'Key Provider',
 };
 
 const toDateStr = (iso: string) => {

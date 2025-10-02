@@ -116,6 +116,12 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
     - Supabase cookies: `sb-access-token` / `supabase-auth-token`
 - Security: JWT tokens MUST NOT be placed in URL query parameters. SSE endpoints rely on cookie-based authentication using `withCredentials: true`.
 
+### SSE Authentication Notes
+- Native `EventSource` cannot send custom headers. For SSE endpoints that require Bearer auth, prefer either:
+  - Cookie-based auth (HttpOnly, SameSite=strict) with `withCredentials: true` on EventSource, or
+  - A fetch-based streaming fallback (ReadableStream) that can set `Authorization: Bearer <token>` safely.
+- Never append access tokens to URL query strings; they can leak via browser history, logs, and HTTP referers.
+
 ## Idempotency
 - Provide a stable `Idempotency-Key` header for retries.
 - Server persists the key on `token_transactions.idempotency_key`.
@@ -152,3 +158,10 @@ All endpoints require authentication. Routes set `Cache-Control: no-store`.
 - Added idempotency support end-to-end.
 - Standardized auth with `requireAuth` across token routes.
 - Added rate-limit handling with `Retry-After`.
+
+## Zero-Cost Usage Logging
+- Some features or flows intentionally bypass token deduction (e.g., Explorer Assistant). To keep analytics complete while maintaining zero billing impact, the middleware records a usage-only event when no deduction occurs.
+- Table: `public.usage_events`
+  - Columns include `feature_name`, `provider`, `model`, `api_key_owner` ('user' | 'system'), `api_key_provider`, `tokens_charged` (can be 0), and timestamps.
+  - These events are merged with `token_transactions` in the Analytics API so that charts remain accurate even for free flows.
+  - Deducted operations continue to be recorded in `token_transactions`.

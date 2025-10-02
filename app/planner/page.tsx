@@ -222,6 +222,8 @@ export default function PlannerPage() {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          // Surface idempotency for middleware/token layer if supported
+          ...(body?.idempotencyKey ? { 'Idempotency-Key': String(body.idempotencyKey) } : {}),
         },
         body: JSON.stringify(body),
       })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tokenService } from '@/lib/services/token.service';
 import { requireAuth } from '@/lib/server/auth';
+import { getSupabaseAdmin } from '@/lib/server/supabase-admin';
 
 export interface TokenMiddlewareOptions {
   featureName: string;
@@ -65,6 +66,26 @@ export class TokenMiddleware {
         // annotate headers to make it explicit no tokens were used
         response.headers.set('X-Tokens-Used', '0');
         response.headers.set('X-Explorer-Bypass', 'assistant');
+        // Log zero-cost usage-only events to usage_events (no duplicate token counting)
+        try {
+          const admin = getSupabaseAdmin();
+          const provider = (context as any)?.provider ?? null;
+          const model = (context as any)?.model ?? null;
+          const apiKeyOwner = (context as any)?.api_key_owner ?? (context as any)?.apiKeyOwner ?? null;
+          const apiKeyProvider = (context as any)?.api_key_provider ?? (context as any)?.apiKeyProvider ?? null;
+          await admin.from('usage_events').insert({
+            user_id: userId,
+            feature_name: featureName,
+            provider,
+            model,
+            api_key_owner: apiKeyOwner,
+            api_key_provider: apiKeyProvider,
+            tokens_charged: 0,
+          });
+        } catch (e) {
+          // non-fatal
+        }
+
         return response;
       }
 
@@ -75,8 +96,8 @@ export class TokenMiddleware {
         '127.0.0.1';
       const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-      // Calculate required tokens
-      const tokensNeeded = requiredTokens || await tokenService.getFeatureCost(featureName, { ...context, correlation_id: correlationId });
+      // Calculate required tokens. IMPORTANT: respect explicit 0 using nullish coalescing
+      const tokensNeeded = (requiredTokens ?? await tokenService.getFeatureCost(featureName, { ...context, correlation_id: correlationId }));
 
       // Check rate limits
       const rateLimit = await tokenService.checkRateLimit(userId, featureName, { ...context, correlation_id: correlationId });
@@ -103,9 +124,9 @@ export class TokenMiddleware {
         );
       }
 
-      // Deduct tokens if not skipping
+      // Deduct tokens if not skipping and tokensNeeded > 0
       let transactionId: string | undefined;
-      if (!skipDeduction) {
+      if (!skipDeduction && tokensNeeded > 0) {
         const deductResult = await tokenService.deductTokens(
           userId,
           featureName,
@@ -133,19 +154,41 @@ export class TokenMiddleware {
         const response = await handler(userId);
         
         // Add token usage headers to response
-        response.headers.set('X-Tokens-Used', tokensNeeded.toString());
+        response.headers.set('X-Tokens-Used', Math.max(0, tokensNeeded).toString());
         response.headers.set('X-Tokens-Remaining-Monthly', rateLimit.monthlyRemaining.toString());
         response.headers.set('X-Correlation-Id', correlationId);
+        response.headers.set('X-Feature-Name', featureName);
         
         if (transactionId) {
           response.headers.set('X-Token-Transaction-ID', transactionId);
+        }
+        // Log zero-cost usage-only events (no duplicate token counting). This covers free/zero-cost features.
+        if (!transactionId && tokensNeeded <= 0) {
+          try {
+            const admin = getSupabaseAdmin();
+            const provider = (context as any)?.provider ?? null;
+            const model = (context as any)?.model ?? null;
+            const apiKeyOwner = (context as any)?.api_key_owner ?? (context as any)?.apiKeyOwner ?? null;
+            const apiKeyProvider = (context as any)?.api_key_provider ?? (context as any)?.apiKeyProvider ?? null;
+            await admin.from('usage_events').insert({
+              user_id: userId,
+              feature_name: featureName,
+              provider,
+              model,
+              api_key_owner: apiKeyOwner,
+              api_key_provider: apiKeyProvider,
+              tokens_charged: 0,
+            });
+          } catch (e) {
+            // non-fatal
+          }
         }
 
         return response;
 
       } catch (handlerError) {
         // If handler fails and we deducted tokens, refund them
-        if (transactionId && !skipDeduction) {
+        if (transactionId && !skipDeduction && tokensNeeded > 0) {
           await tokenService.refundTokens(
             userId,
             featureName,
@@ -257,6 +300,15 @@ export class TokenMiddleware {
     if (origin) context.origin = origin;
     if (feature) context.feature = feature;
     if (cid) context.correlation_id = cid;
+
+    // Idempotency: accept from header or query param (idempotencyKey|idem)
+    const idemHeader = request.headers.get('idempotency-key');
+    const idemQuery = searchParams.get('idempotencyKey') || searchParams.get('idem');
+    const idem = (idemHeader || idemQuery || '').trim();
+    if (idem) {
+      context.idempotency_key = idem; // snake_case for analytics or future functions
+      context.idempotencyKey = idem;  // camelCase for existing DB functions
+    }
 
     return context;
   }

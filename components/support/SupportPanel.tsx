@@ -33,6 +33,23 @@ function SupportPanel({
   })
   const [showBroadcast, setShowBroadcast] = useState(true)
   const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({})
+  const [activeForm, setActiveForm] = useState<null | 'ticket' | 'feedback'>(null)
+  const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [ticketForm, setTicketForm] = useState({
+    email: '',
+    subject: '',
+    category: 'bug',
+    severity: 'medium',
+    description: ''
+  })
+  const [feedbackForm, setFeedbackForm] = useState({
+    email: '',
+    subject: '',
+    category: 'other',
+    rating: 5,
+    description: ''
+  })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -113,6 +130,30 @@ function SupportPanel({
     // Don't re-initialize if we already have messages
     if (messages.length > 0) return
 
+    // If a saved conversation exists, restore it instead of greeting again
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('support:conversation:v1') : null
+      if (saved) {
+        const data = JSON.parse(saved)
+        const savedMessages = Array.isArray(data?.messages) ? data.messages : []
+        if (savedMessages.length > 0) {
+          // Convert serialized timestamps back to Date objects
+          const restoredMessages = savedMessages.map((msg: any) => ({
+            ...msg,
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+          }))
+          
+          setMessages(restoredMessages)
+          setConversationState(prev => ({
+            ...prev,
+            ...(data?.conversationState || {}),
+            messages: restoredMessages
+          }))
+          return
+        }
+      }
+    } catch {}
+
     // Get automated welcome response
     const welcomeResponse = supportEngine.generateResponse('greeting', '', conversationState)
 
@@ -149,7 +190,7 @@ function SupportPanel({
 
     // Analyze intent and generate response
     try {
-      const { intent, confidence } = supportEngine.analyzeIntent(messageContent)
+      const { intent, confidence } = supportEngine.analyzeIntent(messageContent, conversationState)
       
       const updatedState: ConversationState = {
         ...conversationState,
@@ -250,9 +291,31 @@ function SupportPanel({
           event_label: type
         })
       }
+    } else if (reply.action === 'form' && reply.data) {
+      const type = (reply.data as any).type as 'ticket' | 'feedback'
+      setActiveForm(type)
+      setFormStatus('idle')
+      setFormError(null)
+      // Add assistant message indicating form is opened
+      const assistantMessage: Message = {
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        content: type === 'ticket' 
+          ? "Sure — let's file a support ticket. Please complete the form below and click Submit."
+          : "Great — please share your feedback using the form below and click Submit.",
+        timestamp: new Date(),
+        intent: type === 'ticket' ? 'ticket' : 'feedback'
+      }
+      setMessages(prev => [...prev, assistantMessage])
+      // Analytics
+      if (typeof window !== 'undefined' && (window as any).gtag) {
+        (window as any).gtag('event', 'support_open_form', {
+          event_category: 'support',
+          event_label: type
+        })
+      }
     } else if (reply.intent) {
       handleSendMessage(reply.text)
-      
       // Analytics
       if (typeof window !== 'undefined' && (window as any).gtag) {
         (window as any).gtag('event', 'support_quick_reply', {
@@ -263,9 +326,88 @@ function SupportPanel({
     }
   }
 
+  // Submit Support Ticket (form)
+  const submitTicket = async () => {
+    if (!ticketForm.subject.trim() || !ticketForm.description.trim()) {
+      setFormError('Subject and description are required.')
+      return
+    }
+    setFormStatus('submitting')
+    setFormError(null)
+    try {
+      const res = await fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...ticketForm,
+          sessionId: conversationState.sessionId,
+          pageUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+          browser: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
+        })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error ? (typeof data.error === 'string' ? data.error : 'Validation error') : 'Failed to submit ticket')
+      }
+      const id = data.ticket?.id || 'ticket'
+      const confirmMsg: Message = {
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        content: `Thanks! Your ticket has been submitted successfully. Reference: ${id}. Our team will get back to you soon.`,
+        timestamp: new Date(),
+        intent: 'ticket'
+      }
+      setMessages(prev => [...prev, confirmMsg])
+      setActiveForm(null)
+      setFormStatus('success')
+      setTicketForm({ email: '', subject: '', category: 'bug', severity: 'medium', description: '' })
+    } catch (e: any) {
+      setFormStatus('error')
+      setFormError(e?.message || 'Failed to submit ticket')
+    }
+  }
+
+  // Submit Feedback (form)
+  const submitFeedback = async () => {
+    if (!feedbackForm.subject.trim() || !feedbackForm.description.trim()) {
+      setFormError('Subject and description are required.')
+      return
+    }
+    setFormStatus('submitting')
+    setFormError(null)
+    try {
+      const res = await fetch('/api/support/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...feedbackForm,
+          sessionId: conversationState.sessionId,
+          pageUrl: typeof window !== 'undefined' ? window.location.href : undefined
+        })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error ? (typeof data.error === 'string' ? data.error : 'Validation error') : 'Failed to submit feedback')
+      }
+      const confirmMsg: Message = {
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        content: `Thank you for your feedback! We really appreciate it — your input helps improve ThesisFlow‑AI.`,
+        timestamp: new Date(),
+        intent: 'feedback'
+      }
+      setMessages(prev => [...prev, confirmMsg])
+      setActiveForm(null)
+      setFormStatus('success')
+      setFeedbackForm({ email: '', subject: '', category: 'other', rating: 5, description: '' })
+    } catch (e: any) {
+      setFormStatus('error')
+      setFormError(e?.message || 'Failed to submit feedback')
+    }
+  }
+
   const handleFeedback = (messageId: string, rating: 'up' | 'down') => {
     setFeedback(prev => ({ ...prev, [messageId]: rating }))
-    
     // Analytics
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'support_feedback', {
@@ -383,7 +525,7 @@ function SupportPanel({
         <div className="p-3 bg-blue-50 border-b border-blue-200 text-sm">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <div className="font-medium text-blue-900">🚀 New release v1.3 shipped</div>
+              <div className="font-medium text-blue-900">🚀 New release v2.02 shipped</div>
               <div className="text-blue-700">Enhanced Research Assistant with better context understanding</div>
             </div>
             <Button
@@ -496,32 +638,109 @@ function SupportPanel({
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input or Forms */}
       <div className="p-4 border-t">
-        <div className="flex gap-2">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSendMessage()
-              }
-            }}
-            placeholder="Ask Nova anything..."
-            className="flex-1"
-            disabled={isTyping}
-          />
-          <Button
-            onClick={() => handleSendMessage()}
-            disabled={!inputValue.trim() || isTyping}
-            size="sm"
-            className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+        {activeForm === 'ticket' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3">
+              <Input placeholder="Email (optional)" value={ticketForm.email}
+                     onChange={(e) => setTicketForm({ ...ticketForm, email: e.target.value })} />
+              <Input placeholder="Subject" value={ticketForm.subject}
+                     onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <select className="border rounded px-2 py-2 text-sm" value={ticketForm.category}
+                        onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value as any })}>
+                  <option value="bug">Bug</option>
+                  <option value="billing">Billing</option>
+                  <option value="feature">Feature</option>
+                  <option value="other">Other</option>
+                </select>
+                <select className="border rounded px-2 py-2 text-sm" value={ticketForm.severity}
+                        onChange={(e) => setTicketForm({ ...ticketForm, severity: e.target.value as any })}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <textarea className="border rounded px-3 py-2 text-sm min-h-28" placeholder="Describe the issue..."
+                        value={ticketForm.description}
+                        onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })} />
+            </div>
+            {formError && <div className="text-red-600 text-xs">{formError}</div>}
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setActiveForm(null)}>Cancel</Button>
+              <Button onClick={submitTicket} disabled={formStatus === 'submitting'} size="sm" className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90">
+                {formStatus === 'submitting' ? 'Submitting…' : 'Submit Ticket'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activeForm === 'feedback' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3">
+              <Input placeholder="Email (optional)" value={feedbackForm.email}
+                     onChange={(e) => setFeedbackForm({ ...feedbackForm, email: e.target.value })} />
+              <Input placeholder="Subject" value={feedbackForm.subject}
+                     onChange={(e) => setFeedbackForm({ ...feedbackForm, subject: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <select className="border rounded px-2 py-2 text-sm" value={feedbackForm.category}
+                        onChange={(e) => setFeedbackForm({ ...feedbackForm, category: e.target.value as any })}>
+                  <option value="uiux">UI/UX</option>
+                  <option value="functionality">Functionality</option>
+                  <option value="performance">Performance</option>
+                  <option value="content">Content</option>
+                  <option value="other">Other</option>
+                </select>
+                <select className="border rounded px-2 py-2 text-sm" value={feedbackForm.rating}
+                        onChange={(e) => setFeedbackForm({ ...feedbackForm, rating: Number(e.target.value) })}>
+                  <option value={5}>★★★★★</option>
+                  <option value={4}>★★★★☆</option>
+                  <option value={3}>★★★☆☆</option>
+                  <option value={2}>★★☆☆☆</option>
+                  <option value={1}>★☆☆☆☆</option>
+                </select>
+              </div>
+              <textarea className="border rounded px-3 py-2 text-sm min-h-28" placeholder="Share your feedback..."
+                        value={feedbackForm.description}
+                        onChange={(e) => setFeedbackForm({ ...feedbackForm, description: e.target.value })} />
+            </div>
+            {formError && <div className="text-red-600 text-xs">{formError}</div>}
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setActiveForm(null)}>Cancel</Button>
+              <Button onClick={submitFeedback} disabled={formStatus === 'submitting'} size="sm" className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90">
+                {formStatus === 'submitting' ? 'Submitting…' : 'Submit Feedback'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!activeForm && (
+          <div className="flex gap-2">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSendMessage()
+                }
+              }}
+              placeholder="Ask Nova anything..."
+              className="flex-1"
+              disabled={isTyping}
+            />
+            <Button
+              onClick={() => handleSendMessage()}
+              disabled={!inputValue.trim() || isTyping}
+              size="sm"
+              className="bg-[#FF6B2C] hover:bg-[#FF6B2C]/90"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
