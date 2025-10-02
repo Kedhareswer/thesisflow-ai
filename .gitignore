@@ -79,3 +79,6 @@ env/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+
+# Support data (PII risk - use temp directories instead)
+data/support/_store/

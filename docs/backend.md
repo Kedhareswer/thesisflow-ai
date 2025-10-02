@@ -144,3 +144,21 @@ Request → Supabase (primary) → Temp fallback (if primary fails) → Response
 - Use typed responses and consistent error shapes
 - Prefer services in `lib/services/**` for business logic; keep route handlers thin
 - **PII Handling**: Always use ephemeral storage for sensitive fallback data; never persist PII in repository directories
+
+## Recent Security & Stability Fixes
+
+### Session Management Improvements (2025-01-02)
+- **Topics page (`app/topics/page.tsx`)**: Fixed `createdAt` timestamp persistence using `sessionCreatedAtRef` to prevent session reordering on snapshots
+- **Topics detail page (`app/topics/[id]/page.tsx`)**: Fixed React hook order violation by ensuring all hooks execute unconditionally before early returns
+
+### Security Hardening
+- **Support tickets API (`app/api/support/tickets/route.ts`)**: Enhanced PII protection by:
+  - Using environment-defined runtime data directory (`RUNTIME_DATA_DIR`) 
+  - Falling back to system temp directories (`/tmp` on Unix, `%TEMP%` on Windows)
+  - Preventing PII storage in repository directories that could be committed
+- **Updated `.gitignore`**: Added `data/support/_store/` exclusion to prevent accidental PII commits
+
+### Key Implementation Details
+- **Session persistence**: `sessionCreatedAtRef.current` set once per session start, preserves timestamp across effect runs
+- **Hook consistency**: Safe fallbacks (`session?.results ?? []`) computed before any conditional returns
+- **Runtime storage**: `getRuntimeDataDir()` function prioritizes `RUNTIME_DATA_DIR` env var over system temp paths

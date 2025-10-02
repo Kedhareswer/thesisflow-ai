@@ -34,6 +34,9 @@ export default function FindTopicsPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [activeClusterId, setActiveClusterId] = useState<string | null>(null)
 
+  // Ref to persist createdAt across effect runs (only updates for new sessions)
+  const sessionCreatedAtRef = useRef<number | null>(null)
+
   // Auth session for authenticated API calls (required by token middleware)
   const { session } = useSupabaseAuth()
 
@@ -198,7 +201,12 @@ export default function FindTopicsPage() {
     try {
       const newId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : String(Date.now())
       setSessionId(newId)
-    } catch { setSessionId(String(Date.now())) }
+      // Reset createdAt ref for new session
+      sessionCreatedAtRef.current = Date.now()
+    } catch { 
+      setSessionId(String(Date.now()))
+      sessionCreatedAtRef.current = Date.now()
+    }
 
     setIsSearching(true)
     setSearchMode('results')
@@ -341,10 +349,16 @@ export default function FindTopicsPage() {
     if (!sessionId || !searchQuery) return
     const results = literature.results || []
     if (results.length === 0) return
+    
+    // Ensure we have a createdAt timestamp (set when session starts)
+    if (sessionCreatedAtRef.current === null) {
+      sessionCreatedAtRef.current = Date.now()
+    }
+    
     upsertSession({
       id: sessionId,
       query: searchQuery,
-      createdAt: Date.now(),
+      createdAt: sessionCreatedAtRef.current,
       quality: qualityMode,
       results,
       topics,

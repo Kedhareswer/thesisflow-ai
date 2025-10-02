@@ -51,6 +51,10 @@ export default function TopicDetailPage({ params }: PageProps) {
   const [sortBy, setSortBy] = useState<'relevance' | 'date'>("relevance")
   const [showAll, setShowAll] = useState(false)
 
+  // Safe fallbacks before any early returns to ensure hook order
+  const results = session?.results ?? []
+  const safeQuery = q.trim().toLowerCase()
+
   useEffect(() => {
     if (!session) {
       // Session missing; redirect to library
@@ -58,29 +62,28 @@ export default function TopicDetailPage({ params }: PageProps) {
     }
   }, [session, router])
 
-  if (!session) return null
-
   const toYear = (y: unknown) => {
     const n = typeof y === 'number' ? y : typeof y === 'string' ? parseInt(y as string, 10) : NaN
     return Number.isFinite(n) ? (n as number) : 0
   }
 
   const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase()
-    let arr = session.results.slice()
-    if (term) {
+    let arr = results.slice()
+    if (safeQuery) {
       arr = arr.filter((p) =>
-        p.title?.toLowerCase().includes(term) ||
-        p.abstract?.toLowerCase().includes(term) ||
-        p.journal?.toLowerCase().includes(term) ||
-        safeHostname(p.url).includes(term)
+        p.title?.toLowerCase().includes(safeQuery) ||
+        p.abstract?.toLowerCase().includes(safeQuery) ||
+        p.journal?.toLowerCase().includes(safeQuery) ||
+        safeHostname(p.url).includes(safeQuery)
       )
     }
     if (sortBy === 'date') {
       arr.sort((a, b) => toYear(b.year) - toYear(a.year))
     }
     return arr
-  }, [session.results, q, sortBy])
+  }, [results, safeQuery, sortBy])
+
+  if (!session) return null
 
   const total = session.results.length
   const reviewedCount = Object.values(state.reviewed).filter(Boolean).length

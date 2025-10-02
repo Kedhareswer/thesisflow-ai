@@ -4,6 +4,7 @@ import { getAuthUser, createSupabaseAdmin } from '@/lib/auth-utils'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import os from 'node:os'
 
 const ticketSchema = z.object({
   email: z.string().email().optional(),
@@ -17,8 +18,17 @@ const ticketSchema = z.object({
   metadata: z.record(z.any()).optional(),
 })
 
-// Local JSON fallback store
-const storeDir = path.join(process.cwd(), 'data', 'support', '_store')
+// Local JSON fallback store - use runtime data directory or system temp to avoid committing PII
+const getRuntimeDataDir = () => {
+  // Prefer environment-defined runtime data directory
+  if (process.env.RUNTIME_DATA_DIR) {
+    return process.env.RUNTIME_DATA_DIR
+  }
+  // Fallback to system temp directory
+  return process.platform === 'win32' ? process.env.TEMP || os.tmpdir() : '/tmp'
+}
+
+const storeDir = path.join(getRuntimeDataDir(), 'thesisflow-support')
 const ticketsFile = path.join(storeDir, 'tickets.json')
 
 async function ensureStore() {

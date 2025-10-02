@@ -119,8 +119,28 @@ ThesisFlow-AI uses Next.js 14 with TypeScript, React, and Tailwind CSS for a mod
 - Validate topics report SSE by triggering generation and observing progressive tokens
 - Validate AbortController timeout shows the user-friendly timeout message
 
+## Recent Frontend Fixes (2025-01-02)
+
+### React Hook Order Compliance
+- **Fixed hook order violation** in `app/topics/[id]/page.tsx`:
+  - Created safe fallbacks (`session?.results ?? []`) before any early returns
+  - Ensured `useMemo` hook always executes regardless of conditional logic
+  - Prevents "Cannot call a React Hook conditionally" errors
+
+### Session State Management  
+- **Enhanced session persistence** in `app/topics/page.tsx`:
+  - Added `sessionCreatedAtRef` to maintain consistent timestamps across effect runs
+  - Prevents session reordering when snapshots update existing sessions
+  - Ref resets only when explicitly starting new search sessions
+
+### Key Patterns
+- **Hook consistency**: All hooks must execute unconditionally before early returns
+- **Ref-based persistence**: Use `useRef` for values that should persist across renders but not trigger re-renders
+- **Safe fallbacks**: Compute fallback values before any conditional logic that might skip hook execution
+
 ## References
 - Topics page: `app/topics/page.tsx`
+- Topics detail: `app/topics/[id]/page.tsx` 
 - Literature search hook: `hooks/use-literature-search.ts`
 - Chat streaming UI: `app/explorer/components/ResearchAssistant.tsx`
 - SSE routes: `app/api/ai/chat/stream/route.ts`, `app/api/topics/report/stream/route.ts`
