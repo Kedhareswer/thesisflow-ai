@@ -252,7 +252,7 @@ export class TokenService {
   }
 
   /**
-   * Get current user token status
+   * Get current user token status (automatic monthly reset via database triggers)
    */
   async getUserTokenStatus(userId: string): Promise<{
     monthlyUsed: number;
@@ -260,9 +260,10 @@ export class TokenService {
     monthlyRemaining: number;
   } | null> {
     try {
-      // Try to get existing row
+      // Use the view that automatically handles monthly resets
+      // This ensures tokens are reset even if user hasn't been active
       const { data, error } = await this.supabase
-        .from('user_tokens')
+        .from('user_tokens_with_auto_reset')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
@@ -271,10 +272,10 @@ export class TokenService {
 
       let row = data
       if (!row) {
-        // Initialize via RPC then refetch
+        // Initialize via RPC then refetch using the auto-reset view
         await this.initializeUserTokens(userId)
         const { data: afterInit, error: refetchErr } = await this.supabase
-          .from('user_tokens')
+          .from('user_tokens_with_auto_reset')
           .select('*')
           .eq('user_id', userId)
           .maybeSingle()
