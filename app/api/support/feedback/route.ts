@@ -4,6 +4,7 @@ import { getAuthUser, createSupabaseAdmin } from '@/lib/auth-utils'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import os from 'node:os'
 
 const feedbackSchema = z.object({
   email: z.string().email().optional(),
@@ -16,8 +17,8 @@ const feedbackSchema = z.object({
   metadata: z.record(z.any()).optional(),
 })
 
-// Local JSON fallback store
-const storeDir = path.join(process.cwd(), 'data', 'support', '_store')
+// Local JSON fallback store - ephemeral temp location to prevent PII persistence
+const storeDir = path.join(os.tmpdir(), 'thesisflow-ai', 'support', '_store')
 const feedbackFile = path.join(storeDir, 'feedback.json')
 
 async function ensureStore() {

@@ -29,6 +29,8 @@ This guide documents backend routes, streaming conventions, token middleware, an
   - `app/api/stripe/*`
   - `app/api/tokens/*`
   - `app/api/usage/*`
+- Support & feedback
+  - `app/api/support/feedback/route.ts` (feedback collection with ephemeral fallback)
 
 See additional endpoints in `app/api/` for citations, humanize/paraphraser, projects, upload, etc.
 
@@ -94,8 +96,51 @@ See additional endpoints in `app/api/` for citations, humanize/paraphraser, proj
 - Functions (public highlights):
   - `get_feature_cost`, `deduct_user_tokens`, `refund_user_tokens`, `check_token_rate_limit`, `reset_user_tokens_if_needed`, `initialize_user_tokens`, `check_literature_search_rate_limit`, `can_use_feature`
 
+## Support & Feedback API
+
+### Overview
+The support feedback API (`app/api/support/feedback/route.ts`) provides a dual-storage approach for collecting user feedback:
+1. **Primary**: Supabase `support_feedback` table
+2. **Fallback**: Ephemeral local JSON store for service unavailability
+
+### Security Implementation
+- **PII Protection**: Fallback storage uses ephemeral temp directory (`os.tmpdir()`) instead of repository directory to prevent PII persistence
+- **Storage Location**: `os.tmpdir()/thesisflow-ai/support/_store/feedback.json`
+- **Ephemeral**: Temp files cleared on system restart, preventing long-term PII retention
+- **Repository Clean**: No feedback data persisted in source control or deployment artifacts
+
+### API Endpoints
+- **GET** `/api/support/feedback` - Retrieve feedback (user-filtered when authenticated)
+- **POST** `/api/support/feedback` - Submit feedback with validation
+
+### Data Flow
+```
+Request → Supabase (primary) → Temp fallback (if primary fails) → Response
+```
+
+### Schema Validation
+```typescript
+{
+  email?: string,           // Optional email
+  subject: string,          // 3-200 chars
+  category: enum,          // uiux|functionality|performance|content|other
+  rating?: number,         // 1-5 integer
+  description: string,     // 5-5000 chars
+  pageUrl?: string,        // Optional URL
+  sessionId?: string,      // Optional session tracking
+  metadata?: object        // Optional additional data
+}
+```
+
+### Fallback Behavior
+- Creates temp directory with recursive mkdir
+- Initializes empty JSON array if file doesn't exist
+- Appends new feedback with UUID and timestamps
+- Maintains same response format as Supabase primary
+
 ## Developer tips
 - Keep SSE event naming stable; clients depend on exact names
 - For streaming handlers, implement per-stage timeouts and explicit refunds
 - Use typed responses and consistent error shapes
 - Prefer services in `lib/services/**` for business logic; keep route handlers thin
+- **PII Handling**: Always use ephemeral storage for sensitive fallback data; never persist PII in repository directories
