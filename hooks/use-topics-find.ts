@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 export type TopicsFindEvent = 'init' | 'progress' | 'sources' | 'metrics' | 'insights' | 'clusters' | 'done' | 'error' | 'ping'
 
@@ -201,6 +201,11 @@ export function useTopicsFind(options: UseTopicsFindOptions = {}) {
   }, [closeCurrent])
 
   const elapsedMs = useMemo(() => (state.startedAt ? (state.finishedAt || Date.now()) - state.startedAt : 0), [state.startedAt, state.finishedAt])
+
+  // Cleanup EventSource on component unmount to prevent memory leaks
+  useEffect(() => {
+    return closeCurrent
+  }, [closeCurrent])
 
   return {
     ...state,

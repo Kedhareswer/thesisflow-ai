@@ -16,9 +16,11 @@ export function tokenize(text: string): string[] {
 export function embedText(title: string, snippet?: string): Vec {
   const v = new Float32Array(DIM)
   const inc = (tok: string, w: number) => {
-    let h = 2166136261
-    for (let i = 0; i < tok.length; i++) h = (h ^ tok.charCodeAt(i)) * 16777619
-    const idx = Math.abs(h) % DIM
+    let h = 2166136261 >>> 0  // Ensure 32-bit unsigned integer
+    for (let i = 0; i < tok.length; i++) {
+      h = ((h ^ tok.charCodeAt(i)) * 16777619) >>> 0  // Keep as 32-bit unsigned integer
+    }
+    const idx = (h >>> 0) % DIM  // Compute integer index for proper Float32Array indexing
     v[idx] += w
   }
   for (const tok of tokenize(title)) inc(tok, 2)

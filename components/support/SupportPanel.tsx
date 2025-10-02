@@ -137,11 +137,17 @@ function SupportPanel({
         const data = JSON.parse(saved)
         const savedMessages = Array.isArray(data?.messages) ? data.messages : []
         if (savedMessages.length > 0) {
-          setMessages(savedMessages)
+          // Convert serialized timestamps back to Date objects
+          const restoredMessages = savedMessages.map((msg: any) => ({
+            ...msg,
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+          }))
+          
+          setMessages(restoredMessages)
           setConversationState(prev => ({
             ...prev,
             ...(data?.conversationState || {}),
-            messages: savedMessages
+            messages: restoredMessages
           }))
           return
         }

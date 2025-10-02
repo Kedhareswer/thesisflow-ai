@@ -133,10 +133,31 @@ ThesisFlow-AI uses Next.js 14 with TypeScript, React, and Tailwind CSS for a mod
   - Prevents session reordering when snapshots update existing sessions
   - Ref resets only when explicitly starting new search sessions
 
+### EventSource Memory Leak Fix
+- **Fixed EventSource memory leak** in `hooks/use-topics-find.ts`:
+  - Added cleanup effect with empty dependency array that returns `closeCurrent`
+  - Ensures EventSource connections are properly closed on component unmount
+  - Prevents state updates on unmounted components and connection leaks
+
+### Timestamp Restoration Bug Fix
+- **Fixed timestamp restoration** in `components/support/SupportPanel.tsx`:
+  - Added proper timestamp conversion when restoring messages from localStorage
+  - Serialized Date objects are now converted back to Date instances: `new Date(msg.timestamp)`
+  - Ensures restored message timestamps match the expected `Date` type from `Message` interface
+
+### Float32Array Indexing Fix
+- **Fixed typed array indexing** in `lib/utils/simple-embed-cluster.ts`:
+  - Ensured hash values remain 32-bit unsigned integers using `>>> 0` operators
+  - Fixed non-integer index computation that created object properties instead of proper array indices
+  - Prevents zero vector generation and improves embedding accuracy
+
 ### Key Patterns
 - **Hook consistency**: All hooks must execute unconditionally before early returns
 - **Ref-based persistence**: Use `useRef` for values that should persist across renders but not trigger re-renders
 - **Safe fallbacks**: Compute fallback values before any conditional logic that might skip hook execution
+- **Memory leak prevention**: Always add cleanup effects for EventSource, intervals, and subscriptions
+- **Type safety**: Ensure serialized data is properly converted back to expected types when restoring from storage
+- **Typed array integrity**: Use proper integer arithmetic for typed array indexing to prevent object property creation
 
 ## References
 - Topics page: `app/topics/page.tsx`

@@ -114,7 +114,7 @@ The support feedback API (`app/api/support/feedback/route.ts`) provides a dual-s
 - **POST** `/api/support/feedback` - Submit feedback with validation
 
 ### Data Flow
-```
+```text
 Request → Supabase (primary) → Temp fallback (if primary fails) → Response
 ```
 
