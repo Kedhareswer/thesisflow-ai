@@ -29,13 +29,10 @@ graph TB
         I[Server-Sent Events] --> J[AI Streaming]
     end
     
-    subgraph "AI Provider Ecosystem"
-        K[OpenAI GPT-4o/o3/o3-mini] --> L[Multi-Provider Router]
-        M[Google Gemini 2.5 Pro/Flash] --> L
-        N[Anthropic Claude 4.1/3.5] --> L
-        O[Groq LLaMA 3.3-70B] --> L
-        P[Mistral Large 2411] --> L
-        Q[AIML Cross-Provider API] --> L
+    subgraph "AI Provider"
+        K[Nova AI (Llama-3.3-70B)] --> L[Groq Infrastructure]
+        L --> M[Optimized for Research]
+        M --> N[Academic-focused Prompting]
     end
     
     subgraph "Document Processing"
@@ -79,17 +76,14 @@ cp env.template .env.local
 
 # 3. Start development servers
 pnpm dev                         # Frontend (port 3000)
-node server/websocket-server.js  # WebSocket collaboration (port 3001)
-
 # 4. Optional: Python literature search service
 cd python && python app.py      # Enhanced search APIs (port 5000)
-```
 
-### Required Configuration
+### **Required Configuration:**
 
 **Essential Services:**
 - **Supabase**: Database, authentication, file storage, and RLS policies
-- **AI Provider**: At least one from OpenAI, Gemini, Claude, Groq, Mistral, or AIML
+- **Nova AI (Groq)**: Llama-3.3-70B for all AI features - single API key required
 - **HuggingFace**: For AI content detection and model inference
 
 **Enhanced Features:**
@@ -200,7 +194,7 @@ flowchart TB
 |---------|------------|-------------|----------|
 | **Multi-Source Search** | 11+ APIs with intelligent orchestration | 1-3s response time | Comprehensive coverage, no missed papers |
 | **Real-time Streaming** | Server-Sent Events + WebSocket | <100ms latency | Live results as they arrive |
-| **AI Research Assistant** | GPT-4o/Claude/Gemini with conversation memory | 3-8s generation | Context-aware answers with citations |
+| **AI Research Assistant** | Nova AI (Llama-3.3-70B) with conversation memory | 3-8s generation | Context-aware answers with citations |
 | **Smart Caching** | Supabase + Redis with 1-hour TTL | 85%+ cache hit rate | Instant results for repeated queries |
 | **Citation Analysis** | OpenAlex graph traversal | Forward/backward links | Discover influential and related work |
 | **Export Integration** | BibTeX, RIS, JSON, CSV formats | Bulk export support | Seamless reference management |
@@ -599,16 +593,12 @@ python app.py                    # Literature APIs (port 5000)
 2. Go to Settings → API to get your project URL and keys
 3. Run the database setup scripts in `scripts/` folder
 
-**Step 2: Get AI Provider API Keys**
-Choose at least one AI provider:
+**Step 2: Get Nova AI API Key**
+ThesisFlow-AI uses Nova AI (Groq) exclusively for all AI features:
 
-| Provider | Get API Key | Models Available | Cost |
-|----------|-------------|------------------|------|
-| **OpenAI** | [platform.openai.com](https://platform.openai.com/api-keys) | GPT-4o, o3, o3-mini | $0.01-0.06/1K tokens |
-| **Google Gemini** | [makersuite.google.com](https://makersuite.google.com/app/apikey) | Gemini 2.5 Pro/Flash | $0.001-0.01/1K tokens |
-| **Anthropic** | [console.anthropic.com](https://console.anthropic.com/settings/keys) | Claude 4.1, 3.5 Sonnet | $0.003-0.015/1K tokens |
-| **Groq** | [console.groq.com](https://console.groq.com/keys) | LLaMA 3.3-70B | Free tier available |
-| **Mistral** | [console.mistral.ai](https://console.mistral.ai/api-keys/) | Large 2411, Codestral | $0.002-0.008/1K tokens |
+| Provider | Get API Key | Model Used | Benefits |
+|----------|-------------|------------|----------|
+| **Nova AI (Groq)** | [console.groq.com](https://console.groq.com/keys) | Llama-3.3-70B | Free tier • Research-optimized • Fast inference |
 
 **Step 3: Configure .env.local**
 
@@ -620,12 +610,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# AI Provider (Choose at least one)
-OPENAI_API_KEY=your_openai_api_key
-GEMINI_API_KEY=your_gemini_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
+# Nova AI (Required)
 GROQ_API_KEY=your_groq_api_key
-MISTRAL_API_KEY=your_mistral_api_key
 
 # HuggingFace (Required for AI content detection)
 HUGGINGFACE_API_KEY=your_huggingface_api_key

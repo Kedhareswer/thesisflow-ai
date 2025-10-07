@@ -49,11 +49,11 @@ const METRIC_LABELS: Record<Metric, string> = {
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
   service: 'Service',
-  provider: 'Provider',
+  provider: 'AI Provider',
   model: 'Model',
   feature: 'Feature',
-  api_key_owner: 'Key Owner',
-  api_key_provider: 'Key Provider',
+  api_key_owner: 'API Key Owner', 
+  api_key_provider: 'API Key Provider'
 };
 
 const toDateStr = (iso: string) => {

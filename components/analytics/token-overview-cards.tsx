@@ -63,15 +63,15 @@ export function TokenOverviewCards({ monthlyUsed, monthlyLimit, monthlyRemaining
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Range Cost (est.)</CardTitle>
-          <CardDescription>Estimated provider cost</CardDescription>
+          <CardTitle className="text-sm font-medium">Nova AI Cost</CardTitle>
+          <CardDescription>Nova AI usage cost in range</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div className="text-2xl font-bold">${(rangeTotals?.cost ?? 0).toFixed(2)}</div>
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="text-2xl font-bold">${(rangeTotals?.cost ?? 0).toFixed(4)}</div>
           </div>
-          <p className="text-xs text-muted-foreground">Estimates may differ from provider billing</p>
+          <p className="text-xs text-green-600">Nova AI (Llama-3.3-70B) - Saved with plan pricing</p>
         </CardContent>
       </Card>
     </div>

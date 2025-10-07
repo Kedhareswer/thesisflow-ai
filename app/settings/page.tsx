@@ -8,12 +8,10 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Save, Shield, Bell, User, Database, Key, Download, Trash2, CheckCircle, Cpu, Lock } from "lucide-react"
+import { Save, Shield, Bell, User, Download, Trash2, Key } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { supabase } from "@/integrations/supabase/client"
-import { AIProviderStatus } from "@/components/ai-provider-status"
-import { ApiKeyManager } from "@/components/api-key-manager"
 import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
 
 interface UserSettings {
@@ -304,11 +302,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="account" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
-          <TabsTrigger value="ai">AI Settings</TabsTrigger>
         </TabsList>
 
         {/* Account Settings */}
@@ -569,79 +566,23 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* AI Settings */}
-        <TabsContent value="ai" className="space-y-6">
-          {/* Header */}
-          <div className="border-b pb-4">
-            <div className="flex items-center gap-3 mb-2">
-              <Cpu className="h-6 w-6" />
-              <h2 className="text-xl font-semibold">AI Configuration</h2>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Configure personal API keys for enhanced performance and privacy
-            </p>
-          </div>
-
-          {/* Personal API Keys */}
-          <Card className="border-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Key className="h-5 w-5" />
-                Personal API Keys
-              </CardTitle>
-              <CardDescription>Configure your own API keys for direct access to AI providers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ApiKeyManager />
-            </CardContent>
-          </Card>
-
-          {/* Benefits */}
-          <Card className="border">
+        {/* Nova AI Status - Simplified info panel */}
+        <div className="mt-6">
+          <Card className="border-green-200 bg-green-50">
             <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5" />
-                  <h3 className="font-semibold">Benefits of Personal API Keys</h3>
-                </div>
-
-                <div className="grid gap-3 text-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0"></div>
-                    <div>
-                      <span className="font-medium">Full Control:</span> Use your own usage limits and billing
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0"></div>
-                    <div>
-                      <span className="font-medium">Privacy:</span> Direct communication with AI providers
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0"></div>
-                    <div>
-                      <span className="font-medium">Performance:</span> No rate limiting from shared keys
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0"></div>
-                    <div>
-                      <span className="font-medium">Latest Models:</span> Access newest models as available
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Lock className="h-3 w-3" />
-                    <span>All API keys are encrypted and stored securely</span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <h3 className="font-semibold text-green-800">AI Provider Status</h3>
               </div>
+              <p className="text-sm text-green-700 mb-2">
+                ThesisFlow AI uses <strong>Nova AI (Llama-3.3-70B)</strong> exclusively for all AI features.
+              </p>
+              <p className="text-xs text-green-600">
+                No configuration needed - Nova AI is optimized for academic and research tasks.
+              </p>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
       </Tabs>
     </div>
   )

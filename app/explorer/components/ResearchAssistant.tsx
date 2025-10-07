@@ -10,8 +10,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { type AIProvider, AI_PROVIDERS, AIProviderService, type StreamingCallbacks, type StreamingController, type ChatMessage } from "@/lib/ai-providers"
-import { AIProviderDetector } from "@/lib/ai-provider-detector"
+import { NovaAIService, type NovaAIContext } from "@/lib/services/nova-ai.service"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
@@ -45,8 +44,6 @@ interface Message {
   role: "user" | "assistant"
   content: string
   timestamp: Date
-  provider?: AIProvider
-  model?: string
 }
 
 interface Personality {
@@ -216,23 +213,15 @@ export function ResearchAssistant({
       id: `session-${index}`,
       role: msg.role,
       content: msg.content,
-      timestamp: new Date(msg.timestamp),
-      provider: session.preferences.aiProvider as AIProvider || 'gemini',
-      model: session.preferences.aiModel || 'gemini-pro'
+      timestamp: new Date(msg.timestamp)
     }))
   )
   const [isTyping, setIsTyping] = useState(false)
   // Show research context card collapsed by default; user can expand
   const [contextCollapsed, setContextCollapsed] = useState(true)
   
-  // AI Provider state
-  const [availableProviders, setAvailableProviders] = useState<AIProvider[]>([])
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
-  const [selectedModel, setSelectedModel] = useState<string>("")
-  const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [streamingController, setStreamingController] = useState<StreamingController | null>(null)
+  const [streamingAbortController, setStreamingAbortController] = useState<AbortController | null>(null)
 
   // Reasoning panel text content and optional progress (shown within content)
   const [reasoningLines, setReasoningLines] = useState<string[]>([])
@@ -242,47 +231,6 @@ export function ResearchAssistant({
   const [messageBranches, setMessageBranches] = useState<Record<string, Message[]>>({})
   const [currentBranches, setCurrentBranches] = useState<Record<string, number>>({})
 
-  // Map provider → local logo assets placed under /public
-  const PROVIDER_LOGOS: Partial<Record<AIProvider, string>> = {
-    groq: "/groq-icon.svg",
-    mistral: "/mistral-ai-icon.svg",
-    gemini: "/gemini-icon.svg",
-    openai: "/openai-icon.svg",
-    anthropic: "/anthropic-icon.png",
-    aiml: "/ai-ml-icon.png"
-  }
-
-  const getProviderIcon = (provider: AIProvider) => {
-    const logo = PROVIDER_LOGOS[provider]
-    if (logo) {
-      return (
-        <img
-          src={logo}
-          alt={`${AI_PROVIDERS[provider].name} logo`}
-          className="h-5 w-5 object-contain"
-          loading="lazy"
-        />
-      )
-    }
-    
-    // Fallback icons if logo not found
-    switch (provider) {
-      case "gemini":
-        return <img src="/gemini-icon.svg" alt="Gemini" className="h-5 w-5 object-contain" />
-      case "groq":
-        return <Zap className="h-5 w-5 text-[#00AC47]" />
-      case "openai":
-        return <img src="/openai-icon.svg" alt="OpenAI" className="h-5 w-5 object-contain" />
-      case "anthropic":
-        return <img src="/anthropic-icon.png" alt="Anthropic" className="h-5 w-5 object-contain" />
-      case "mistral":
-        return <img src="/mistral-ai-icon.svg" alt="Mistral" className="h-5 w-5 object-contain" />
-      case "aiml":
-        return <img src="/ai-ml-icon.png" alt="AI/ML" className="h-5 w-5 object-contain" />
-      default:
-        return <Bot className="h-5 w-5 opacity-70" />
-    }
-  }
 
   const SelectedPersonalityIcon = selectedPersonality?.icon
 
@@ -298,9 +246,9 @@ export function ResearchAssistant({
 
 
   const handleAbortStream = useCallback(() => {
-    if (streamingController) {
-      streamingController.abort()
-      setStreamingController(null)
+    if (streamingAbortController) {
+      streamingAbortController.abort()
+      setStreamingAbortController(null)
       setIsSending(false)
       setIsTyping(false)
       toast({
@@ -310,53 +258,13 @@ export function ResearchAssistant({
       setReasoningLines([])
       setReasoningProgress(undefined)
     }
-  }, [streamingController, toast])
+  }, [streamingAbortController, toast])
 
-  // Load available providers on mount
-  useEffect(() => {
-    const loadProviders = async () => {
-      setIsLoading(true)
-      try {
-        const providers = await AIProviderDetector.getClientAvailableProviders()
-        setAvailableProviders(providers)
-        
-        if (providers.length > 0 && !selectedProvider) {
-          const defaultProvider = providers[0]
-          setSelectedProvider(defaultProvider)
-          const models = AI_PROVIDERS[defaultProvider].models
-          setAvailableModels(models)
-          setSelectedModel(models[0])
-        }
-      } catch (error) {
-        console.error("Error loading AI providers:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load AI providers",
-          variant: "destructive"
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadProviders()
-  }, [])
-
-  // Update models when provider changes
-  useEffect(() => {
-    if (selectedProvider) {
-      const models = AI_PROVIDERS[selectedProvider].models
-      setAvailableModels(models)
-      if (!models.includes(selectedModel)) {
-        setSelectedModel(models[0])
-      }
-    }
-  }, [selectedProvider, selectedModel])
 
   // Auto-scroll handled by Conversation component
 
   const handleSendMessage = async () => {
-    if (!value.trim() || isSending || !selectedProvider || !selectedModel) return
+    if (!value.trim() || isSending) return
 
     // No plan/usage gating in Explorer Assistant — unlimited when using user-provided keys
 
@@ -364,9 +272,7 @@ export function ResearchAssistant({
       id: Date.now().toString(),
       role: "user",
       content: value.trim(),
-      timestamp: new Date(),
-      provider: selectedProvider,
-      model: selectedModel
+      timestamp: new Date()
     }
 
     setMessages(prev => [...prev, userMessage])
@@ -385,93 +291,80 @@ export function ResearchAssistant({
       id: assistantMessageId,
       role: "assistant",
       content: "",
-      timestamp: new Date(),
-      provider: selectedProvider,
-      model: selectedModel
+      timestamp: new Date()
     }
     
     setMessages(prev => [...prev, assistantMessage])
 
     try {
-      // Build comprehensive system prompt with session context
-      const basePrompt = selectedPersonality?.systemPrompt || 
-        "You are a helpful research assistant. Provide clear, accurate, and detailed responses."
-      
       // Get current research context from session
       const researchContext = buildResearchContext()
       
-      const systemPrompt = researchContext 
-        ? `${basePrompt}
+      // Build Nova AI context
+      const novaContext: NovaAIContext = {
+        teamId: 'explorer',
+        recentMessages: messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          senderId: msg.role === 'user' ? 'user' : 'assistant',
+          senderName: msg.role === 'user' ? 'User' : 'Nova',
+          timestamp: msg.timestamp.toISOString(),
+          type: msg.role === 'user' ? 'text' : 'ai_response',
+          reactions: {},
+          status: 'sent'
+        })),
+        currentUser: { 
+          id: 'user', 
+          name: 'User', 
+          email: 'user@explorer.local',
+          avatar: '', 
+          status: 'online'
+        },
+        mentionedUsers: [],
+        actionType: 'research'
+      }
 
-=== CURRENT RESEARCH CONTEXT ===
-${researchContext}
+      // Add context-aware prefix to user message
+      const contextualMessage = researchContext 
+        ? `Research Context: ${researchContext}\n\nUser Question: ${userMessageContent}`
+        : userMessageContent
 
-Use this research context to provide more relevant and targeted responses. Reference specific papers, topics, or ideas from the context when relevant.`
-        : basePrompt
+      // Set up abort controller for cancellation
+      const abortController = new AbortController()
+      setStreamingAbortController(abortController)
 
-      // Set up streaming callbacks
-      const streamingCallbacks: StreamingCallbacks = {
-        onToken: (token: string) => {
+      // Use Nova AI streaming
+      const novaService = NovaAIService.getInstance()
+      await novaService.processMessageStream(
+        contextualMessage,
+        novaContext,
+        // onChunk
+        (chunk: string) => {
           setMessages(prev => prev.map(msg => 
             msg.id === assistantMessageId 
-              ? { ...msg, content: msg.content + token }
+              ? { ...msg, content: msg.content + chunk }
               : msg
           ))
         },
-        onProgress: (progress) => {
-          // Update with progress messages/percentages
-          console.log('Streaming progress:', progress)
-          if (typeof progress?.percentage === 'number') {
-            setReasoningProgress(progress.percentage)
-          }
-          const msg = progress?.message
-          if (typeof msg === 'string' && msg.length > 0) {
-            setReasoningLines(prev => {
-              if (prev.length > 0 && prev[prev.length - 1] === msg) return prev
-              return [...prev, msg]
-            })
-          }
-        },
-        onError: (error: string) => {
-          console.error("Streaming error:", error)
-          // Suppress destructive toast if this was a user-initiated abort
-          if (error !== 'Stream aborted by user') {
-            toast({
-              title: "Streaming Error",
-              description: error,
-              variant: "destructive"
-            })
-          }
+        // onComplete
+        (response) => {
+          console.log('Nova AI streaming complete:', response)
           setIsTyping(false)
           setIsSending(false)
-          setStreamingController(null)
-          setReasoningLines([])
-          setReasoningProgress(undefined)
-        },
-        onDone: async (metadata) => {
-          console.log('Streaming complete:', metadata)
-          setIsTyping(false)
-          setIsSending(false)
-          setStreamingController(null)
+          setStreamingAbortController(null)
+          
           // Mark reasoning as complete and clear shortly after
-          setReasoningLines(prev => {
-            if (prev.length === 0 || prev[prev.length - 1] !== 'Response complete') {
-              return [...prev, 'Response complete']
-            }
-            return prev
-          })
+          setReasoningLines(['Response complete'])
           setReasoningProgress(100)
           setTimeout(() => {
             setReasoningLines([])
             setReasoningProgress(undefined)
           }, 600)
           
-          // No token deduction or usage increment for Explorer Assistant
-          
           // Save messages to session
           addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
           
-          // Use a timeout to ensure state has updated, then save the assistant message
+          // Save the assistant message
           setTimeout(() => {
             setMessages(currentMessages => {
               const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
@@ -481,37 +374,24 @@ Use this research context to provide more relevant and targeted responses. Refer
               return currentMessages
             })
           }, 100)
-        }
-      }
-
-      // Build conversation history for context
-      const conversationHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
-      // Add the new user message to the conversation
-      conversationHistory.push({
-        role: 'user',
-        content: userMessageContent
-      })
-
-      // Start streaming with full conversation history
-      const controller = await AIProviderService.streamChat(
-        conversationHistory,
-        selectedProvider,
-        selectedModel,
-        streamingCallbacks,
-        {
-          systemPrompt,
-          temperature: 0.7,
-          maxTokens: 2000,
-          // Identify Explorer Assistant origin so server can bypass token middleware
-          origin: 'explorer',
-          feature: 'assistant'
+        },
+        // onError
+        (error: Error) => {
+          console.error('Nova AI streaming error:', error)
+          if (error.message !== 'Stream aborted by user') {
+            toast({
+              title: "Error",
+              description: error.message || 'Failed to get response from Nova AI',
+              variant: "destructive"
+            })
+          }
+          setIsTyping(false)
+          setIsSending(false)
+          setStreamingAbortController(null)
+          setReasoningLines([])
+          setReasoningProgress(undefined)
         }
       )
-      
-      setStreamingController(controller)
 
     } catch (error) {
       console.error("Error sending message:", error)
@@ -723,77 +603,12 @@ Use this research context to provide more relevant and targeted responses. Refer
           )
         )}
         
+        {/* Nova AI Status Indicator */}
         <div className="flex items-center gap-3 mb-4">
-          {/* Provider Dropdown */}
-          <DropdownMenu
-            trigger={
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isLoading || availableProviders.length === 0}
-                className="h-8"
-              >
-                {selectedProvider ? (
-                  <>
-                    {getProviderIcon(selectedProvider)}
-                    <span className="ml-2">{AI_PROVIDERS[selectedProvider].name}</span>
-                  </>
-                ) : (
-                  <>
-                    <Bot className="w-4 h-4" />
-                    <span className="ml-2">Select Provider</span>
-                  </>
-                )}
-                <ChevronDown className="w-3 h-3 ml-2" />
-              </Button>
-            }
-          >
-            {availableProviders.map((provider) => (
-              <DropdownMenuItem
-                key={provider}
-                onClick={() => setSelectedProvider(provider)}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    {getProviderIcon(provider)}
-                    <span>{AI_PROVIDERS[provider].name}</span>
-                  </div>
-                  {selectedProvider === provider && (
-                    <Check className="w-4 h-4 text-primary" />
-                  )}
-                </div>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenu>
-
-          {/* Model Dropdown */}
-          <DropdownMenu
-            trigger={
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!selectedProvider || availableModels.length === 0}
-                className="h-8"
-              >
-                <span>{selectedModel || "Select Model"}</span>
-                <ChevronDown className="w-3 h-3 ml-2" />
-              </Button>
-            }
-          >
-            {availableModels.map((model) => (
-              <DropdownMenuItem
-                key={model}
-                onClick={() => setSelectedModel(model)}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span>{model}</span>
-                  {selectedModel === model && (
-                    <Check className="w-4 h-4 text-primary" />
-                  )}
-                </div>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenu>
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-200">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span>Powered by Nova AI (Llama-3.3-70B) - Research Optimized</span>
+          </div>
 
           {/* Personality Selector */}
           {personalities.length > 0 && (
@@ -855,7 +670,7 @@ Use this research context to provide more relevant and targeted responses. Refer
           <div className="flex flex-col gap-2">
             <Button
               onClick={handleSendMessage}
-              disabled={!value.trim() || isSending || !selectedProvider || !selectedModel}
+              disabled={!value.trim() || isSending}
               className="px-4"
             >
               {isSending ? (
@@ -864,7 +679,7 @@ Use this research context to provide more relevant and targeted responses. Refer
                 <ArrowRight className="w-4 h-4" />
               )}
             </Button>
-            {streamingController && (
+            {streamingAbortController && (
               <Button
                 onClick={handleAbortStream}
                 variant="outline"
