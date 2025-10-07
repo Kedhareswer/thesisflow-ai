@@ -26,11 +26,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # # local env files
-# .env
-# .env.local
-# .env.*        # ignore all other env variants (e.g., .env.production)
-# !.env.example
-# !env.template
+.env
+.env.local
+.env.*        # ignore all other env variants (e.g., .env.production)
+!.env.example
+!env.template
 
 # vercel
 .vercel
