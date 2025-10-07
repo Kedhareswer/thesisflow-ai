@@ -1,4 +1,4 @@
-import { OpenRouterClient } from './openrouter.service'
+import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
 export interface ExtractionOptions {
   type: 'text' | 'tables' | 'metadata' | 'summary' | 'all';
@@ -69,10 +69,10 @@ export class DataExtractionService {
     // Generate summary using AI
     if (options.type === 'summary' || options.type === 'all') {
       try {
-        const sr = await this.generateSummaryWithOpenRouter(text);
+        const sr = await this.generateSummaryWithNova(text);
         result.summary = sr.summary;
         result.keyPoints = sr.keyPoints;
-        (result as any).aiSummarySource = 'openrouter';
+        (result as any).aiSummarySource = 'nova';
       } catch {
         result.summary = await this.generateSummary(text);
         result.keyPoints = await this.extractKeyPoints(text);
@@ -180,59 +180,50 @@ export class DataExtractionService {
     return sentences.slice(0, 3).join(' ').trim();
   }
 
-  private async generateSummaryWithOpenRouter(text: string): Promise<{ summary: string; keyPoints: string[] }> {
-    const client = new OpenRouterClient()
-    const system = {
-      role: 'system' as const,
-      content: [
-        'You are a careful summarization assistant for research documents.',
-        'Return ONLY valid JSON with the following TypeScript type:',
-        '{ summary: string; keyPoints: string[] }',
-        'Requirements:',
-        '- summary: 3-7 sentences capturing the main objective, method, and key findings',
-        '- keyPoints: 5-10 concise bullet points; avoid hallucinations; do not invent references',
-        '- Do not include markdown fences or extra commentary; JSON only',
-      ].join('\n'),
-    }
-
+  private async generateSummaryWithNova(text: string, userId?: string): Promise<{ summary: string; keyPoints: string[] }> {
     const context = (text || '').replace(/\r\n/g, '\n')
     const excerpt = context.length > 8000 ? context.slice(0, 8000) : context
-    const user = {
-      role: 'user' as const,
-      content: [
-        'Summarize the following document content:',
-        '---BEGIN DOCUMENT---',
-        excerpt,
-        '---END DOCUMENT---',
-      ].join('\n'),
-    }
+    
+    const prompt = `You are a careful summarization assistant for research documents.
+Return ONLY valid JSON with the following TypeScript type:
+{ summary: string; keyPoints: string[] }
 
-    // Same spirit as Planner: ordered model fallback
-    const modelsToTry = [
-      'z-ai/glm-4.5-air:free',
-      'agentica-org/deepcoder-14b-preview:free',
-      'nousresearch/deephermes-3-llama-3-8b-preview:free',
-      'nvidia/nemotron-nano-9b-v2:free',
-      'deepseek/deepseek-chat-v3.1:free',
-      'openai/gpt-oss-120b:free',
-    ] as const
+Requirements:
+- summary: 3-7 sentences capturing the main objective, method, and key findings
+- keyPoints: 5-10 concise bullet points; avoid hallucinations; do not invent references
+- Do not include markdown fences or extra commentary; JSON only
 
-    let lastErr: any
-    for (const model of modelsToTry) {
-      try {
-        const content = await client.chatCompletion(model, [system, user])
-        const parsed = this.parseFirstJson<{ summary?: string; keyPoints?: string[] }>(content)
+Summarize the following document content:
+---BEGIN DOCUMENT---
+${excerpt}
+---END DOCUMENT---`
+
+    try {
+      const result = await enhancedAIService.generateText({
+        prompt,
+        provider: "groq",
+        model: "llama-3.1-8b-instant",
+        maxTokens: 1500,
+        temperature: 0.2,
+        userId
+      })
+
+      if (result.success && result.content) {
+        const parsed = this.parseFirstJson<{ summary?: string; keyPoints?: string[] }>(result.content)
         const summary = (parsed.summary && typeof parsed.summary === 'string' && parsed.summary.trim()) || this.fallbackSummary(excerpt)
         const keyPointsArr = Array.isArray(parsed.keyPoints) ? parsed.keyPoints.filter((s) => !!s && typeof s === 'string').slice(0, 10) : []
         const keyPoints = keyPointsArr.length ? keyPointsArr : await this.extractKeyPoints(excerpt)
         return { summary, keyPoints }
-      } catch (err) {
-        lastErr = err
-        continue
       }
+    } catch (err) {
+      console.error('Nova summarization failed:', err)
     }
 
-    throw new Error(lastErr?.message || 'All OpenRouter models failed for summary')
+    // Fallback to basic extraction
+    return {
+      summary: this.fallbackSummary(excerpt),
+      keyPoints: await this.extractKeyPoints(excerpt)
+    }
   }
 
   private parseFirstJson<T = any>(text: string): T {
@@ -243,7 +234,7 @@ export class DataExtractionService {
       try { return JSON.parse(slice) } catch {}
     }
     try { return JSON.parse(text) } catch {}
-    throw new Error('Failed to parse JSON from OpenRouter response')
+    throw new Error('Failed to parse JSON from AI response')
   }
 
   private async extractKeyPoints(text: string): Promise<string[]> {

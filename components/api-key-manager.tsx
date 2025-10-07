@@ -48,11 +48,11 @@ const AI_PROVIDERS = [
   },
   {
     id: "groq",
-    name: "Groq",
-    description: "Ultra-fast inference with Llama 3.3, DeepSeek, and Gemma models",
+    name: "Nova (Groq)",
+    description: "Ultra-fast inference with Llama 3.3, DeepSeek, and Gemma models. Also accepts NOVA_API_KEY.",
     docsUrl: "https://console.groq.com/keys",
-    placeholder: "gsk_...",
-    keyFormat: 'Starts with "gsk_" followed by 50+ characters',
+    placeholder: "gsk_... or Nova key",
+    keyFormat: 'Starts with "gsk_" or Nova key format',
   },
   {
     id: "gemini",

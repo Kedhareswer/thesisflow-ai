@@ -9,7 +9,9 @@
     "start": "next start",
     "ws": "node server/websocket-server.js",
     "sse:smoke": "node scripts/sse-smoke.js",
-    "sse:smoke:load": "node scripts/sse-smoke.js --query 'large language models' --limit 20 --concurrency 6 --sessions 12 --timeoutMs 45000"
+    "sse:smoke:load": "node scripts/sse-smoke.js --query 'large language models' --limit 20 --concurrency 6 --sessions 12 --timeoutMs 45000",
+    "test:nova": "node scripts/test-nova-integration.js",
+    "test:nova:dev": "TEST_BASE_URL=http://localhost:3000 node scripts/test-nova-integration.js"
   },
   "dependencies": {
     "@base-ui-components/react": "latest",

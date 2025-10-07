@@ -2,7 +2,6 @@ import { NextRequest } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { buildParaphrasePrompt } from "@/lib/services/paraphrase.service"
-import { OpenRouterClient } from "@/lib/services/openrouter.service"
 
 function sse(headers?: Record<string, string>) {
   const encoder = new TextEncoder()
@@ -93,53 +92,34 @@ export async function GET(request: NextRequest) {
         }, heartbeatMs)
 
         try {
-          // Preferred path: Use OpenRouter with fallback model order (same spirit as Planner)
-          const client = new OpenRouterClient()
-          const modelsToTry = [
-            "z-ai/glm-4.5-air:free",
-            "agentica-org/deepcoder-14b-preview:free",
-            "nousresearch/deephermes-3-llama-3-8b-preview:free",
-            "nvidia/nemotron-nano-9b-v2:free",
-            "deepseek/deepseek-chat-v3.1:free",
-            "openai/gpt-oss-120b:free",
-          ]
+          // Primary path: Use Nova (Groq) for fast, reliable paraphrasing
+          await enhancedAIService.generateTextStream({
+            prompt,
+            provider: "groq",
+            model: "llama-3.1-8b-instant",
+            maxTokens,
+            temperature,
+            userId: user.id,
+            onToken: (token) => send({ type: "token", token }),
+            onProgress: (p) => send({ type: "progress", ...p }),
+            onError: (err) => {
+              // Sanitize error payload to prevent leaking internal details
+              const errorPayload = err && typeof err === 'object'
+                ? {
+                    name: (err as any)?.name || 'Error',
+                    message: (err as any)?.message || 'An error occurred during processing',
+                    // Only include stack trace in development mode
+                    ...(process.env.NODE_ENV === 'development' && (err as any)?.stack ? { stack: (err as any).stack } : {}),
+                  }
+                : { message: String(err) || 'An error occurred during processing' }
 
-          let content = ""
-          let lastErr: any
-          for (const m of modelsToTry) {
-            try {
-              // Use a single user message containing our composed prompt
-              content = await client.chatCompletion(m, [{ role: "user", content: prompt }], abortController.signal)
-              if (content) break
-            } catch (err) {
-              lastErr = err
-              continue
-            }
-          }
-
-          if (!content) {
-            throw new Error(lastErr?.message || "OpenRouter returned no content")
-          }
-
-          // Simulate token streaming by chunking the content
-          const chunks = content.split(/(\s+)/) // keep spaces
-          const total = chunks.length
-          for (let i = 0; i < chunks.length; i++) {
-            if (abortController.signal.aborted) break
-            const token = chunks[i]
-            if (token) {
-              send({ type: "token", token })
-            }
-            // lightweight progress signal
-            if (i % 20 === 0) {
-              const pct = Math.round((i / Math.max(1, total)) * 100)
-              send({ type: "progress", percentage: pct })
-            }
-            await new Promise((r) => setTimeout(r, 15))
-          }
+              send({ type: "error", error: errorPayload })
+            },
+            abortSignal: abortController.signal,
+          })
           send({ type: "done" })
         } catch (e: any) {
-          // Fallback to existing enhanced streaming path for resilience
+          // Fallback: Try enhanced AI service with any available provider
           try {
             await enhancedAIService.generateTextStream({
               prompt,

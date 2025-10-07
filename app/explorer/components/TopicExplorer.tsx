@@ -60,7 +60,7 @@ class EnhancedResearchService {
 
 ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
 
-      // Use EnhancedAIService with user API keys (no OpenRouter)
+      // Use EnhancedAIService with user API keys 
       const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
 
       const result = await enhancedAIService.generateText({

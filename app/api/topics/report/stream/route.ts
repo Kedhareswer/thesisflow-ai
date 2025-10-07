@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withTokenValidation, TokenMiddleware } from '@/lib/middleware/token-middleware'
-import type { ChatMessage } from '@/lib/ai-providers'
 import { tokenService } from '@/lib/services/token.service'
-import { enumerateSources, tryModels, withTimeout, type Paper } from '@/lib/utils/sources'
+import { enumerateSources, withTimeout, type Paper } from '@/lib/utils/sources'
+import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -53,9 +53,9 @@ export const POST = withTokenValidation(
       // Overall timeout budget (align with client 4-minute AbortController)
       // Use explicit per-stage budgets so later stages don't starve
       const totalBudgetMs = 240_000
-      const curationBudgetMs = 30_000
-      const analysisBudgetMs = 90_000
-      const synthesisBudgetMs = 120_000
+      const curationBudgetMs = 90_000  // Increased to 90s to handle slow AI API responses
+      const analysisBudgetMs = 75_000  // Reduced to 75s
+      const synthesisBudgetMs = 75_000  // Reduced to 75s to keep total under 240s
 
       let interval: NodeJS.Timeout
       let abort: () => void
@@ -102,37 +102,116 @@ export const POST = withTokenValidation(
           request.signal.addEventListener('abort', abort)
 
           try {
-            // Progress: curation
+            // Progress: curation using Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: 'Curating trusted sources…' })}\n\n`))
-            const curatorSystem: ChatMessage = { role: 'system', content: 'You are a meticulous research curator. You only trust reputable, peer‑reviewed or authoritative sources.' }
-            const curatorUser: ChatMessage = { role: 'user', content: `Topic: ${query}\n\nBelow is a numbered list of candidate sources (already vetted to be safe).\nMark each as HIGH, MEDIUM, or LOW trust and list 1‑line rationale.\nReturn strictly in markdown table with columns: ID | Trust | Rationale.\n\nSources:\n${sourcesText}` }
-            const curation = await withTimeout(tryModels(models, [curatorSystem, curatorUser], request.signal), curationBudgetMs, 'Curation')
+            
+            const curatorPrompt = `You are a meticulous research curator. You only trust reputable, peer‑reviewed or authoritative sources.
 
-            // Progress: analyzer
+Topic: ${query}
+
+Below is a numbered list of candidate sources (already vetted to be safe).
+Mark each as HIGH, MEDIUM, or LOW trust and list 1‑line rationale.
+Return strictly in markdown table with columns: ID | Trust | Rationale.
+
+Sources:
+${sourcesText}`
+
+            let curation = 'Curation unavailable'
+            try {
+              // Use automatic provider fallback (don't specify provider for resilience)
+              const curationResult = await withTimeout(
+                enhancedAIService.generateText({
+                  prompt: curatorPrompt,
+                  // No provider specified - will use fallback mechanism with all available providers
+                  maxTokens: 2000,
+                  temperature: 0.2,
+                  userId
+                }),
+                curationBudgetMs,
+                'Curation'
+              )
+              curation = curationResult.success ? (curationResult.content || 'Curation unavailable') : 'Curation unavailable'
+            } catch (curationError: any) {
+              // Fallback: Simple trust ratings if AI curation times out or rate limited
+              if (curationError?.message?.includes('timed out') || curationError?.message?.includes('rate limit')) {
+                curation = '| ID | Trust | Rationale |\n|---|---|---|\n' + 
+                  limited.map((p, i) => `| ${i+1} | MEDIUM | ${p.source || 'Academic'} source |`).join('\n')
+              } else {
+                curation = 'Curation unavailable due to API error'
+              }
+            }
+
+            // Progress: analyzer using Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: 'Analyzing each source…' })}\n\n`))
-            const analyzerSystem: ChatMessage = { role: 'system', content: 'You are a precise literature analyst. Summarize without hallucinations.' }
-            const analyzerUser: ChatMessage = { role: 'user', content: `For the topic "${query}", write 2‑3 bullet summaries for EACH numbered source below.\nUse inline citations like [1], [2] to refer to the same numbering.\nReturn as markdown with '## Per‑source Summaries' and subsections like '### [n] Title'.\n\nSources:\n${sourcesText}` }
-            const perSource = await withTimeout(tryModels(models, [analyzerSystem, analyzerUser], request.signal), analysisBudgetMs, 'Analysis')
+            
+            const analyzerPrompt = `You are a precise literature analyst. Summarize without hallucinations.
 
-            // Progress: synthesizer
+For the topic "${query}", write 2‑3 bullet summaries for EACH numbered source below.
+Use inline citations like [1], [2] to refer to the same numbering.
+Return as markdown with '## Per‑source Summaries' and subsections like '### [n] Title'.
+
+Sources:
+${sourcesText}`
+
+            const perSourceResult = await withTimeout(
+              enhancedAIService.generateText({
+                prompt: analyzerPrompt,
+                // Use automatic provider fallback for resilience
+                maxTokens: 3000,
+                temperature: 0.2,
+                userId
+              }),
+              analysisBudgetMs,
+              'Analysis'
+            )
+            const perSource = perSourceResult.success ? (perSourceResult.content || 'Analysis unavailable') : 'Analysis unavailable'
+
+            // Progress: synthesizer using Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: 'Synthesizing final report…' })}\n\n`))
+            
             const words = (quality === 'Enhanced') ? '1500-2200' : '1000-1500'
-            const synthSystem: ChatMessage = { role: 'system', content: 'You are a senior research writer. Produce structured, citation‑grounded reviews.' }
-            const synthUser: ChatMessage = { role: 'user', content: `Write a scholarly review on: "${query}". Use ONLY the numbered sources below. Cite inline with [n]. Length ${words} words.\nStructure with clear headings (Title, Abstract, Background, Methods, Findings, Visual Summaries, Limitations, References).\nInclude these visual summaries as Markdown:\n1) Evidence Summary Table (ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation).\n2) Key Metrics Table (Metric | Value/Range | Population/Scope | Citation).\n3) Regional Comparison Table (Region | Trend/Direction | Notable Study [n]).\n4) Timeline Table (Period | Milestones | Citations).\n5) ASCII Bar Chart in a \`\`\`text codeblock showing top 5 trends with percentages.\n6) ASCII Line Chart (annual trend) in a \`\`\`text codeblock.\nIf data insufficient, write 'Data not available'.\nAfter body, include a "References" section listing the same numbered items.\n\nSources:\n${sourcesText}` }
-            const body = await withTimeout(tryModels(models, [synthSystem, synthUser], request.signal), synthesisBudgetMs, 'Synthesis')
+            const synthPrompt = `You are a senior research writer. Produce structured, citation‑grounded reviews.
+
+Write a scholarly review on: "${query}". Use ONLY the numbered sources below. Cite inline with [n]. Length ${words} words.
+Structure with clear headings (Title, Abstract, Background, Methods, Findings, Visual Summaries, Limitations, References).
+Include these visual summaries as Markdown:
+1) Evidence Summary Table (ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation).
+2) Key Metrics Table (Metric | Value/Range | Population/Scope | Citation).
+3) Regional Comparison Table (Region | Trend/Direction | Notable Study [n]).
+4) Timeline Table (Period | Milestones | Citations).
+5) ASCII Bar Chart in a \`\`\`text codeblock showing top 5 trends with percentages.
+6) ASCII Line Chart (annual trend) in a \`\`\`text codeblock.
+If data insufficient, write 'Data not available'.
+After body, include a "References" section listing the same numbered items.
+
+Sources:
+${sourcesText}`
+
+            const bodyResult = await withTimeout(
+              enhancedAIService.generateText({
+                prompt: synthPrompt,
+                // Use automatic provider fallback for resilience
+                maxTokens: quality === 'Enhanced' ? 3000 : 2500,
+                temperature: 0.3,
+                userId
+              }),
+              synthesisBudgetMs,
+              'Synthesis'
+            )
+            const body = bodyResult.success ? (bodyResult.content || 'Synthesis unavailable') : 'Synthesis unavailable'
 
             const finalDoc = [
               `# ${query} — Evidence‑Grounded Review`,
               '',
               '## Source Curation',
-              curation.trim(),
+              (curation || 'Curation unavailable').trim(),
               '',
-              perSource.trim(),
+              (perSource || 'Analysis unavailable').trim(),
               '',
-              body.trim(),
+              (body || 'Synthesis unavailable').trim(),
             ].join('\n')
 
             // Stream content as tokens
