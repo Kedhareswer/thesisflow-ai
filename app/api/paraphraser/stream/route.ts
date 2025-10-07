@@ -2,7 +2,49 @@ import { NextRequest } from "next/server"
 import { requireAuth } from "@/lib/auth-utils"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { buildParaphrasePrompt } from "@/lib/services/paraphrase.service"
-import { OpenRouterClient } from "@/lib/services/openrouter.service"
+
+// Server-side Nova AI functionality using hardcoded Groq API
+async function callNovaAI(prompt: string, signal?: AbortSignal): Promise<string> {
+  const groqApiKey = process.env.GROQ_API_KEY
+  
+  if (!groqApiKey) {
+    throw new Error('Groq API key not configured. Please set GROQ_API_KEY environment variable.')
+  }
+  
+  console.log('[Paraphraser] Making request to Groq API...')
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${groqApiKey}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 3000,
+      temperature: 0.7,
+      top_p: 0.9,
+      messages: [
+        { 
+          role: "system", 
+          content: "You are Nova, a specialized research collaboration assistant. You help with paraphrasing and rewriting academic content while maintaining scholarly tone and accuracy."
+        },
+        { role: "user", content: prompt }
+      ]
+    }),
+    signal
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error('Groq API error:', response.status, errorData)
+    throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  const aiContent = data.choices?.[0]?.message?.content || 'No response generated'
+  console.log('[Paraphraser] Success! Generated', aiContent.length, 'characters')
+  return aiContent
+}
 
 function sse(headers?: Record<string, string>) {
   const encoder = new TextEncoder()
@@ -93,32 +135,17 @@ export async function GET(request: NextRequest) {
         }, heartbeatMs)
 
         try {
-          // Preferred path: Use OpenRouter with fallback model order (same spirit as Planner)
-          const client = new OpenRouterClient()
-          const modelsToTry = [
-            "z-ai/glm-4.5-air:free",
-            "agentica-org/deepcoder-14b-preview:free",
-            "nousresearch/deephermes-3-llama-3-8b-preview:free",
-            "nvidia/nemotron-nano-9b-v2:free",
-            "deepseek/deepseek-chat-v3.1:free",
-            "openai/gpt-oss-120b:free",
-          ]
-
-          let content = ""
-          let lastErr: any
-          for (const m of modelsToTry) {
-            try {
-              // Use a single user message containing our composed prompt
-              content = await client.chatCompletion(m, [{ role: "user", content: prompt }], abortController.signal)
-              if (content) break
-            } catch (err) {
-              lastErr = err
-              continue
-            }
+          // Check if Groq API key is configured
+          const groqApiKey = process.env.GROQ_API_KEY
+          if (!groqApiKey) {
+            throw new Error('Nova AI not configured. Please set GROQ_API_KEY environment variable.')
           }
 
+          // Use Nova AI (Groq) for paraphrasing
+          const content = await callNovaAI(prompt, abortController.signal)
+
           if (!content) {
-            throw new Error(lastErr?.message || "OpenRouter returned no content")
+            throw new Error("Nova AI returned no content")
           }
 
           // Simulate token streaming by chunking the content

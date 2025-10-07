@@ -1,8 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ErrorHandler } from '@/lib/utils/error-handler'
-import { generatePlanWithOpenRouter } from '@/lib/services/openrouter.service'
 import { DeepResearcherService } from '@/lib/services/deep-researcher.service'
 import { TokenMiddleware } from '@/lib/middleware/token-middleware'
+
+// Server-side Nova AI functionality using hardcoded Groq API
+async function generatePlanWithNovaAI(topic: string, description: string, selectedTools: string[]): Promise<{id: string, tasks: string[], rawContent?: string}> {
+  const groqApiKey = process.env.GROQ_API_KEY
+  
+  if (!groqApiKey) {
+    throw new Error('Groq API key not configured. Please set GROQ_API_KEY environment variable.')
+  }
+  
+  const systemPrompt = [
+    'You are Nova, a specialized research collaboration assistant for academic teams and research hubs.',
+    'You are an expert research planner that creates actionable research task lists.',
+    'Create a detailed, numbered list of specific research tasks.',
+    'Each task should be actionable, specific, and contribute to comprehensive understanding.',
+    'Focus on academic rigor and evidence-based approaches.',
+    'Maintain a professional, scholarly tone appropriate for academic discourse.',
+  ].join('\n')
+
+  const userPrompt = [
+    `Create a research plan for: "${topic}"`,
+    description ? `Description: ${description}` : '',
+    selectedTools.length ? `Available tools: ${selectedTools.join(', ')}` : '',
+    '',
+    'Format as a numbered list of specific, actionable research tasks.',
+    'Each task should be clear and contribute to comprehensive understanding of the topic.',
+  ].filter(Boolean).join('\n')
+
+  try {
+    console.log('[Plan Execute] Making request to Groq API for research plan...')
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqApiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 2000,
+        temperature: 0.7,
+        top_p: 0.9,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Groq API error:', response.status, errorData)
+      throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content || 'No plan generated'
+    console.log('[Plan Execute] Success! Generated plan with', content.length, 'characters')
+    
+    // Parse the content into tasks
+    const lines = content.split('\n').filter((line: string) => line.trim())
+    const numberPattern = /^\s*\d+\.\s*/
+    const tasks = lines
+      .filter((line: string) => numberPattern.test(line))
+      .map((line: string) => line.replace(numberPattern, '').trim())
+      .filter((task: string) => task.length > 0)
+    
+    // Generate a unique ID for this plan
+    const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    return {
+      id: planId,
+      tasks: tasks.length > 0 ? tasks : ['Research and analyze the topic comprehensively'],
+      rawContent: content
+    }
+  } catch (error) {
+    console.error('Nova AI plan generation failed:', error)
+    throw new Error(`AI plan generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,19 +210,17 @@ export async function POST(request: NextRequest) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(deepResultPayload)}\n\n`))
 
             } else {
-              // Planner generation via OpenRouter (exclusive provider for planner)
+              // Planner generation via Nova AI (Groq)
               // Send a few progress updates while preparing and requesting the model
               controller.enqueue(encoder.encode(`event: progress\n`))
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Preparing prompt…', overallProgress: 10 })}\n\n`))
               controller.enqueue(encoder.encode(`event: progress\n`))
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Requesting OpenRouter model…', overallProgress: 25 })}\n\n`))
-              const plan = await generatePlanWithOpenRouter({
-                topic: String(userQuery),
-                description: String(description || ''),
-                selectedTools: selectedTools as string[],
-                maxTasks: clampedMaxTasks,
-                signal: request.signal,
-              })
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Requesting Nova AI model…', overallProgress: 25 })}\n\n`))
+              const plan = await generatePlanWithNovaAI(
+                String(userQuery),
+                String(description || ''),
+                selectedTools as string[]
+              )
               controller.enqueue(encoder.encode(`event: progress\n`))
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', message: 'Validating plan…', overallProgress: 80 })}\n\n`))
               controller.enqueue(encoder.encode(`event: plan\n`))

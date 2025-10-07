@@ -387,10 +387,13 @@ export default function FindTopicsPage() {
       }, 1000)
       const controller = new AbortController()
       reportAbortRef.current = controller
-      // Overall client-side timeout: 4 minutes
+      // Overall client-side timeout: 5 minutes (increased to accommodate server-side retries)
       reportTimeoutRef.current = setTimeout(() => {
-        try { controller.abort() } catch {}
-      }, 240000)
+        try { 
+          controller.abort()
+          setReportError('Report generation timed out. The system tried multiple approaches but couldn\'t complete within the time limit. Please try again.')
+        } catch {}
+      }, 300000)
       const sourceCount = Math.min(20, Math.max(8, papers.length))
       const resp = await fetch(`/api/topics/report/stream?quality=${encodeURIComponent(qualityMode)}&limit=${sourceCount}`, {
         method: 'POST',
@@ -438,6 +441,9 @@ export default function FindTopicsPage() {
 
           if (eventType === 'token' && payload?.content) {
             setReport(prev => prev + String(payload.content))
+          } else if (eventType === 'progress' && payload?.message) {
+            // Update UI with progress messages from server
+            setReport(prev => prev ? prev : `*${payload.message}*\n\n`)
           } else if (eventType === 'error') {
             const msg = payload?.error || 'Streaming error'
             throw new Error(msg)
@@ -450,10 +456,20 @@ export default function FindTopicsPage() {
     } catch (e) {
       const err = e as any
       let message = 'Failed to generate report'
+      
       if (err?.name === 'AbortError' || /aborted/i.test(String(err?.message))) {
-        message = 'Report generation timed out after 4 minutes. Please try again.'
+        message = 'Report generation was cancelled or timed out. The system may be experiencing high demand. Please try again in a few moments.'
       } else if (err instanceof Error) {
-        message = err.message
+        // Parse specific timeout errors from server
+        if (err.message.includes('Curation timed out')) {
+          message = 'Source curation took longer than expected. This can happen with complex topics or when AI models are under heavy load. Please try again.'
+        } else if (err.message.includes('Analysis timed out')) {
+          message = 'Source analysis timed out. Try reducing the number of sources or switching to Standard quality mode.'
+        } else if (err.message.includes('Synthesis timed out')) {
+          message = 'Report synthesis timed out. Try switching to Standard quality mode for faster processing.'
+        } else {
+          message = err.message
+        }
       }
       setReportError(message)
     } finally {

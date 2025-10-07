@@ -14,14 +14,14 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { buildWritingPrompt } from "@/lib/prompt-builder"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
-import { AI_PROVIDERS, type AIProvider } from "@/lib/ai-providers"
+// Removed AI provider imports - using Nova AI exclusively
 import { Label } from "@/components/ui/label"
 import { FileProcessor, type FileProcessingResult } from "@/lib/file-processors"
 import { transformInlineCitations, extractCitationNumbers, buildReferenceBlock } from "@/lib/utils/inline-citation"
-import { getPreset } from "@/lib/config/model-presets"
+// Removed model presets - using Nova AI exclusively
 import { runGuardrails } from "@/lib/services/guardrails.service"
 import { supabase } from "@/lib/supabase"
-import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+// Removed AI provider selector - using Nova AI exclusively
 import { searchSemanticScholar, getCitationData, transformSemanticScholarPaper } from "@/app/explorer/semantic-scholar"
 import {
   Sparkles,
@@ -41,30 +41,24 @@ import {
 } from "lucide-react"
 
 interface AIWritingAssistantProps {
-  selectedProvider: string
-  selectedModel: string
   onInsertText: (text: string) => void
   documentTemplate: string
   currentDocumentContent?: string // Add current document content for better context
   isAuthenticated?: boolean // Add authentication state
-  onProviderChange?: (provider: AIProvider | undefined) => void
   onModelChange?: (model: string | undefined) => void
 }
 
 export function AIWritingAssistant({
-  selectedProvider,
-  selectedModel,
   onInsertText,
   documentTemplate,
   currentDocumentContent = "",
   isAuthenticated = false,
-  onProviderChange,
   onModelChange
 }: AIWritingAssistantProps) {
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const preset = getPreset(selectedProvider, selectedModel)
-  const [temperature, setTemperature] = useState(preset?.defaultTemperature ?? 0.5)
+  // Using Nova AI exclusively - no need for provider selection
+  const [temperature, setTemperature] = useState(0.7)
   const [generatedText, setGeneratedText] = useState('')
   const [writingTask, setWritingTask] = useState<string>('continue')
   const [showSettings, setShowSettings] = useState(false)
@@ -92,11 +86,7 @@ export function AIWritingAssistant({
     { id: 'analyze', name: 'Analyze & Improve', description: 'Analyze current content and suggest improvements' },
   ]
 
-  // Get available models for the selected provider
-  const getAvailableModels = (provider: AIProvider) => {
-    const providerConfig = AI_PROVIDERS[provider]
-    return providerConfig?.models || ['gpt-4']
-  }
+  // Using Nova AI exclusively - no model selection needed
 
   // Drag-and-drop handlers for uploader area
   const onDragOver = (e: React.DragEvent) => {
@@ -488,7 +478,7 @@ export function AIWritingAssistant({
       }
     }
 
-    context += `Using: ${selectedProvider} with ${selectedModel}\n`
+    context += `Using: Nova AI (Llama-3.3-70B)\n`
     context += `Template: ${documentTemplate || 'Standard Academic'}\n`
 
     return context
@@ -526,7 +516,7 @@ export function AIWritingAssistant({
         writingTask,
         ragEnabled,
         uploadedSourceCount: uploadedSources.length,
-        systemPromptAddon: preset?.systemPromptAddon,
+        systemPromptAddon: undefined, // Nova AI uses built-in system prompt
       })
 
       // Call the AI generation API with authentication
@@ -538,14 +528,9 @@ export function AIWritingAssistant({
         },
         body: JSON.stringify({
           prompt: fullPrompt,
-          provider: selectedProvider,
-          model: selectedModel,
           maxTokens: 1200,
           temperature,
-          metadata: {
-            ragEnabled,
-            uploadedSourceCount: uploadedSources.length,
-          },
+          // Nova AI handles provider/model selection internally
         }),
       })
 
@@ -598,7 +583,7 @@ export function AIWritingAssistant({
 
       toast({
         title: "Content generated",
-        description: `AI writing assistant generated ${writingTask} content using ${selectedProvider}.`,
+        description: `AI writing assistant generated ${writingTask} content using Nova AI.`,
       })
     } catch (error) {
       console.error("Error generating text:", error)
@@ -739,10 +724,9 @@ export function AIWritingAssistant({
                 },
                 body: JSON.stringify({
                   prompt: fixPrompt,
-                  provider: selectedProvider,
-                  model: selectedModel,
                   temperature: 0.1,
                   maxTokens: 1800,
+                  // Nova AI handles provider/model selection internally
                 })
               })
               const data = await resp.json()
@@ -758,20 +742,18 @@ export function AIWritingAssistant({
         </Button>
       </div>
 
-      {/* AI Provider Settings */}
+      {/* Nova AI Settings */}
       {showSettings && (
         <div className="space-y-4">
           <Card>
             <CardContent className="pt-4">
-              <MinimalAIProviderSelector
-                selectedProvider={selectedProvider as AIProvider}
-                selectedModel={selectedModel}
-                onProviderChange={onProviderChange || (() => { })}
-                onModelChange={onModelChange || (() => { })}
-                variant="compact"
-                showModelSelector={true}
-                showConfigLink={false}
-              />
+              <div className="text-sm text-gray-600">
+                <p className="font-medium text-gray-900 mb-2">AI Provider</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Nova AI (Llama-3.3-70B) - Optimized for academic writing</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
           <div className="flex items-center gap-4">
@@ -875,7 +857,7 @@ export function AIWritingAssistant({
       <div className="text-xs text-muted-foreground mt-2">
         {isAuthenticated ? (
           <>
-            Using {AI_PROVIDERS[selectedProvider as AIProvider]?.name || selectedProvider} / {selectedModel} with {documentTemplate || 'standard'} template style
+            Using Nova AI (Llama-3.3-70B) with {documentTemplate || 'standard'} template style
           </>
         ) : (
           <div className="flex items-center gap-2 text-amber-600">
