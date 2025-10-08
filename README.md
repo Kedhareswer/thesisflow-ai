@@ -1,635 +1,616 @@
-# ThesisFlow-AI
+<div align="center">
 
-*Comprehensive AI-powered research platform for academic discovery, document processing, and team collaboration*
+# 🎓 ThesisFlow-AI
 
-[![License](https://img.shields.io/badge/License-MIT-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai/blob/master/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/thesisflow-ai?style=flat-square&color=FF6B2C)](https://github.com/Kedhareswer/thesisflow-ai)
-[![Production](https://img.shields.io/badge/Status-Production_Ready-28a745?style=flat-square)](https://thesisflow-ai.vercel.app)
-[![Version](https://img.shields.io/badge/Version-2.1.0-FF6B2C?style=flat-square)](https://github.com/Kedhareswer/thesisflow-ai)
+### *AI-Powered Research Platform for Academic Excellence*
 
-## 🚀 Core Features
+[![License](https://img.shields.io/badge/License-MIT-FF6B2C?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.9-FF6B2C?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/Kedhareswer/thesisflow-ai/releases)
+[![Status](https://img.shields.io/badge/Status-Production_Ready-28a745?style=for-the-badge&logo=checkmarx&logoColor=white)](https://thesisflow-ai.vercel.app)
+[![GitHub Stars](https://img.shields.io/github/stars/Kedhareswer/thesisflow-ai?style=for-the-badge&logo=github&color=FF6B2C)](https://github.com/Kedhareswer/thesisflow-ai)
 
-| 🔍 Explorer | ✍️ Writer | 📅 Planner | 👥 Collaborate |
-|-------------|-----------|-------------|----------------|
-| **Multi-source literature search**<br/>• 11+ academic databases<br/>• AI research assistant with streaming<br/>• Deep research with real-time results<br/>• Citation analysis & export | **LaTeX collaborative editor**<br/>• Real-time preview with KaTeX<br/>• Multi-format document extraction<br/>• AI writing assistance<br/>• OCR for images & scanned docs | **AI-powered project management**<br/>• Intelligent task generation<br/>• Gantt charts & calendar views<br/>• Team assignments & tracking<br/>• Progress analytics | **Real-time team collaboration**<br/>• WebSocket-powered chat<br/>• File sharing & mentions<br/>• Presence indicators<br/>• Role-based permissions |
+[![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
-## Tech Stack
-
-```mermaid
-graph TB
-    subgraph "Frontend Architecture"
-        A[Next.js 15 + React 19] --> B[TypeScript + TailwindCSS]
-        B --> C[Shadcn/UI + Framer Motion]
-        C --> D[KaTeX + Tesseract.js]
-    end
-    
-    subgraph "Backend Services"
-        E[Supabase PostgreSQL] --> F[Row Level Security]
-        G[WebSocket Server] --> H[Socket.IO + JWT Auth]
-        I[Server-Sent Events] --> J[AI Streaming]
-    end
-    
-    subgraph "AI Provider"
-        K[Nova AI (Llama-3.3-70B)] --> L[Groq Infrastructure]
-        L --> M[Optimized for Research]
-        M --> N[Academic-focused Prompting]
-    end
-    
-    subgraph "Document Processing"
-        R[PDF Parser] --> S[Extraction Engine]
-        T[Mammoth.js DOCX] --> S
-        U[Tesseract.js OCR] --> S
-        V[PapaCSV Parser] --> S
-    end
-    
-    subgraph "Literature APIs"
-        W[OpenAlex] --> X[Search Orchestrator]
-        Y[arXiv + CrossRef] --> X
-        Z[Google Scholar] --> X
-        AA[PubMed + DOAJ] --> X
-    end
-    
-    A --> E
-    A --> I
-    L --> J
-    S --> E
-    X --> E
-    
-    style A fill:#FF6B2C,color:#fff
-    style E fill:#FF6B2C,color:#fff
-    style L fill:#FF6B2C,color:#fff
-    style S fill:#28a745,color:#fff
-    style X fill:#17a2b8,color:#fff
-```
-
-## Quick Start
-
-```bash
-# 1. Clone and setup
-git clone https://github.com/Kedhareswer/thesisflow-ai.git
-cd thesisflow-ai
-pnpm install
-
-# 2. Configure environment
-cp env.template .env.local
-# Edit .env.local with your API keys (see setup guide below)
-
-# 3. Start development servers
-pnpm dev                         # Frontend (port 3000)
-# 4. Optional: Python literature search service
-cd python && python app.py      # Enhanced search APIs (port 5000)
-
-### **Required Configuration:**
-
-**Essential Services:**
-- **Supabase**: Database, authentication, file storage, and RLS policies
-- **Nova AI (Groq)**: Llama-3.3-70B for all AI features - single API key required
-- **HuggingFace**: For AI content detection and model inference
-
-**Enhanced Features:**
-- **Google Search API**: Advanced literature search and citation discovery
-- **Stripe**: Subscription management and payment processing  
-- **Academic APIs**: Unpaywall, CORE, SerpAPI for comprehensive research
-
-**🌐 Live Demo:** [thesisflow-ai.vercel.app](https://thesisflow-ai.vercel.app)
+[🚀 Live Demo](https://thesisflow-ai.vercel.app) • [📚 Documentation](https://github.com/Kedhareswer/thesisflow-ai/wiki) • [🐛 Report Issues](https://github.com/Kedhareswer/thesisflow-ai/issues) • [💬 Discussions](https://github.com/Kedhareswer/thesisflow-ai/discussions)
 
 ---
 
-## 💎 Monthly Token System
+**Comprehensive platform for academic research, document processing, AI-powered writing, and real-time team collaboration**
 
-ThesisFlow-AI uses an intelligent monthly token system that powers all AI features:
+</div>
 
-| Plan | Monthly Tokens | Features | Price |
-|------|----------------|----------|-------|
-| **Free** | 50 tokens | Core research tools, basic AI assistance | $0 |
-| **Pro** | 500 tokens | Advanced AI models, priority processing, collaboration | $19/month |
+## 📑 Table of Contents
 
-### 🔥 Token Usage
-
-**AI-Powered Features (Token Required):**
-- 🤖 AI Chat & Research Assistant (streaming responses)
-- 🔍 Topic Exploration & Deep Research
-- 📄 Document Summarization & Analysis
-- 📋 AI Project Planning & Task Generation
-- ✍️ LaTeX Writing Assistance
-
-**Always Free Features:**
-- 📚 Literature Search (11+ academic databases)
-- 📊 Project Management & Calendar
-- 👥 Team Collaboration & Chat
-- 📁 File Upload & Document Extraction
-- 📈 Analytics & Progress Tracking
-
-### 📊 Usage Monitoring
-
-Track your token consumption across the platform:
-- **Navigation Bar**: Live token counter with usage breakdown
-- **Profile Menu**: Current plan status and upgrade options
-- **Plan & Analytics** (`/plan`): Detailed usage charts by feature
-- **Token Dashboard** (`/tokens`): Transaction history and cost analysis
-*Tokens reset monthly and unused tokens don't roll over. Upgrade anytime for immediate access to additional tokens.*
-
-## 📋 Changelog
-
-Stay up to date with the latest releases and improvements:
-
-- **Web**: https://thesisflow-ai.vercel.app/changelog
-- **RSS**: https://thesisflow-ai.vercel.app/changelog/rss.xml
-- **Atom**: https://thesisflow-ai.vercel.app/changelog/atom.xml
-
-Direct links to specific versions: `https://thesisflow-ai.vercel.app/changelog#v2.1.0`
+- [✨ Key Features](#-key-features)
+- [🏗️ Architecture Overview](#️-architecture-overview)
+- [⚡ Quick Start](#-quick-start)
+- [💎 Token System & Pricing](#-token-system--pricing)
+- [🔍 Feature Deep Dive](#-feature-deep-dive)
+  - [Literature Explorer](#literature-explorer)
+  - [LaTeX Writer](#latex-writer)
+  - [AI-Powered Planner](#ai-powered-planner)
+  - [Team Collaboration](#team-collaboration)
+  - [AI Integration](#ai-integration)
+- [🛠️ Installation Guide](#️-installation-guide)
+- [📡 API Reference](#-api-reference)
+- [🚀 Deployment](#-deployment)
+- [🤝 Contributing](#-contributing)
+- [📋 Changelog](#-changelog)
 
 ---
 
-## 🎯 Advanced Features
+## ✨ Key Features
 
-### 🔍 Literature Explorer & Deep Research
+<table>
+<tr>
+<td width="25%" align="center">
+
+### 🔍 Explorer
+**Multi-Source Research**
+
+</td>
+<td width="25%" align="center">
+
+### ✍️ Writer
+**LaTeX Editing**
+
+</td>
+<td width="25%" align="center">
+
+### 📅 Planner
+**Project Management**
+
+</td>
+<td width="25%" align="center">
+
+### 👥 Collaborate
+**Real-Time Teams**
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+- 11+ academic databases
+- AI research assistant
+- Deep research mode
+- Citation analysis
+- Export to BibTeX/RIS
+- Smart caching (1-3s)
+
+</td>
+<td valign="top">
+
+- Real-time LaTeX preview
+- KaTeX math rendering
+- Multi-format extraction
+- AI writing assistance
+- OCR for scanned docs
+- Template library
+
+</td>
+<td valign="top">
+
+- AI task generation
+- Gantt charts
+- Calendar integration
+- Team assignments
+- Progress analytics
+- Deadline tracking
+
+</td>
+<td valign="top">
+
+- WebSocket messaging
+- File sharing
+- @Mentions
+- Presence indicators
+- Role-based access
+- Real-time sync
+
+</td>
+</tr>
+</table>
+
+## 🏗️ Architecture Overview
 
 ```mermaid
-flowchart TB
-    A[Research Query] --> B[Unified Search Orchestrator]
-    
-    subgraph "Academic Databases"
-        C[OpenAlex - 250M+ papers]
-        D[arXiv - Preprints]
-        E[CrossRef - DOI Registry]
-        F[PubMed - Medical Literature]
-        G[DOAJ - Open Access]
-        H[OpenAIRE - European Research]
-    end
-    
-    subgraph "Web & News Sources"
-        I[Google Scholar]
-        J[DuckDuckGo Search]
-        K[Tavily AI Search]
-        L[Context7 Documentation]
-        M[LangSearch Multi-Source]
-    end
-    
-    subgraph "AI Processing Pipeline"
-        N[Real-time Streaming Results]
-        O[Smart Deduplication]
-        P[Citation Analysis & Ranking]
-        Q[AI Research Assistant]
-    end
-    
-    B --> C & D & E & F & G & H
-    B --> I & J & K & L & M
-    C & D & E & F & G & H --> N
-    I & J & K & L & M --> N
-    N --> O --> P --> Q
-
-    Q --> R[Streaming Chat Interface]
-    Q --> S[Export & Citation Tools]
-    Q --> T[Topic Deep Dive]
+graph LR
+    A[Client Browser] --> B[Next.js 15 Frontend]
+    B --> C[API Routes]
+    C --> D[Supabase PostgreSQL]
+    C --> E[AI Providers]
+    C --> F[Literature APIs]
+    B --> G[WebSocket Server]
+    G --> D
     
     style B fill:#FF6B2C,color:#fff
-    style N fill:#17a2b8,color:#fff
-    style Q fill:#28a745,color:#fff
+    style D fill:#28a745,color:#fff
+    style E fill:#17a2b8,color:#fff
 ```
 
-**🚀 Next-Generation Search Capabilities:**
+### Technology Stack
 
-| Feature | Technology | Performance | Benefits |
-|---------|------------|-------------|----------|
-| **Multi-Source Search** | 11+ APIs with intelligent orchestration | 1-3s response time | Comprehensive coverage, no missed papers |
-| **Real-time Streaming** | Server-Sent Events + WebSocket | <100ms latency | Live results as they arrive |
-| **AI Research Assistant** | Nova AI (Llama-3.3-70B) with conversation memory | 3-8s generation | Context-aware answers with citations |
-| **Smart Caching** | Supabase + Redis with 1-hour TTL | 85%+ cache hit rate | Instant results for repeated queries |
-| **Citation Analysis** | OpenAlex graph traversal | Forward/backward links | Discover influential and related work |
-| **Export Integration** | BibTeX, RIS, JSON, CSV formats | Bulk export support | Seamless reference management |
+<table>
+<tr>
+<td width="33%">
 
-### ✍️ LaTeX Writer & Document Processing
+**Frontend**
+- Next.js 15 + React 19
+- TypeScript
+- TailwindCSS + Shadcn/UI
+- Framer Motion
+- KaTeX (Math rendering)
+- Tesseract.js (OCR)
 
-```mermaid
-flowchart TB
-    subgraph "Multi-Format Document Processing"
-        A[File Upload - 10MB Max] --> B[Format Detection Engine]
-        B --> C{Processing Pipeline}
-        
-        C -->|PDF| D[pdf-parse + OCR<br/>Text, Tables, Images]
-        C -->|DOCX/DOC| E[mammoth.js<br/>Rich Text + Media]
-        C -->|PowerPoint| F[XML Parser<br/>Slides + Notes + Metadata]
-        C -->|CSV/Excel| G[PapaCSV + XLSX<br/>Data Analysis]
-        C -->|Images/Scans| H[Tesseract.js + Sharp<br/>OCR + Image Processing]
-        C -->|Plain Text| I[Direct Text Analysis<br/>NLP + Structure]
-        
-        D & E & F & G & H & I --> J[Extraction Orchestrator]
-        J --> K[AI Analysis Engine]
-        K --> L[Structured Output]
-    end
-    
-    subgraph "Collaborative LaTeX Editor"
-        M[LaTeX Editor Interface] --> N[Real-time Preview]
-        N --> O[KaTeX Math Rendering]
-        O --> P[Live Formula Display]
-        
-        M --> Q[Multi-User Collaboration]
-        Q --> R[Presence Indicators]
-        Q --> S[Real-time Sync]
-        Q --> T[Conflict Resolution]
-        
-        M --> U[Smart LaTeX Toolbar]
-        U --> V[Document Structure]
-        U --> W[Math & Equations]
-        U --> X[Citations & References]
-        U --> Y[Tables & Figures]
-    end
-    
-    L --> Z[AI Writing Assistant]
-    Z --> AA[LaTeX Content Generation]
-    AA --> M
-    
-    style J fill:#FF6B2C,color:#fff
-    style M fill:#28a745,color:#fff
-    style Z fill:#17a2b8,color:#fff
-```
+</td>
+<td width="33%">
 
-**🔧 Advanced Document Processing:**
+**Backend**
+- Supabase PostgreSQL
+- Row Level Security (RLS)
+- Socket.IO (WebSocket)
+- Server-Sent Events (SSE)
+- JWT Authentication
+- Redis Caching
 
-| Format | Extraction Capabilities | Processing Speed | AI Enhancement |
-|--------|------------------------|------------------|----------------|
-| **PDF** | Text, tables, images, metadata, OCR for scanned docs | 15-45s | Structure analysis, key insights, citations |
-| **DOCX/DOC** | Rich text, tables, images, comments, track changes | 10-30s | Content summarization, formatting preservation |
-| **PowerPoint** | Slides, speaker notes, embedded media, animations | 20-40s | Presentation flow analysis, key points extraction |
-| **CSV/Excel** | Data parsing, type detection, statistical analysis | 5-15s | Data insights, trend analysis, visualization suggestions |
-| **Images/Scans** | OCR text extraction, layout analysis, metadata | 30-90s | Content recognition, text structure, quality enhancement |
-| **Plain Text** | Direct processing, encoding detection, structure | 2-10s | NLP analysis, topic modeling, sentiment analysis |
+</td>
+<td width="33%">
 
-**🎨 LaTeX Editor Features:**
+**AI & External**
+- Nova AI (Llama-3.3-70B)
+- OpenRouter (100+ models)
+- OpenAlex + arXiv
+- CrossRef + PubMed
+- Google Scholar API
+- HuggingFace
 
-- **Real-time Collaboration**: Multi-user editing with live cursors and presence
-- **Live Preview**: Split-pane with instant KaTeX mathematical rendering
-- **Smart Toolbar**: LaTeX-specific commands, shortcuts, and templates
-- **AI Integration**: Generate LaTeX content from natural language prompts
-- **Export Options**: PDF compilation, LaTeX source, HTML preview
-- **Template Library**: Academic papers, theses, presentations, and custom templates
-- **Citation Management**: BibTeX integration with automatic formatting
-- **Version Control**: Document history, branching, and merge capabilities
+</td>
+</tr>
+</table>
 
-### 📅 AI-Powered Project Management
+## ⚡ Quick Start
 
-```mermaid
-flowchart TB
-    subgraph "AI Planning Engine"
-        A[Natural Language Input] --> B[AI Task Generator]
-        B --> C[Smart Scheduling]
-        C --> D[Dependency Analysis]
-        D --> E[Resource Allocation]
-    end
-    
-    subgraph "Project Visualization"
-        F[Interactive Calendar] --> G[Gantt Charts]
-        G --> H[Kanban Boards]
-        H --> I[Progress Analytics]
-        I --> J[Timeline Views]
-    end
-    
-    subgraph "Team Collaboration"
-        K[Role-based Access] --> L[Task Assignments]
-        L --> M[Real-time Updates]
-        M --> N[Notification System]
-        N --> O[Progress Tracking]
-    end
-    
-    subgraph "Data & Intelligence"
-        P[Supabase Backend] --> Q[RLS Security]
-        Q --> R[Usage Analytics]
-        R --> S[Performance Insights]
-        S --> T[Predictive Scheduling]
-    end
-    
-    E --> F
-    J --> K
-    O --> P
-    T --> A
-    
-    style B fill:#FF6B2C,color:#fff
-    style F fill:#28a745,color:#fff
-    style K fill:#17a2b8,color:#fff
-    style P fill:#6f42c1,color:#fff
-```
+### Prerequisites
 
-**🤖 Intelligent Planning Features:**
+| Requirement | Version | Installation |
+|-------------|---------|--------------|
+| **Node.js** | 18.0+ | [nodejs.org](https://nodejs.org/) |
+| **pnpm** | Latest | `npm install -g pnpm` |
+| **Supabase Account** | - | [supabase.com](https://supabase.com/) |
+| **Groq API Key** | - | [console.groq.com](https://console.groq.com/keys) |
 
-| Feature | AI Technology | Capabilities | Benefits |
-|---------|---------------|--------------|----------|
-| **AI Task Generation** | GPT-4o + Planning Prompts | Natural language → structured tasks | 10x faster project setup |
-| **Smart Scheduling** | Constraint optimization | Automatic dependency resolution | Conflict-free timelines |
-| **Progress Prediction** | ML analytics on completion patterns | Deadline risk assessment | Proactive project management |
-| **Resource Optimization** | Team capacity analysis | Workload balancing | Improved productivity |
-
-**📊 Multi-View Project Management:**
-- **Calendar Integration**: Date-fns powered scheduling with conflict detection
-- **Gantt Charts**: Interactive timeline visualization with drag-drop editing
-- **Kanban Boards**: Agile workflow management with custom columns
-- **Analytics Dashboard**: Completion rates, velocity tracking, team performance
-- **Hierarchical Structure**: Projects → Tasks → Subtasks → Comments with full nesting
-- **Real-time Sync**: Live updates across all team members and devices
-
-### Real-time Team Collaboration
-
-```mermaid
-flowchart TB
-    subgraph "WebSocket Infrastructure"
-        A[Socket.IO Server - Port 3001] --> B[JWT Authentication]
-        B --> C[Team Rooms & Channels]
-        C --> D[Message Broadcasting]
-        D --> E[Presence Management]
-    end
-    
-    subgraph "Communication Features"
-        F[Real-time Chat] --> G[File Sharing & Attachments]
-        G --> H[@Mentions & Notifications]
-        H --> I[Typing Indicators]
-        I --> J[Read Receipts & Status]
-        J --> K[Message Threading]
-    end
-    
-    subgraph "Collaboration Tools"
-        L[Document Co-editing] --> M[Live Cursors]
-        M --> N[Change Tracking]
-        N --> O[Conflict Resolution]
-        O --> P[Version History]
-    end
-    
-    subgraph "Team Management"
-        Q[Role-based Permissions] --> R[Owner/Admin/Editor/Viewer]
-        R --> S[Granular Access Control]
-        S --> T[Notification Preferences]
-        T --> U[Email & Push Integration]
-    end
-    
-    A --> F & L & Q
-    K --> V[Multi-device Sync]
-    P --> W[Backup & Recovery]
-    U --> X[Cross-platform Notifications]
-    
-    style A fill:#FF6B2C,color:#fff
-    style F fill:#28a745,color:#fff
-    style L fill:#17a2b8,color:#fff
-    style Q fill:#6f42c1,color:#fff
-```
-
-**🚀 Advanced Collaboration Capabilities:**
-
-| Feature | Technology Stack | Performance | Capabilities |
-|---------|------------------|-------------|--------------|
-| **Real-time Messaging** | Socket.IO + PostgreSQL + RLS | <50ms latency | Instant delivery, persistence, search |
-| **Document Collaboration** | WebSocket + Operational Transform | Live sync | Multi-user editing, conflict resolution |
-| **Presence System** | In-memory + Database hybrid | Real-time updates | Online status, activity tracking, typing |
-| **File Management** | Supabase Storage + CDN | Secure uploads | Version control, sharing permissions |
-| **Notification Engine** | WebSocket + Email + Push | Multi-channel | Granular preferences, smart batching |
-| **Team Administration** | RLS + JWT + Role Engine | Enterprise-grade | Fine-grained permissions, audit trails |
-
-**🔐 Enterprise Security:**
-- **Encryption in transit (TLS) and at rest**: All data encrypted during transmission and storage
-- **Row Level Security**: Database-level access control with Supabase RLS
-- **JWT Authentication**: Secure token-based authentication with refresh tokens
-- **Audit Logging**: Complete activity tracking for compliance and security
-- **GDPR Compliance**: Data privacy controls and user data portability
-
-### 🤖 Advanced AI Integration
-
-```mermaid
-flowchart TB
-    subgraph "Multi-Provider AI Router"
-        A[Intelligent Provider Selection] --> B[OpenRouter Integration]
-        B --> C[Fallback Chain Management]
-        C --> D[Token & Cost Optimization]
-        D --> E[Usage Analytics]
-    end
-    
-    subgraph "AI Provider Ecosystem"
-        F[OpenAI GPT-4o/o3/o3-mini]
-        G[Google Gemini 2.5 Pro/Flash]
-        H[Anthropic Claude 4.1/3.5 Sonnet]
-        I[Groq LLaMA 3.3-70B Versatile]
-        J[Mistral Large 2411/Codestral]
-        K[AIML Cross-Provider API]
-        L[OpenRouter Free Tier Models]
-    end
-    
-    subgraph "Streaming Infrastructure"
-        M[Server-Sent Events] --> N[Real-time Token Streaming]
-        N --> O[Progress Tracking & Reasoning]
-        O --> P[Heartbeat & Connection Management]
-        P --> Q[Graceful Error Handling]
-    end
-    
-    subgraph "AI-Powered Features"
-        R[Conversational Research Assistant]
-        S[LaTeX Content Generation]
-        T[Document Analysis & Extraction]
-        U[Project Planning & Task Generation]
-        V[Literature Summarization]
-        W[Citation & Reference Management]
-    end
-    
-    A --> F & G & H & I & J & K & L
-    F & G & H & I & J & K & L --> M
-    M --> R & S & T & U & V & W
-    
-    style A fill:#FF6B2C,color:#fff
-    style M fill:#28a745,color:#fff
-    style R fill:#17a2b8,color:#fff
-```
-
-**🚀 Next-Generation AI Capabilities:**
-
-| Provider | Latest Models | Context Window | Specialized Features | Primary Use Cases |
-|----------|---------------|----------------|---------------------|------------------|
-| **OpenAI** | GPT-4o, o3, o3-mini | 200K tokens | Advanced reasoning, function calling | Complex analysis, research synthesis |
-| **Google Gemini** | 2.5 Pro/Flash, 2.0 Flash | 1M tokens | Ultra-long context, multimodal | Document processing, comprehensive analysis |
-| **Anthropic** | Claude 4.1 Opus, 3.5 Sonnet | 200K tokens | Academic writing, ethical reasoning | Research papers, literature reviews |
-| **Groq** | LLaMA 3.3-70B, Whisper | 128K tokens | Ultra-fast inference (500+ tok/s) | Real-time chat, quick responses |
-| **Mistral** | Large 2411, Codestral | 128K tokens | Code generation, multilingual | Technical writing, programming |
-| **AIML API** | Cross-provider access | Variable | Model aggregation, cost optimization | Fallback routing, budget management |
-
-**🔥 Advanced AI Features:**
-
-- **Streaming Conversations**: Real-time token-by-token responses with progress tracking
-- **Context Preservation**: Full conversation history maintained across sessions
-- **Intelligent Fallbacks**: Automatic provider switching on failures or rate limits
-- **Progress & Intermediate Steps**: Live progress updates and intermediate outputs during complex tasks
-- **Multi-Modal Processing**: Text, images, documents, and data analysis
-- **Cost Optimization**: Smart model selection based on task complexity and budget
-- **OpenRouter Integration**: Access to 100+ models through unified API
-
----
-
-## System Architecture
-
-### Complete Platform Overview
-
-```mermaid
-flowchart TB
-    subgraph "Frontend Layer"
-        A[Next.js 15 + React 19] --> B[TypeScript + TailwindCSS]
-        B --> C[Shadcn/UI + Framer Motion]
-        C --> D[KaTeX + Tesseract.js]
-    end
-    
-    subgraph "API Gateway & Routes"
-        E[AI Streaming Routes] --> F[SSE + WebSocket]
-        G[Literature Search APIs] --> H[Multi-Source Orchestration]
-        I[Document Processing] --> J[Extraction Pipeline]
-        K[Collaboration APIs] --> L[Real-time Messaging]
-        M[Project Management] --> N[Planning & Analytics]
-    end
-    
-    subgraph "Real-time Infrastructure"
-        O[Socket.IO Server - Port 3001] --> P[JWT Authentication]
-        Q[Server-Sent Events] --> R[AI Token Streaming]
-        S[Keep-alive Services] --> T[Cloud Platform Support]
-        U[WebSocket Rooms] --> V[Team Collaboration]
-    end
-    
-    subgraph "Database & Storage Layer"
-        W[Supabase PostgreSQL] --> X[Row Level Security]
-        Y[File Storage + CDN] --> Z[Document Management]
-        AA[Authentication Service] --> BB[JWT + Session Management]
-        CC[Caching Layer] --> DD[Redis + Memory Cache]
-    end
-    
-    subgraph "AI & External Services"
-        EE[Multi-Provider AI Router] --> FF[OpenAI + Gemini + Claude + Groq + Mistral + AIML]
-        GG[Literature Search Engine] --> HH[OpenAlex + arXiv + CrossRef + PubMed + DOAJ + Google Scholar]
-        II[Document Processing Engine] --> JJ[PDF + DOCX + PPT + CSV + OCR + Text Analysis]
-        KK[OpenRouter Integration] --> LL[100+ Free & Premium Models]
-    end
-    
-    A --> E & G & I & K & M
-    E --> EE
-    G --> GG
-    I --> II
-    K --> O
-    M --> W
-    O --> W
-    EE --> FF
-    GG --> HH
-    II --> JJ
-    KK --> FF
-    
-    style A fill:#FF6B2C,color:#fff
-    style W fill:#28a745,color:#fff
-    style EE fill:#17a2b8,color:#fff
-    style O fill:#6f42c1,color:#fff
-    style GG fill:#ffc107,color:#000
-```
-
-### 🔧 Core Architecture Components
-
-| Layer | Technology Stack | Purpose | Performance |
-|-------|------------------|---------|-------------|
-| **Frontend** | Next.js 15, React 19, TypeScript, TailwindCSS | Modern UI with server-side rendering | <100ms page loads |
-| **Database** | Supabase PostgreSQL with RLS | Secure data storage and real-time sync | 99.9% uptime |
-| **AI Services** | Multi-provider router with OpenRouter | Intelligent content generation | 3-8s response time |
-| **Real-time** | Socket.IO + WebSocket infrastructure | Live collaboration and messaging | <50ms latency |
-| **Document Processing** | Multi-format extraction pipeline | File analysis and OCR | 15-45s processing |
-| **Literature Search** | 11+ academic database integration | Comprehensive research discovery | 1-3s search time |
-
-### 🛡️ Security & Performance
-
-**🔒 Enterprise-Grade Security:**
-- **Authentication**: JWT-based auth with Supabase and refresh token rotation
-- **Authorization**: Row Level Security (RLS) policies with fine-grained permissions
-- **Data Protection**: End-to-end encryption for files and messages
-- **API Security**: Rate limiting, request validation, and CORS protection
-- **Compliance**: GDPR-ready with data portability and deletion controls
-
-**⚡ Performance Benchmarks:**
-
-| Feature | Response Time | Throughput | Reliability | Scalability |
-|---------|---------------|------------|-------------|-------------|
-| **Literature Search** | 1-3s | 100+ req/min | 98% success rate | 50+ concurrent users |
-| **AI Generation** | 3-8s streaming | 30+ concurrent | 95% success rate | Auto-scaling |
-| **Document Processing** | 15-45s | 25+ files/min | 92% success rate | Queue-based |
-| **Real-time Chat** | <50ms | 1000+ msg/min | 99.9% uptime | 500+ concurrent |
-| **File Upload** | 2-10s | 20MB/file | 96% success rate | CDN-accelerated |
-
----
-
-## 🚀 Complete Setup Guide
-
-### 📋 Prerequisites
-
-| Requirement | Version | Purpose | Installation |
-|-------------|---------|---------|--------------|
-| **Node.js** | 18.0+ | Frontend runtime | [nodejs.org](https://nodejs.org/) |
-| **pnpm** | Latest | Fast package manager | `npm install -g pnpm` |
-| **Python** | 3.8+ | Optional backend services | [python.org](https://python.org/) |
-| **Supabase Account** | - | Database & authentication | [supabase.com](https://supabase.com/) |
-| **AI Provider Account** | - | At least one AI service | See provider links below |
-
-### 🛠️ Installation Steps
+### Installation
 
 ```bash
-# 1. Clone repository and install dependencies
+# 1. Clone repository
 git clone https://github.com/Kedhareswer/thesisflow-ai.git
 cd thesisflow-ai
+
+# 2. Install dependencies
 pnpm install
 
-# 2. Configure environment variables
+# 3. Configure environment
 cp env.template .env.local
-# Edit .env.local with your API keys (see configuration guide below)
+# Edit .env.local with your API keys (see configuration below)
 
-# 3. Start development servers
-pnpm dev                         # Frontend (port 3000)
-node server/websocket-server.js  # WebSocket collaboration (port 3001)
+# 4. Start development servers
+pnpm dev                          # Frontend (port 3000)
+node server/websocket-server.js   # WebSocket (port 3001)
 
-# 4. Optional: Python literature search service
+# 5. Optional: Python literature search
 cd python
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python app.py                    # Literature APIs (port 5000)
+python app.py                     # Literature APIs (port 5000)
 ```
 
-### 🔑 Environment Configuration
+### Environment Configuration
 
-**Step 1: Create Supabase Project**
-1. Visit [supabase.com](https://supabase.com/) and create a new project
-2. Go to Settings → API to get your project URL and keys
-3. Run the database setup scripts in `scripts/` folder
-
-**Step 2: Get Nova AI API Key**
-ThesisFlow-AI uses Nova AI (Groq) exclusively for all AI features:
-
-| Provider | Get API Key | Model Used | Benefits |
-|----------|-------------|------------|----------|
-| **Nova AI (Groq)** | [console.groq.com](https://console.groq.com/keys) | Llama-3.3-70B | Free tier • Research-optimized • Fast inference |
-
-**Step 3: Configure .env.local**
-
-Copy the essential variables to your `.env.local` file:
+**Required Variables:**
 
 ```bash
-# Supabase Configuration (Required)
+# Supabase (Required)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# Nova AI (Required)
+# Nova AI via Groq (Required)
 GROQ_API_KEY=your_groq_api_key
 
-# HuggingFace (Required for AI content detection)
+# HuggingFace (Required for AI detection)
 HUGGINGFACE_API_KEY=your_huggingface_api_key
 
 # WebSocket Configuration
 NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+```
 
-# Optional: Enhanced Features
+**Optional Enhancements:**
+
+```bash
+# Google Search API (Enhanced literature search)
 GOOGLE_SEARCH_API_KEY=your_google_search_api_key
 GOOGLE_SEARCH_CSE_ID=your_custom_search_engine_id
+
+# Stripe (Payment processing)
 STRIPE_SECRET_KEY=your_stripe_secret_key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 ```
 
-### 🔒 Security Best Practices
+> **🚨 Security:** Never commit `.env.local` to version control!
 
-| Security Measure | Implementation | Importance |
-|------------------|----------------|------------|
+---
+
+## 💎 Token System & Pricing
+
+### Subscription Plans
+
+| Plan | Monthly Tokens | Price | Best For |
+|------|----------------|-------|----------|
+| **Free** | 50 tokens | $0 | Students & individual researchers |
+| **Pro** | 500 tokens | $19/month | Active researchers & small teams |
+
+### Token Usage
+
+<table>
+<tr>
+<td width="50%">
+
+**🔥 AI-Powered Features** *(Tokens Required)*
+
+- AI Chat & Research Assistant
+- Topic Exploration & Deep Research
+- Document Summarization & Analysis
+- AI Project Planning & Task Generation
+- LaTeX Writing Assistance
+
+</td>
+<td width="50%">
+
+**✨ Always Free Features**
+
+- Literature Search (11+ databases)
+- Project Management & Calendar
+- Team Collaboration & Chat
+- File Upload & Document Extraction
+- Analytics & Progress Tracking
+
+</td>
+</tr>
+</table>
+
+### Usage Monitoring
+
+| Location | Feature | Description |
+|----------|---------|-------------|
+| **Navigation Bar** | Live Counter | Real-time token usage display |
+| **Profile Menu** | Plan Status | Current plan and upgrade options |
+| **`/plan` Page** | Analytics Dashboard | Detailed usage charts by feature |
+| **`/tokens` Page** | Transaction History | Complete token usage log |
+
+> **📅 Note:** Tokens reset monthly. Unused tokens don't roll over.
+
+---
+
+## 🔍 Feature Deep Dive
+
+### Literature Explorer
+
+**Multi-Source Academic Search Engine**
+
+```mermaid
+graph TB
+    A[Search Query] --> B[Orchestrator]
+    B --> C[Academic DBs]
+    B --> D[Web Sources]
+    C --> E[Results Processing]
+    D --> E
+    E --> F[AI Assistant]
+    
+    style B fill:#FF6B2C,color:#fff
+    style E fill:#28a745,color:#fff
+    style F fill:#17a2b8,color:#fff
+```
+
+#### Data Sources
+
+<table>
+<tr>
+<td width="50%">
+
+**Academic Databases**
+- OpenAlex (250M+ papers)
+- arXiv (Preprints)
+- CrossRef (DOI Registry)
+- PubMed (Medical)
+- DOAJ (Open Access)
+- OpenAIRE (European Research)
+
+</td>
+<td width="50%">
+
+**Web & News**
+- Google Scholar
+- DuckDuckGo Search
+- Tavily AI Search
+- Context7 Documentation
+- LangSearch Multi-Source
+
+</td>
+</tr>
+</table>
+
+#### Performance Metrics
+
+| Feature | Technology | Performance |
+|---------|------------|-------------|
+| **Multi-Source Search** | 11+ APIs orchestration | 1-3s response |
+| **Real-time Streaming** | SSE + WebSocket | <100ms latency |
+| **AI Assistant** | Nova AI (Llama-3.3-70B) | 3-8s generation |
+| **Smart Caching** | Supabase + Redis (1hr TTL) | 85%+ hit rate |
+| **Citation Analysis** | OpenAlex graph | Forward/backward links |
+| **Export Formats** | BibTeX, RIS, JSON, CSV | Bulk export |
+
+### LaTeX Writer
+
+**Collaborative LaTeX Editor with Real-Time Preview**
+
+```mermaid
+graph LR
+    A[LaTeX Editor] --> B[KaTeX Renderer]
+    A --> C[Multi-User Sync]
+    A --> D[AI Assistant]
+    B --> E[Live Preview]
+    C --> E
+    D --> A
+    
+    style A fill:#FF6B2C,color:#fff
+    style B fill:#28a745,color:#fff
+    style D fill:#17a2b8,color:#fff
+```
+
+#### Document Processing
+
+| Format | Extraction Method | Processing Time | Capabilities |
+|--------|-------------------|-----------------|--------------|
+| **PDF** | pdf-parse + OCR | 15-45s | Text, tables, images, metadata |
+| **DOCX/DOC** | mammoth.js | 10-30s | Rich text, tables, comments |
+| **PowerPoint** | XML Parser | 20-40s | Slides, notes, embedded media |
+| **CSV/Excel** | PapaCSV + XLSX | 5-15s | Data parsing, type detection |
+| **Images/Scans** | Tesseract.js + Sharp | 30-90s | OCR, layout analysis |
+| **Plain Text** | Direct processing | 2-10s | NLP, structure analysis |
+
+#### Editor Features
+
+<table>
+<tr>
+<td width="50%">
+
+**Collaboration**
+- Multi-user editing
+- Live cursors & presence
+- Real-time sync
+- Conflict resolution
+- Version control
+
+</td>
+<td width="50%">
+
+**LaTeX Tools**
+- KaTeX math rendering
+- Smart toolbar
+- Template library
+- BibTeX integration
+- PDF compilation
+- AI content generation
+
+</td>
+</tr>
+</table>
+
+### AI-Powered Planner
+
+**Intelligent Project Management with AI Task Generation**
+
+```mermaid
+graph TB
+    A[Natural Language] --> B[AI Task Generator]
+    B --> C[Smart Scheduling]
+    C --> D[Gantt/Calendar]
+    D --> E[Team Assignments]
+    
+    style B fill:#FF6B2C,color:#fff
+    style C fill:#28a745,color:#fff
+    style D fill:#17a2b8,color:#fff
+```
+
+#### AI Planning Features
+
+| Feature | Technology | Benefit |
+|---------|------------|----------|
+| **AI Task Generation** | GPT-4o + Planning Prompts | 10x faster project setup |
+| **Smart Scheduling** | Constraint optimization | Conflict-free timelines |
+| **Progress Prediction** | ML analytics | Deadline risk assessment |
+| **Resource Optimization** | Team capacity analysis | Improved productivity |
+
+#### Visualization Options
+
+<table>
+<tr>
+<td width="50%">
+
+**Views**
+- Interactive Calendar
+- Gantt Charts
+- Kanban Boards
+- Timeline Views
+- Progress Analytics
+
+</td>
+<td width="50%">
+
+**Features**
+- Drag-drop editing
+- Conflict detection
+- Team assignments
+- Real-time sync
+- Hierarchical structure
+
+</td>
+</tr>
+</table>
+
+### Team Collaboration
+
+**Real-Time Communication & Document Co-Editing**
+
+```mermaid
+graph TB
+    A[Socket.IO Server] --> B[JWT Auth]
+    B --> C[Team Rooms]
+    C --> D[Real-time Chat]
+    C --> E[File Sharing]
+    C --> F[Presence]
+    
+    style A fill:#FF6B2C,color:#fff
+    style C fill:#28a745,color:#fff
+    style D fill:#17a2b8,color:#fff
+```
+
+#### Collaboration Features
+
+| Feature | Technology | Performance |
+|---------|------------|-------------|
+| **Real-time Messaging** | Socket.IO + PostgreSQL | <50ms latency |
+| **Document Co-editing** | WebSocket + OT | Live sync |
+| **Presence System** | In-memory + DB | Real-time updates |
+| **File Management** | Supabase Storage + CDN | Secure uploads |
+| **Notifications** | WebSocket + Email + Push | Multi-channel |
+
+#### Security & Permissions
+
+<table>
+<tr>
+<td width="50%">
+
+**Security**
+- TLS encryption
+- Row Level Security (RLS)
+- JWT authentication
+- Audit logging
+- GDPR compliance
+
+</td>
+<td width="50%">
+
+**Permissions**
+- Owner/Admin/Editor/Viewer
+- Granular access control
+- Team management
+- Notification preferences
+- Multi-device sync
+
+</td>
+</tr>
+</table>
+
+### AI Integration
+
+**Multi-Provider AI Router with Intelligent Fallbacks**
+
+```mermaid
+graph TB
+    A[AI Router] --> B[OpenRouter]
+    A --> C[Direct Providers]
+    B --> D[100+ Models]
+    C --> E[OpenAI/Gemini/Claude]
+    D --> F[SSE Streaming]
+    E --> F
+    
+    style A fill:#FF6B2C,color:#fff
+    style B fill:#28a745,color:#fff
+    style F fill:#17a2b8,color:#fff
+```
+
+#### Supported AI Providers
+
+| Provider | Models | Context | Use Cases |
+|----------|--------|---------|-----------|
+| **OpenAI** | GPT-4o, o3, o3-mini | 200K tokens | Complex analysis, research synthesis |
+| **Google Gemini** | 2.5 Pro/Flash | 1M tokens | Document processing, long context |
+| **Anthropic** | Claude 4.1, 3.5 Sonnet | 200K tokens | Academic writing, literature reviews |
+| **Groq** | LLaMA 3.3-70B | 128K tokens | Real-time chat (500+ tok/s) |
+| **Mistral** | Large 2411, Codestral | 128K tokens | Code generation, multilingual |
+| **OpenRouter** | 100+ models | Variable | Fallback routing, cost optimization |
+
+#### AI Features
+
+<table>
+<tr>
+<td width="50%">
+
+**Streaming & Context**
+- Real-time token streaming
+- Full conversation history
+- Progress tracking
+- Intelligent fallbacks
+- Multi-modal processing
+
+</td>
+<td width="50%">
+
+**Applications**
+- Research assistant
+- LaTeX content generation
+- Document analysis
+- Project planning
+- Literature summarization
+- Citation management
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🛠️ Installation Guide
+
+### Database Setup
+
+```bash
+# Run database migrations
+node scripts/run-migration.js
+
+# Verify Supabase connection
+npx supabase status
+
+# Optional: Seed with sample data
+node scripts/seed-database.js
+```
+
+### Database Schema
+
+| Table | Purpose | Key Features |
+|-------|---------|--------------|
+| `user_profiles` | User accounts & preferences | RLS policies, plan tracking |
+| `projects` | Research projects & tasks | Hierarchical structure, team sharing |
+| `teams` | Collaboration groups | Role-based permissions, invitations |
+| `extractions` | Document processing results | File metadata, AI analysis |
+| `chat_sessions` | AI conversation history | Context preservation, search |
+| `literature_cache` | Search result caching | 1-hour TTL, deduplication |
+| `user_tokens` | Monthly usage tracking | Token consumption, plan limits |
+
+### Security & Performance
+
+**Security Measures:**
+
+| Measure | Implementation | Priority |
+|---------|----------------|----------|
 | **Environment Isolation** | Separate `.env.local` for dev/prod | Critical |
 | **API Key Rotation** | Monthly key rotation schedule | High |
 | **Usage Monitoring** | Track API consumption and costs | High |
@@ -637,32 +618,15 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 | **Rate Limiting** | Per-user and per-endpoint limits | Medium |
 | **Audit Logging** | Track all sensitive operations | Medium |
 
-**🚨 Never commit `.env.local` to version control!**
+**Performance Benchmarks:**
 
-### 🗄️ Database Setup
-
-```bash
-# Run database migrations (creates all required tables and functions)
-node scripts/run-migration.js
-
-# Verify Supabase connection
-npx supabase status
-
-# Optional: Seed with sample data for development
-node scripts/seed-database.js
-```
-
-**📊 Database Schema Overview:**
-
-| Table | Purpose | Key Features |
-|-------|---------|--------------|
-| `user_profiles` | User accounts and preferences | RLS policies, plan tracking |
-| `projects` | Research projects and tasks | Hierarchical structure, team sharing |
-| `teams` | Collaboration groups | Role-based permissions, invitations |
-| `extractions` | Document processing results | File metadata, AI analysis |
-| `chat_sessions` | AI conversation history | Context preservation, search |
-| `literature_cache` | Search result caching | 1-hour TTL, deduplication |
-| `user_tokens` | Monthly usage tracking | Token consumption, plan limits |
+| Feature | Response Time | Throughput | Reliability |
+|---------|---------------|------------|-------------|
+| **Literature Search** | 1-3s | 100+ req/min | 98% success |
+| **AI Generation** | 3-8s streaming | 30+ concurrent | 95% success |
+| **Document Processing** | 15-45s | 25+ files/min | 92% success |
+| **Real-time Chat** | <50ms | 1000+ msg/min | 99.9% uptime |
+| **File Upload** | 2-10s | 20MB/file | 96% success |
 
 ---
 
@@ -742,26 +706,35 @@ const response = await fetch('/api/extract', {
 | **Railway** | Full-stack deployment | Database included, simple setup | $5-20/month |
 | **Google Cloud Run** | Containerized deployment | Pay-per-use, custom domains | Variable |
 
-### 📊 Production Metrics
+### Production Metrics
 
-```mermaid
-graph TB
-    A[Performance Metrics] --> A1[API Response: <200ms]
-    A --> A2[Search Speed: 1-3s]
-    A --> A3[AI Generation: 3-8s]
-    
-    B[Reliability] --> B1[Uptime: 99.9%]
-    B --> B2[Success Rate: 95%+]
-    B --> B3[Error Recovery: <5s]
-    
-    C[Scalability] --> C1[Concurrent Users: 500+]
-    C --> C2[Requests/min: 1000+]
-    C --> C3[Storage: Unlimited]
-    
-    style A fill:#FF6B2C,color:#fff
-    style B fill:#28a745,color:#fff
-    style C fill:#17a2b8,color:#fff
+| Metric | Target | Status |
+|--------|--------|--------|
+| **API Response** | <200ms | ✅ Achieved |
+| **Search Speed** | 1-3s | ✅ Achieved |
+| **AI Generation** | 3-8s | ✅ Achieved |
+| **Uptime** | 99.9% | ✅ Achieved |
+| **Success Rate** | 95%+ | ✅ Achieved |
+| **Concurrent Users** | 500+ | ✅ Scalable |
+| **Requests/min** | 1000+ | ✅ Scalable |
+
+---
+
+## 📋 Changelog
+
+Stay up to date with the latest releases and improvements:
+
+**📍 Access Changelog:**
+- **Web Interface**: [thesisflow-ai.vercel.app/changelog](https://thesisflow-ai.vercel.app/changelog)
+- **RSS Feed**: [changelog/rss.xml](https://thesisflow-ai.vercel.app/changelog/rss.xml)
+- **Atom Feed**: [changelog/atom.xml](https://thesisflow-ai.vercel.app/changelog/atom.xml)
+
+**Direct Version Links:**
 ```
+https://thesisflow-ai.vercel.app/changelog#v1.0.9
+```
+
+**Current Version:** 1.0.9 (September 2025)
 
 ---
 
