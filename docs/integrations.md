@@ -36,15 +36,14 @@ This document describes all external and internal integrations used by ThesisFlo
 - Literature search: `enhanced_literature_search_system`, `create_literature_search_rate_limits_table`
 - Planner drafts: `create_planner_drafts`
 
-## Nova AI (Groq/Nebius)
-- Service: `lib/services/nova-ai.service.ts`
-- Direct integration with Llama-3.3-70B model
+## AI Service
+- Service: `lib/enhanced-ai-service.ts` (simplified, server-side only)
+- Direct integration with Llama-3.3-70B via server-configured API
 - Usage:
-  - Chat streaming: `app/api/ai/chat/stream/route.ts`
-  - Topics report (SSE): `app/api/topics/report/stream/route.ts`
-  - Research assistant: All AI features use Nova AI exclusively
-- Environment: `GROQ_API_KEY` or `NEBIUS_API_KEY` (see `ENV_SETUP.md`)
-- Reliability: Single provider eliminates fallback complexity and timeout issues
+  - All AI features use server-side API keys exclusively
+  - No user API key management required
+- Environment: `GROQ_API_KEY` (configured server-side only)
+- Note: Uses internal name "Nova AI" for consistency
 
 ## Search providers
 - Aggregated by: `lib/services/literature-search.service.ts`

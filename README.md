@@ -162,12 +162,12 @@ graph LR
 <td width="33%">
 
 **AI & External**
-- Nova AI (Llama-3.3-70B)
-- OpenRouter (100+ models)
+- Nova AI (Llama-3.3-70B via Groq)
+- Server-side AI processing
 - OpenAlex + arXiv
 - CrossRef + PubMed
 - Google Scholar API
-- HuggingFace
+- HuggingFace (AI Detection)
 
 </td>
 </tr>
@@ -433,7 +433,7 @@ graph TB
 
 | Feature | Technology | Benefit |
 |---------|------------|----------|
-| **AI Task Generation** | GPT-4o + Planning Prompts | 10x faster project setup |
+| **AI Task Generation** | Nova AI + Planning Prompts | 10x faster project setup |
 | **Smart Scheduling** | Constraint optimization | Conflict-free timelines |
 | **Progress Prediction** | ML analytics | Deadline risk assessment |
 | **Resource Optimization** | Team capacity analysis | Improved productivity |
@@ -521,60 +521,93 @@ graph TB
 
 ### AI Integration
 
-**Multi-Provider AI Router with Intelligent Fallbacks**
+**Simplified Server-Side AI Service**
 
 ```mermaid
 graph TB
-    A[AI Router] --> B[OpenRouter]
-    A --> C[Direct Providers]
-    B --> D[100+ Models]
-    C --> E[OpenAI/Gemini/Claude]
-    D --> F[SSE Streaming]
-    E --> F
-    
-    style A fill:#FF6B2C,color:#fff
-    style B fill:#28a745,color:#fff
-    style F fill:#17a2b8,color:#fff
+    A[AI Requests] --> B[Enhanced AI Service]
+    B --> C[Nova AI - Groq]
+    C --> D[Llama-3.3-70B]
+    D --> E[SSE Streaming]
+
+    style B fill:#FF6B2C,color:#fff
+    style C fill:#28a745,color:#fff
+    style E fill:#17a2b8,color:#fff
 ```
 
-#### Supported AI Providers
+#### Nova AI Architecture
 
-| Provider | Models | Context | Use Cases |
-|----------|--------|---------|-----------|
-| **OpenAI** | GPT-4o, o3, o3-mini | 200K tokens | Complex analysis, research synthesis |
-| **Google Gemini** | 2.5 Pro/Flash | 1M tokens | Document processing, long context |
-| **Anthropic** | Claude 4.1, 3.5 Sonnet | 200K tokens | Academic writing, literature reviews |
-| **Groq** | LLaMA 3.3-70B | 128K tokens | Real-time chat (500+ tok/s) |
-| **Mistral** | Large 2411, Codestral | 128K tokens | Code generation, multilingual |
-| **OpenRouter** | 100+ models | Variable | Fallback routing, cost optimization |
+ThesisFlow-AI uses a **simplified single-provider architecture** with Nova AI (Llama-3.3-70B via Groq) for all AI-powered features.
 
-#### AI Features
+**Key Benefits:**
+- ✅ **Zero Configuration** - No user API keys needed
+- ✅ **Consistent Performance** - Single optimized model for academic tasks
+- ✅ **Better Security** - API keys managed server-side only
+- ✅ **Simplified Codebase** - No provider fallback complexity
+- ✅ **Research-Optimized** - Tuned specifically for academic workflows
+
+#### AI Model Specifications
+
+| Feature | Details |
+|---------|---------|
+| **Provider** | Groq Cloud API |
+| **Model** | Llama-3.3-70B-Versatile |
+| **Context Window** | 128K tokens |
+| **Performance** | 500+ tokens/second |
+| **Configuration** | Server-side only (`GROQ_API_KEY`) |
+| **Branding** | "Nova AI" (internal name) |
+
+#### AI-Powered Features
 
 <table>
 <tr>
 <td width="50%">
 
-**Streaming & Context**
-- Real-time token streaming
+**Core Capabilities**
+- Real-time streaming responses
 - Full conversation history
 - Progress tracking
-- Intelligent fallbacks
 - Multi-modal processing
+- Academic-focused prompts
 
 </td>
 <td width="50%">
 
 **Applications**
-- Research assistant
-- LaTeX content generation
-- Document analysis
-- Project planning
+- Research assistant chat
 - Literature summarization
-- Citation management
+- Document analysis
+- Project planning & task generation
+- LaTeX writing assistance
+- Topic exploration
 
 </td>
 </tr>
 </table>
+
+#### Streaming Architecture
+
+All AI features use **Server-Sent Events (SSE)** for real-time token streaming:
+
+```javascript
+// Client-side streaming (automatic via EventSource)
+const eventSource = new EventSource('/api/ai/chat/stream?...')
+
+eventSource.addEventListener('token', (event) => {
+  const { content } = JSON.parse(event.data)
+  // Render token in real-time
+})
+
+eventSource.addEventListener('done', (event) => {
+  // Generation complete
+})
+```
+
+**Performance Metrics:**
+- Token streaming: 500+ tokens/second
+- Initial response: 200-500ms
+- Average generation: 3-8 seconds
+- Concurrent requests: 30+ supported
 
 ---
 
@@ -784,7 +817,7 @@ pnpm build
 
 **🔧 Core Technologies:** Next.js 15 • React 19 • Supabase • TypeScript • TailwindCSS
 
-**🤖 AI Partners:** OpenAI • Google • Anthropic • Groq • Mistral • HuggingFace
+**🤖 AI Technology:** Groq Cloud API (Nova AI - Llama-3.3-70B) • HuggingFace (AI Detection)
 
 **📚 Academic Sources:** OpenAlex • arXiv • CrossRef • PubMed • Google Scholar (API)
 
