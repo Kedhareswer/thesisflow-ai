@@ -8,6 +8,7 @@
     "lint": "next lint",
     "start": "next start",
     "ws": "node server/websocket-server.js",
+    "ws:prod": "NODE_ENV=production node server/websocket-server.js",
     "sse:smoke": "node scripts/sse-smoke.js",
     "sse:smoke:load": "node scripts/sse-smoke.js --query 'large language models' --limit 20 --concurrency 6 --sessions 12 --timeoutMs 45000"
   },

@@ -1,109 +1,192 @@
-# 🚀 **COMPLETE DEPLOYMENT CHECKLIST**
+# WebSocket Deployment Checklist
 
-## **✅ PHASE 1: RAILWAY WEBSOCKET DEPLOYMENT**
+## ✅ Pre-Deployment Setup
 
-### **1. Setup Railway Account**
-- [ ] Go to [railway.app](https://railway.app)
-- [ ] Sign up with GitHub (free)
-- [ ] Connect your GitHub repository
+### 1. Repository Preparation
+- [ ] Ensure `render.yaml` is in root directory
+- [ ] Health check endpoint added to `websocket-server.js`
+- [ ] All code committed and pushed to main branch
+- [ ] Dependencies are properly listed in `package.json`
 
-### **2. Deploy WebSocket Server**
-- [ ] Create new Railway project
-- [ ] Select "Deploy from GitHub Repo"
-- [ ] Choose `thesisflow-ai` repository
-- [ ] Set start command: `node server/websocket-server.js`
+### 2. Environment Variables Ready
+- [ ] `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` - Service role key (keep secret!)
+- [ ] `NEXT_PUBLIC_APP_URL` - Your Vercel frontend URL
+- [ ] `NODE_ENV=production` for production deployment
 
-### **3. Configure Environment Variables in Railway**
-Copy these from your `.env.local`:
+### 3. Frontend Configuration (Vercel)
+- [ ] Add `NEXT_PUBLIC_SOCKET_URL` environment variable pointing to Render WebSocket URL
+- [ ] Update socket connection logic to use production URL
+- [ ] Test WebSocket connection from frontend
+
+## ✅ Render Deployment Steps
+
+### 1. Create Render Service
+- [ ] Log into [render.com](https://render.com)
+- [ ] Click "New +" → "Web Service"
+- [ ] Connect GitHub repository
+- [ ] Configure service settings:
+  - **Name**: `thesisflow-websocket-server`
+  - **Runtime**: `Node`
+  - **Build Command**: `npm install`
+  - **Start Command**: `node server/websocket-server.js`
+  - **Plan**: `Starter` (free) or `Standard` ($7/month)
+
+### 2. Environment Configuration
+- [ ] Go to service Settings → Environment
+- [ ] Add all required environment variables
+- [ ] Verify no secrets are in Git repository
+- [ ] Save environment configuration
+
+### 3. Initial Deployment
+- [ ] Click "Deploy Latest Commit"
+- [ ] Monitor deployment logs for errors
+- [ ] Wait for successful build and start
+- [ ] Verify health check endpoint responds
+
+## ✅ Post-Deployment Testing
+
+### 1. Health Check
+- [ ] Test health endpoint: `https://your-websocket.onrender.com/health`
+- [ ] Verify response includes status, timestamp, uptime, connections
+- [ ] Confirm 200 status code
+
+### 2. WebSocket Connectivity
+- [ ] Test connection from browser developer tools
+- [ ] Verify authentication works with Supabase JWT
+- [ ] Test team joining functionality
+- [ ] Test message sending/receiving
+
+### 3. Integration Testing
+- [ ] Update frontend `NEXT_PUBLIC_SOCKET_URL` on Vercel
+- [ ] Test full chat functionality from production frontend
+- [ ] Verify presence updates work
+- [ ] Test with multiple users/browsers
+
+### 4. Performance Monitoring
+- [ ] Monitor Render logs for connection patterns
+- [ ] Check memory and CPU usage in Render dashboard
+- [ ] Set up alerts for service downtime
+- [ ] Monitor error rates and response times
+
+## ✅ Production Readiness
+
+### 1. Scaling Configuration
+- [ ] Configure min/max instances if needed
+- [ ] Set up auto-scaling based on CPU/memory
+- [ ] Consider upgrading to Standard plan for production traffic
+- [ ] Review resource limits and adjust as needed
+
+### 2. Security Checklist
+- [ ] All environment variables are secure (no secrets in code)
+- [ ] CORS is properly configured for your frontend domain
+- [ ] Authentication is working correctly
+- [ ] Rate limiting is in place if needed
+
+### 3. Monitoring Setup
+- [ ] Enable Render monitoring and alerts
+- [ ] Set up uptime monitoring (optional: use UptimeRobot)
+- [ ] Monitor database connection stability
+- [ ] Track WebSocket connection metrics
+
+### 4. Backup & Recovery
+- [ ] Document environment variable configuration
+- [ ] Backup Render service configuration
+- [ ] Have rollback plan ready
+- [ ] Test disaster recovery procedure
+
+## ✅ Client-Side Updates
+
+### 1. Socket Service Configuration
+- [ ] Update socket service to use production WebSocket URL
+- [ ] Implement proper error handling for connection failures
+- [ ] Add reconnection logic with exponential backoff
+- [ ] Handle network switching gracefully
+
+### 2. Environment Configuration
 ```bash
-- [ ] NEXT_PUBLIC_SUPABASE_URL=https://wvlxgbqjwgleizbpdulo.supabase.co
-- [ ] SUPABASE_SERVICE_ROLE_KEY=your_service_key_here
-- [ ] NODE_ENV=production
-- [ ] NEXT_PUBLIC_APP_URL=https://your-vercel-app.vercel.app
+# Add to Vercel environment variables
+NEXT_PUBLIC_SOCKET_URL=https://your-websocket.onrender.com
 ```
 
-### **4. Get Your Railway WebSocket URL**
-- [ ] After deployment, copy the Railway URL (e.g., `https://thesisflow-websocket-production-xxxx.up.railway.app`)
-- [ ] Test the URL by visiting `/health` endpoint
-
-## **✅ PHASE 2: VERCEL ENVIRONMENT UPDATE**
-
-### **5. Update Vercel Environment Variables**
-- [ ] Go to Vercel dashboard → Your project → Settings → Environment Variables
-- [ ] Add: `NEXT_PUBLIC_SOCKET_URL=https://your-railway-websocket-url.up.railway.app`
-- [ ] Redeploy your Vercel app
-
-### **6. Update Local Development**
-- [ ] Update your `.env.local`:
-```bash
-# For production testing
-NEXT_PUBLIC_SOCKET_URL=https://your-railway-websocket-url.up.railway.app
-
-# For local development (uncomment when needed)
-# NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+### 3. Connection Logic
+```javascript
+// Example production connection
+const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:3001', {
+  auth: { token: supabaseToken },
+  transports: ['websocket', 'polling'],
+  upgrade: true,
+  rememberUpgrade: true
+});
 ```
 
-## **✅ PHASE 3: TESTING & VERIFICATION**
+## ✅ Troubleshooting Guide
 
-### **7. Test WebSocket Connection**
-- [ ] Run local test: `node scripts/test-websocket.js https://your-railway-url.up.railway.app`
-- [ ] Should show "✅ Connection successful!"
-- [ ] Health check should return server status
+### Common Issues & Solutions
 
-### **8. Test Production Features**
-- [ ] Visit your Vercel app
-- [ ] Create/join a team
-- [ ] Test real-time chat
-- [ ] Test presence indicators
-- [ ] Check browser console for WebSocket errors
+**Connection Refused**
+- Check if Render service is running
+- Verify environment variables are set
+- Check CORS configuration
+- Ensure health endpoint responds
 
-### **9. Monitor Railway Deployment**
-- [ ] Check Railway logs for WebSocket connections
-- [ ] Monitor server health at `/health` endpoint
-- [ ] Verify CORS settings are working
+**Authentication Errors**
+- Verify Supabase service role key
+- Check JWT token format and expiration
+- Ensure auth middleware is working
 
-## **🔧 TROUBLESHOOTING**
+**High Memory Usage**
+- Monitor active connections count
+- Check for memory leaks in connection cleanup
+- Consider upgrading Render plan
+- Review connection pooling
 
-### **Common Issues:**
+**Slow Response Times**
+- Check database query performance
+- Monitor Render resource usage
+- Consider Redis caching for session data
+- Optimize message broadcasting
 
-**❌ CORS Error**
-- Check `NEXT_PUBLIC_APP_URL` in Railway matches your Vercel domain
-- Ensure Railway WebSocket server shows your domain in CORS logs
+## ✅ Maintenance Tasks
 
-**❌ Connection Refused**
-- Verify Railway deployment is running
-- Check Railway start command: `node server/websocket-server.js`
-- Test health endpoint: `https://your-railway-url.up.railway.app/health`
+### Daily
+- [ ] Check service health status
+- [ ] Monitor connection count and patterns
+- [ ] Review error logs for issues
 
-**❌ Authentication Failed**
-- Verify `SUPABASE_SERVICE_ROLE_KEY` in Railway environment
-- Check Supabase project is active and accessible
+### Weekly
+- [ ] Check resource usage trends
+- [ ] Review performance metrics
+- [ ] Update dependencies if needed
+- [ ] Test backup procedures
 
-**❌ Environment Variable Issues**
-- Ensure all required env vars are set in Railway
-- Redeploy after env var changes
+### Monthly
+- [ ] Security audit of environment variables
+- [ ] Performance optimization review
+- [ ] Cost optimization analysis
+- [ ] Disaster recovery testing
 
-## **💰 COST BREAKDOWN**
+## 🚀 Go-Live Checklist
 
-- **Railway**: FREE (500 hours/month)
-- **Vercel**: Your existing plan
-- **Upgrade Path**: Railway Pro ($5/month) if you exceed free tier
+- [ ] All tests passing
+- [ ] Environment variables configured
+- [ ] Health check responding
+- [ ] Frontend updated with production socket URL
+- [ ] Monitoring and alerts active
+- [ ] Team notified of deployment
+- [ ] Rollback plan documented
+- [ ] Post-deployment testing completed
 
-## **🎯 SUCCESS CRITERIA**
+## 📞 Support Resources
 
-Your deployment is successful when:
-- [ ] Railway WebSocket server shows "healthy" status
-- [ ] Vercel app connects to Railway WebSocket server
-- [ ] Real-time features work in production
-- [ ] No CORS or connection errors in browser console
-- [ ] Teams can chat and see presence indicators
+- **Render Documentation**: [render.com/docs](https://render.com/docs)
+- **Socket.IO Documentation**: [socket.io/docs](https://socket.io/docs)
+- **Supabase Documentation**: [supabase.com/docs](https://supabase.com/docs)
+- **Project Issues**: Create GitHub issue for bug reports
 
-## **📞 SUPPORT**
+---
 
-If you encounter issues:
-1. Check Railway deployment logs
-2. Test WebSocket connection with test script
-3. Verify all environment variables are set correctly
-4. Check browser console for specific error messages
-
-**Your setup is now production-ready! 🎉**
+**Deployment Date**: _________________
+**Deployed by**: _____________________
+**Production URL**: ___________________
+**Version**: _________________________

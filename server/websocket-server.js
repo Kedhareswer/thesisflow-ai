@@ -18,19 +18,7 @@ dotenv.config({ path: fs.existsSync(envLocal) ? envLocal : envDefault });
 
 // Prefer platform-provided PORT (Render/Heroku/Railway), then fallback to WEBSOCKET_PORT, then 3002
 const PORT = process.env.PORT || process.env.WEBSOCKET_PORT || 3002;
-
-// Production-ready CORS origins (supports both local dev and production)
-const CORS_ORIGINS = [
-  process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  'https://thesisflow-ai.vercel.app',
-  'https://*.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:3001'
-].filter(Boolean);
-
-const CORS_ORIGIN = process.env.NODE_ENV === 'production' 
-  ? CORS_ORIGINS 
-  : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const CORS_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // Create Supabase admin client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -43,24 +31,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Create HTTP server with health check endpoint
-const httpServer = createServer((req, res) => {
-  // Health check endpoint for Railway deployment
-  if (req.url === '/health' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      status: 'healthy', 
-      timestamp: new Date().toISOString(),
-      activeConnections: activeConnections.size,
-      uptime: process.uptime()
-    }));
-    return;
-  }
-  
-  // Default response for non-health requests
-  res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('WebSocket server running');
-});
+// Create HTTP server
+const httpServer = createServer();
 
 // Create Socket.IO server with CORS configuration
 const io = new Server(httpServer, {
@@ -629,10 +601,29 @@ io.on('connection', async (socket) => {
   });
 });
 
+// Add health check endpoint for Render
+httpServer.on('request', (req, res) => {
+  if (req.url === '/health' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      connections: activeConnections.size
+    }));
+    return;
+  }
+  
+  // Handle other HTTP requests (return 404)
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('Not Found');
+});
+
 // Start server
 httpServer.listen(PORT, () => {
   console.log(`WebSocket server running on port ${PORT}`);
   console.log(`CORS origin: ${CORS_ORIGIN}`);
+  console.log(`Health check available at: http://localhost:${PORT}/health`);
 });
 
 // Graceful shutdown

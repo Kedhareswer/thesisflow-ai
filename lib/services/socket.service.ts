@@ -44,15 +44,11 @@ class SocketService {
 
     this.userId = userId
 
-    // Production-ready WebSocket URL configuration
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || (
-      process.env.NODE_ENV === 'production' 
-        ? "https://thesisflow-websocket.up.railway.app" // Update this with your Railway URL
-        : "http://localhost:3001"
-    )
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || 
+      (this.isDev ? "http://localhost:3001" : "https://thesisflow-websocket-server.onrender.com")
     const path = process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io"
-    const timeout = parseInt(process.env.NEXT_PUBLIC_SOCKET_TIMEOUT || "30000", 10)
-    const reconnectionAttempts = parseInt(process.env.NEXT_PUBLIC_SOCKET_RECONNECTION_ATTEMPTS || "15", 10)
+    const timeout = parseInt(process.env.NEXT_PUBLIC_SOCKET_TIMEOUT || "20000", 10)
+    const reconnectionAttempts = parseInt(process.env.NEXT_PUBLIC_SOCKET_RECONNECTION_ATTEMPTS || "10", 10)
 
     // Create socket instance but don't auto-connect until we attach auth token
     this.socket = io(url, {
@@ -305,7 +301,8 @@ class SocketService {
   // Wake up sleeping Render service with HTTP request
   private async wakeUpService(): Promise<void> {
     try {
-      const url = process.env.NEXT_PUBLIC_SOCKET_URL || "https://thesisflow-socket-railway.onrender.com"
+      const url = process.env.NEXT_PUBLIC_SOCKET_URL || 
+        (this.isDev ? "http://localhost:3001" : "https://thesisflow-websocket-server.onrender.com")
       if (this.isDev) console.debug("socket: attempting to wake up service")
       
       // Simple HTTP GET to wake up the service
