@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
 import CookieConsent from "@/components/ui/cookies"
+import { ClientErrorSuppression } from "@/components/common/ClientErrorSuppression"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -38,6 +39,8 @@ export default function RootLayout({
                 <Analytics />
                 {/* Global Cookie Consent Banner (new) */}
                 <CookieConsent />
+                {/* Chrome Extension Error Suppression */}
+                <ClientErrorSuppression />
               </ResearchSessionProvider>
             </SupabaseAuthProvider>
           </AuthErrorBoundary>

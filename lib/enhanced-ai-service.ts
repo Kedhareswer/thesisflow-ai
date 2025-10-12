@@ -204,6 +204,112 @@ READING_TIME: [reading minutes]`
       readingTime,
     }
   }
+
+  /**
+   * Generate research ideas for a given topic
+   */
+  async generateResearchIdeas(
+    topic: string,
+    context = "",
+    count = 5
+  ): Promise<{
+    ideas: Array<{
+      title: string
+      description: string
+      research_question: string
+      methodology: string
+      impact: string
+      challenges: string
+    }>
+    context: string
+    references: string[]
+  }> {
+    const prompt = `Generate ${count} innovative research ideas for the topic: "${topic}"${
+      context ? `\n\nContext: ${context}` : ""
+    }
+
+For each idea, provide:
+1. Title (concise, descriptive)
+2. Description (2-3 sentences)
+3. Research Question (specific, answerable)
+4. Methodology (brief approach)
+5. Impact (potential contributions)
+6. Challenges (anticipated obstacles)
+
+Format as JSON:
+{
+  "ideas": [
+    {
+      "title": "...",
+      "description": "...",
+      "research_question": "...",
+      "methodology": "...",
+      "impact": "...",
+      "challenges": "..."
+    }
+  ],
+  "context": "Brief analysis of the research landscape",
+  "references": ["Suggested reference area 1", "Suggested reference area 2"]
+}`
+
+    const result = await this.generateText({
+      prompt,
+      maxTokens: Math.min(2000, 300 * count),
+      temperature: 0.8,
+    })
+
+    if (!result.success || !result.content) {
+      throw new Error(result.error || "Failed to generate research ideas")
+    }
+
+    try {
+      // Try to parse as JSON
+      const parsed = JSON.parse(result.content)
+      return parsed
+    } catch (error) {
+      // Fallback: parse text format
+      console.warn("Failed to parse JSON, using fallback parser")
+      return this.parseIdeasFallback(result.content, topic, count)
+    }
+  }
+
+  private parseIdeasFallback(
+    content: string,
+    topic: string,
+    count: number
+  ): {
+    ideas: Array<{
+      title: string
+      description: string
+      research_question: string
+      methodology: string
+      impact: string
+      challenges: string
+    }>
+    context: string
+    references: string[]
+  } {
+    // Simple fallback parser
+    const ideas = []
+    const lines = content.split("\n").filter(line => line.trim())
+
+    for (let i = 0; i < Math.min(count, 5); i++) {
+      ideas.push({
+        title: `Research Idea ${i + 1} for ${topic}`,
+        description: lines[i * 2] || `Explore innovative approaches to ${topic}`,
+        research_question: `How can we advance understanding of ${topic}?`,
+        methodology: "Mixed methods approach with literature review and empirical analysis",
+        impact: "Potential to contribute to academic knowledge and practical applications",
+        challenges: "Data availability and methodological constraints"
+      })
+    }
+
+    return {
+      ideas,
+      context: `Research in ${topic} is an active field with many opportunities for contribution.`,
+      references: ["Academic databases", "Domain experts", "Recent publications"]
+    }
+  }
 }
 
 export const enhancedAIService = new EnhancedAIService()

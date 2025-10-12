@@ -19,13 +19,8 @@ import { CitationExportService } from "@/lib/services/citation-export.service"
 import type { ResearchPaper, SearchFilters } from "@/lib/types/common"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useResearchPapers, useResearchContext } from "@/components/research-session-provider"
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/integrations/supabase/client'
 import { useUserPlan } from "@/hooks/use-user-plan"
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface EnhancedLiteratureSearchProps {
   className?: string

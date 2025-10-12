@@ -19,14 +19,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 
-// Enhanced research service that uses user API keys via EnhancedAIService
+// Enhanced research service using Nova AI (Groq) exclusively
 class EnhancedResearchService {
   static async exploreTopics(
     topic: string,
     depth = 3,
     additionalContext?: string,
-    selectedProvider?: AIProvider,
-    selectedModel?: string,
   ): Promise<{
     content: string
     topic: string
@@ -60,16 +58,25 @@ class EnhancedResearchService {
 
 ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
 
-      // Use EnhancedAIService with user API keys 
-      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-
-      const result = await enhancedAIService.generateText({
-        prompt,
-        provider: selectedProvider,
-        model: selectedModel,
-        maxTokens: 1800,
-        temperature: 0.7,
+      // Call server-side API route
+      const response = await fetch('/api/ai/explore-topics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          maxTokens: 1800,
+          temperature: 0.7,
+        }),
       })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to explore topic' }))
+        throw new Error(errorData.error || "Failed to explore research topic. Please check your AI provider configuration.")
+      }
+
+      const result = await response.json()
 
       if (!result.success || !result.content) {
         throw new Error(result.error || "Failed to explore research topic. Please check your AI provider configuration.")
@@ -87,8 +94,8 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
       let errorMessage = "Failed to explore research topic"
 
       if (error instanceof Error) {
-        if (error.message.includes("No AI providers") || error.message.includes("No valid API keys")) {
-          errorMessage = "No AI providers are configured. Please add at least one API key in Settings."
+        if (error.message.includes("No AI providers") || error.message.includes("No valid API keys") || error.message.includes("AI service not configured")) {
+          errorMessage = "AI service is not configured. Please contact administrator or check your API keys."
         } else if (error.message.includes("authentication") || error.message.includes("sign in")) {
           errorMessage = "Authentication error. Please sign in again to access AI features."
         } else if (error.message.includes("rate limit")) {
@@ -109,11 +116,9 @@ ${depth <= 2 ? "Brief overview" : depth <= 4 ? "Detailed analysis" : "Comprehens
 
 interface TopicExplorerProps {
   className?: string
-  selectedProvider?: AIProvider
-  selectedModel?: string
 }
 
-export function TopicExplorer({ className, selectedProvider, selectedModel }: TopicExplorerProps) {
+export function TopicExplorer({ className }: TopicExplorerProps) {
   const { toast } = useToast()
   const { topics, currentTopic, addTopic, updateTopic } = useResearchTopics()
   const { hasContext, contextSummary } = useResearchContext()
@@ -121,8 +126,6 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
   const [topic, setTopic] = useState(() => currentTopic || "")
   const [depth, setDepth] = useState("3")
   const [additionalContext, setAdditionalContext] = useState("")
-  const [localProvider, setLocalProvider] = useState<AIProvider | undefined>(selectedProvider)
-  const [localModel, setLocalModel] = useState<string | undefined>(selectedModel)
   
 
   const topicExploration = useAsync<{
@@ -190,7 +193,7 @@ export function TopicExplorer({ className, selectedProvider, selectedModel }: To
 [Promising research paths]
 
 ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" : "Comprehensive deep-dive"} required.`
-        await topicExploration.execute(topic, depthNumber, additionalContext, localProvider, localModel)
+        await topicExploration.execute(topic, depthNumber, additionalContext)
 
         // Add topic to research session after successful execution
         addTopic({
@@ -211,7 +214,7 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
         })
       }
     }, 500) // 500ms debounce
-  }, [topic, depth, additionalContext, localProvider, localModel, topicExploration.execute, addTopic, toast])
+  }, [topic, depth, additionalContext, topicExploration.execute, addTopic, toast])
 
   // Update topic with insights when exploration data is available
   useEffect(() => {

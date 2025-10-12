@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from "framer-motion"
-import { NovaAIService, type NovaAIContext } from "@/lib/services/nova-ai.service"
+import type { NovaAIContext } from "@/lib/services/nova-ai.service"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
@@ -203,6 +203,13 @@ export function ResearchAssistant({
     hasContext, 
     contextSummary 
   } = useResearchSession()
+
+  // Create a deferred version of addChatMessage to avoid setState during render
+  const deferredAddChatMessage = useCallback((role: 'user' | 'assistant', content: string, contextUsed?: string[]) => {
+    setTimeout(() => {
+      addChatMessage(role, content, contextUsed)
+    }, 0)
+  }, [addChatMessage])
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
@@ -333,65 +340,97 @@ export function ResearchAssistant({
       const abortController = new AbortController()
       setStreamingAbortController(abortController)
 
-      // Use Nova AI streaming
-      const novaService = NovaAIService.getInstance()
-      await novaService.processMessageStream(
-        contextualMessage,
-        novaContext,
-        // onChunk
-        (chunk: string) => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, content: msg.content + chunk }
-              : msg
-          ))
+      // Use Nova AI via API route with streaming
+      const response = await fetch('/api/nova/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        // onComplete
-        (response) => {
-          console.log('Nova AI streaming complete:', response)
-          setIsTyping(false)
-          setIsSending(false)
-          setStreamingAbortController(null)
-          
-          // Mark reasoning as complete and clear shortly after
-          setReasoningLines(['Response complete'])
-          setReasoningProgress(100)
-          setTimeout(() => {
-            setReasoningLines([])
-            setReasoningProgress(undefined)
-          }, 600)
-          
-          // Save messages to session
-          addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
-          
-          // Save the assistant message
-          setTimeout(() => {
-            setMessages(currentMessages => {
-              const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
-              if (finalMessage?.content) {
-                addChatMessage('assistant', finalMessage.content, researchContext ? ['research_context'] : undefined)
+        body: JSON.stringify({
+          message: contextualMessage,
+          context: novaContext,
+          stream: true
+        }),
+        signal: abortController.signal
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to get response' }))
+        throw new Error(errorData.error || 'Failed to get response from Nova AI')
+      }
+
+      if (!response.body) {
+        throw new Error('No response body received')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim()
+              if (data === '[DONE]') {
+                // Stream complete
+                setIsTyping(false)
+                setIsSending(false)
+                setStreamingAbortController(null)
+
+                // Mark reasoning as complete and clear shortly after
+                setReasoningLines(['Response complete'])
+                setReasoningProgress(100)
+                setTimeout(() => {
+                  setReasoningLines([])
+                  setReasoningProgress(undefined)
+                }, 600)
+
+                // Save messages to session (deferred to avoid setState during render)
+                deferredAddChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
+
+                // Save the assistant message
+                setTimeout(() => {
+                  setMessages(currentMessages => {
+                    const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
+                    if (finalMessage?.content) {
+                      deferredAddChatMessage('assistant', finalMessage.content, researchContext ? ['research_context'] : undefined)
+                    }
+                    return currentMessages
+                  })
+                }, 100)
+                return
               }
-              return currentMessages
-            })
-          }, 100)
-        },
-        // onError
-        (error: Error) => {
-          console.error('Nova AI streaming error:', error)
-          if (error.message !== 'Stream aborted by user') {
-            toast({
-              title: "Error",
-              description: error.message || 'Failed to get response from Nova AI',
-              variant: "destructive"
-            })
+
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed.chunk) {
+                  // Handle streaming chunk
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: msg.content + parsed.chunk }
+                      : msg
+                  ))
+                } else if (parsed.error) {
+                  throw new Error(parsed.error)
+                }
+              } catch (e) {
+                // Skip invalid JSON lines
+                if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+                  console.error('Error parsing stream data:', e)
+                }
+              }
+            }
           }
-          setIsTyping(false)
-          setIsSending(false)
-          setStreamingAbortController(null)
-          setReasoningLines([])
-          setReasoningProgress(undefined)
         }
-      )
+      } finally {
+        reader.releaseLock()
+      }
 
     } catch (error) {
       console.error("Error sending message:", error)

@@ -172,13 +172,16 @@ class ResearchSessionService {
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach(listener => {
-      try {
-        listener(this.session)
-      } catch (error) {
-        console.warn('Error in research session listener:', error)
-      }
-    })
+    // Use setTimeout to defer listener notifications to avoid setState during render
+    setTimeout(() => {
+      this.listeners.forEach(listener => {
+        try {
+          listener(this.session)
+        } catch (error) {
+          console.error('Error in research session listener:', error)
+        }
+      })
+    }, 0)
   }
 
   private updateSession(updates: Partial<ResearchSessionData>): void {

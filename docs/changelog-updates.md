@@ -1,5 +1,75 @@
 # Recent Updates - Nova AI Integration
 
+## v2.4.3 - TopicExplorer Component Cleanup (2025-10-12)
+
+### 🧹 Code Cleanup
+
+Following v2.4.2's complete Nebius to Groq migration, this release cleans up the TopicExplorer component to fully align with the single-provider (Nova AI/Groq) architecture.
+
+#### Component Simplification
+- **Removed Unused Provider/Model Parameters**: Updated `TopicExplorer.tsx` to remove all multi-provider parameter handling
+  - Simplified `exploreTopics()` method signature - removed `selectedProvider` and `selectedModel` parameters
+  - Removed unused state variables `localProvider` and `localModel`
+  - Cleaned up component props interface and callback dependencies
+  - Updated comment from "uses user API keys" to "using Nova AI (Groq) exclusively"
+
+#### Impact
+- Cleaner, more maintainable code in Explorer page
+- Reduced complexity by removing dead code paths
+- Fully aligned with single-provider architecture
+
+### 🛠️ Files Modified
+- `app/explorer/components/TopicExplorer.tsx` - Complete provider/model parameter removal
+- `docs/changelog-updates.md` - Added v2.4.3 entry
+- `docs/AI_CLEANUP_SUMMARY.md` - Updated with v2.4.3 cleanup details
+
+---
+
+## v2.4.2 - Complete Nebius to Groq Migration (2025-10-12)
+
+### 🚀 Critical Bug Fixes
+
+Following v2.4.0's user API key removal and v2.4.1's initial cleanup, this release completes the migration from Nebius API to Groq API and fixes all broken provider configuration checks.
+
+#### API Fixes
+- **Fixed Collaborate Page**: Updated `lib/services/nova-ai.service.ts` to use Groq API instead of Nebius
+  - Changed API endpoint from `https://api.studio.nebius.com/v1/chat/completions` to `https://api.groq.com/openai/v1/chat/completions`
+  - Updated model from `meta-llama/Llama-3.3-70B-Instruct-fast` to `llama-3.3-70b-versatile`
+  - Changed environment variable from `NEBIUS_API_KEY` to `GROQ_API_KEY`
+  - Fixed all 3 API call locations: `processMessage()`, `processMessageStream()`, `getSuggestions()`
+
+- **Fixed Explorer Page**: Added missing `generateResearchIdeas()` method to `lib/enhanced-ai-service.ts`
+  - Implemented complete research idea generation with JSON response parsing
+  - Added fallback parser for non-JSON responses
+  - Proper TypeScript types matching component expectations
+
+#### Provider Configuration Fixes
+- **Fixed `lib/ai-provider-detector.ts`**: Updated `getClientAvailableProviders()` to return `['groq']` directly instead of calling removed `/api/ai/providers` route
+- **Fixed `lib/ai-config.ts`**: Simplified all methods for single-provider architecture
+  - `getAvailableProviders()`: Always returns `['groq']`
+  - `getBestProvider()`: Always returns `'groq'`
+  - `getProviderStatus()`: Returns Nova AI status message
+  - Updated display name from "Groq (Fast)" to "Nova AI (Groq)"
+
+#### Pages Verified
+- ✅ **Explorer**: Uses `enhancedAIService.generateText()` and `generateResearchIdeas()` - working correctly
+- ✅ **Planner**: Uses Nova AI via `/api/plan-and-execute` POST endpoint - working correctly
+- ✅ **Collaborate**: Uses `NovaAIService` via Groq API - working correctly
+
+### 📊 Impact
+All AI features now correctly use the Groq API (branded as "Nova AI") with no references to removed APIs or Nebius endpoints. The "No AI providers configured" and "Nebius API error" messages have been eliminated.
+
+### 🛠️ Files Modified
+- `lib/services/nova-ai.service.ts` - Complete Nebius to Groq migration
+- `lib/enhanced-ai-service.ts` - Added `generateResearchIdeas()` method
+- `lib/ai-provider-detector.ts` - Simplified for single provider
+- `lib/ai-config.ts` - Simplified for single provider
+- `README.md` - Updated AI architecture documentation
+- `docs/changelog-updates.md` - Added v2.4.2 entry
+- `docs/AI_CLEANUP_SUMMARY.md` - Updated with v2.4.2 fixes
+
+---
+
 ## v2.3.0 - Nova AI Simplification (2025-01-07)
 
 ### 🚀 Major Architecture Simplification

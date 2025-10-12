@@ -106,38 +106,11 @@ export class AIProviderDetector {
 
   /**
    * Client-side detection (for UI components)
-   * This calls an API route to get provider availability
+   * Simplified for single-provider architecture (Groq/Nova AI only)
    */
   static async getClientAvailableProviders(): Promise<AIProvider[]> {
-    try {
-      // Build headers with optional Supabase auth token if available
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      try {
-        // Dynamically import supabase client only on the client side
-        const { supabase } = await import("./supabase")
-        const { data } = await supabase.auth.getSession()
-        const token = data.session?.access_token
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`
-        }
-      } catch {
-        // Supabase not available (e.g., during SSR), ignore
-      }
-
-      const response = await fetch('/api/ai/providers', {
-        method: 'GET',
-        headers: headers as HeadersInit,
-        credentials: 'include',
-      })
-      if (!response.ok) throw new Error('Failed to fetch providers')
-      const data = await response.json()
-      return data.availableProviders || []
-    } catch (error) {
-      console.error('Error fetching available providers:', error)
-      return []
-    }
+    // ThesisFlow-AI uses only Groq (Nova AI) provider
+    // Always return 'groq' as the only provider
+    return ['groq']
   }
 }

@@ -1,5 +1,3 @@
-"use client"
-
 import { ProductivityMessage, ProductivityUser } from '@/components/ui/productivity-messaging'
 
 export interface NovaAIContext {
@@ -23,13 +21,17 @@ export interface NovaAIResponse {
 
 export class NovaAIService {
   private static instance: NovaAIService
-  private nebiusApiKey: string
-  
+  private groqApiKey: string
+
   constructor() {
-    // Use server-side env var instead of client-side for security
-    this.nebiusApiKey = process.env.NEBIUS_API_KEY || process.env.NEXT_PUBLIC_NEBIUS_API_KEY || ''
+    // Use server-side env var for Groq API
+    this.groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || ''
+    
+    if (!this.groqApiKey) {
+      console.warn('NovaAIService: GROQ_API_KEY not found in environment variables')
+    }
   }
-  
+
   public static getInstance(): NovaAIService {
     if (!NovaAIService.instance) {
       NovaAIService.instance = new NovaAIService()
@@ -38,15 +40,19 @@ export class NovaAIService {
   }
 
   /**
-   * Process a message with Nova using Nebius API
+   * Process a message with Nova AI using Groq API
    */
   async processMessage(
     message: string,
     context: NovaAIContext
   ): Promise<NovaAIResponse> {
     try {
+      if (!this.groqApiKey) {
+        throw new Error('GROQ API key is not configured')
+      }
+
       const systemPrompt = this.buildSystemPrompt(context)
-      
+
       // Lightweight debug to help diagnose intermittent behavior without exposing secrets
       try {
         console.debug('[NovaAI] processMessage', {
@@ -56,15 +62,15 @@ export class NovaAIService {
           mentionedUsers: context.mentionedUsers?.length || 0
         })
       } catch {}
-      
-      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.nebiusApiKey}`
+          'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
+          model: "llama-3.3-70b-versatile",
           max_tokens: 1000,
           temperature: 0.6,
           top_p: 0.9,
@@ -77,8 +83,8 @@ export class NovaAIService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Nebius API error:', response.status, errorData)
-        throw new Error(`Nebius API error: ${errorData.error?.message || response.statusText}`)
+        console.error('Nova AI (Groq) API error:', response.status, errorData)
+        throw new Error(`Nova AI API error: ${errorData.error?.message || response.statusText}`)
       }
 
       const data = await response.json()
@@ -87,7 +93,7 @@ export class NovaAIService {
     } catch (error) {
       console.error('Nova error:', error)
       return {
-        content: "I'm having trouble connecting right now. Please check your Nebius API configuration and try again!",
+        content: "I'm having trouble connecting right now. Please check your Nova AI configuration and try again!",
         confidence: 0,
         type: 'response'
       }
@@ -95,7 +101,7 @@ export class NovaAIService {
   }
 
   /**
-   * Process a message with Nova using streaming
+   * Process a message with Nova AI using streaming
    */
   async processMessageStream(
     message: string,
@@ -105,8 +111,13 @@ export class NovaAIService {
     onError: (error: Error) => void
   ): Promise<void> {
     try {
+      if (!this.groqApiKey) {
+        onError(new Error('GROQ API key is not configured'))
+        return
+      }
+
       const systemPrompt = this.buildSystemPrompt(context)
-      
+
       // Lightweight debug to help diagnose intermittent behavior without exposing secrets
       try {
         console.debug('[NovaAI] processMessageStream', {
@@ -116,15 +127,15 @@ export class NovaAIService {
           mentionedUsers: context.mentionedUsers?.length || 0
         })
       } catch {}
-      
-      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.nebiusApiKey}`
+          'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
+          model: "llama-3.3-70b-versatile",
           max_tokens: 1000,
           temperature: 0.6,
           top_p: 0.9,
@@ -138,8 +149,8 @@ export class NovaAIService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Nebius API error:', response.status, errorData)
-        throw new Error(`Nebius API error: ${errorData.error?.message || response.statusText}`)
+        console.error('Nova AI (Groq) API error:', response.status, errorData)
+        throw new Error(`Nova AI API error: ${errorData.error?.message || response.statusText}`)
       }
 
       if (!response.body) {
@@ -259,32 +270,32 @@ Focus on:
       .join('\n')
 
     try {
-      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.nebiusApiKey}`
+          'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
+          model: "llama-3.3-70b-versatile",
           max_tokens: 200,
           temperature: 0.8,
           top_p: 0.9,
           messages: [
-            { 
-              role: "system", 
-              content: 'You are a productivity assistant. Provide concise, actionable suggestions.' 
+            {
+              role: "system",
+              content: 'You are a productivity assistant. Provide concise, actionable suggestions.'
             },
-            { 
-              role: "user", 
-              content: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}` 
+            {
+              role: "user",
+              content: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}`
             }
           ]
         })
       })
 
       if (!response.ok) {
-        throw new Error(`Nebius API error: ${response.statusText}`)
+        throw new Error(`Nova AI API error: ${response.statusText}`)
       }
 
       const data = await response.json()

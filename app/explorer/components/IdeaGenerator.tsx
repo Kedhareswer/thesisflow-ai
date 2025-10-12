@@ -33,13 +33,34 @@ class IdeaGenerationService {
     timestamp: string
   }> {
     try {
-      const { enhancedAIService } = await import("@/lib/enhanced-ai-service")
-      
-      const researchResults = await enhancedAIService.generateResearchIdeas(topic, context, count)
+      // Call server-side API route
+      const response = await fetch('/api/ai/generate-ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic,
+          context,
+          count,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to generate ideas' }))
+        throw new Error(errorData.error || "Failed to generate research ideas. Please check your AI provider configuration.")
+      }
+
+      const researchResults = await response.json()
+
+      if (!researchResults.success) {
+        throw new Error(researchResults.error || "Failed to generate research ideas. Please check your AI provider configuration.")
+      }
+
       const ideaObjects = researchResults.ideas
 
       // Convert idea objects to strings
-      const ideas = ideaObjects.map((idea, index) => `${index + 1}. ${idea.title}\n${idea.description}`)
+      const ideas = ideaObjects.map((idea: any, index: number) => `${index + 1}. ${idea.title}\n${idea.description}`)
 
       // Format the ideas nicely for display
       const formattedIdeas = ideas.join("\n\n")
@@ -54,10 +75,10 @@ class IdeaGenerationService {
       }
     } catch (error) {
       console.error("Error generating ideas:", error)
-      if (error instanceof Error && error.message.includes("No AI providers")) {
-        throw new Error("No AI providers are configured. Please add at least one API key in Settings.")
+      if (error instanceof Error && (error.message.includes("No AI providers") || error.message.includes("AI service not configured"))) {
+        throw new Error("AI service is not configured. Please contact administrator or check your API keys.")
       }
-      throw new Error("Failed to generate research ideas. Please check your AI provider configuration.")
+      throw new Error(error instanceof Error ? error.message : "Failed to generate research ideas. Please check your AI provider configuration.")
     }
   }
 }
