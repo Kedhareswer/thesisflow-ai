@@ -21,7 +21,7 @@ See diagrams in `docs/sequences-and-flows.md`.
   - Streaming endpoints set `Content-Type: text/event-stream` and emit named events
 - Services (`lib/services/**`)
   - AI providers, literature search, extraction, summarization, planning, analytics, tokens
-  - Provider abstractions and graceful fallback (OpenRouter)
+  - Provider abstractions and graceful fallback (Nova/Groq primary, OpenRouter fallback)
 - Middleware (`lib/middleware/token-middleware.ts`)
   - Token checks, rate limits, cost calculation, deduction/refund orchestration
 - Servers (`server/`)

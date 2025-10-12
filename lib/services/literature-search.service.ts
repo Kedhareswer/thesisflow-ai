@@ -649,16 +649,23 @@ export class LiteratureSearchService {
    */
   private async searchOpenAlex(query: string, limit: number): Promise<Paper[]> {
     try {
+      // Sanitize query - remove special characters that might cause 400 errors
+      const cleanQuery = query.trim().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ')
+      if (!cleanQuery) return []
+      
       const url = new URL('https://api.openalex.org/works');
-      url.searchParams.set('search', query);
-      url.searchParams.set('per-page', limit.toString());
-      url.searchParams.set('mailto', 'research@example.com'); // Replace with actual email
+      url.searchParams.set('search', cleanQuery);
+      url.searchParams.set('per-page', Math.min(50, Math.max(1, limit)).toString());
+      url.searchParams.set('mailto', 'research@thesisflow.ai');
 
       const response = await this.fetchWithPolicies('openalex', url.toString(), {
-        headers: { 'User-Agent': 'AI-Research-Assistant/1.0' }
+        headers: { 'User-Agent': 'ThesisFlow-AI/1.0' }
       }, { timeoutMs: this.REQUEST_TIMEOUT, retries: 2 });
 
-      if (!response.ok) throw new Error(`OpenAlex API error: ${response.status}`);
+      if (!response.ok) {
+        console.warn(`OpenAlex API error: ${response.status} for query: ${cleanQuery}`)
+        return []
+      }
 
       const data = await response.json();
       return data.results?.map((work: OpenAlexWork) => ({

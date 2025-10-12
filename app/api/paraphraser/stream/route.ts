@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
           }
           send({ type: "done" })
         } catch (e: any) {
-          // Fallback to existing enhanced streaming path for resilience
+          // Fallback: Try enhanced AI service with any available provider
           try {
             await enhancedAIService.generateTextStream({
               prompt,

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withTokenValidation, TokenMiddleware } from '@/lib/middleware/token-middleware'
-import type { ChatMessage } from '@/lib/ai-providers'
 import { tokenService } from '@/lib/services/token.service'
 import { enumerateSources, withTimeout, type Paper } from '@/lib/utils/sources'
 
@@ -185,7 +184,41 @@ export const POST = withTokenValidation(
               }
             }
 
-            // Progress: analyzer
+Topic: ${query}
+
+Below is a numbered list of candidate sources (already vetted to be safe).
+Mark each as HIGH, MEDIUM, or LOW trust and list 1‑line rationale.
+Return strictly in markdown table with columns: ID | Trust | Rationale.
+
+Sources:
+${sourcesText}`
+
+            let curation = 'Curation unavailable'
+            try {
+              // Use automatic provider fallback (don't specify provider for resilience)
+              const curationResult = await withTimeout(
+                enhancedAIService.generateText({
+                  prompt: curatorPrompt,
+                  // No provider specified - will use fallback mechanism with all available providers
+                  maxTokens: 2000,
+                  temperature: 0.2,
+                  userId
+                }),
+                curationBudgetMs,
+                'Curation'
+              )
+              curation = curationResult.success ? (curationResult.content || 'Curation unavailable') : 'Curation unavailable'
+            } catch (curationError: any) {
+              // Fallback: Simple trust ratings if AI curation times out or rate limited
+              if (curationError?.message?.includes('timed out') || curationError?.message?.includes('rate limit')) {
+                curation = '| ID | Trust | Rationale |\n|---|---|---|\n' + 
+                  limited.map((p, i) => `| ${i+1} | MEDIUM | ${p.source || 'Academic'} source |`).join('\n')
+              } else {
+                curation = 'Curation unavailable due to API error'
+              }
+            }
+
+            // Progress: analyzer using Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: 'Analyzing each source…' })}\n\n`))
             const analyzerSystem: ChatMessage = { role: 'system', content: 'You are a precise literature analyst. Summarize without hallucinations.' }
@@ -193,9 +226,26 @@ export const POST = withTokenValidation(
             const analyzerPrompt = `${analyzerUser.content}`
             const perSource = await withTimeout(callNovaAI(analyzerPrompt), analysisBudgetMs, 'Analysis')
 
-            // Progress: synthesizer
+Sources:
+${sourcesText}`
+
+            const perSourceResult = await withTimeout(
+              enhancedAIService.generateText({
+                prompt: analyzerPrompt,
+                // Use automatic provider fallback for resilience
+                maxTokens: 3000,
+                temperature: 0.2,
+                userId
+              }),
+              analysisBudgetMs,
+              'Analysis'
+            )
+            const perSource = perSourceResult.success ? (perSourceResult.content || 'Analysis unavailable') : 'Analysis unavailable'
+
+            // Progress: synthesizer using Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: 'Synthesizing final report…' })}\n\n`))
+            
             const words = (quality === 'Enhanced') ? '1500-2200' : '1000-1500'
             const synthSystem: ChatMessage = { role: 'system', content: 'You are a senior research writer. Produce structured, citation‑grounded reviews.' }
             const synthUser: ChatMessage = { role: 'user', content: `Write a scholarly review on: "${query}". Use ONLY the numbered sources below. Cite inline with [n]. Length ${words} words.\nStructure with clear headings (Title, Abstract, Background, Methods, Findings, Visual Summaries, Limitations, References).\nInclude these visual summaries as Markdown:\n1) Evidence Summary Table (ID | Study/Source | Year | Method | Sample/Scope | Key Finding | Citation).\n2) Key Metrics Table (Metric | Value/Range | Population/Scope | Citation).\n3) Regional Comparison Table (Region | Trend/Direction | Notable Study [n]).\n4) Timeline Table (Period | Milestones | Citations).\n5) ASCII Bar Chart in a \`\`\`text codeblock showing top 5 trends with percentages.\n6) ASCII Line Chart (annual trend) in a \`\`\`text codeblock.\nIf data insufficient, write 'Data not available'.\nAfter body, include a "References" section listing the same numbered items.\n\nSources:\n${sourcesText}` }
@@ -206,11 +256,11 @@ export const POST = withTokenValidation(
               `# ${query} — Evidence‑Grounded Review`,
               '',
               '## Source Curation',
-              curation.trim(),
+              (curation || 'Curation unavailable').trim(),
               '',
-              perSource.trim(),
+              (perSource || 'Analysis unavailable').trim(),
               '',
-              body.trim(),
+              (body || 'Synthesis unavailable').trim(),
             ].join('\n')
 
             // Stream content as tokens

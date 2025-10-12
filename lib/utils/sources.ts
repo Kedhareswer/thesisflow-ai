@@ -2,7 +2,7 @@
  * Shared utilities for handling paper sources and citations
  */
 
-import { OpenRouterClient } from '@/lib/services/openrouter.service'
+import { enhancedAIService } from '@/lib/enhanced-ai-service'
 import type { ChatMessage } from '@/lib/ai-providers'
 
 export interface Paper {
@@ -35,25 +35,30 @@ export function enumerateSources(papers: Paper[]): string {
 }
 
 /**
- * Tries multiple OpenRouter models in sequence until one succeeds
- * @param models Array of model names to try
- * @param messages Chat messages to send to the model
+ * Uses Nova (Groq) for AI text generation with fallback
+ * @param prompt Text prompt to send to the model
+ * @param userId Optional user ID for tracking
  * @param signal Optional abort signal for cancellation
- * @returns Content from the first successful model
+ * @returns Content from Nova or fallback provider
  */
-export async function tryModels(models: string[], messages: ChatMessage[], signal?: AbortSignal): Promise<string> {
-  const client = new OpenRouterClient()
-  let lastErr: any
-  for (const model of models) {
-    try {
-      const content = await client.chatCompletion(model, messages, signal)
-      if (content) return content
-    } catch (e) {
-      lastErr = e
-      continue
+export async function tryNova(prompt: string, userId?: string, signal?: AbortSignal): Promise<string> {
+  try {
+    const result = await enhancedAIService.generateText({
+      prompt,
+      provider: "groq",
+      model: "llama-3.1-8b-instant",
+      maxTokens: 2000,
+      temperature: 0.2,
+      userId
+    })
+    
+    if (result.success && result.content) {
+      return result.content
     }
+    throw new Error(result.error || 'Nova generation failed')
+  } catch (err: any) {
+    throw new Error(err?.message || 'Nova request failed')
   }
-  throw new Error(lastErr?.message || 'All OpenRouter models failed')
 }
 
 /**

@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
         const top = items.slice(0, Math.min(30, items.length))
         const mini = top.map((p) => ({ title: p.title, abstract: p.snippet || '' }))
         const prompt = `Extract 10-20 concise research topics from the following papers.\nReturn as a JSON array of strings.\n\n${mini.map((m, i) => `[${i + 1}] ${m.title}\n${m.abstract.slice(0, 500)}`).join('\n\n')}`
-        const result = await enhancedAIService.generateText({ prompt, maxTokens: 700, temperature: 0.2, userId: user.id })
+        const result = await enhancedAIService.generateText({ prompt, maxTokens: 2000, temperature: 0.2, userId: user.id })
         if (result.success && result.content) {
           let topics: string[] = []
           try {
