@@ -68,7 +68,7 @@ import {
   Paperclip
 } from "lucide-react"
 
-import { useSocket as useAppSocket } from "@/lib/services/socket.service"
+import { useSocket as useAppSocket, socketService } from "@/lib/services/socket.service"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { RouteGuard } from "@/components/route-guard"
@@ -194,6 +194,32 @@ export default function CollaboratePage() {
   const { user, isLoading: authLoading, session } = useSupabaseAuth()
   // Use authenticated socket from lib (attaches Supabase token)
   const socket = useAppSocket(user?.id || null)
+  
+  // Debug socket connection
+  useEffect(() => {
+    console.log('[CollaboratePage] Socket status:', {
+      socketExists: !!socket,
+      connected: socket?.connected,
+      userId: user?.id,
+      authLoading
+    })
+    
+    if (socket) {
+      const handleConnect = () => console.log('[CollaboratePage] ✅ Socket connected!')
+      const handleDisconnect = () => console.log('[CollaboratePage] ❌ Socket disconnected')
+      const handleError = (err: any) => console.error('[CollaboratePage] 🚨 Socket error:', err)
+      
+      socket.on('connect', handleConnect)
+      socket.on('disconnect', handleDisconnect)
+      socket.on('connect_error', handleError)
+      
+      return () => {
+        socket.off('connect', handleConnect)
+        socket.off('disconnect', handleDisconnect)
+        socket.off('connect_error', handleError)
+      }
+    }
+  }, [socket, user?.id, authLoading])
 
   // API helper functions
   const apiCall = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -437,19 +463,31 @@ export default function CollaboratePage() {
 
   // Load messages
   const loadMessages = useCallback(async (teamId: string) => {
-    if (!teamId) return
+    if (!teamId) {
+      console.log('[CollaboratePage] loadMessages: No teamId provided')
+      return
+    }
+    
+    console.log(`[CollaboratePage] 📨 Loading messages for team: ${teamId}`)
+    
     try {
       if (socket && (socket as any).connected) {
+        console.log('[CollaboratePage] 🔌 Socket connected, attempting socket message loading...')
         try {
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
+              console.log('[CollaboratePage] ⏰ Socket message loading timed out')
               ;(socket as any).off('messages', handler)
               reject(new Error('Socket timeout'))
             }, 5000) // 5 second timeout
             
             const handler = (payload: any) => {
+              console.log('[CollaboratePage] 📥 Socket messages received:', payload)
               clearTimeout(timeout)
-              if (!payload || payload.teamId !== teamId) return
+              if (!payload || payload.teamId !== teamId) {
+                console.log('[CollaboratePage] ❌ Invalid payload or wrong teamId')
+                return
+              }
               const formatted: ChatMessage[] = (payload.messages || []).map((msg: any) => ({
                 id: msg.id,
                 senderId: msg.senderId,
@@ -464,21 +502,29 @@ export default function CollaboratePage() {
                 // @ts-ignore - extended at runtime
                 replyTo: msg.replyTo || null,
               }))
+              console.log(`[CollaboratePage] ✅ Formatted ${formatted.length} messages from socket`)
               setMessages(formatted.reverse())
               ;(socket as any).off('messages', handler)
               resolve()
             }
             ;(socket as any).on('messages', handler)
+            console.log('[CollaboratePage] 📤 Emitting get_messages to socket...')
             ;(socket as any).emit('get_messages', { teamId, limit: 50 })
           })
+          console.log('[CollaboratePage] ✅ Messages loaded via socket')
           return
         } catch (socketError) {
-          // Continue to API fallback
+          console.warn('[CollaboratePage] ⚠️ Socket loading failed, falling back to API:', socketError)
         }
+      } else {
+        console.log('[CollaboratePage] 🔌 Socket not connected, using API directly')
       }
       
       // Fallback to API if socket unavailable or failed
+      console.log('[CollaboratePage] 🌐 Loading messages via API...')
       const data = await apiCall(`/api/collaborate/messages?teamId=${teamId}&limit=50`)
+      console.log('[CollaboratePage] 📡 API response:', data)
+      
       if (data.success) {
         const formattedMessages: ChatMessage[] = data.messages.map((msg: any) => ({
           id: msg.id,
@@ -494,12 +540,13 @@ export default function CollaboratePage() {
           // @ts-ignore - extended at runtime
           replyTo: msg.replyTo || null,
         }))
+        console.log(`[CollaboratePage] ✅ Formatted ${formattedMessages.length} messages from API`)
         setMessages(formattedMessages.reverse())
       } else {
-        console.error('Failed to load messages:', data.error)
+        console.error('[CollaboratePage] ❌ API failed to load messages:', data.error)
       }
     } catch (error) {
-      console.error('Error loading messages:', error)
+      console.error('[CollaboratePage] 💥 Error loading messages:', error)
     }
   }, [apiCall, socket])
 
@@ -889,7 +936,7 @@ export default function CollaboratePage() {
         updatePresence('online', 'Active in chat')
 
         // Send via realtime service (socket preferred, include optimistic id for correlation)
-        await collaborateService.sendMessage(
+        const sendResult = await collaborateService.sendMessage(
           selectedTeamId,
           user.id,
           optimisticMessage.content,
@@ -898,6 +945,12 @@ export default function CollaboratePage() {
           socket, // Pass the socket instance
           tempId
         )
+        
+        if (!sendResult.success) {
+          // If socket send fails, remove optimistic message
+          setMessages(prev => prev.filter(m => m.id !== tempId))
+          throw new Error(sendResult.error || 'Failed to send message')
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -1093,21 +1146,24 @@ export default function CollaboratePage() {
   // Enhanced team selection with presence loading and realtime presence subscriptions
   useEffect(() => {
     if (selectedTeamId) {
+      console.log(`[CollaboratePage] 🔄 Team selected: ${selectedTeamId}`)
       setIsSwitchingTeam(true) // Trigger switching state on team selection
       let cancelled = false
       ;(async () => {
         try {
+          console.log('[CollaboratePage] 🚀 Loading team data...')
           await Promise.all([
             loadMessagesRef.current?.(selectedTeamId),
             loadTeamPresence(selectedTeamId)
           ])
+          console.log('[CollaboratePage] ✅ Team data loaded')
         } finally {
           if (!cancelled) setIsSwitchingTeam(false)
         }
       })()
       updatePresence('online', 'Viewing team chat')
       
-      // Subscribe to real-time messages for this team
+      // Subscribe to real-time messages for this team using socket directly
       const unsubscribe = collaborateService.subscribeToMessages(
         selectedTeamId,
         (newMessage: ChatMessage) => {
@@ -1120,7 +1176,8 @@ export default function CollaboratePage() {
             if (exists) return prev
             return [...prev, enriched]
           })
-        }
+        },
+        socket // Pass socket instance
       )
       
       // Define handlers in scope so cleanup can access them
@@ -1177,14 +1234,16 @@ export default function CollaboratePage() {
         }
       }
 
-      // Socket presence/typing events and join
+      // Socket presence/typing events and join using socket service
       if (socket) {
-        ;(socket as any).on('user-status-changed', handleStatusChanged)
-        ;(socket as any).on('user-joined', handleUserJoined)
-        ;(socket as any).on('user-left', handleUserLeft)
-        ;(socket as any).on('user-typing', handleTyping)
-        // Request live presence snapshot on join (server should respond with 'team-presence')
-        ;(socket as any).emit('join_team', { teamId: selectedTeamId })
+        socketService.on('user-status-changed', handleStatusChanged)
+        socketService.on('user-joined', handleUserJoined)
+        socketService.on('user-left', handleUserLeft)
+        socketService.on('typing', handleTyping)
+        // Join team and request presence snapshot
+        socketService.joinTeam(selectedTeamId)
+        // Request team presence data
+        ;(socket as any).emit('get_team_presence', { teamId: selectedTeamId })
       }
 
       // Setup scroll listener
@@ -1196,16 +1255,15 @@ export default function CollaboratePage() {
         cancelled = true
         unsubscribe()
         if (socket) {
-          ;(socket as any).off('user-status-changed', handleStatusChanged)
-          ;(socket as any).off('user-joined', handleUserJoined)
-          ;(socket as any).off('user-left', handleUserLeft)
-          ;(socket as any).off('user-typing', handleTyping)
-          ;(socket as any).emit('leave_team', { teamId: selectedTeamId })
+          socketService.off('user-status-changed', handleStatusChanged)
+          socketService.off('user-joined', handleUserJoined)
+          socketService.off('user-left', handleUserLeft)
+          socketService.off('typing', handleTyping)
+          socketService.leaveTeam(selectedTeamId)
         }
         if (messagesContainerRef.current) {
           messagesContainerRef.current.removeEventListener('scroll', checkScrollPosition)
         }
-        ;(socket as any).off('user-typing')
       }
     }
   }, [selectedTeamId, loadTeamPresence, checkScrollPosition, socket])

@@ -3,6 +3,49 @@ import { requireAuth } from "@/lib/auth-utils"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { buildParaphrasePrompt } from "@/lib/services/paraphrase.service"
 
+// Server-side Nova AI functionality using hardcoded Groq API
+async function callNovaAI(prompt: string, signal?: AbortSignal): Promise<string> {
+  const groqApiKey = process.env.GROQ_API_KEY
+  
+  if (!groqApiKey) {
+    throw new Error('Groq API key not configured. Please set GROQ_API_KEY environment variable.')
+  }
+  
+  console.log('[Paraphraser] Making request to Groq API...')
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${groqApiKey}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 3000,
+      temperature: 0.7,
+      top_p: 0.9,
+      messages: [
+        { 
+          role: "system", 
+          content: "You are Nova, a specialized research collaboration assistant. You help with paraphrasing and rewriting academic content while maintaining scholarly tone and accuracy."
+        },
+        { role: "user", content: prompt }
+      ]
+    }),
+    signal
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error('Groq API error:', response.status, errorData)
+    throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  const aiContent = data.choices?.[0]?.message?.content || 'No response generated'
+  console.log('[Paraphraser] Success! Generated', aiContent.length, 'characters')
+  return aiContent
+}
+
 function sse(headers?: Record<string, string>) {
   const encoder = new TextEncoder()
 
@@ -92,31 +135,35 @@ export async function GET(request: NextRequest) {
         }, heartbeatMs)
 
         try {
-          // Primary path: Use Nova (Groq) for fast, reliable paraphrasing
-          await enhancedAIService.generateTextStream({
-            prompt,
-            provider: "groq",
-            model: "llama-3.1-8b-instant",
-            maxTokens,
-            temperature,
-            userId: user.id,
-            onToken: (token) => send({ type: "token", token }),
-            onProgress: (p) => send({ type: "progress", ...p }),
-            onError: (err) => {
-              // Sanitize error payload to prevent leaking internal details
-              const errorPayload = err && typeof err === 'object'
-                ? {
-                    name: (err as any)?.name || 'Error',
-                    message: (err as any)?.message || 'An error occurred during processing',
-                    // Only include stack trace in development mode
-                    ...(process.env.NODE_ENV === 'development' && (err as any)?.stack ? { stack: (err as any).stack } : {}),
-                  }
-                : { message: String(err) || 'An error occurred during processing' }
+          // Check if Groq API key is configured
+          const groqApiKey = process.env.GROQ_API_KEY
+          if (!groqApiKey) {
+            throw new Error('Nova AI not configured. Please set GROQ_API_KEY environment variable.')
+          }
 
-              send({ type: "error", error: errorPayload })
-            },
-            abortSignal: abortController.signal,
-          })
+          // Use Nova AI (Groq) for paraphrasing
+          const content = await callNovaAI(prompt, abortController.signal)
+
+          if (!content) {
+            throw new Error("Nova AI returned no content")
+          }
+
+          // Simulate token streaming by chunking the content
+          const chunks = content.split(/(\s+)/) // keep spaces
+          const total = chunks.length
+          for (let i = 0; i < chunks.length; i++) {
+            if (abortController.signal.aborted) break
+            const token = chunks[i]
+            if (token) {
+              send({ type: "token", token })
+            }
+            // lightweight progress signal
+            if (i % 20 === 0) {
+              const pct = Math.round((i / Math.max(1, total)) * 100)
+              send({ type: "progress", percentage: pct })
+            }
+            await new Promise((r) => setTimeout(r, 15))
+          }
           send({ type: "done" })
         } catch (e: any) {
           // Fallback: Try enhanced AI service with any available provider

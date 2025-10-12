@@ -11,8 +11,8 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useResearchIdeas, useResearchContext, useResearchTopics } from "@/components/research-session-provider"
-import type { AIProvider } from "@/lib/ai-providers"
-import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+// Removed AI provider types - using Nova AI exclusively
+// Removed AI provider selector - using Nova AI exclusively
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -24,8 +24,6 @@ class IdeaGenerationService {
     topic: string,
     context = "",
     count = 5,
-    provider?: AIProvider,
-    model?: string,
   ): Promise<{
     content: string
     ideas: string[]
@@ -78,8 +76,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
   const [useSessionContext, setUseSessionContext] = useState(hasContext)
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider | undefined>(undefined)
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined)
+  // Removed provider/model state - using Nova AI exclusively
   
   // State for tracking selected ideas from current generation
   const [selectedGeneratedIdeas, setSelectedGeneratedIdeas] = useState<Set<number>>(new Set())
@@ -140,7 +137,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
           ideaContext
 
-        const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, selectedProvider, selectedModel)
+        const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount)
         setIdeaGenerationData(generatedData)
         
         // Auto-select all ideas by default
@@ -164,7 +161,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         setIdeaGenerationLoading(false)
       }
     }, 500) // 500ms debounce
-  }, [ideaTopic, ideaContext, ideaCount, selectedProvider, selectedModel, useSessionContext, buildContext])
+  }, [ideaTopic, ideaContext, ideaCount, useSessionContext, buildContext])
 
   // Handle idea selection
   const handleIdeaSelection = (index: number, selected: boolean) => {
@@ -266,15 +263,12 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         </Alert>
       )}
       
-      {/* AI Provider/Model Selector */}
+      {/* Nova AI Status */}
       <div className="mb-4 flex justify-center">
-        <MinimalAIProviderSelector
-          selectedProvider={selectedProvider}
-          onProviderChange={setSelectedProvider}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-          variant="inline"
-        />
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <span>Powered by Nova AI (Llama-3.3-70B)</span>
+        </div>
       </div>
       
       {/* Redesigned Form Card */}

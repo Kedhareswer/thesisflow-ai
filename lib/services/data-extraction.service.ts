@@ -1,4 +1,4 @@
-import { enhancedAIService } from '@/lib/enhanced-ai-service'
+// Removed OpenRouterClient - now using Nova AI (Groq) directly
 
 export interface ExtractionOptions {
   type: 'text' | 'tables' | 'metadata' | 'summary' | 'all';
@@ -69,10 +69,10 @@ export class DataExtractionService {
     // Generate summary using AI
     if (options.type === 'summary' || options.type === 'all') {
       try {
-        const sr = await this.generateSummaryWithNova(text);
+        const sr = await this.generateSummaryWithNovaAI(text);
         result.summary = sr.summary;
         result.keyPoints = sr.keyPoints;
-        (result as any).aiSummarySource = 'nova';
+        (result as any).aiSummarySource = 'nova-ai';
       } catch {
         result.summary = await this.generateSummary(text);
         result.keyPoints = await this.extractKeyPoints(text);
@@ -180,49 +180,79 @@ export class DataExtractionService {
     return sentences.slice(0, 3).join(' ').trim();
   }
 
-  private async generateSummaryWithNova(text: string, userId?: string): Promise<{ summary: string; keyPoints: string[] }> {
-    const context = (text || '').replace(/\r\n/g, '\n')
-    const excerpt = context.length > 8000 ? context.slice(0, 8000) : context
+  private async generateSummaryWithNovaAI(text: string): Promise<{ summary: string; keyPoints: string[] }> {
+    const groqApiKey = process.env.GROQ_API_KEY
     
-    const prompt = `You are a careful summarization assistant for research documents.
-Return ONLY valid JSON with the following TypeScript type:
-{ summary: string; keyPoints: string[] }
-
-Requirements:
-- summary: 3-7 sentences capturing the main objective, method, and key findings
-- keyPoints: 5-10 concise bullet points; avoid hallucinations; do not invent references
-- Do not include markdown fences or extra commentary; JSON only
-
-Summarize the following document content:
----BEGIN DOCUMENT---
-${excerpt}
----END DOCUMENT---`
-
-    try {
-      const result = await enhancedAIService.generateText({
-        prompt,
-        provider: "groq",
-        model: "llama-3.1-8b-instant",
-        maxTokens: 1500,
-        temperature: 0.2,
-        userId
-      })
-
-      if (result.success && result.content) {
-        const parsed = this.parseFirstJson<{ summary?: string; keyPoints?: string[] }>(result.content)
-        const summary = (parsed.summary && typeof parsed.summary === 'string' && parsed.summary.trim()) || this.fallbackSummary(excerpt)
-        const keyPointsArr = Array.isArray(parsed.keyPoints) ? parsed.keyPoints.filter((s) => !!s && typeof s === 'string').slice(0, 10) : []
-        const keyPoints = keyPointsArr.length ? keyPointsArr : await this.extractKeyPoints(excerpt)
-        return { summary, keyPoints }
-      }
-    } catch (err) {
-      console.error('Nova summarization failed:', err)
+    if (!groqApiKey) {
+      console.warn('Groq API key not configured, falling back to basic summary')
+      const fallbackSummary = this.fallbackSummary(text)
+      const fallbackKeyPoints = await this.extractKeyPoints(text)
+      return { summary: fallbackSummary, keyPoints: fallbackKeyPoints }
     }
 
-    // Fallback to basic extraction
-    return {
-      summary: this.fallbackSummary(excerpt),
-      keyPoints: await this.extractKeyPoints(excerpt)
+    const systemPrompt = [
+      'You are Nova, a specialized research collaboration assistant for academic teams and research hubs.',
+      'You are a careful summarization assistant for research documents.',
+      'Return ONLY valid JSON with the following TypeScript type:',
+      '{ summary: string; keyPoints: string[] }',
+      'Requirements:',
+      '- summary: 3-7 sentences capturing the main objective, method, and key findings',
+      '- keyPoints: 5-10 concise bullet points; avoid hallucinations; do not invent references',
+      '- Do not include markdown fences or extra commentary; JSON only',
+      '- Maintain a professional, scholarly tone appropriate for academic discourse',
+    ].join('\n')
+
+    const context = (text || '').replace(/\r\n/g, '\n')
+    const excerpt = context.length > 8000 ? context.slice(0, 8000) : context
+    const userPrompt = [
+      'Summarize the following document content:',
+      '---BEGIN DOCUMENT---',
+      excerpt,
+      '---END DOCUMENT---',
+    ].join('\n')
+
+    try {
+      console.log('[Data Extraction] Making request to Groq API for summary...')
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${groqApiKey}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          max_tokens: 2000,
+          temperature: 0.7,
+          top_p: 0.9,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ]
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Groq API error:', response.status, errorData)
+        throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`)
+      }
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content || ''
+      console.log('[Data Extraction] Success! Generated summary with', content.length, 'characters')
+
+      const parsed = this.parseFirstJson<{ summary?: string; keyPoints?: string[] }>(content)
+      const summary = (parsed.summary && typeof parsed.summary === 'string' && parsed.summary.trim()) || this.fallbackSummary(excerpt)
+      const keyPointsArr = Array.isArray(parsed.keyPoints) ? parsed.keyPoints.filter((s) => !!s && typeof s === 'string').slice(0, 10) : []
+      const keyPoints = keyPointsArr.length ? keyPointsArr : await this.extractKeyPoints(excerpt)
+      
+      return { summary, keyPoints }
+    } catch (error) {
+      console.error('Nova AI summary generation failed:', error)
+      // Graceful fallback to basic summary if Nova AI fails
+      const fallbackSummary = this.fallbackSummary(excerpt)
+      const fallbackKeyPoints = await this.extractKeyPoints(excerpt)
+      return { summary: fallbackSummary, keyPoints: fallbackKeyPoints }
     }
   }
 
@@ -234,7 +264,7 @@ ${excerpt}
       try { return JSON.parse(slice) } catch {}
     }
     try { return JSON.parse(text) } catch {}
-    throw new Error('Failed to parse JSON from AI response')
+    throw new Error('Failed to parse JSON from Nova AI response')
   }
 
   private async extractKeyPoints(text: string): Promise<string[]> {

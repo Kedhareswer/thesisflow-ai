@@ -36,14 +36,15 @@ This document describes all external and internal integrations used by ThesisFlo
 - Literature search: `enhanced_literature_search_system`, `create_literature_search_rate_limits_table`
 - Planner drafts: `create_planner_drafts`
 
-## OpenRouter (LLM)
-- Service: `lib/services/openrouter.service.ts`
-- Client facade & fallback: `lib/ai-providers.ts`, `lib/enhanced-ai-service.ts`
+## Nova AI (Groq/Nebius)
+- Service: `lib/services/nova-ai.service.ts`
+- Direct integration with Llama-3.3-70B model
 - Usage:
   - Chat streaming: `app/api/ai/chat/stream/route.ts`
   - Topics report (SSE): `app/api/topics/report/stream/route.ts`
-- Environment: `OPENROUTER_API_KEY` (see `.env.example` or `env.template`)
-- Fallback strategy: rotate through a prioritized model list on 400/unsupported/model errors
+  - Research assistant: All AI features use Nova AI exclusively
+- Environment: `GROQ_API_KEY` or `NEBIUS_API_KEY` (see `ENV_SETUP.md`)
+- Reliability: Single provider eliminates fallback complexity and timeout issues
 
 ## Search providers
 - Aggregated by: `lib/services/literature-search.service.ts`

@@ -1,4 +1,34 @@
-# Recent Updates - Support Chat System Implementation
+# Recent Updates - Nova AI Integration
+
+## v2.3.0 - Nova AI Simplification (2025-01-07)
+
+### 🚀 Major Architecture Simplification
+
+#### Nova AI Integration
+- **Single AI Provider**: Replaced complex multi-provider system with Nova AI (Llama-3.3-70B) exclusively
+- **Simplified Configuration**: Only requires `GROQ_API_KEY` - no more complex provider selection
+- **Research-Optimized**: Nova AI specifically tuned for academic and research tasks
+- **Reliable Performance**: Eliminates provider fallback complexity and timeout issues
+- **Cost Transparency**: Clear Nova AI usage tracking in plan analytics with cost breakdown
+
+#### User Experience Improvements  
+- **Removed Provider Selection**: No more confusing AI provider/model dropdowns in UI
+- **Consistent AI Experience**: Same Nova AI across all features (Research Assistant, Writing, Topics, etc.)
+- **Clear Status Indicators**: Green Nova AI status badges throughout the platform
+- **Simplified Settings**: Removed AI configuration tabs - users see Nova AI status only
+
+#### Technical Benefits
+- **Faster Response Times**: Direct Nova AI integration without routing overhead
+- **Better Error Handling**: Simplified error messages and graceful fallbacks  
+- **Reduced Complexity**: Removed `ai-providers.ts`, `enhanced-ai-service.ts` complexity
+- **Production Ready**: Single proven provider with enterprise-grade reliability
+
+### 🛠️ Files Modified
+- **Settings Page** (`/settings`): Removed AI Settings tab, added Nova AI status
+- **Research Assistant**: Direct Nova AI integration with clean UI
+- **Plan Analytics** (`/plan`): Nova AI cost tracking and usage visualization
+- **All AI Components**: Unified Nova AI experience across Explorer, Writer, Extract
+- **Documentation**: Updated setup guides to show Nova AI requirements only
 
 ## v2.2.0 - Support Chat System (2025-09-24)
 

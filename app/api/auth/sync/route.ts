@@ -21,8 +21,9 @@ export async function POST(request: NextRequest) {
 
     // Helper to clear our cookies
     const clearCookies = () => {
-      res.cookies.set('sb-access-token', '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0 })
-      res.cookies.set('sb-refresh-token', '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0 })
+      const isProduction = process.env.NODE_ENV === 'production'
+      res.cookies.set('sb-access-token', '', { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', maxAge: 0 })
+      res.cookies.set('sb-refresh-token', '', { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', maxAge: 0 })
     }
 
     // If we have a session (SIGNED_IN or TOKEN_REFRESHED), set cookies
@@ -32,9 +33,12 @@ export async function POST(request: NextRequest) {
       const accessMaxAge = 60 * 60 // 1 hour
       const refreshMaxAge = 60 * 60 * 24 * 7 // 7 days
 
+      // Set secure cookies only in production, allow HTTP in development
+      const isProduction = process.env.NODE_ENV === 'production'
+      
       res.cookies.set('sb-access-token', session.access_token, {
         httpOnly: true,
-        secure: true,
+        secure: isProduction,
         sameSite: 'lax',
         path: '/',
         maxAge: accessMaxAge,
@@ -42,7 +46,7 @@ export async function POST(request: NextRequest) {
 
       res.cookies.set('sb-refresh-token', session.refresh_token, {
         httpOnly: true,
-        secure: true,
+        secure: isProduction,
         sameSite: 'lax',
         path: '/',
         maxAge: refreshMaxAge,

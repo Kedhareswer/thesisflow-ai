@@ -22,12 +22,12 @@
   - RPC functions for tokens, usage, and limits
   - URL: xxxxx
 
-## AI Providers
-- OpenRouter via:
-  - `lib/services/openrouter.service.ts`
-  - `lib/ai-providers.ts`
-  - `lib/enhanced-ai-service.ts`
-- Model fallback patterns for resilience
+## AI Provider
+- Nova AI (Groq) via:
+  - `lib/services/nova-ai.service.ts`
+  - Direct Llama-3.3-70B integration
+  - Research-optimized prompting
+- Single provider for reliability and simplicity
 
 ## Search Providers
 - OpenAlex, arXiv, CrossRef

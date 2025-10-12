@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: thesisflow-websocket-server
+    runtime: node
+    plan: starter  # Use 'starter' for free tier, upgrade to 'standard' for production
+    region: oregon  # Choose region closest to your users
+    branch: main  # Deploy from main branch
+    
+    # Build configuration
+    buildCommand: npm install
+    startCommand: node server/websocket-server.js
+    
+    # Health check configuration
+    healthCheckPath: /health
+    
+    # Auto-deploy configuration
+    autoDeploy: true
+    
+    # Environment variables (set these in Render dashboard)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false  # Set manually in Render dashboard - KEEP SECRET
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false  # Set to your Vercel frontend URL
+      
+    # Resource limits
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+      
+    # Scaling configuration
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 70
+      targetCPUPercent: 70

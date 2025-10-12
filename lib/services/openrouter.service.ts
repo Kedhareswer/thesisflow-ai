@@ -50,36 +50,71 @@ export class OpenRouterClient {
   async chatCompletion(model: string, messages: ChatMessage[], signal?: AbortSignal): Promise<string> {
     if (!this.apiKey) throw new Error("OpenRouter API key is not configured")
 
-    const res = await fetch(OPENROUTER_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-        // Optional best practices for OpenRouter
-        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost",
-        "X-Title": process.env.NEXT_PUBLIC_APP_NAME || "AI Project Planner",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        // We avoid vendor-specific response_format for broad model compatibility
-        // and instead enforce JSON in the prompt and robustly parse below.
-      }),
-      signal,
-    })
+    // Add retry logic with exponential backoff for network resilience
+    const maxRetries = 3
+    let attempt = 0
+    let lastError: Error | null = null
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
-      throw new Error(text || `OpenRouter request failed with status ${res.status}`)
+    while (attempt < maxRetries) {
+      try {
+        const res = await fetch(OPENROUTER_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+            // Optional best practices for OpenRouter
+            "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost",
+            "X-Title": process.env.NEXT_PUBLIC_APP_NAME || "AI Project Planner",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            stream: false,
+            // Optimize for reliability
+            max_tokens: 4000,
+            temperature: 0.7,
+          }),
+          signal,
+        })
+
+        if (res.status === 429) {
+          // Rate limited - wait longer before retry
+          const delay = Math.min(1000 * Math.pow(2, attempt), 8000)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          attempt++
+          continue
+        }
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "")
+          throw new Error(text || `OpenRouter request failed with status ${res.status}`)
+        }
+
+        const data = await res.json().catch(() => ({})) as any
+        const content: string | undefined = data?.choices?.[0]?.message?.content
+        
+        if (!content || typeof content !== "string") {
+          throw new Error("OpenRouter returned no content")
+        }
+        
+        return content
+
+      } catch (error: any) {
+        lastError = error
+        attempt++
+        
+        // Don't retry if aborted or on final attempt
+        if (signal?.aborted || attempt >= maxRetries) {
+          break
+        }
+        
+        // Exponential backoff for other errors
+        const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
     }
 
-    const data = await res.json().catch(() => ({})) as any
-    const content: string | undefined = data?.choices?.[0]?.message?.content
-    if (!content || typeof content !== "string") {
-      throw new Error("OpenRouter returned no content")
-    }
-    return content
+    throw lastError || new Error("OpenRouter request failed after retries")
   }
 }
 

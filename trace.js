@@ -1,1 +1,4 @@
-process.on('uncaughtException',err= TRACE:\n'+err.stack);process.exit(1);});
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION TRACE:\n' + err.stack);
+  process.exit(1);
+});

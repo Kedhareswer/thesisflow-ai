@@ -536,6 +536,24 @@ Thank you!`)
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
+            {/* Nova AI Status */}
+            <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-green-800">Nova AI Usage Overview</h3>
+                </div>
+                <p className="text-sm text-green-700 mb-4">
+                  All AI features powered by <strong>Nova AI (Llama-3.3-70B)</strong> with plan-optimized pricing. 
+                  Your costs are included in your subscription - no surprise charges!
+                </p>
+                <div className="flex items-center gap-2 text-xs text-green-600">
+                  <CheckCircle className="h-3 w-3" />
+                  <span>High-performance inference • Academic-focused • Cost-efficient</span>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Overview Cards */}
             {tokenStatus && (
               <TokenOverviewCards

@@ -171,7 +171,7 @@ class CollaborateService {
     }
   }
 
-  // Send a message
+  // Send a message with improved socket integration
   async sendMessage(
     teamId: string,
     userId: string,
@@ -186,15 +186,22 @@ class CollaborateService {
       // If socket connected, send via websocket only (server persists and broadcasts)
       if (socket && socket.connected) {
         const idToUse = clientMessageId || `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        socket.emit('new_message', {
+        
+        // Use improved socket service method
+        const success = socketService.sendMessage(
           teamId,
           content,
           type,
           mentions,
-          clientMessageId: idToUse,
-          metadata: metadata || {},
-        });
-        return { success: true, message: { id: idToUse } as any, clientMessageId: idToUse };
+          idToUse,
+          metadata
+        )
+        
+        if (success) {
+          return { success: true, message: { id: idToUse } as any, clientMessageId: idToUse }
+        } else {
+          throw new Error('Socket send failed')
+        }
       }
 
       // Fallback: send via API when offline
@@ -254,16 +261,16 @@ class CollaborateService {
     }
   }
 
-  // Subscribe to new messages for a team
+  // Subscribe to new messages for a team with proper socket service integration
   subscribeToMessages(teamId: string, callback: (message: any) => void, socket?: any): () => void {
     if (!socket) {
-      return () => {}; // Return empty cleanup function
+      return () => {} // Return empty cleanup function
     }
     
-    // Join the team room
-    socket.emit('join_team', { teamId });
+    // Join the team room using socket service
+    socketService.joinTeam(teamId)
     
-    // Listen for new messages
+    // Listen for new messages with proper event name
     const handleNewMessage = (data: any) => {
       if (data.teamId === teamId) {
         callback({
@@ -278,35 +285,34 @@ class CollaborateService {
           mentions: Array.isArray(data.mentions) ? data.mentions : [],
           // Preserve correlation id for optimistic replacement
           clientMessageId: data.clientMessageId,
-        });
+        })
       }
-    };
+    }
     
-    socket.on('new_message', handleNewMessage);
+    // Use socket service for event handling
+    socketService.on('new_message', handleNewMessage)
     
     // Return unsubscribe function
     return () => {
-      socket.off('new_message', handleNewMessage);
-      socket.emit('leave_team', { teamId });
-    };
+      socketService.off('new_message', handleNewMessage)
+      socketService.leaveTeam(teamId)
+    }
   }
 
-  // Subscribe to user status changes
+  // Subscribe to user status changes with proper integration
   subscribeToUserStatus(callback: (userId: string, status: 'online' | 'offline' | 'away') => void): () => void {
-    const socket = socketService.initialize('current-user');
-    
-    // Listen for status changes
+    // Listen for status changes using socket service
     const handleStatusChange = (data: any) => {
-      callback(data.userId, data.status);
-    };
+      callback(data.userId, data.status)
+    }
     
     // Server emits 'user-status-changed'
-    socket.on('user-status-changed', handleStatusChange);
+    socketService.on('user-status-changed', handleStatusChange)
     
     // Return unsubscribe function
     return () => {
-      socket.off('user-status-changed', handleStatusChange);
-    };
+      socketService.off('user-status-changed', handleStatusChange)
+    }
   }
 }
 

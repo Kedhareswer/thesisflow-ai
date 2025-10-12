@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { AIProvider } from "@/lib/ai-providers"
 import Link from "next/link"
 import { useResearchTopics, useResearchContext } from "@/components/research-session-provider"
-import MinimalAIProviderSelector from "@/components/ai-provider-selector-minimal"
+// Removed AI provider selector - using Nova AI exclusively
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
@@ -274,18 +274,12 @@ ${depthNumber <= 2 ? "Brief overview" : depthNumber <= 4 ? "Detailed analysis" :
         </Alert>
       )}
 
-      {/* AI Provider Selector - Inline variant for Explorer */}
+      {/* Nova AI Status */}
       <div className="mb-6">
-        <MinimalAIProviderSelector
-          selectedProvider={localProvider}
-          onProviderChange={setLocalProvider}
-          selectedModel={localModel}
-          onModelChange={setLocalModel}
-          variant="inline"
-          showModelSelector={true}
-          showConfigLink={true}
-          className="justify-center"
-        />
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <span>Powered by Nova AI (Llama-3.3-70B)</span>
+        </div>
       </div>
 
       <Card>

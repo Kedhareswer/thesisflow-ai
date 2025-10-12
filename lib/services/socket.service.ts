@@ -5,16 +5,21 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/integrations/supabase/client"
 import { renderKeepAliveService } from "./render-keepalive.service"
 
-// Socket events
+// Socket events - aligned with server
 export enum SocketEvent {
   CONNECT = "connect",
   DISCONNECT = "disconnect",
   JOIN_TEAM = "join_team",
   LEAVE_TEAM = "leave_team",
   NEW_MESSAGE = "new_message",
-  USER_STATUS_CHANGE = "user_status_change",
+  USER_STATUS_CHANGE = "user-status-changed",
+  USER_JOINED = "user-joined",
+  USER_LEFT = "user-left",
   TYPING = "typing",
   STOP_TYPING = "stop_typing",
+  MESSAGES = "messages",
+  USER_TEAMS = "user-teams",
+  TEAM_PRESENCE = "team-presence",
 }
 
 // Socket service for real-time communication
@@ -24,10 +29,10 @@ class SocketService {
   private initialized = false
   private readonly isDev = process.env.NODE_ENV === 'development'
 
-  // Initialize socket connection
+  // Initialize socket connection with proper error handling
   initialize(userId: string): Socket {
     // If already initialized for this user, return existing socket
-    if (this.socket && this.userId === userId) {
+    if (this.socket && this.userId === userId && this.socket.connected) {
       return this.socket
     }
 
@@ -39,7 +44,8 @@ class SocketService {
 
     this.userId = userId
 
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "https://thesisflow-socket-railway.onrender.com"
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || 
+      (this.isDev ? "http://localhost:3001" : "https://thesisflow-websocket-server.onrender.com")
     const path = process.env.NEXT_PUBLIC_SOCKET_PATH || "/socket.io"
     const timeout = parseInt(process.env.NEXT_PUBLIC_SOCKET_TIMEOUT || "20000", 10)
     const reconnectionAttempts = parseInt(process.env.NEXT_PUBLIC_SOCKET_RECONNECTION_ATTEMPTS || "10", 10)
@@ -105,27 +111,8 @@ class SocketService {
       }
     }
 
-    // Fetch Supabase session token and connect
-    supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token
-      if (!token) {
-        if (this.isDev) console.debug("socket: no Supabase token; delaying connect")
-        return
-      }
-      // Prefer server-trusted user id from session
-      const sessionUserId = data.session?.user?.id
-      if (sessionUserId) {
-        this.userId = sessionUserId
-      }
-      if (!this.socket) return
-      // Attach token for server auth middleware
-      ;(this.socket as any).auth = { token }
-      try {
-        this.socket.connect()
-      } catch (e) {
-        if (this.isDev) console.warn("socket: connect failed")
-      }
-    })
+    // Fetch Supabase session token and connect with retry logic
+    this.connectWithAuth()
 
     // Also react to auth state changes (refresh tokens, login/logout)
     supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -148,6 +135,55 @@ class SocketService {
     return this.socket
   }
 
+  // Separate method for auth connection with retry
+  private async connectWithAuth(retryCount = 0): Promise<void> {
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      
+      console.log(`[SocketService] Auth attempt ${retryCount + 1}:`, {
+        hasToken: !!token,
+        tokenPrefix: token ? `${token.substring(0, 20)}...` : 'none',
+        userId: data.session?.user?.id,
+        expiresAt: data.session?.expires_at
+      })
+      
+      if (!token) {
+        console.warn("[SocketService] No Supabase token available; delaying connect")
+        if (retryCount < 3) {
+          setTimeout(() => this.connectWithAuth(retryCount + 1), 2000)
+        }
+        return
+      }
+      
+      // Prefer server-trusted user id from session
+      const sessionUserId = data.session?.user?.id
+      if (sessionUserId) {
+        this.userId = sessionUserId
+      }
+      
+      if (!this.socket) return
+      
+      // Attach token for server auth middleware
+      ;(this.socket as any).auth = { token }
+      
+      try {
+        this.socket.connect()
+        console.log("[SocketService] ✅ Socket connection initiated with auth")
+      } catch (e) {
+        console.warn("[SocketService] Socket connect failed", e)
+        if (retryCount < 3) {
+          setTimeout(() => this.connectWithAuth(retryCount + 1), 2000)
+        }
+      }
+    } catch (error) {
+      console.error("[SocketService] Auth connection error", error)
+      if (retryCount < 3) {
+        setTimeout(() => this.connectWithAuth(retryCount + 1), 2000)
+      }
+    }
+  }
+
   // Join a team room to receive team-specific messages
   joinTeam(teamId: string): void {
     if (!this.socket) return
@@ -160,22 +196,34 @@ class SocketService {
     this.socket.emit(SocketEvent.LEAVE_TEAM, { teamId })
   }
 
-  // Send a new message to a team
+  // Send a new message to a team with better error handling
   sendMessage(
     teamId: string,
     message: string,
     type: "text" | "system" = "text",
-    mentions?: string[]
-  ): void {
-    if (!this.socket || !this.userId) return
+    mentions?: string[],
+    clientMessageId?: string,
+    metadata?: Record<string, any>
+  ): boolean {
+    if (!this.socket || !this.userId) {
+      if (this.isDev) console.warn("socket: cannot send message - not connected")
+      return false
+    }
 
-    this.socket.emit(SocketEvent.NEW_MESSAGE, {
-      teamId,
-      userId: this.userId,
-      content: message,
-      type,
-      mentions: Array.isArray(mentions) ? mentions : undefined,
-    })
+    try {
+      this.socket.emit(SocketEvent.NEW_MESSAGE, {
+        teamId,
+        content: message,
+        type,
+        mentions: Array.isArray(mentions) ? mentions : undefined,
+        clientMessageId,
+        metadata: metadata || {},
+      })
+      return true
+    } catch (error) {
+      if (this.isDev) console.error("socket: failed to send message", error)
+      return false
+    }
   }
 
   // Update user status (online, offline, away)
@@ -220,16 +268,20 @@ class SocketService {
     })
   }
 
-  // Add event listener
+  // Add event listener with cleanup tracking
   on(event: SocketEvent | string, callback: (...args: any[]) => void): void {
     if (!this.socket) return
     this.socket.on(event, callback)
   }
 
   // Remove event listener
-  off(event: SocketEvent | string, callback: (...args: any[]) => void): void {
+  off(event: SocketEvent | string, callback?: (...args: any[]) => void): void {
     if (!this.socket) return
-    this.socket.off(event, callback)
+    if (callback) {
+      this.socket.off(event, callback)
+    } else {
+      this.socket.off(event)
+    }
   }
 
   // Connection state helper
@@ -249,7 +301,8 @@ class SocketService {
   // Wake up sleeping Render service with HTTP request
   private async wakeUpService(): Promise<void> {
     try {
-      const url = process.env.NEXT_PUBLIC_SOCKET_URL || "https://thesisflow-socket-railway.onrender.com"
+      const url = process.env.NEXT_PUBLIC_SOCKET_URL || 
+        (this.isDev ? "http://localhost:3001" : "https://thesisflow-websocket-server.onrender.com")
       if (this.isDev) console.debug("socket: attempting to wake up service")
       
       // Simple HTTP GET to wake up the service
@@ -265,13 +318,38 @@ class SocketService {
     }
   }
 
-  // Disconnect socket
+  // Disconnect socket with proper cleanup
   disconnect(): void {
     if (this.socket) {
-      this.updateUserStatus("offline")
-      this.socket.disconnect()
-      this.socket = null
-      this.userId = null
+      try {
+        this.updateUserStatus("offline")
+        this.socket.removeAllListeners()
+        this.socket.disconnect()
+      } catch (error) {
+        if (this.isDev) console.warn("socket: disconnect error", error)
+      } finally {
+        this.socket = null
+        this.userId = null
+        this.initialized = false
+      }
+    }
+  }
+
+  // Get current connection status
+  getConnectionStatus(): { connected: boolean; userId: string | null } {
+    return {
+      connected: !!this.socket?.connected,
+      userId: this.userId
+    }
+  }
+
+  // Force reconnect
+  forceReconnect(): void {
+    if (this.socket && this.userId) {
+      this.disconnect()
+      setTimeout(() => {
+        this.initialize(this.userId!)
+      }, 1000)
     }
   }
 }
