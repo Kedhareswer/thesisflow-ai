@@ -20,8 +20,9 @@ See diagrams in `docs/sequences-and-flows.md`.
   - App Router route handlers (REST/SSE)
   - Streaming endpoints set `Content-Type: text/event-stream` and emit named events
 - Services (`lib/services/**`)
-  - AI providers, literature search, extraction, summarization, planning, analytics, tokens
-  - Provider abstractions and graceful fallback (Nova/Groq primary, OpenRouter fallback)
+  - Simplified AI service (`enhanced-ai-service.ts`) - server-side only, no user API keys
+  - Literature search, extraction, summarization, planning, analytics, tokens
+  - Single AI provider architecture (no fallback complexity)
 - Middleware (`lib/middleware/token-middleware.ts`)
   - Token checks, rate limits, cost calculation, deduction/refund orchestration
 - Servers (`server/`)

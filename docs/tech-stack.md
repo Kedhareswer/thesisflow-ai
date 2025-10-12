@@ -22,12 +22,13 @@
   - RPC functions for tokens, usage, and limits
   - URL: xxxxx
 
-## AI Provider
-- Nova AI (Groq) via:
-  - `lib/services/nova-ai.service.ts`
+## AI Service
+- Server-side AI integration via:
+  - `lib/enhanced-ai-service.ts` (simplified, single provider)
   - Direct Llama-3.3-70B integration
-  - Research-optimized prompting
-- Single provider for reliability and simplicity
+  - Research-optimized for academic tasks
+- No user API key management - all configuration server-side
+- Environment variable: `GROQ_API_KEY`
 
 ## Search Providers
 - OpenAlex, arXiv, CrossRef
