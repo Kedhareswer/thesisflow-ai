@@ -3,6 +3,12 @@ import { withTokenValidation, TokenMiddleware } from '@/lib/middleware/token-mid
 import { tokenService } from '@/lib/services/token.service'
 import { enumerateSources, withTimeout, type Paper } from '@/lib/utils/sources'
 
+// Define ChatMessage type
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 // Server-side Nova AI functionality using hardcoded Groq API
 async function callNovaAI(prompt: string): Promise<string> {
   const groqApiKey = process.env.GROQ_API_KEY
@@ -184,63 +190,12 @@ export const POST = withTokenValidation(
               }
             }
 
-Topic: ${query}
-
-Below is a numbered list of candidate sources (already vetted to be safe).
-Mark each as HIGH, MEDIUM, or LOW trust and list 1‑line rationale.
-Return strictly in markdown table with columns: ID | Trust | Rationale.
-
-Sources:
-${sourcesText}`
-
-            let curation = 'Curation unavailable'
-            try {
-              // Use automatic provider fallback (don't specify provider for resilience)
-              const curationResult = await withTimeout(
-                enhancedAIService.generateText({
-                  prompt: curatorPrompt,
-                  // No provider specified - will use fallback mechanism with all available providers
-                  maxTokens: 2000,
-                  temperature: 0.2,
-                  userId
-                }),
-                curationBudgetMs,
-                'Curation'
-              )
-              curation = curationResult.success ? (curationResult.content || 'Curation unavailable') : 'Curation unavailable'
-            } catch (curationError: any) {
-              // Fallback: Simple trust ratings if AI curation times out or rate limited
-              if (curationError?.message?.includes('timed out') || curationError?.message?.includes('rate limit')) {
-                curation = '| ID | Trust | Rationale |\n|---|---|---|\n' + 
-                  limited.map((p, i) => `| ${i+1} | MEDIUM | ${p.source || 'Academic'} source |`).join('\n')
-              } else {
-                curation = 'Curation unavailable due to API error'
-              }
-            }
-
-            // Progress: analyzer using Nova (Groq)
+            // Progress: analyze each source with Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message: 'Analyzing each source…' })}\n\n`))
-            const analyzerSystem: ChatMessage = { role: 'system', content: 'You are a precise literature analyst. Summarize without hallucinations.' }
-            const analyzerUser: ChatMessage = { role: 'user', content: `For the topic "${query}", write 2‑3 bullet summaries for EACH numbered source below.\nUse inline citations like [1], [2] to refer to the same numbering.\nReturn as markdown with '## Per‑source Summaries' and subsections like '### [n] Title'.\n\nSources:\n${sourcesText}` }
-            const analyzerPrompt = `${analyzerUser.content}`
+            
+            const analyzerPrompt = `For the topic "${query}", write 2‑3 bullet summaries for EACH numbered source below.\nUse inline citations like [1], [2] to refer to the same numbering.\nReturn as markdown with '## Per‑source Summaries' and subsections like '### [n] Title'.\n\nSources:\n${sourcesText}`
             const perSource = await withTimeout(callNovaAI(analyzerPrompt), analysisBudgetMs, 'Analysis')
-
-Sources:
-${sourcesText}`
-
-            const perSourceResult = await withTimeout(
-              enhancedAIService.generateText({
-                prompt: analyzerPrompt,
-                // Use automatic provider fallback for resilience
-                maxTokens: 3000,
-                temperature: 0.2,
-                userId
-              }),
-              analysisBudgetMs,
-              'Analysis'
-            )
-            const perSource = perSourceResult.success ? (perSourceResult.content || 'Analysis unavailable') : 'Analysis unavailable'
 
             // Progress: synthesizer using Nova (Groq)
             controller.enqueue(encoder.encode(`event: progress\n`))
