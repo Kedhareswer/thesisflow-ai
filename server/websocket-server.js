@@ -601,29 +601,13 @@ io.on('connection', async (socket) => {
   });
 });
 
-// Add health check endpoint for Render
-httpServer.on('request', (req, res) => {
-  if (req.url === '/health' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      status: 'healthy', 
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      connections: activeConnections.size
-    }));
-    return;
-  }
-  
-  // Handle other HTTP requests (return 404)
-  res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('Not Found');
-});
+// Render monitors the port automatically - no custom health check needed
 
 // Start server
 httpServer.listen(PORT, () => {
   console.log(`WebSocket server running on port ${PORT}`);
   console.log(`CORS origin: ${CORS_ORIGIN}`);
-  console.log(`Health check available at: http://localhost:${PORT}/health`);
+  console.log(`WebSocket endpoint: ws://localhost:${PORT}`);
 });
 
 // Graceful shutdown
