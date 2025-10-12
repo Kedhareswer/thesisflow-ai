@@ -16,9 +16,21 @@ const envDefault = path.resolve(__dirname, '../.env');
 
 dotenv.config({ path: fs.existsSync(envLocal) ? envLocal : envDefault });
 
-// Prefer platform-provided PORT (Render/Heroku/Railway), then fallback to WS_PORT, then 3001
-const PORT = process.env.PORT || process.env.WS_PORT || 3001;
-const CORS_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+// Prefer platform-provided PORT (Render/Heroku/Railway), then fallback to WEBSOCKET_PORT, then 3002
+const PORT = process.env.PORT || process.env.WEBSOCKET_PORT || 3002;
+
+// Production-ready CORS origins (supports both local dev and production)
+const CORS_ORIGINS = [
+  process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  'https://thesisflow-ai.vercel.app',
+  'https://*.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001'
+].filter(Boolean);
+
+const CORS_ORIGIN = process.env.NODE_ENV === 'production' 
+  ? CORS_ORIGINS 
+  : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // Create Supabase admin client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,8 +43,24 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Create HTTP server
-const httpServer = createServer();
+// Create HTTP server with health check endpoint
+const httpServer = createServer((req, res) => {
+  // Health check endpoint for Railway deployment
+  if (req.url === '/health' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      activeConnections: activeConnections.size,
+      uptime: process.uptime()
+    }));
+    return;
+  }
+  
+  // Default response for non-health requests
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('WebSocket server running');
+});
 
 // Create Socket.IO server with CORS configuration
 const io = new Server(httpServer, {
@@ -119,23 +147,29 @@ async function updateUserStatus(userId, status, lastActive = null) {
   }
 }
 
-// Socket.IO middleware for authentication
+// Socket.IO middleware for authentication with enhanced debugging
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
+    console.log('[ws-auth] Token present:', !!token, token ? `${token.substring(0, 20)}...` : 'none');
+    
     if (!token) {
+      console.log('[ws-auth] No token provided');
       return next(new Error('Authentication required'));
     }
 
     const user = await verifyUser(token);
     if (!user) {
+      console.log('[ws-auth] Token validation failed');
       return next(new Error('Invalid authentication'));
     }
 
+    console.log('[ws-auth] User authenticated:', user.id);
     socket.userId = user.id;
     socket.userEmail = user.email;
     next();
   } catch (error) {
+    console.error('[ws-auth] Authentication error:', error);
     next(new Error('Authentication failed'));
   }
 });
@@ -191,10 +225,12 @@ io.on('connection', async (socket) => {
         }
         teamPresence.get(teamId).add(socket.userId);
 
-        // Notify other team members
+        // Notify other team members with enhanced user info
         socket.to(`team:${teamId}`).emit('user-joined', {
           userId: socket.userId,
-          teamId
+          teamId,
+          timestamp: new Date().toISOString(),
+          userProfile: userProfile
         });
 
         console.log(`User ${socket.userId} joined team ${teamId}`);
@@ -233,10 +269,11 @@ io.on('connection', async (socket) => {
     if (!userStillInTeam && teamPresence.has(teamId)) {
       teamPresence.get(teamId).delete(socket.userId);
       
-      // Notify other team members
+      // Notify other team members with enhanced info
       socket.to(`team:${teamId}`).emit('user-left', {
         userId: socket.userId,
-        teamId
+        teamId,
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -283,8 +320,8 @@ io.on('connection', async (socket) => {
         .eq('id', socket.userId)
         .single();
 
-      // Broadcast message to team members
-      io.to(`team:${teamId}`).emit('new_message', {
+      // Broadcast message to team members with consistent event structure
+      const messagePayload = {
         id: message.id,
         content: message.content,
         // Preserve AI responses as ai_response type for consistent UI rendering
@@ -299,6 +336,16 @@ io.on('connection', async (socket) => {
         mentions: message.mentions || [],
         metadata: message.metadata || {},
         clientMessageId,
+      };
+      
+      // Emit to all team members
+      io.to(`team:${teamId}`).emit('new_message', messagePayload);
+      
+      // Also emit acknowledgment to sender for optimistic UI updates
+      socket.emit('message_sent', {
+        success: true,
+        message: messagePayload,
+        clientMessageId
       });
 
       // Send notifications for mentions
@@ -409,7 +456,7 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // Handle typing indicators
+  // Handle typing indicators with consistent event names
   socket.on('typing', ({ teamId }) => {
     socket.to(`team:${teamId}`).emit('typing', {
       userId: socket.userId,
@@ -521,7 +568,8 @@ io.on('connection', async (socket) => {
           socket.to(`team:${teamId}`).emit('user-status-changed', {
             userId: socket.userId,
             status,
-            teamId
+            teamId,
+            timestamp: new Date().toISOString()
           });
         }
       }
@@ -564,7 +612,8 @@ io.on('connection', async (socket) => {
             
             io.to(`team:${teamId}`).emit('user-left', {
               userId: socket.userId,
-              teamId
+              teamId,
+              timestamp: new Date().toISOString()
             });
           }
         }
