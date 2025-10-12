@@ -39,12 +39,15 @@ const RULES = [
   // 5) API-like assignments (api_key, secret, token, apikey)
   { name: 'kv-secret', regex: /(api[_-]?key|apikey|secret|token|auth[_-]?token)\s*[:=]\s*(["']?)[^\s\n"']+\2/gi, replace: (m, k) => `${k}: xxxxx` },
 
-  // 6) Known key prefixes (OpenAI, Anthropic, Gemini, Mistral, Supabase, OpenRouter)
+  // 6) Known key prefixes (OpenAI, Anthropic, Gemini, Mistral, Supabase, OpenRouter, Nova/Groq)
   { name: 'openai-sk', regex: /(sk-[A-Za-z0-9-_]+)/g, replace: () => 'xxxxx' },
+  { name: 'groq-gsk', regex: /(gsk_[A-Za-z0-9-_]+)/g, replace: () => 'xxxxx' },
   { name: 'env-openai', regex: /(OPENAI_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
   { name: 'env-anthropic', regex: /(ANTHROPIC_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
   { name: 'env-gemini', regex: /(GEMINI_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
   { name: 'env-mistral', regex: /(MISTRAL_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
+  { name: 'env-groq', regex: /(GROQ_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
+  { name: 'env-nova', regex: /(NOVA_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
   { name: 'env-openrouter', regex: /(OPENROUTER_API_KEY)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
   { name: 'env-supabase-any', regex: /(SUPABASE_[A-Z0-9_]+)\s*[:=]\s*['"]?[^\s\n'"/]+/g, replace: (m, k) => `${k}: xxxxx` },
 ];

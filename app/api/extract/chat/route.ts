@@ -45,18 +45,15 @@ async function callNovaAI(systemPrompt: string, userPrompt: string): Promise<str
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    // Require auth (cookie, header, or query per requireAuth helper)
-    const user = await requireAuth(request, 'extract-chat')
+      const safeContext = (context || '').slice(0, 8000)
+      const prompt = `You are a helpful research assistant for document extraction and Q&A.
+Answer strictly using the provided document context. If the answer is not in the context, say you do not know.
+Be concise, factual, and avoid speculation. Use markdown lists or tables when helpful.
+Preserve equations, units, and citations as-is if present. Do not fabricate references.
 
-    const body = await request.json().catch(() => ({} as any))
-    const message: string = (body?.message || '').toString()
-    const context: string = (body?.context || '').toString()
+${safeContext ? `Document Context (truncated):\n${safeContext}` : 'Document Context: (none provided)'}
 
-    if (!message || !message.trim()) {
-      return NextResponse.json({ success: false, error: 'Message is required' }, { status: 400 })
-    }
+User Question: ${message.trim()}`
 
     // Check if Groq API key is configured
     const groqApiKey = process.env.GROQ_API_KEY
@@ -95,4 +92,4 @@ export async function POST(request: NextRequest) {
     console.error('[Extract Chat] Error:', msg)
     return NextResponse.json({ success: false, error: msg }, { status: msg.toLowerCase().includes('auth') ? 401 : 500 })
   }
-}
+)

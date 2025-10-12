@@ -16,9 +16,9 @@ export class AIProviderDetector {
     const providers: ProviderAvailability[] = [
       {
         provider: "groq",
-        available: !!process.env.GROQ_API_KEY?.trim(),
-        envKey: "GROQ_API_KEY",
-        priority: 1, // Fast and reliable
+        available: !!(process.env.GROQ_API_KEY?.trim() || process.env.NOVA_API_KEY?.trim()),
+        envKey: "GROQ_API_KEY or NOVA_API_KEY",
+        priority: 1, // Fast and reliable (Nova alias supported)
       },
       {
         provider: "openai",

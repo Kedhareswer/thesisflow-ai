@@ -110,7 +110,7 @@ class EnhancedAIService {
         return []
       }
       const keys: UserApiKey[] = []
-      const groq = process.env.GROQ_API_KEY
+      const groq = process.env.GROQ_API_KEY || process.env.NOVA_API_KEY // Nova alias for Groq
       const openai = process.env.OPENAI_API_KEY
       const anthropic = process.env.ANTHROPIC_API_KEY
       const gemini = process.env.GEMINI_API_KEY
