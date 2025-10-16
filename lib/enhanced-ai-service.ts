@@ -282,7 +282,8 @@ READING_TIME: [reading minutes]`
   async generateResearchIdeas(
     topic: string,
     context = "",
-    count = 5
+    count = 5,
+    researchLevel: "undergraduate" | "masters" | "phd" | "postdoc" = "masters"
   ): Promise<{
     ideas: Array<{
       title: string
@@ -291,23 +292,51 @@ READING_TIME: [reading minutes]`
       methodology: string
       impact: string
       challenges: string
+      research_plan: string[]
+      key_considerations: string[]
+      timeline: string
+      required_expertise: string[]
+      novelty_score: string
     }>
     context: string
     references: string[]
   }> {
-    const prompt = `Generate ${count} innovative research ideas for the topic: "${topic}"${
-      context ? `\n\nContext: ${context}` : ""
+    // Define sophistication based on research level
+    const levelGuidance = {
+      undergraduate: "Focus on foundational research, literature reviews, and exploratory studies. Emphasize learning and skill development.",
+      masters: "Focus on applied research with moderate novelty. Include empirical studies, methodological innovations, or comprehensive analyses.",
+      phd: "Focus on highly novel, original research that advances the field. Include cutting-edge methodologies, theoretical contributions, and significant empirical work.",
+      postdoc: "Focus on groundbreaking research with transformative potential. Include interdisciplinary approaches, paradigm-shifting ideas, and field-defining contributions."
     }
 
-For each idea, provide:
-1. Title (concise, descriptive)
-2. Description (2-3 sentences)
-3. Research Question (specific, answerable)
-4. Methodology (brief approach)
-5. Impact (potential contributions)
-6. Challenges (anticipated obstacles)
+    const prompt = `You are a research advisor helping to generate ${count} UNIQUE and SOPHISTICATED research ideas for the topic: "${topic}"${
+      context ? `\n\nAdditional Context: ${context}` : ""
+    }
 
-Format as JSON:
+Research Level: ${researchLevel.toUpperCase()}
+Guidance: ${levelGuidance[researchLevel]}
+
+CRITICAL REQUIREMENTS:
+1. Each idea MUST be substantially different from others - no repetitive variations
+2. Focus on NOVELTY and INNOVATION - avoid obvious or conventional approaches
+3. Consider interdisciplinary perspectives and emerging trends
+4. Ensure ideas are feasible but ambitious for the specified research level
+5. Provide specific, actionable details - no vague generalities
+
+For EACH idea, provide:
+- title: Compelling, specific title (not generic)
+- description: 3-4 sentences explaining the core concept and its uniqueness
+- research_question: Precise, answerable research question
+- methodology: Detailed approach including methods, data sources, analysis techniques
+- impact: Specific contributions to theory, practice, or policy
+- challenges: Realistic obstacles with potential mitigation strategies
+- research_plan: Array of 4-5 specific, sequential steps (not generic)
+- key_considerations: Array of 4-5 specific practical considerations (resources, ethics, collaboration, timeline factors)
+- timeline: Realistic timeframe (e.g., "12-18 months" or "2-3 years")
+- required_expertise: Array of specific skills/knowledge needed
+- novelty_score: Rate as "Incremental", "Moderate", "High", or "Transformative"
+
+OUTPUT ONLY VALID JSON (no markdown, no code blocks):
 {
   "ideas": [
     {
@@ -316,16 +345,21 @@ Format as JSON:
       "research_question": "...",
       "methodology": "...",
       "impact": "...",
-      "challenges": "..."
+      "challenges": "...",
+      "research_plan": ["Step 1", "Step 2", "Step 3", "Step 4"],
+      "key_considerations": ["Consideration 1", "Consideration 2", "Consideration 3", "Consideration 4"],
+      "timeline": "...",
+      "required_expertise": ["Skill 1", "Skill 2", "Skill 3"],
+      "novelty_score": "..."
     }
   ],
-  "context": "Brief analysis of the research landscape",
-  "references": ["Suggested reference area 1", "Suggested reference area 2"]
+  "context": "Brief analysis of current research gaps and opportunities in this area",
+  "references": ["Specific reference area 1", "Specific reference area 2", "Specific reference area 3"]
 }`
 
     const result = await this.generateText({
       prompt,
-      maxTokens: Math.min(2000, 300 * count),
+      maxTokens: Math.min(4000, 600 * count), // Increased for richer content
       temperature: 0.8,
     })
 
@@ -334,12 +368,29 @@ Format as JSON:
     }
 
     try {
+      // Clean up the response to extract JSON
+      let jsonContent = result.content.trim()
+
+      // Remove markdown code blocks if present
+      if (jsonContent.includes('```json')) {
+        jsonContent = jsonContent.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+      } else if (jsonContent.includes('```')) {
+        jsonContent = jsonContent.replace(/```\s*/g, '')
+      }
+
+      // Try to find JSON object in the content
+      const jsonMatch = jsonContent.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        jsonContent = jsonMatch[0]
+      }
+
       // Try to parse as JSON
-      const parsed = JSON.parse(result.content)
+      const parsed = JSON.parse(jsonContent)
       return parsed
     } catch (error) {
       // Fallback: parse text format
-      console.warn("Failed to parse JSON, using fallback parser")
+      console.warn("Failed to parse JSON, using fallback parser", error)
+      console.log("Raw content:", result.content)
       return this.parseIdeasFallback(result.content, topic, count)
     }
   }
@@ -356,6 +407,11 @@ Format as JSON:
       methodology: string
       impact: string
       challenges: string
+      research_plan: string[]
+      key_considerations: string[]
+      timeline: string
+      required_expertise: string[]
+      novelty_score: string
     }>
     context: string
     references: string[]
@@ -371,7 +427,12 @@ Format as JSON:
         research_question: `How can we advance understanding of ${topic}?`,
         methodology: "Mixed methods approach with literature review and empirical analysis",
         impact: "Potential to contribute to academic knowledge and practical applications",
-        challenges: "Data availability and methodological constraints"
+        challenges: "Data availability and methodological constraints",
+        research_plan: ["Literature review", "Methodology design", "Data collection", "Analysis and findings"],
+        key_considerations: ["Resource availability", "Ethical considerations", "Timeline feasibility", "Expertise requirements"],
+        timeline: "12-18 months",
+        required_expertise: ["Research methodology", "Domain knowledge", "Data analysis"],
+        novelty_score: "Moderate"
       })
     }
 

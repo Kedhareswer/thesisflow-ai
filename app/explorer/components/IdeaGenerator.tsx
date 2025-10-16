@@ -24,9 +24,10 @@ class IdeaGenerationService {
     topic: string,
     context = "",
     count = 5,
+    researchLevel: "undergraduate" | "masters" | "phd" | "postdoc" = "masters"
   ): Promise<{
     content: string
-    ideas: string[]
+    ideas: any[] // Full idea objects
     topic: string
     context: string
     count: number
@@ -43,6 +44,7 @@ class IdeaGenerationService {
           topic,
           context,
           count,
+          researchLevel,
         }),
       })
 
@@ -59,15 +61,14 @@ class IdeaGenerationService {
 
       const ideaObjects = researchResults.ideas
 
-      // Convert idea objects to strings
-      const ideas = ideaObjects.map((idea: any, index: number) => `${index + 1}. ${idea.title}\n${idea.description}`)
-
       // Format the ideas nicely for display
-      const formattedIdeas = ideas.join("\n\n")
+      const formattedIdeas = ideaObjects.map((idea: any, index: number) =>
+        `${index + 1}. ${idea.title}\n${idea.description}`
+      ).join("\n\n")
 
       return {
         content: formattedIdeas,
-        ideas,
+        ideas: ideaObjects, // Return full objects instead of strings
         topic,
         context,
         count,
@@ -96,6 +97,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const [ideaTopic, setIdeaTopic] = useState(() => currentTopic || "")
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
+  const [researchLevel, setResearchLevel] = useState<"undergraduate" | "masters" | "phd" | "postdoc">("masters")
   const [useSessionContext, setUseSessionContext] = useState(hasContext)
   // Removed provider/model state - using Nova AI exclusively
   
@@ -114,7 +116,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   
   const [ideaGenerationData, setIdeaGenerationData] = useState<{
     content: string
-    ideas: string[]
+    ideas: any[]
     topic: string
     context: string
     count: number
@@ -161,7 +163,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           `${ideaContext}\n\nResearch Session Context:\n${buildContext()}` : 
           ideaContext
 
-        const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount)
+        const generatedData = await IdeaGenerationService.generateIdeas(ideaTopic, enhancedContext, ideaCount, researchLevel)
         setIdeaGenerationData(generatedData)
         
         // Auto-select all ideas by default
@@ -185,7 +187,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
         setIdeaGenerationLoading(false)
       }
     }, 500) // 500ms debounce
-  }, [ideaTopic, ideaContext, ideaCount, useSessionContext, buildContext])
+  }, [ideaTopic, ideaContext, ideaCount, researchLevel, useSessionContext, buildContext])
 
   // Handle idea selection
   const handleIdeaSelection = (index: number, selected: boolean) => {
@@ -224,26 +226,23 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
     }
 
     const ideasToSave = Array.from(selectedGeneratedIdeas).map(index => {
-      const ideaText = ideaGenerationData.ideas[index]
-      const lines = ideaText.split('\n')
-      const title = lines[0].replace(/^\d+\.\s*/, '').trim()
-      const description = lines.slice(1).join('\n').trim() || title
-      
+      const idea = ideaGenerationData.ideas[index]
+
       return {
-        title,
-        description,
+        title: idea.title,
+        description: idea.description,
         topic: ideaTopic,
         source: 'generated' as const
       }
     })
-    
+
     addIdeas(ideasToSave)
-    
+
     toast({
       title: "Ideas Saved",
       description: `Saved ${ideasToSave.length} selected ideas to your research session.`,
     })
-    
+
     // Clear the current generation data after saving
     setIdeaGenerationData(null)
     setSelectedGeneratedIdeas(new Set())
@@ -322,6 +321,30 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                   placeholder="e.g., diagnostics, drug discovery, ethics"
                   className="w-full bg-gray-50 border-gray-200 focus:border-primary focus:ring-primary"
                 />
+              </div>
+
+              {/* Research Level */}
+              <div className="space-y-2">
+                <Label htmlFor="research-level" className="text-sm font-medium text-gray-900">
+                  Research Level
+                </Label>
+                <Select value={researchLevel} onValueChange={(value: any) => setResearchLevel(value)}>
+                  <SelectTrigger id="research-level" className="w-full bg-gray-50 border-gray-200">
+                    <SelectValue placeholder="Select research level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="undergraduate">Undergraduate (B.Tech/B.Sc)</SelectItem>
+                    <SelectItem value="masters">Masters (M.Tech/M.Sc)</SelectItem>
+                    <SelectItem value="phd">PhD/Research Level</SelectItem>
+                    <SelectItem value="postdoc">Postdoc/Innovation Level</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  {researchLevel === "undergraduate" && "Foundational research with learning focus"}
+                  {researchLevel === "masters" && "Applied research with moderate novelty"}
+                  {researchLevel === "phd" && "Highly novel, field-advancing research"}
+                  {researchLevel === "postdoc" && "Groundbreaking, transformative research"}
+                </p>
               </div>
 
               {/* Session Context Checkbox */}
@@ -436,10 +459,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           {/* Generated Ideas Cards */}
           {ideaGenerationData ? (
             <div className="space-y-3">
-              {ideaGenerationData.ideas.map((idea: string, index: number) => {
-                const lines = idea.split('\n')
-                const title = lines[0].replace(/^\d+\.\s*/, '').trim()
-                const description = lines.slice(1).join('\n').trim()
+              {ideaGenerationData.ideas.map((idea: any, index: number) => {
                 const isSelected = selectedGeneratedIdeas.has(index)
                 const isExpanded = expandedIdea === index
 
@@ -462,7 +482,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                         <div className="flex-1 space-y-2">
                           <div className="flex items-start justify-between gap-2">
                             <h4 className="font-semibold text-gray-900 leading-snug flex-1">
-                              {title}
+                              {idea.title}
                             </h4>
                             <button
                               onClick={() => setExpandedIdea(isExpanded ? null : index)}
@@ -480,7 +500,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                           {/* Collapsed view - truncated description */}
                           {!isExpanded && (
                             <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
-                              {description || title}
+                              {idea.description}
                             </p>
                           )}
 
@@ -490,41 +510,74 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                               <div>
                                 <h5 className="text-xs font-semibold text-gray-900 mb-2">Description</h5>
                                 <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                  {description || title}
+                                  {idea.description}
                                 </p>
                               </div>
 
-                              <div>
-                                <h5 className="text-xs font-semibold text-gray-900 mb-2">Research Plan</h5>
-                                <div className="space-y-2 text-sm text-gray-700">
-                                  <div className="flex items-start gap-2">
-                                    <span className="text-primary font-medium">1.</span>
-                                    <span>Literature review on {ideaTopic}</span>
-                                  </div>
-                                  <div className="flex items-start gap-2">
-                                    <span className="text-primary font-medium">2.</span>
-                                    <span>Define research methodology and data collection approach</span>
-                                  </div>
-                                  <div className="flex items-start gap-2">
-                                    <span className="text-primary font-medium">3.</span>
-                                    <span>Conduct experiments and analysis</span>
-                                  </div>
-                                  <div className="flex items-start gap-2">
-                                    <span className="text-primary font-medium">4.</span>
-                                    <span>Document findings and prepare manuscript</span>
+                              {idea.research_question && (
+                                <div>
+                                  <h5 className="text-xs font-semibold text-gray-900 mb-2">Research Question</h5>
+                                  <p className="text-sm text-gray-700 leading-relaxed">
+                                    {idea.research_question}
+                                  </p>
+                                </div>
+                              )}
+
+                              {idea.methodology && (
+                                <div>
+                                  <h5 className="text-xs font-semibold text-gray-900 mb-2">Methodology</h5>
+                                  <p className="text-sm text-gray-700 leading-relaxed">
+                                    {idea.methodology}
+                                  </p>
+                                </div>
+                              )}
+
+                              {idea.research_plan && idea.research_plan.length > 0 && (
+                                <div>
+                                  <h5 className="text-xs font-semibold text-gray-900 mb-2">Research Plan</h5>
+                                  <div className="space-y-2 text-sm text-gray-700">
+                                    {idea.research_plan.map((step: string, stepIndex: number) => (
+                                      <div key={stepIndex} className="flex items-start gap-2">
+                                        <span className="text-primary font-medium">{stepIndex + 1}.</span>
+                                        <span>{step}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
-                              </div>
+                              )}
 
-                              <div>
-                                <h5 className="text-xs font-semibold text-gray-900 mb-2">Key Considerations</h5>
-                                <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                                  <li>Feasibility and available resources</li>
-                                  <li>Timeline: 6-12 months estimated</li>
-                                  <li>Required expertise and collaboration needs</li>
-                                  <li>Potential impact and novelty</li>
-                                </ul>
-                              </div>
+                              {idea.key_considerations && idea.key_considerations.length > 0 && (
+                                <div>
+                                  <h5 className="text-xs font-semibold text-gray-900 mb-2">Key Considerations</h5>
+                                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                    {idea.key_considerations.map((consideration: string, consIndex: number) => (
+                                      <li key={consIndex}>{consideration}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {(idea.timeline || idea.novelty_score) && (
+                                <div className="flex flex-wrap gap-3 text-xs">
+                                  {idea.timeline && (
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 rounded">
+                                      <Calendar className="h-3 w-3 text-blue-600" />
+                                      <span className="text-blue-700">{idea.timeline}</span>
+                                    </div>
+                                  )}
+                                  {idea.novelty_score && (
+                                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded ${
+                                      idea.novelty_score === "Transformative" ? "bg-purple-50 text-purple-700" :
+                                      idea.novelty_score === "High" ? "bg-green-50 text-green-700" :
+                                      idea.novelty_score === "Moderate" ? "bg-yellow-50 text-yellow-700" :
+                                      "bg-gray-50 text-gray-700"
+                                    }`}>
+                                      <TrendingUp className="h-3 w-3" />
+                                      <span>{idea.novelty_score} Novelty</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Action Buttons */}
                               <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-200">
@@ -567,6 +620,16 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
                                 {ideaTopic.split(' ')[0] || 'Research'}
                               </span>
+                              {idea.novelty_score && (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
+                                  idea.novelty_score === "Transformative" ? "bg-purple-100 text-purple-700" :
+                                  idea.novelty_score === "High" ? "bg-green-100 text-green-700" :
+                                  idea.novelty_score === "Moderate" ? "bg-yellow-100 text-yellow-700" :
+                                  "bg-gray-100 text-gray-700"
+                                }`}>
+                                  {idea.novelty_score}
+                                </span>
+                              )}
                               <span className="text-xs text-gray-500 flex items-center gap-1">
                                 Click <ChevronDown className="inline h-3 w-3" /> for details
                               </span>

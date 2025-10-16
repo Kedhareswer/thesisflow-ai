@@ -3,7 +3,7 @@ import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
 export async function POST(request: NextRequest) {
   try {
-    const { topic, context, count } = await request.json()
+    const { topic, context, count, researchLevel } = await request.json()
 
     if (!topic) {
       return NextResponse.json(
@@ -12,12 +12,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('Idea generation request received:', { topic, context, count })
+    console.log('Idea generation request received:', { topic, context, count, researchLevel })
 
     const result = await enhancedAIService.generateResearchIdeas(
       topic,
       context || '',
-      count || 5
+      count || 5,
+      researchLevel || 'masters'
     )
 
     return NextResponse.json({

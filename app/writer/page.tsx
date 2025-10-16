@@ -992,13 +992,10 @@ export default function WriterPage() {
                           <Card>
                             <CardContent className="p-4">
                               <AiWritingAssistant
-                                selectedProvider={selectedProvider || "groq"}
-                                selectedModel={selectedModel || "llama-3.3-70b-versatile"}
                                 onInsertText={(text) => setDocumentContent((prev) => prev + text)}
                                 documentTemplate={selectedTemplate}
                                 currentDocumentContent={documentContent}
                                 isAuthenticated={isAuthenticated}
-                                onProviderChange={setSelectedProvider}
                                 onModelChange={setSelectedModel}
                               />
                             </CardContent>
