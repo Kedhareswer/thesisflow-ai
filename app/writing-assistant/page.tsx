@@ -18,7 +18,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PenTool, CheckCircle, Lightbulb, BarChart, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { enhancedAIService } from "@/lib/enhanced-ai-service"
 import { supabase } from "@/integrations/supabase/client"
-import { useUserAI } from "@/hooks/use-user-ai"
 
 // Tiptap Editor MenuBar (basic formatting)
 function MenuBar({ editor }: { editor: any }) {
@@ -99,7 +98,67 @@ export default function WritingAssistantPage() {
   const [shareOpen, setShareOpen] = React.useState(false);
   const { socket, activeUsers } = useSocket();
   const { toast } = useToast();
-  const { improveWriting } = useUserAI();
+
+  // Inline improveWriting function using enhancedAIService
+  const improveWriting = async (text: string, task: string): Promise<WritingResult> => {
+    const taskDescriptions = {
+      grammar: "Fix grammar, spelling, and punctuation errors",
+      clarity: "Improve clarity, readability, and flow",
+      academic: "Enhance for academic writing style",
+      creative: "Boost creativity and expressiveness",
+      professional: "Polish for professional communication"
+    };
+
+    const prompt = `You are a professional writing assistant. ${taskDescriptions[task as keyof typeof taskDescriptions] || "Improve the following text"}.
+
+Original text:
+${text}
+
+Provide your response in the following JSON format:
+{
+  "improvedText": "[improved version of the text]",
+  "suggestions": [
+    {
+      "type": "grammar|clarity|style",
+      "original": "[original phrase]",
+      "improved": "[improved phrase]",
+      "reason": "[brief explanation]"
+    }
+  ],
+  "metrics": {
+    "readability": 75,
+    "sentiment": "neutral|positive|negative",
+    "wordCount": ${text.split(/\s+/).length}
+  }
+}`;
+
+    const result = await enhancedAIService.generateText({
+      prompt,
+      maxTokens: 2000,
+      temperature: 0.7
+    });
+
+    if (!result.success || !result.content) {
+      throw new Error(result.error || "Failed to improve text");
+    }
+
+    try {
+      // Try to parse as JSON
+      const parsed = JSON.parse(result.content);
+      return parsed;
+    } catch {
+      // Fallback if not valid JSON
+      return {
+        improvedText: result.content,
+        suggestions: [],
+        metrics: {
+          readability: 70,
+          sentiment: "neutral",
+          wordCount: text.split(/\s+/).length
+        }
+      };
+    }
+  };
 
   // Handle invite from ShareModal
   const handleShareInvite = (email: string, permission: "viewer" | "editor") => {
