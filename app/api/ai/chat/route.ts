@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
         name: user.email || 'User',
         email: user.email || '',
         avatar: '',
-        color: '#0055ff'
+        color: '#0055ff',
+        status: 'online' as const
       },
       mentionedUsers: [],
       actionType: 'general' as const

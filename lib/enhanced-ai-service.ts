@@ -21,6 +21,17 @@ export interface GenerateTextResult {
   }
 }
 
+export interface GenerateTextStreamOptions {
+  prompt: string
+  maxTokens?: number
+  temperature?: number
+  userId?: string
+  onToken?: (token: string) => void
+  onProgress?: (progress: { message?: string; percentage?: number }) => void
+  onError?: (error: string) => void
+  abortSignal?: AbortSignal
+}
+
 class EnhancedAIService {
   /**
    * Generate text using server-side configured API key
@@ -104,6 +115,66 @@ class EnhancedAIService {
         completionTokens: data.usage?.completion_tokens,
         totalTokens: data.usage?.total_tokens,
       },
+    }
+  }
+
+  /**
+   * Generate text with streaming support
+   * Simulates streaming by chunking the response
+   */
+  async generateTextStream(options: GenerateTextStreamOptions): Promise<void> {
+    try {
+      console.log("Enhanced AI Service: Starting streaming text generation...")
+
+      // Send initial progress
+      options.onProgress?.({ message: "Initializing AI model...", percentage: 10 })
+
+      const result = await this.generateText({
+        prompt: options.prompt,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        userId: options.userId
+      })
+
+      if (!result.success || !result.content) {
+        options.onError?.(result.error || "Failed to generate content")
+        return
+      }
+
+      // Simulate streaming by chunking the content
+      const content = result.content
+      const words = content.split(/(\s+)/)
+      const chunkSize = 3 // Stream 3 words at a time for smoother effect
+
+      options.onProgress?.({ message: "Generating response...", percentage: 30 })
+
+      for (let i = 0; i < words.length; i += chunkSize) {
+        // Check abort signal
+        if (options.abortSignal?.aborted) {
+          console.log("Enhanced AI Service: Stream aborted by client")
+          return
+        }
+
+        const chunk = words.slice(i, i + chunkSize).join('')
+        options.onToken?.(chunk)
+
+        // Send progress updates
+        const percentage = 30 + Math.floor((i / words.length) * 60)
+        if (i % 10 === 0) {
+          options.onProgress?.({ percentage })
+        }
+
+        // Small delay to simulate streaming (20ms for fast response)
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+
+      options.onProgress?.({ message: "Complete", percentage: 100 })
+      console.log("Enhanced AI Service: Streaming completed successfully")
+
+    } catch (error) {
+      console.error("Enhanced AI Service: Streaming error:", error)
+      const errorMessage = error instanceof Error ? error.message : "Streaming failed"
+      options.onError?.(errorMessage)
     }
   }
 

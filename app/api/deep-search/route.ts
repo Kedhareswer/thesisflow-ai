@@ -400,8 +400,6 @@ export async function GET(request: NextRequest) {
             const prompt = buildSummaryPrompt(q, top)
             const result = await enhancedAIService.generateText({
               prompt,
-              provider,
-              model,
               maxTokens: 900,
               temperature: 0.3,
               userId: user.id,
