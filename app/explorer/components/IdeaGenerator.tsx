@@ -270,155 +270,150 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
 
   return (
     <div className={className}>
-      {/* Research Context Status */}
-      {hasContext && (
-        <Alert className="mb-4 border-blue-200 bg-blue-50">
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Research Context:</strong> {contextSummary}
-            <br />
-            <span className="text-sm text-blue-600">
-              Context will be automatically included in idea generation to provide more relevant suggestions.
-            </span>
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Nova AI Status */}
-      <div className="mb-4 flex justify-center">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <span>Powered by Nova AI (Llama-3.3-70B)</span>
-        </div>
-      </div>
-      
-      {/* Redesigned Form Card */}
-      <Card className="bg-white shadow-sm border-gray-200">
-        <CardContent className="p-6">
+      {/* Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
+        {/* Left Column - Input Form */}
+        <div className="space-y-4">
           {/* Header */}
-          <div className="mb-6">
+          <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Idea Generation</h2>
-            <p className="text-gray-600 text-sm">Generate innovative research ideas for your topic</p>
+            <p className="text-sm text-gray-600">Unlock novel research directions with AI.</p>
           </div>
 
-          {/* Form Fields */}
-          <div className="space-y-6">
-            {/* Research Topic and Number of Ideas - Side by Side */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <Label htmlFor="research-topic" className="text-sm font-semibold text-gray-900 mb-2 block">
-                  Research Topic
+          {/* Tabs for Navigation */}
+          <div className="flex gap-2 border-b border-gray-200">
+            <button className="pb-2 px-1 text-sm font-medium text-primary border-b-2 border-primary">
+              Generate
+            </button>
+            <button className="pb-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">
+              Saved Ideas
+            </button>
+          </div>
+
+          {/* Form Card */}
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6 space-y-6">
+              {/* Core Topic */}
+              <div className="space-y-2">
+                <Label htmlFor="research-topic" className="text-sm font-medium text-gray-900">
+                  Core Topic
                 </Label>
                 <Input
                   id="research-topic"
                   value={ideaTopic}
                   onChange={(e) => setIdeaTopic(e.target.value)}
-                  placeholder="e.g., Quantum Computing"
-                  className="w-full"
+                  placeholder="e.g., Artificial Intelligence in Healthcare"
+                  className="w-full bg-gray-50 border-gray-200 focus:border-primary focus:ring-primary"
                 />
               </div>
-              <div>
-                <Label htmlFor="idea-count" className="text-sm font-semibold text-gray-900 mb-2 block">
-                  Number of Ideas
+
+              {/* Keywords (Optional) */}
+              <div className="space-y-2">
+                <Label htmlFor="additional-context" className="text-sm font-medium text-gray-900">
+                  Keywords (Optional)
                 </Label>
-                <Select value={ideaCount.toString()} onValueChange={(value) => setIdeaCount(Number(value))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3 Ideas</SelectItem>
-                    <SelectItem value="5">5 Ideas</SelectItem>
-                    <SelectItem value="7">7 Ideas</SelectItem>
-                    <SelectItem value="10">10 Ideas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Additional Context */}
-            <div>
-              <Label htmlFor="additional-context" className="text-sm font-semibold text-gray-900 mb-2 block">
-                Additional Context (Optional)
-              </Label>
-              <Textarea
-                id="additional-context"
-                value={ideaContext}
-                onChange={(e) => setIdeaContext(e.target.value)}
-                placeholder="Provide any additional context, constraints, or focus areas..."
-                className="w-full resize-none"
-                rows={4}
-              />
-            </div>
-
-            {/* Session Context Checkbox */}
-            {hasContext && (
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="use-session-context"
-                  checked={useSessionContext}
-                  onCheckedChange={(checked) => setUseSessionContext(checked as boolean)}
+                <Input
+                  id="keywords"
+                  value={ideaContext}
+                  onChange={(e) => setIdeaContext(e.target.value)}
+                  placeholder="e.g., diagnostics, drug discovery, ethics"
+                  className="w-full bg-gray-50 border-gray-200 focus:border-primary focus:ring-primary"
                 />
-                <label htmlFor="use-session-context" className="text-sm text-gray-700">
-                  Use research session context for enhanced idea generation
-                </label>
               </div>
-            )}
 
-            {/* Generate Button */}
-            <Button
-              type="button"
-              onClick={handleIdeaGeneration}
-              disabled={ideaGenerationLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
-            >
-              {ideaGenerationLoading ? (
-                <>
-                  <LoadingSpinner className="mr-2" />
-                  Generating Ideas...
-                </>
-              ) : (
-                <>
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  Generate Ideas
-                </>
+              {/* Session Context Checkbox */}
+              {hasContext && (
+                <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-md border border-blue-100">
+                  <Checkbox
+                    id="use-session-context"
+                    checked={useSessionContext}
+                    onCheckedChange={(checked) => setUseSessionContext(checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="use-session-context" className="text-xs text-blue-800 leading-tight">
+                    Use research session context for enhanced idea generation
+                  </label>
+                </div>
               )}
-            </Button>
 
-            {/* Error Display */}
-            {ideaGenerationError && (
-              <div className="text-red-600 text-sm mt-2">
-                {ideaGenerationError.includes("AI provider configuration") ? (
+              {/* Generate Button */}
+              <Button
+                type="button"
+                onClick={handleIdeaGeneration}
+                disabled={ideaGenerationLoading}
+                className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 flex items-center justify-center gap-2"
+              >
+                {ideaGenerationLoading ? (
                   <>
-                    No AI providers are configured. Please add at least one API key in{" "}
-                    <Link href="/settings" className="underline">
-                      Settings
-                    </Link>
-                    .
+                    <LoadingSpinner className="h-4 w-4" />
+                    <span>Generating Ideas</span>
                   </>
                 ) : (
-                  ideaGenerationError
+                  <>
+                    <Lightbulb className="h-4 w-4" />
+                    <span>Generate Ideas</span>
+                  </>
                 )}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              </Button>
 
-      {/* Generated Ideas Display */}
-      {ideaGenerationData && (
-        <Card className="mt-6 bg-white shadow-sm border-gray-200">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Generated Research Ideas
-              </CardTitle>
+              {/* Error Display */}
+              {ideaGenerationError && (
+                <Alert className="border-red-200 bg-red-50">
+                  <AlertDescription className="text-sm text-red-800">
+                    {ideaGenerationError.includes("AI provider configuration") ? (
+                      <>
+                        No AI providers are configured. Please add at least one API key in{" "}
+                        <Link href="/settings" className="underline font-medium">
+                          Settings
+                        </Link>
+                        .
+                      </>
+                    ) : (
+                      ideaGenerationError
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Research Context Status */}
+          {hasContext && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                <strong className="text-blue-900">Research Context Active:</strong>
+                <br />
+                <span className="text-blue-700">{contextSummary}</span>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Nova AI Status */}
+          <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span>Powered by Nova AI (Llama-3.3-70B)</span>
+          </div>
+        </div>
+
+        {/* Right Column - Generated Ideas */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Generated Ideas
+              {ideaGenerationData && (
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  Showing {ideaGenerationData.ideas.length} ideas
+                </span>
+              )}
+            </h3>
+            {ideaGenerationData && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleSelectAll}
-                  className="text-xs"
+                  className="text-xs h-8"
                 >
                   {selectedGeneratedIdeas.size === ideaGenerationData.ideas.length ? 'Deselect All' : 'Select All'}
                 </Button>
@@ -426,67 +421,100 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                   onClick={handleSaveSelectedIdeas}
                   disabled={selectedGeneratedIdeas.size === 0}
                   size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-green-600 hover:bg-green-700 text-white text-xs h-8"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-3 w-3 mr-1.5" />
                   Save Selected ({selectedGeneratedIdeas.size})
                 </Button>
               </div>
-            </div>
-            <CardDescription>
-              Select the ideas you want to save to your research session. All ideas are selected by default.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="prose max-w-none">
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="space-y-4">
-                  {ideaGenerationData.ideas.map((idea: string, index: number) => {
-                    const lines = idea.split('\n')
-                    const title = lines[0].replace(/^\d+\.\s*/, '').trim()
-                    const description = lines.slice(1).join('\n').trim()
-                    const isSelected = selectedGeneratedIdeas.has(index)
-                    
-                    return (
-                      <div key={index} className={`border-l-4 pl-4 py-3 rounded-r-md transition-colors ${
-                        isSelected ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-gray-50'
-                      }`}>
-                        <div className="flex items-start gap-3">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => handleIdeaSelection(index, checked as boolean)}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <h4 className={`font-semibold mb-2 ${
-                              isSelected ? 'text-green-800' : 'text-gray-900'
-                            }`}>
-                              {index + 1}. {title}
-                            </h4>
-                            <p className={`text-sm leading-relaxed ${
-                              isSelected ? 'text-green-700' : 'text-gray-700'
-                            }`}>
-                              {description || title}
-                            </p>
+            )}
+          </div>
+
+          {/* Generated Ideas Cards */}
+          {ideaGenerationData ? (
+            <div className="space-y-3">
+              {ideaGenerationData.ideas.map((idea: string, index: number) => {
+                const lines = idea.split('\n')
+                const title = lines[0].replace(/^\d+\.\s*/, '').trim()
+                const description = lines.slice(1).join('\n').trim()
+                const isSelected = selectedGeneratedIdeas.has(index)
+
+                return (
+                  <Card
+                    key={index}
+                    className={`transition-all duration-200 ${
+                      isSelected
+                        ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleIdeaSelection(index, checked as boolean)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 space-y-2">
+                          <h4 className="font-semibold text-gray-900 leading-snug">
+                            {title}
+                          </h4>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {description || title}
+                          </p>
+
+                          {/* Tags - Example based on your reference image */}
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {/* You can dynamically generate these based on topic/context */}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                              {ideaTopic.split(' ')[0] || 'Research'}
+                            </span>
                           </div>
                         </div>
+                        <button
+                          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                          aria-label="Bookmark idea"
+                        >
+                          <svg
+                            className="w-4 h-4 text-gray-400 hover:text-gray-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                            />
+                          </svg>
+                        </button>
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <Card className="border-dashed border-2 border-gray-200 bg-gray-50/50">
+              <CardContent className="p-12 text-center">
+                <Lightbulb className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p className="text-sm text-gray-500 mb-2">No ideas generated yet</p>
+                <p className="text-xs text-gray-400">Enter a topic and click "Generate Ideas" to get started</p>
+              </CardContent>
+            </Card>
+          )}
 
-      {ideaGenerationError && (
-        <Card className="border-red-200 mt-6">
-          <CardContent className="pt-6">
-            <p className="text-red-600">{ideaGenerationError}</p>
-          </CardContent>
-        </Card>
-      )}
+          {ideaGenerationError && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertDescription className="text-sm text-red-800">
+                {ideaGenerationError}
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
