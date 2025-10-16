@@ -53,6 +53,8 @@ import { CommandPalette, useCommandPalette } from "./components/command-palette"
 import { VersionHistory, DocumentVersion } from "./components/version-history"
 import { CollaborativePresence, CollaboratorUser } from "./components/collaborative-presence"
 import { PreviewRenderer } from "./components/preview-renderer"
+import { FloatingToolbar } from "./components/floating-toolbar"
+import { EditorContextMenu } from "./components/editor-context-menu"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -797,6 +799,132 @@ export default function WriterPage() {
     // In production, open a diff view modal
   }
 
+  // Floating toolbar formatting handler
+  const handleFloatingToolbarFormat = (format: string) => {
+    // Handle text formatting from floating toolbar
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed) return
+
+    const selectedText = selection.toString()
+    if (!selectedText) return
+
+    let formattedText = selectedText
+    switch (format) {
+      case "bold":
+        formattedText = `**${selectedText}**`
+        break
+      case "italic":
+        formattedText = `*${selectedText}*`
+        break
+      case "underline":
+        formattedText = `<u>${selectedText}</u>`
+        break
+      case "highlight":
+        formattedText = `<mark>${selectedText}</mark>`
+        break
+      case "heading1":
+        formattedText = `# ${selectedText}`
+        break
+      case "heading2":
+        formattedText = `## ${selectedText}`
+        break
+      case "heading3":
+        formattedText = `### ${selectedText}`
+        break
+      case "bulletList":
+        formattedText = `- ${selectedText}`
+        break
+      case "numberedList":
+        formattedText = `1. ${selectedText}`
+        break
+      case "code":
+        formattedText = `\`\`\`\n${selectedText}\n\`\`\``
+        break
+      case "quote":
+        formattedText = `> ${selectedText}`
+        break
+      case "link":
+        formattedText = `[${selectedText}](url)`
+        break
+      default:
+        return
+    }
+
+    // Find and replace the selected text in the document content
+    const newContent = documentContent.replace(selectedText, formattedText)
+    setDocumentContent(newContent)
+
+    toast({
+      title: "Formatting Applied",
+      description: `Applied ${format} formatting`,
+    })
+  }
+
+  // Context menu handlers
+  const handleContextMenuCopy = () => {
+    try {
+      navigator.clipboard.writeText(window.getSelection()?.toString() || "")
+      toast({ title: "Copied", description: "Text copied to clipboard" })
+    } catch (err) {
+      toast({ title: "Copy failed", description: "Failed to copy text", variant: "destructive" })
+    }
+  }
+
+  const handleContextMenuCut = () => {
+    try {
+      const selectedText = window.getSelection()?.toString() || ""
+      navigator.clipboard.writeText(selectedText)
+      if (selectedText) {
+        const newContent = documentContent.replace(selectedText, "")
+        setDocumentContent(newContent)
+      }
+      toast({ title: "Cut", description: "Text cut to clipboard" })
+    } catch (err) {
+      toast({ title: "Cut failed", description: "Failed to cut text", variant: "destructive" })
+    }
+  }
+
+  const handleContextMenuPaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed) {
+        const selectedText = selection.toString()
+        const newContent = documentContent.replace(selectedText, text)
+        setDocumentContent(newContent)
+      } else {
+        setDocumentContent(documentContent + text)
+      }
+      toast({ title: "Pasted", description: "Text pasted from clipboard" })
+    } catch (err) {
+      toast({ title: "Paste failed", description: "Failed to paste text", variant: "destructive" })
+    }
+  }
+
+  const handleContextMenuAiAssist = (action: string) => {
+    toast({
+      title: "AI Assistant",
+      description: `${action} action triggered`,
+    })
+    // In production, integrate with AI writing assistant
+  }
+
+  const handleContextMenuTranslate = (language: string) => {
+    toast({
+      title: "Translate",
+      description: `Translating to ${language}`,
+    })
+    // In production, integrate with translation service
+  }
+
+  const handleContextMenuSearch = (text: string) => {
+    toast({
+      title: "Search",
+      description: `Searching for "${text}"`,
+    })
+    // In production, open search dialog
+  }
+
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
@@ -970,13 +1098,25 @@ export default function WriterPage() {
                         onChange={(e) => setDocumentTitle(e.target.value)}
                       />
 
-                      <LaTeXEditor
-                        value={documentContent}
-                        onChange={setDocumentContent}
-                        className="min-h-[500px] border-none focus-within:ring-0 focus-within:ring-offset-0"
-                        template={selectedTemplate}
-                        onTemplateChange={setSelectedTemplate}
-                      />
+                      <EditorContextMenu
+                        onCopy={handleContextMenuCopy}
+                        onCut={handleContextMenuCut}
+                        onPaste={handleContextMenuPaste}
+                        onAiAssist={handleContextMenuAiAssist}
+                        onTranslate={handleContextMenuTranslate}
+                        onSearch={handleContextMenuSearch}
+                      >
+                        <LaTeXEditor
+                          value={documentContent}
+                          onChange={setDocumentContent}
+                          className="min-h-[500px] border-none focus-within:ring-0 focus-within:ring-offset-0"
+                          template={selectedTemplate}
+                          onTemplateChange={setSelectedTemplate}
+                        />
+                      </EditorContextMenu>
+
+                      {/* Floating Toolbar */}
+                      <FloatingToolbar onFormat={handleFloatingToolbarFormat} />
 
                       <Separator className="my-8" />
 

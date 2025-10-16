@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { IdeasWorkspace } from "./IdeasWorkspace"
 
 // Enhanced research service for idea generation
 class IdeaGenerationService {
@@ -93,14 +94,17 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   const { ideas: sessionIdeas, selectedIdeas, addIdeas, selectIdea } = useResearchIdeas()
   const { hasContext, contextSummary, buildContext, currentTopic } = useResearchContext()
   const { topics } = useResearchTopics()
-  
+
+  // State for active tab
+  const [activeTab, setActiveTab] = useState<"generate" | "saved">("generate")
+
   const [ideaTopic, setIdeaTopic] = useState(() => currentTopic || "")
   const [ideaContext, setIdeaContext] = useState("")
   const [ideaCount, setIdeaCount] = useState(5)
   const [researchLevel, setResearchLevel] = useState<"undergraduate" | "masters" | "phd" | "postdoc">("masters")
   const [useSessionContext, setUseSessionContext] = useState(hasContext)
   // Removed provider/model state - using Nova AI exclusively
-  
+
   // State for tracking selected ideas from current generation
   const [selectedGeneratedIdeas, setSelectedGeneratedIdeas] = useState<Set<number>>(new Set())
 
@@ -272,27 +276,43 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
 
   return (
     <div className={className}>
-      {/* Two-Column Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-[400px_1fr] gap-4 md:gap-6">
-        {/* Left Column - Input Form */}
-        <div className="space-y-4">
-          {/* Header */}
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Research Idea Generation</h2>
-            <p className="text-xs sm:text-sm text-gray-600">Unlock novel research directions with AI.</p>
-          </div>
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Research Idea Generation</h2>
+        <p className="text-xs sm:text-sm text-gray-600">Unlock novel research directions with AI.</p>
+      </div>
 
-          {/* Tabs for Navigation */}
-          <div className="flex gap-2 border-b border-gray-200">
-            <button className="pb-2 px-1 text-sm font-medium text-primary border-b-2 border-primary">
-              Generate
-            </button>
-            <button className="pb-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">
-              Saved Ideas
-            </button>
-          </div>
+      {/* Tabs for Navigation */}
+      <div className="flex gap-2 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab("generate")}
+          className={`pb-2 px-4 text-sm font-medium transition-colors ${
+            activeTab === "generate"
+              ? "text-primary border-b-2 border-primary"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Generate
+        </button>
+        <button
+          onClick={() => setActiveTab("saved")}
+          className={`pb-2 px-4 text-sm font-medium transition-colors ${
+            activeTab === "saved"
+              ? "text-primary border-b-2 border-primary"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Saved Ideas
+        </button>
+      </div>
 
-          {/* Form Card */}
+      {/* Tab Content */}
+      {activeTab === "generate" ? (
+        <>
+          {/* Two-Column Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-[400px_1fr] gap-4 md:gap-6">
+            {/* Left Column - Input Form */}
+            <div className="space-y-4">{/* Form Card */}
           <Card className="bg-white shadow-sm border border-gray-200">
             <CardContent className="p-6 space-y-6">
               {/* Core Topic */}
@@ -661,6 +681,11 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           )}
         </div>
       </div>
+        </>
+      ) : (
+        /* Saved Ideas Tab Content */
+        <IdeasWorkspace />
+      )}
     </div>
   )
 }
