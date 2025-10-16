@@ -8,6 +8,8 @@ export interface GenerateTextOptions {
   maxTokens?: number
   temperature?: number
   userId?: string // Only used for logging/tracking, not for API key lookup
+  provider?: string // AI provider (currently only 'groq' supported)
+  model?: string // Model name (defaults to context-appropriate model)
 }
 
 export interface GenerateTextResult {
@@ -53,7 +55,7 @@ class EnhancedAIService {
       const result = await this.callGroqAPI(
         apiKey,
         options.prompt,
-        "llama-3.3-70b-versatile",
+        options.model || "llama-4-scout-17bx16moe", // Default: Llama 4 Scout for 128K context + synthesis
         options.maxTokens || 1000,
         options.temperature || 0.7
       )

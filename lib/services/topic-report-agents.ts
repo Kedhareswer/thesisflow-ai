@@ -102,17 +102,17 @@ After body, include a "References" section listing the same numbered items.
 Sources:
 ${sourcesText}`
 
-  // Use larger model for synthesis
+  // Use GPT-OSS 120B for advanced synthesis with reasoning capabilities
   try {
     const result = await enhancedAIService.generateText({
       prompt,
       provider: "groq",
-      model: "llama-3.3-70b-versatile",
+      model: "gpt-oss-120b", // Updated: GPT-OSS 120B for frontier-level reasoning and comprehensive report generation
       maxTokens: quality === 'Enhanced' ? 3000 : 2500,
       temperature: 0.3,
       userId
     })
-    
+
     if (result.success && result.content) {
       return result.content
     }

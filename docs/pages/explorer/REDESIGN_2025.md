@@ -97,7 +97,7 @@ className={paperIndex < 3 ? 'sticky' : ''}
 - ✅ **Info Card**: "What is the Research Topic Explorer?" explanation
 - ✅ **Collapsible Context**: Additional Context only shows when not loading/showing results
 - ✅ **Cleaner Form**: Simplified layout with better spacing
-- ✅ **Nova AI Status**: Green indicator showing "Powered by Nova AI (Llama-3.3-70B)"
+- ✅ **Nova AI Status**: Green indicator showing "Powered by Nova AI (Multi-Model)"
 
 **User Benefits:**
 - Better space utilization

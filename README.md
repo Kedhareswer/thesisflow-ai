@@ -163,7 +163,8 @@ graph LR
 <td width="33%">
 
 **AI & External**
-- Nova AI (Llama-3.3-70B via Groq)
+- Nova AI (Multi-model via Groq)
+- 7 Groq models optimized by task
 - Server-side AI processing
 - OpenAlex + arXiv
 - CrossRef + PubMed
@@ -352,7 +353,7 @@ graph TB
 |---------|------------|-------------|
 | **Multi-Source Search** | 11+ APIs orchestration | 1-3s response |
 | **Real-time Streaming** | SSE + WebSocket | <100ms latency |
-| **AI Assistant** | Nova AI (Llama-3.3-70B) | 3-8s generation |
+| **AI Assistant** | Nova AI (Multi-Model) | 0.5-15s (model-dependent) |
 | **Smart Caching** | Supabase + Redis (1hr TTL) | 85%+ hit rate |
 | **Citation Analysis** | OpenAlex graph | Forward/backward links |
 | **Export Formats** | BibTeX, RIS, JSON, CSV | Bulk export |
@@ -522,41 +523,45 @@ graph TB
 
 ### AI Integration
 
-**Simplified Server-Side AI Service**
+**Multi-Model Optimization Architecture**
 
 ```mermaid
 graph TB
     A[AI Requests] --> B[Enhanced AI Service]
     B --> C[Nova AI - Groq]
-    C --> D[Llama-3.3-70B]
-    D --> E[SSE Streaming]
+    C --> D[Model Router]
+    D --> E[7 Specialized Models]
+    E --> F[SSE Streaming]
 
     style B fill:#FF6B2C,color:#fff
     style C fill:#28a745,color:#fff
-    style E fill:#17a2b8,color:#fff
+    style F fill:#17a2b8,color:#fff
 ```
 
 #### Nova AI Architecture
 
-ThesisFlow-AI uses a **simplified single-provider architecture** with Nova AI (Llama-3.3-70B via Groq) for all AI-powered features.
+ThesisFlow-AI uses a **multi-model optimization architecture** with Nova AI powered by **7 specialized Groq models**, each optimized for specific tasks.
 
 **Key Benefits:**
 - ✅ **Zero Configuration** - No user API keys needed
-- ✅ **Consistent Performance** - Single optimized model for academic tasks
+- ✅ **Optimized Performance** - Right model for each task (speed, quality, context)
 - ✅ **Better Security** - API keys managed server-side only
-- ✅ **Simplified Codebase** - No provider fallback complexity
-- ✅ **Research-Optimized** - Tuned specifically for academic workflows
+- ✅ **Cost Efficiency** - 8B models for simple tasks, 120B for complex synthesis
+- ✅ **Research-Optimized** - Academic-focused model selection
 
-#### AI Model Specifications
+#### Multi-Model Strategy
 
-| Feature | Details |
-|---------|---------|
-| **Provider** | Groq Cloud API |
-| **Model** | Llama-3.3-70B-Versatile |
-| **Context Window** | 128K tokens |
-| **Performance** | 500+ tokens/second |
-| **Configuration** | Server-side only (`GROQ_API_KEY`) |
-| **Branding** | "Nova AI" (internal name) |
+| System | Model | Why |
+|--------|-------|-----|
+| **NOVA Chat** | Qwen 3 32B | Thinking mode + efficient dialogue |
+| **Summarization** | Llama 4 Scout (128K) | Extended context for long documents |
+| **Paraphrasing** | Llama 3.1 8B Instant | Ultra-fast with low latency |
+| **Research Ideas** | Llama 4 Scout | Comprehensive analysis + large context |
+| **Report Curator** | Llama 3.1 8B | Fast source ranking |
+| **Report Analyzer** | Llama 3.1 8B | Quick per-source summaries |
+| **Report Synthesizer** | GPT-OSS 120B | Frontier reasoning for complex synthesis |
+
+**Performance Range:** 0.5s (8B fast) to 15s (120B complex)
 
 #### AI-Powered Features
 
@@ -614,22 +619,29 @@ eventSource.addEventListener('done', (event) => {
 
 ### 🤖 Nova AI Architecture
 
-**Single-Provider Design for Academic Excellence**
+**Multi-Model Optimization for Academic Excellence**
 
-ThesisFlow AI uses a **simplified, single-provider architecture** powered exclusively by **Nova AI** (Groq API with Llama-3.3-70B-Versatile). This design eliminates complexity while providing exceptional performance for academic research tasks.
+ThesisFlow AI uses a **multi-model optimization architecture** powered exclusively by **Nova AI** (Groq API with 7 specialized models). This design provides optimal performance, speed, and quality for each type of academic research task.
 
 ```mermaid
 graph TB
     A[User Request] --> B[API Routes Layer]
-    B --> C[NovaAIService Singleton]
+    B --> C[Service Layer]
     C --> D[Groq API]
-    D --> E[Llama-3.3-70B-Versatile]
-    E --> F[Streaming Response]
-    F --> G[Client UI]
+    D --> E[Model Router]
+    E --> F1[Qwen 3 32B]
+    E --> F2[Llama 4 Scout]
+    E --> F3[Llama 3.1 8B]
+    E --> F4[GPT-OSS 120B]
+    F1 --> G[Streaming Response]
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    G --> H[Client UI]
 
     style C fill:#FF6B2C,color:#fff
-    style D fill:#28a745,color:#fff
-    style F fill:#17a2b8,color:#fff
+    style E fill:#28a745,color:#fff
+    style G fill:#17a2b8,color:#fff
 ```
 
 #### Core Components
@@ -762,18 +774,14 @@ const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
 
 For detailed information about Nova AI implementation:
 
-- **📖 Architecture Guide**: [`docs/NOVA_AI_ARCHITECTURE.md`](docs/NOVA_AI_ARCHITECTURE.md)
+- **📖 Architecture Guide**: [`docs/NOVA_AI.md`](docs/NOVA_AI.md)
+  - Multi-model optimization strategy
+  - Model selection decision tree
   - Complete system architecture
   - Usage patterns and examples
   - Security best practices
   - Troubleshooting guide
   - Performance metrics
-
-- **🔧 Fix Summary**: [`docs/NOVA_AI_FIXES.md`](docs/NOVA_AI_FIXES.md)
-  - Detailed fix descriptions
-  - Before/after comparisons
-  - Testing checklist
-  - Deployment notes
 
 #### Performance Benchmarks
 
@@ -1154,7 +1162,7 @@ pnpm build
 
 **🔧 Core Technologies:** Next.js 15 • React 19 • Supabase • TypeScript • TailwindCSS
 
-**🤖 AI Technology:** Groq Cloud API (Nova AI - Llama-3.3-70B) • HuggingFace (AI Detection)
+**🤖 AI Technology:** Groq Cloud API (Nova AI - Multi-Model) • 7 Specialized Groq Models • HuggingFace (AI Detection)
 
 **📚 Academic Sources:** OpenAlex • arXiv • CrossRef • PubMed • Google Scholar (API)
 

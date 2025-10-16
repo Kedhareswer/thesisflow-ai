@@ -27,7 +27,7 @@
 
 ## How it works
 - Client page with `Tabs`. Active tab state and optional initial `query` from URL.
-- Assistant tab uses `ResearchAssistant.tsx`, which streams AI chat via Nova AI service using secure authentication methods.
+- Assistant tab uses `ResearchAssistant.tsx`, which streams AI chat via Nova AI service (multi-model architecture with 7 specialized Groq models) using secure authentication methods.
 - Ideas Generator tab features two sub-tabs: "Generate" for creating new ideas and "Saved Ideas" for managing workspace
 - Authentication uses one of these secure approaches: (1) fetch-based SSE client (ReadableStream + eventsource parser) with Authorization header, (2) HttpOnly, SameSite=strict session cookies, or (3) short-lived one-time SSE tokens minted server-side.
 

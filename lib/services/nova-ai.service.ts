@@ -70,9 +70,9 @@ export class NovaAIService {
           'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "qwen3-32b", // Updated: Qwen 3 32B for thinking mode + efficient dialogue
           max_tokens: 1000,
-          temperature: 0.6,
+          temperature: 0.5, // Adjusted: Slightly lower for balanced reasoning
           top_p: 0.9,
           messages: [
             { role: "system", content: systemPrompt },
@@ -135,9 +135,9 @@ export class NovaAIService {
           'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "qwen3-32b", // Updated: Qwen 3 32B for thinking mode + efficient dialogue
           max_tokens: 1000,
-          temperature: 0.6,
+          temperature: 0.5, // Adjusted: Slightly lower for balanced reasoning
           top_p: 0.9,
           stream: true,
           messages: [
@@ -277,9 +277,9 @@ Focus on:
           'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "qwen3-32b", // Updated: Qwen 3 32B for better suggestion generation
           max_tokens: 200,
-          temperature: 0.8,
+          temperature: 0.7, // Adjusted: Slightly lower for more focused suggestions
           top_p: 0.9,
           messages: [
             {
