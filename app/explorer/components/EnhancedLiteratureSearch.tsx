@@ -631,7 +631,7 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
                     }`}
                     style={{
                       top: paperIndex < 3 ? `${paperIndex * 20}px` : undefined,
-                      zIndex: paperIndex < 3 ? 50 - paperIndex : 1
+                      zIndex: paperIndex < 3 ? paperIndex + 1 : 1
                     }}
                   >
                     <CardContent className="p-4 md:p-6">
