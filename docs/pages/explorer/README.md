@@ -1,7 +1,7 @@
 # Explorer (Research Explorer)
 
 - Source: `app/explorer/page.tsx`
-- Key components: `./components/EnhancedLiteratureSearch`, `./components/TopicExplorer`, `./components/IdeaGenerator`, `./components/ResearchAssistant` (we reviewed `ResearchAssistant.tsx`)
+- Key components: `./components/EnhancedLiteratureSearch`, `./components/TopicExplorer`, `./components/IdeaGenerator`, `./components/ResearchAssistant`, `./components/IdeasWorkspace`
 
 ## What is here
 - Tabbed research workspace: Search, Explore, Ideas, Assistant, Session.
@@ -11,10 +11,25 @@
 ## Why it is used
 - Unified discovery and ideation surface: search papers, generate topics/ideas, and chat with an AI assistant.
 
+## Recent Updates (October 2025)
+
+### Research Assistant Improvements
+- **Fixed personality mode display** - Now shows dynamic personality with icon instead of hardcoded "(Concise mode)"
+- **Upgraded personality selector** - Replaced broken DropdownMenu with functional Select component
+- **Enhanced UX** - Better visual feedback for active personality selection
+- Files updated: `app/explorer/components/ResearchAssistant.tsx:495-503`, `ResearchAssistant.tsx:653-691`
+
+### Ideas Generator Enhancements
+- **Saved Ideas Navigation** - Added functional tab system to switch between "Generate" and "Saved Ideas" views
+- **Ideas Workspace Integration** - Clicking "Saved Ideas" now properly displays the IdeasWorkspace component
+- **Improved State Management** - Added `activeTab` state with proper conditional rendering
+- Files updated: `app/explorer/components/IdeaGenerator.tsx:99`, `IdeaGenerator.tsx:286-307`, `IdeaGenerator.tsx:310-688`
+
 ## How it works
 - Client page with `Tabs`. Active tab state and optional initial `query` from URL.
-- Assistant tab uses `ResearchAssistant.tsx`, which streams AI chat via `AIProviderService.streamChat()` using secure authentication methods.
-- Authentication uses one of these secure approaches: (1) fetch-based SSE client (ReadableStream + eventsource parser) with Authorization header, (2) HttpOnly, SameSite=strict session cookies, or (3) short-lived one-time SSE tokens minted server-side. The middleware bypass for `origin=explorer&feature=assistant` is forwarded safely without exposing tokens in URLs.
+- Assistant tab uses `ResearchAssistant.tsx`, which streams AI chat via Nova AI service using secure authentication methods.
+- Ideas Generator tab features two sub-tabs: "Generate" for creating new ideas and "Saved Ideas" for managing workspace
+- Authentication uses one of these secure approaches: (1) fetch-based SSE client (ReadableStream + eventsource parser) with Authorization header, (2) HttpOnly, SameSite=strict session cookies, or (3) short-lived one-time SSE tokens minted server-side.
 
 ## APIs & Integrations
 - SSE: `app/api/ai/chat/stream/route.ts` (auth via `withTokenValidation('ai_chat', ...)`, SSE events `init`, `token`, `progress`, `done`, `error`, `ping`) with provider fallback.
