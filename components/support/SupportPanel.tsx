@@ -5,13 +5,14 @@ import { MoreVertical, ThumbsUp, ThumbsDown, Send, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { 
-  DropdownMenu, 
+import {
+  DropdownMenu,
   DropdownMenuItem
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { supportEngine, type Message, type ConversationState, type QuickReply } from '@/lib/services/support-engine'
+import changelogData from '@/data/changelog.json'
 
 interface SupportPanelProps {
   onClose: () => void
@@ -31,7 +32,8 @@ function SupportPanel({
     messages: [],
     sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   })
-  const [showBroadcast, setShowBroadcast] = useState(true)
+  const [showBroadcast, setShowBroadcast] = useState(false)
+  const [broadcastMessage, setBroadcastMessage] = useState<{title: string; description: string} | null>(null)
   const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({})
   const [activeForm, setActiveForm] = useState<null | 'ticket' | 'feedback'>(null)
   const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
@@ -58,12 +60,29 @@ function SupportPanel({
   // Initialize conversation and handle prefill
   useEffect(() => {
     initializeConversation()
-    
+
     if (prefillMessage) {
       setInputValue(prefillMessage)
       onClearPrefill?.()
       // Auto-focus input after a short delay
       setTimeout(() => inputRef.current?.focus(), 100)
+    }
+
+    // Load latest changelog entry for broadcast
+    try {
+      const latestRelease = changelogData[0]
+      if (latestRelease) {
+        const dismissedVersion = localStorage.getItem('support:dismissed-broadcast-version')
+        if (dismissedVersion !== latestRelease.version) {
+          setBroadcastMessage({
+            title: `${latestRelease.version} - ${latestRelease.title}`,
+            description: latestRelease.description
+          })
+          setShowBroadcast(true)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load changelog for broadcast:', error)
     }
   }, [prefillMessage, onClearPrefill])
 
@@ -521,17 +540,28 @@ function SupportPanel({
       </div>
 
       {/* Broadcast Banner */}
-      {showBroadcast && (
+      {showBroadcast && broadcastMessage && (
         <div className="p-3 bg-blue-50 border-b border-blue-200 text-sm">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <div className="font-medium text-blue-900">🚀 New release v2.02 shipped</div>
-              <div className="text-blue-700">Enhanced Research Assistant with better context understanding</div>
+              <div className="font-medium text-blue-900">🚀 {broadcastMessage.title}</div>
+              <div className="text-blue-700">{broadcastMessage.description}</div>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowBroadcast(false)}
+              onClick={() => {
+                setShowBroadcast(false)
+                // Save dismissed version to localStorage
+                try {
+                  const latestRelease = changelogData[0]
+                  if (latestRelease) {
+                    localStorage.setItem('support:dismissed-broadcast-version', latestRelease.version)
+                  }
+                } catch (error) {
+                  console.warn('Failed to save dismissed broadcast:', error)
+                }
+              }}
               className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
             >
               <X className="h-3 w-3" />

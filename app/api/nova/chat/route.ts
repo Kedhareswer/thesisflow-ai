@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NovaAIService } from '@/lib/services/nova-ai.service'
 import { getAuthUser } from '@/lib/auth-utils'
-import { AIService } from '@/lib/ai-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,43 +20,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if GROQ API key is available
-    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY
+    // Check if GROQ API key is available (Nova AI only, no fallback)
+    const groqApiKey = process.env.GROQ_API_KEY
     if (!groqApiKey) {
-      console.warn('Nova AI: GROQ_API_KEY not found, falling back to general AI service')
-      
-      // Fallback to general AI service
-      const fullPrompt = `You are Nova, an advanced research assistant. You help users with research tasks, literature reviews, data analysis, and academic writing. 
-      
-Context: ${JSON.stringify(context, null, 2)}
-
-Please provide helpful, accurate, and research-focused responses.
-
-User: ${message}`
-
-      try {
-        const response = await AIService.generateText(fullPrompt, {
-          model: 'gemini-pro',
-          temperature: 0.7,
-          maxTokens: 1000
-        })
-
-        return NextResponse.json({ 
-          response: {
-            content: response.content,
-            confidence: 0.8,
-            type: 'response',
-            provider: response.provider,
-            model: response.model
-          }
-        })
-      } catch (aiError) {
-        console.error('Fallback AI service error:', aiError)
-        return NextResponse.json(
-          { error: 'AI service is not available. Please check your configuration.' },
-          { status: 503 }
-        )
-      }
+      console.error('Nova AI: GROQ_API_KEY not configured')
+      return NextResponse.json(
+        { error: 'Nova AI service is not configured. Please set GROQ_API_KEY environment variable.' },
+        { status: 503 }
+      )
     }
 
     const novaService = NovaAIService.getInstance()

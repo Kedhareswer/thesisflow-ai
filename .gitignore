@@ -82,3 +82,4 @@ env/
 
 # Support data (PII risk - use temp directories instead)
 data/support/_store/
+NUL

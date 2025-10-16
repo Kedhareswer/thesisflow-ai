@@ -15,7 +15,7 @@
     },
     {
       "id": "return_user",
-      "text": "Welcome back! I'm Nova, What can I assist you with today?",
+      "text": "Welcome back! I'm Nova, what can I assist you with today?",
       "quickReplies": [
         { "text": "Latest Updates", "intent": "changelog" },
         { "text": "Feature Help", "intent": "navigation" },

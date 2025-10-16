@@ -24,9 +24,9 @@ export class NovaAIService {
   private groqApiKey: string
 
   constructor() {
-    // Use server-side env var for Groq API
-    this.groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || ''
-    
+    // Use ONLY server-side env var for Groq API (security: never expose via NEXT_PUBLIC)
+    this.groqApiKey = process.env.GROQ_API_KEY || ''
+
     if (!this.groqApiKey) {
       console.warn('NovaAIService: GROQ_API_KEY not found in environment variables')
     }
