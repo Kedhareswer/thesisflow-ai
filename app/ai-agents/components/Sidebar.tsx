@@ -39,6 +39,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, isLoading, signOut } = useSupabaseAuth()
   const { getPlanType, tokenStatus, isProOrHigher } = useUserPlan()
+  const [isHovered, setIsHovered] = React.useState(false)
+
+  // Determine if sidebar should be expanded (either not collapsed or hovered)
+  const isExpanded = !collapsed || isHovered
 
   // Simple avatar used in profile dropdown
   const SimpleAvatar = ({ size = "sm" }: { size?: "sm" | "md" }) => {
@@ -76,13 +80,15 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`sticky top-0 h-screen border-r border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 transition-all duration-300 flex flex-col ${
-        collapsed ? "w-16" : "w-64"
-      }`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`sticky top-0 h-screen border-r border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 transition-all duration-300 ease-in-out flex flex-col ${
+        isExpanded ? "w-64" : "w-16"
+      } ${isHovered && collapsed ? 'shadow-xl z-50' : ''}`}
     >
       {/* Header row with brand + toggle */}
       <div className="flex items-center gap-2 px-3 py-3">
-        {!collapsed && <span className="text-sm font-semibold text-gray-900">ThesisFlow-AI</span>}
+        {isExpanded && <span className="text-sm font-semibold text-gray-900">ThesisFlow-AI</span>}
         <button
           aria-label="Toggle sidebar"
           onClick={onToggle}
@@ -113,10 +119,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <div
                 className={`relative mx-2 my-0.5 flex items-center rounded-md py-2 text-sm transition-colors ${
                   active ? "text-orange-600 bg-orange-50" : "text-gray-700 hover:bg-gray-50"
-                } ${collapsed ? "justify-center" : "gap-3 px-2"}`}
+                } ${isExpanded ? "gap-3 px-2" : "justify-center"}`}
               >
                 {/* Left rail only when expanded */}
-                {!collapsed && (
+                {isExpanded && (
                   <span
                     className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 rounded-sm ${active ? "w-1 bg-orange-500" : "w-0"}`}
                   />
@@ -124,8 +130,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 {/* Icon */}
                 <Icon className={`h-4 w-4 ${active ? "text-orange-600" : "text-gray-500"}`} />
                 {/* Label + external arrow for Chat with PDF */}
-                {!collapsed && (
-                  <span className="flex items-center gap-1">
+                {isExpanded && (
+                  <span className="flex items-center gap-1 whitespace-nowrap">
                     {item.label}
                     {item.id === "chat-pdf" && (
                       <ArrowUpRight className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
@@ -161,7 +167,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
 
         {/* Bottom card - show only when not collapsed AND unauthenticated */}
-        {!collapsed && !isLoading && !user && (
+        {isExpanded && !isLoading && !user && (
           <div className="mt-4 px-3 pb-6">
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
               <div className="mb-2 flex items-center gap-2 text-sm text-yellow-800">
@@ -180,7 +186,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Authenticated footer: Notification bell + Profile menu */}
       {user && !isLoading && (
         <div className="border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 px-2 py-3">
-          <div className={collapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between gap-2"}>
+          <div className={isExpanded ? "flex items-center justify-between gap-2" : "flex flex-col items-center gap-2"}>
             <React.Suspense fallback={<Button variant="ghost" size="icon" disabled><div className="h-5 w-5" /></Button>}>
               <NotificationsModal />
             </React.Suspense>

@@ -21,6 +21,9 @@ import {
   ChevronUp,
   Loader2,
   AlertTriangle,
+  Eye,
+  Columns,
+  PenLine,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,6 +49,10 @@ import type { AIProvider } from "@/lib/ai-providers"
 import WriterShareModal from "./components/writer-share-modal"
 import { AIDetectionBadge } from "@/components/ai-detection-badge"
 import { AIDetectionResult } from "@/lib/services/ai-detection.service"
+import { CommandPalette, useCommandPalette } from "./components/command-palette"
+import { VersionHistory, DocumentVersion } from "./components/version-history"
+import { CollaborativePresence, CollaboratorUser } from "./components/collaborative-presence"
+import { PreviewRenderer } from "./components/preview-renderer"
 
 export default function WriterPage() {
   const searchParams = useSearchParams()
@@ -74,6 +81,12 @@ export default function WriterPage() {
   const [isAiDetectOpen, setIsAiDetectOpen] = useState(false)
   const [isHumanizeOpen, setIsHumanizeOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
+
+  // New states for redesigned UI
+  const [viewMode, setViewMode] = useState<"edit" | "preview" | "split">("edit")
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false)
+  const [currentUserId] = useState("current-user") // In production, get from auth
 
   const [aiDetectionResult, setAiDetectionResult] = useState<AIDetectionResult | null>(null)
   const [humanizedText, setHumanizedText] = useState("")
@@ -754,6 +767,36 @@ export default function WriterPage() {
     })
   }
 
+  // Command palette commands
+  const commands = useCommandPalette({
+    onSave: handleSaveDocument,
+    onExport: handleExportDocument,
+    onImport: handleImportDocument,
+    onShare: handleShareDocument,
+    onNewDocument: handleNewDocument,
+    onTogglePreview: () => setViewMode(viewMode === "preview" ? "edit" : "preview"),
+    onToggleAiAssistant: handleToggleAiAssistant,
+    onToggleCitationManager: handleToggleCitationManager,
+  })
+
+  // Version history handlers
+  const handleRestoreVersion = (version: DocumentVersion) => {
+    setDocumentContent(version.content)
+    setDocumentTitle(version.title)
+    toast({
+      title: "Version Restored",
+      description: `Restored to version ${version.version_number}`,
+    })
+  }
+
+  const handleCompareVersions = (versionA: DocumentVersion, versionB: DocumentVersion) => {
+    toast({
+      title: "Compare Versions",
+      description: `Comparing version ${versionA.version_number} with version ${versionB.version_number}`,
+    })
+    // In production, open a diff view modal
+  }
+
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
@@ -812,13 +855,84 @@ export default function WriterPage() {
         <main className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
           {/* Top Bar */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0">
+            {/* Left section */}
             <div className="flex-1 flex items-center gap-2">
               {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 ml-4 bg-gray-100 rounded-md p-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === "edit" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("edit")}
+                      className="h-8 px-3"
+                    >
+                      <PenLine className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Edit</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit Mode</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === "split" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("split")}
+                      className="h-8 px-3"
+                    >
+                      <Columns className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Split</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Split View</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === "preview" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("preview")}
+                      className="h-8 px-3"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Preview</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Preview Mode</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
+            {/* Center section - Collaborative Presence */}
+            <div className="flex-1 flex items-center justify-center">
+              <CollaborativePresence
+                documentId={documentId || undefined}
+                currentUserId={currentUserId}
+                className="hidden md:flex"
+              />
+            </div>
 
             {/* Right section */}
             <div className="flex-1 flex items-center justify-end gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsVersionHistoryOpen(!isVersionHistoryOpen)}
+                  >
+                    <History className="h-4 w-4" />
+                    <span className="sr-only">Version History</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Version History</TooltipContent>
+              </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={() => setIsShareOpen(true)}>
@@ -828,258 +942,296 @@ export default function WriterPage() {
                 </TooltipTrigger>
                 <TooltipContent>Share</TooltipContent>
               </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handleExportPublisher}>
+                  <Button variant="outline" size="sm" onClick={handleExportPublisher} className="hidden lg:flex">
                     Export as Publisher
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Download .tex (+ .bib if available)</TooltipContent>
               </Tooltip>
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <UserProfileAvatar className="h-6 w-6" />
-                <span>1 user editing</span>
-              </div>
             </div>
           </div>
 
           {/* Document Editor and Tools */}
-          <ScrollArea className="flex-1 p-8 overflow-y-auto">
-            <div className="max-w-3xl mx-auto pb-16">
-              <Input
-                className="text-4xl font-bold mb-4 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto bg-transparent"
-                placeholder="Untitled document"
-                value={documentTitle}
-                onChange={(e) => setDocumentTitle(e.target.value)}
-              />
-              
-
-              <LaTeXEditor
-                value={documentContent}
-                onChange={setDocumentContent}
-                className="min-h-[500px] border-none focus-within:ring-0 focus-within:ring-offset-0"
-                template={selectedTemplate}
-                onTemplateChange={setSelectedTemplate}
-              />
-
-              <Separator className="my-8" />
-
-              {/* AI Writing Assistant */}
-              <Collapsible open={isAiAssistantOpen} onOpenChange={setIsAiAssistantOpen} className="mb-6">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5" /> AI Writing Assistant
-        </div>
-                  {isAiAssistantOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-              <CardContent className="p-4">
-                      <AiWritingAssistant
-                        selectedProvider={selectedProvider || "groq"}
-                        selectedModel={selectedModel || "llama-3.3-70b-versatile"}
-                        onInsertText={(text) => setDocumentContent((prev) => prev + text)}
-                        documentTemplate={selectedTemplate}
-                        currentDocumentContent={documentContent}
-                        isAuthenticated={isAuthenticated}
-                        onProviderChange={setSelectedProvider}
-                        onModelChange={setSelectedModel}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Main Editor/Preview Area */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Edit View */}
+              {(viewMode === "edit" || viewMode === "split") && (
+                <div className={`flex flex-col ${viewMode === "split" ? "w-1/2 border-r border-gray-200" : "w-full"} overflow-hidden`}>
+                  <ScrollArea className="flex-1 p-4 md:p-8 overflow-y-auto">
+                    <div className="max-w-3xl mx-auto pb-16">
+                      <Input
+                        className="text-3xl md:text-4xl font-bold mb-4 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto bg-transparent"
+                        placeholder="Untitled document"
+                        value={documentTitle}
+                        onChange={(e) => setDocumentTitle(e.target.value)}
                       />
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
 
-              {/* Citation Manager */}
-              <Collapsible open={isCitationManagerOpen} onOpenChange={setIsCitationManagerOpen} className="mb-6">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" /> Citation Manager
-                  </div>
-                  {isCitationManagerOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <CitationManager selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
-              </CardContent>
-            </Card>
-                </CollapsibleContent>
-              </Collapsible>
+                      <LaTeXEditor
+                        value={documentContent}
+                        onChange={setDocumentContent}
+                        className="min-h-[500px] border-none focus-within:ring-0 focus-within:ring-offset-0"
+                        template={selectedTemplate}
+                        onTemplateChange={setSelectedTemplate}
+                      />
 
-              {/* AI Detection */}
-              <Collapsible open={isAiDetectOpen} onOpenChange={setIsAiDetectOpen} className="mb-6">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" /> AI Content Detection
-                  </div>
-                  {isAiDetectOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-                    <CardContent className="p-4 space-y-4">
-                      {documentContent ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-4">
-                            <span className="text-sm font-medium">Detection Status:</span>
-                            <AIDetectionBadge
-                              text={documentContent}
-                              onDetectionComplete={handleAiDetectionComplete}
-                              showButton={true}
-                            />
+                      <Separator className="my-8" />
+
+                      {/* AI Writing Assistant */}
+                      <Collapsible open={isAiAssistantOpen} onOpenChange={setIsAiAssistantOpen} className="mb-6">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Lightbulb className="h-5 w-5" /> AI Writing Assistant
                           </div>
-                          
-                          {aiDetectionResult && (
-                            <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-lg font-semibold">
-                                  {aiDetectionResult.is_ai ? "⚠️ AI-Generated Content" : "✅ Human-Written Content"}
-                                </h4>
-                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                  Confidence: {aiDetectionResult.confidence}%
-                                </span>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">AI Probability:</span>
-                                  <span className="ml-2 font-medium">{aiDetectionResult.ai_probability}%</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Human Probability:</span>
-                                  <span className="ml-2 font-medium">{aiDetectionResult.human_probability}%</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Reliability:</span>
-                                  <span className="ml-2 font-medium">{aiDetectionResult.reliability_score}%</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Chunks Analyzed:</span>
-                                  <span className="ml-2 font-medium">{aiDetectionResult.analysis_details.chunks_analyzed}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="text-xs text-gray-500">
-                                Analysis completed using {aiDetectionResult.model_used} at {new Date(aiDetectionResult.timestamp).toLocaleString()}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Write some content in the document to analyze for AI detection.</p>
-                          <p className="text-sm mt-2">Minimum 10 words required for accurate analysis.</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
+                          {isAiAssistantOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4">
+                          <Card>
+                            <CardContent className="p-4">
+                              <AiWritingAssistant
+                                selectedProvider={selectedProvider || "groq"}
+                                selectedModel={selectedModel || "llama-3.3-70b-versatile"}
+                                onInsertText={(text) => setDocumentContent((prev) => prev + text)}
+                                documentTemplate={selectedTemplate}
+                                currentDocumentContent={documentContent}
+                                isAuthenticated={isAuthenticated}
+                                onProviderChange={setSelectedProvider}
+                                onModelChange={setSelectedModel}
+                              />
+                            </CardContent>
+                          </Card>
+                        </CollapsibleContent>
+                      </Collapsible>
 
-              {/* Humanize Text */}
-              <Collapsible open={isHumanizeOpen} onOpenChange={setIsHumanizeOpen} className="mb-6">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5" /> Humanize Text
-                  </div>
-                  {isHumanizeOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-                    <CardContent className="p-4 space-y-4">
-                      <Button onClick={handleHumanize} disabled={!documentContent || humanizedText === "Humanizing..."}>
-                        {humanizedText === "Humanizing..." ? "Humanizing..." : "Humanize Text"}
-                      </Button>
-                      {humanizedText && humanizedText !== "Humanizing..." && (
-                        <div className="space-y-4">
-                          {/* Scores Display */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <p className="text-xs text-gray-600 dark:text-gray-400">Readability Score</p>
-                              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                {humanizationDetails.readability_score || 0}/100
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                {(humanizationDetails.readability_score ?? 0) >= 60 ? "Easy to read" : 
-                                 (humanizationDetails.readability_score ?? 0) >= 30 ? "Moderate" : "Complex"}
-                              </p>
-                            </div>
-                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
-                              <p className="text-xs text-gray-600 dark:text-gray-400">Naturalness Score</p>
-                              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                {humanizationDetails.naturalness_score || 0}/100
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                {(humanizationDetails.naturalness_score ?? 0) >= 70 ? "Very natural" :
-                                 (humanizationDetails.naturalness_score ?? 0) >= 40 ? "Moderately natural" : "Needs work"}
-                              </p>
-                            </div>
+                      {/* Citation Manager */}
+                      <Collapsible open={isCitationManagerOpen} onOpenChange={setIsCitationManagerOpen} className="mb-6">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-5 w-5" /> Citation Manager
                           </div>
+                          {isCitationManagerOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4">
+                          <Card>
+                            <CardContent className="p-4">
+                              <CitationManager selectedTemplate={selectedTemplate} onTemplateChange={setSelectedTemplate} />
+                            </CardContent>
+                          </Card>
+                        </CollapsibleContent>
+                      </Collapsible>
 
-                          {/* Changes Made */}
-                          {humanizationDetails.changes_made && humanizationDetails.changes_made.length > 0 && (
-                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md">
-                              <p className="text-sm font-medium mb-2">Transformations Applied:</p>
-                              <ul className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
-                                {humanizationDetails.changes_made.map((change, idx) => (
-                                  <li key={idx} className="flex items-start">
-                                    <CheckCircle className="h-3 w-3 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                                    {change}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
+                      {/* AI Detection */}
+                      <Collapsible open={isAiDetectOpen} onOpenChange={setIsAiDetectOpen} className="mb-6">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-5 w-5" /> AI Content Detection
+                          </div>
+                          {isAiDetectOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4">
+                          <Card>
+                            <CardContent className="p-4 space-y-4">
+                              {documentContent ? (
+                                <div className="space-y-4">
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-sm font-medium">Detection Status:</span>
+                                    <AIDetectionBadge
+                                      text={documentContent}
+                                      onDetectionComplete={handleAiDetectionComplete}
+                                      showButton={true}
+                                    />
+                                  </div>
 
-                          {/* Humanized Text */}
-                          <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
-                            <p className="text-sm font-medium mb-2">Humanized Version:</p>
-                            <Textarea 
-                              value={humanizedText} 
-                              readOnly 
-                              className="mt-2 min-h-[200px] font-mono text-sm" 
-                            />
-                            <div className="flex gap-2 mt-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(humanizedText)
-                                  toast({
-                                    title: "Copied",
-                                    description: "Humanized text copied to clipboard",
-                                  })
-                                }}
-                              >
-                                <Copy className="h-4 w-4 mr-2" /> Copy
+                                  {aiDetectionResult && (
+                                    <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-lg font-semibold">
+                                          {aiDetectionResult.is_ai ? "⚠️ AI-Generated Content" : "✅ Human-Written Content"}
+                                        </h4>
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                                          Confidence: {aiDetectionResult.confidence}%
+                                        </span>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                          <span className="text-gray-600 dark:text-gray-400">AI Probability:</span>
+                                          <span className="ml-2 font-medium">{aiDetectionResult.ai_probability}%</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-600 dark:text-gray-400">Human Probability:</span>
+                                          <span className="ml-2 font-medium">{aiDetectionResult.human_probability}%</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-600 dark:text-gray-400">Reliability:</span>
+                                          <span className="ml-2 font-medium">{aiDetectionResult.reliability_score}%</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-600 dark:text-gray-400">Chunks Analyzed:</span>
+                                          <span className="ml-2 font-medium">{aiDetectionResult.analysis_details.chunks_analyzed}</span>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-xs text-gray-500">
+                                        Analysis completed using {aiDetectionResult.model_used} at {new Date(aiDetectionResult.timestamp).toLocaleString()}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                  <p>Write some content in the document to analyze for AI detection.</p>
+                                  <p className="text-sm mt-2">Minimum 10 words required for accurate analysis.</p>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      {/* Humanize Text */}
+                      <Collapsible open={isHumanizeOpen} onOpenChange={setIsHumanizeOpen} className="mb-6">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 rounded-md text-lg font-semibold text-gray-900 dark:text-gray-50 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-5 w-5" /> Humanize Text
+                          </div>
+                          {isHumanizeOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4">
+                          <Card>
+                            <CardContent className="p-4 space-y-4">
+                              <Button onClick={handleHumanize} disabled={!documentContent || humanizedText === "Humanizing..."}>
+                                {humanizedText === "Humanizing..." ? "Humanizing..." : "Humanize Text"}
                               </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setDocumentContent(humanizedText)
-                                  toast({
-                                    title: "Text updated",
-                                    description: "Document content replaced with humanized text.",
-                                  })
-                                }}
-                              >
-                                <CheckCircle className="h-4 w-4 mr-2" /> Use Humanized Text
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
+                              {humanizedText && humanizedText !== "Humanizing..." && (
+                                <div className="space-y-4">
+                                  {/* Scores Display */}
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                                      <p className="text-xs text-gray-600 dark:text-gray-400">Readability Score</p>
+                                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                        {humanizationDetails.readability_score || 0}/100
+                                      </p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                        {(humanizationDetails.readability_score ?? 0) >= 60 ? "Easy to read" :
+                                         (humanizationDetails.readability_score ?? 0) >= 30 ? "Moderate" : "Complex"}
+                                      </p>
+                                    </div>
+                                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
+                                      <p className="text-xs text-gray-600 dark:text-gray-400">Naturalness Score</p>
+                                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                        {humanizationDetails.naturalness_score || 0}/100
+                                      </p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                        {(humanizationDetails.naturalness_score ?? 0) >= 70 ? "Very natural" :
+                                         (humanizationDetails.naturalness_score ?? 0) >= 40 ? "Moderately natural" : "Needs work"}
+                                      </p>
+                                    </div>
+                                  </div>
 
+                                  {/* Changes Made */}
+                                  {humanizationDetails.changes_made && humanizationDetails.changes_made.length > 0 && (
+                                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md">
+                                      <p className="text-sm font-medium mb-2">Transformations Applied:</p>
+                                      <ul className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
+                                        {humanizationDetails.changes_made.map((change, idx) => (
+                                          <li key={idx} className="flex items-start">
+                                            <CheckCircle className="h-3 w-3 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                                            {change}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {/* Humanized Text */}
+                                  <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+                                    <p className="text-sm font-medium mb-2">Humanized Version:</p>
+                                    <Textarea
+                                      value={humanizedText}
+                                      readOnly
+                                      className="mt-2 min-h-[200px] font-mono text-sm"
+                                    />
+                                    <div className="flex gap-2 mt-3">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(humanizedText)
+                                          toast({
+                                            title: "Copied",
+                                            description: "Humanized text copied to clipboard",
+                                          })
+                                        }}
+                                      >
+                                        <Copy className="h-4 w-4 mr-2" /> Copy
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          setDocumentContent(humanizedText)
+                                          toast({
+                                            title: "Text updated",
+                                            description: "Document content replaced with humanized text.",
+                                          })
+                                        }}
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-2" /> Use Humanized Text
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {/* Preview View */}
+              {(viewMode === "preview" || viewMode === "split") && (
+                <div className={`${viewMode === "split" ? "w-1/2" : "w-full"} overflow-hidden bg-white`}>
+                  <PreviewRenderer
+                    content={documentContent}
+                    title={documentTitle}
+                    template={selectedTemplate}
+                    className="h-full"
+                  />
+                </div>
+              )}
             </div>
-          </ScrollArea>
+
+            {/* Version History Sidebar */}
+            {isVersionHistoryOpen && (
+              <aside className="w-80 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
+                <VersionHistory
+                  documentId={documentId || undefined}
+                  currentVersion={1}
+                  onRestore={handleRestoreVersion}
+                  onCompare={handleCompareVersions}
+                  className="h-full"
+                />
+              </aside>
+            )}
+          </div>
         </main>
       </div>
       </div>
+
+    {/* Command Palette */}
+    <CommandPalette
+      open={isCommandPaletteOpen}
+      onOpenChange={setIsCommandPaletteOpen}
+      commands={commands}
+    />
+
     {/* Hidden file input for Import */}
     <input
         ref={fileInputRef}

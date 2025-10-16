@@ -433,10 +433,10 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
 
       {/* Search Interface - Show after first search */}
       {!showHero && (
-        <div className="mb-6">
+        <div className="mb-4 md:mb-6">
           <Card className="border-gray-200 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex gap-3 items-center">
+            <CardContent className="p-3 md:p-4">
+              <div className="flex flex-col sm:flex-row gap-2 md:gap-3 items-stretch sm:items-center">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -452,26 +452,29 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
                     className="pl-10 pr-4 border-gray-200"
                   />
                 </div>
-                <Button
-                  onClick={() => setShowFilters(!showFilters)}
-                  variant="outline"
-                  size="default"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filters
-                </Button>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Sort by:</span>
-                  <Select value="Relevance">
-                    <SelectTrigger className="w-32 h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Relevance">Relevance</SelectItem>
-                      <SelectItem value="Date">Date</SelectItem>
-                      <SelectItem value="Citations">Citations</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowFilters(!showFilters)}
+                    variant="outline"
+                    size="default"
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filters
+                  </Button>
+                  <div className="hidden md:flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Sort by:</span>
+                    <Select value="Relevance">
+                      <SelectTrigger className="w-32 h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Relevance">Relevance</SelectItem>
+                        <SelectItem value="Date">Date</SelectItem>
+                        <SelectItem value="Citations">Citations</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -481,9 +484,9 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
 
       {/* Two-Column Layout for Results */}
       {!showHero && (
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6">
           {/* Left Sidebar - Filters */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:block hidden">
             <Card className="border-gray-200">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold">Filters</CardTitle>
@@ -555,8 +558,8 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
           <div className="space-y-4">
             {/* Results Header */}
             {papers.length > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs sm:text-sm text-gray-600">
                   Showing {papers.length} of {totalPapers} results
                   {lastSearchQuery && (
                     <span className="ml-1">for <strong>"{lastSearchQuery}"</strong></span>
@@ -568,14 +571,16 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
                       variant="outline"
                       size="sm"
                       onClick={handleSelectAll}
+                      className="text-xs"
                     >
-                      {selectedPapers.size === papers.length ? 'Deselect All' : 'Select All'}
+                      <span className="hidden sm:inline">{selectedPapers.size === papers.length ? 'Deselect All' : 'Select All'}</span>
+                      <span className="sm:hidden">{selectedPapers.size === papers.length ? 'Deselect' : 'Select'}</span>
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={selectedPapers.size === 0}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Export ({selectedPapers.size})
+                        <Button variant="outline" size="sm" disabled={selectedPapers.size === 0} className="text-xs">
+                          <Download className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">Export</span> ({selectedPapers.size})
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
@@ -617,17 +622,26 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
 
             {/* Paper Cards */}
             {papers.length > 0 && (
-              <div className="space-y-4">
-                {papers.map((paper: ResearchPaper) => (
-                  <Card key={paper.id} className="border-gray-200 hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
+              <div className="relative space-y-4">
+                {papers.map((paper: ResearchPaper, paperIndex: number) => (
+                  <Card
+                    key={paper.id}
+                    className={`border-gray-200 hover:shadow-md transition-all duration-300 bg-white ${
+                      paperIndex < 3 ? 'sticky' : ''
+                    }`}
+                    style={{
+                      top: paperIndex < 3 ? `${paperIndex * 20}px` : undefined,
+                      zIndex: paperIndex < 3 ? 50 - paperIndex : 1
+                    }}
+                  >
+                    <CardContent className="p-4 md:p-6">
                       {/* Paper Title */}
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3 leading-snug">
+                      <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3 leading-snug">
                         {paper.title}
                       </h3>
 
                       {/* Authors and Venue */}
-                      <div className="text-sm text-gray-600 mb-3">
+                      <div className="text-xs md:text-sm text-gray-600 mb-2 md:mb-3">
                         {paper.authors && paper.authors.length > 0 && (
                           <span>
                             {paper.authors.slice(0, 5).join(", ")}
@@ -644,13 +658,13 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
 
                       {/* Abstract */}
                       {paper.abstract && (
-                        <p className="text-sm text-gray-700 mb-4 leading-relaxed line-clamp-3">
+                        <p className="text-xs md:text-sm text-gray-700 mb-3 md:mb-4 leading-relaxed line-clamp-2 md:line-clamp-3">
                           {paper.abstract}
                         </p>
                       )}
 
                       {/* Meta Info */}
-                      <div className="flex items-center gap-4 mb-4 text-sm">
+                      <div className="flex items-center gap-2 md:gap-4 mb-3 md:mb-4 text-xs md:text-sm flex-wrap">
                         {paper.cited_by_count !== undefined && (
                           <div className="flex items-center gap-1 text-gray-600">
                             <span className="font-medium">Citations: {paper.cited_by_count}</span>
@@ -669,33 +683,34 @@ export function EnhancedLiteratureSearch({ className, initialQuery }: EnhancedLi
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-2 md:gap-3 pt-2 md:pt-3 border-t border-gray-100 flex-wrap">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-gray-700 hover:text-primary"
+                          className="text-gray-700 hover:text-primary text-xs"
                           onClick={() => handlePaperSelect(paper.id, !selectedPapers.has(paper.id))}
                         >
-                          <Save className="h-4 w-4 mr-1" />
+                          <Save className="h-3 md:h-4 w-3 md:w-4 mr-1" />
                           {selectedPapers.has(paper.id) ? 'Saved' : 'Save'}
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-gray-700 hover:text-primary">
-                          <Quote className="h-4 w-4 mr-1" />
+                        <Button variant="ghost" size="sm" className="text-gray-700 hover:text-primary text-xs">
+                          <Quote className="h-3 md:h-4 w-3 md:w-4 mr-1" />
                           Cite
                         </Button>
                         {paper.pdf_url && (
-                          <Button variant="ghost" size="sm" asChild className="text-gray-700 hover:text-primary">
+                          <Button variant="ghost" size="sm" asChild className="text-gray-700 hover:text-primary text-xs">
                             <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer">
-                              <FileText className="h-4 w-4 mr-1" />
+                              <FileText className="h-3 md:h-4 w-3 md:w-4 mr-1" />
                               PDF
                             </a>
                           </Button>
                         )}
                         {paper.url && (
-                          <Button variant="ghost" size="sm" asChild className="text-gray-700 hover:text-primary ml-auto">
+                          <Button variant="ghost" size="sm" asChild className="text-gray-700 hover:text-primary ml-auto text-xs">
                             <a href={paper.url} target="_blank" rel="noopener noreferrer">
-                              View Paper
-                              <ExternalLink className="h-4 w-4 ml-1" />
+                              <span className="hidden sm:inline">View Paper</span>
+                              <span className="sm:hidden">View</span>
+                              <ExternalLink className="h-3 md:h-4 w-3 md:w-4 ml-1" />
                             </a>
                           </Button>
                         )}

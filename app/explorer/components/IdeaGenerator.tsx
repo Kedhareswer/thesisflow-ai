@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Lightbulb, TrendingUp, Info, Save, CheckSquare, Square } from "lucide-react"
+import { Lightbulb, TrendingUp, Info, Save, CheckSquare, Square, ChevronDown, ChevronUp, Plus, Calendar } from "lucide-react"
 import { FormField, TextareaField } from "@/components/forms/FormField"
 import { LoadingSpinner } from "@/components/common/LoadingSpinner"
 import { useToast } from "@/hooks/use-toast"
@@ -101,6 +101,9 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   
   // State for tracking selected ideas from current generation
   const [selectedGeneratedIdeas, setSelectedGeneratedIdeas] = useState<Set<number>>(new Set())
+
+  // State for expanded idea details
+  const [expandedIdea, setExpandedIdea] = useState<number | null>(null)
   
   // Update topic field when currentTopic changes, but only if different and not currently generating
   useEffect(() => {
@@ -271,13 +274,13 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
   return (
     <div className={className}>
       {/* Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-[400px_1fr] gap-4 md:gap-6">
         {/* Left Column - Input Form */}
         <div className="space-y-4">
           {/* Header */}
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Idea Generation</h2>
-            <p className="text-sm text-gray-600">Unlock novel research directions with AI.</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Research Idea Generation</h2>
+            <p className="text-xs sm:text-sm text-gray-600">Unlock novel research directions with AI.</p>
           </div>
 
           {/* Tabs for Navigation */}
@@ -398,11 +401,11 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
 
         {/* Right Column - Generated Ideas */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
               Generated Ideas
               {ideaGenerationData && (
-                <span className="ml-2 text-sm font-normal text-gray-500">
+                <span className="ml-2 text-xs sm:text-sm font-normal text-gray-500">
                   Showing {ideaGenerationData.ideas.length} ideas
                 </span>
               )}
@@ -424,7 +427,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                   className="bg-green-600 hover:bg-green-700 text-white text-xs h-8"
                 >
                   <Save className="h-3 w-3 mr-1.5" />
-                  Save Selected ({selectedGeneratedIdeas.size})
+                  <span className="hidden sm:inline">Save Selected</span> ({selectedGeneratedIdeas.size})
                 </Button>
               </div>
             )}
@@ -438,6 +441,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                 const title = lines[0].replace(/^\d+\.\s*/, '').trim()
                 const description = lines.slice(1).join('\n').trim()
                 const isSelected = selectedGeneratedIdeas.has(index)
+                const isExpanded = expandedIdea === index
 
                 return (
                   <Card
@@ -456,40 +460,119 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
                           className="mt-1"
                         />
                         <div className="flex-1 space-y-2">
-                          <h4 className="font-semibold text-gray-900 leading-snug">
-                            {title}
-                          </h4>
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            {description || title}
-                          </p>
-
-                          {/* Tags - Example based on your reference image */}
-                          <div className="flex flex-wrap gap-2 pt-2">
-                            {/* You can dynamically generate these based on topic/context */}
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
-                              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
-                              {ideaTopic.split(' ')[0] || 'Research'}
-                            </span>
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-semibold text-gray-900 leading-snug flex-1">
+                              {title}
+                            </h4>
+                            <button
+                              onClick={() => setExpandedIdea(isExpanded ? null : index)}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              aria-label={isExpanded ? "Show less" : "Read more"}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-gray-600" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-gray-600" />
+                              )}
+                            </button>
                           </div>
+
+                          {/* Collapsed view - truncated description */}
+                          {!isExpanded && (
+                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                              {description || title}
+                            </p>
+                          )}
+
+                          {/* Expanded view - full details */}
+                          {isExpanded && (
+                            <div className="space-y-4 pt-2">
+                              <div>
+                                <h5 className="text-xs font-semibold text-gray-900 mb-2">Description</h5>
+                                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                  {description || title}
+                                </p>
+                              </div>
+
+                              <div>
+                                <h5 className="text-xs font-semibold text-gray-900 mb-2">Research Plan</h5>
+                                <div className="space-y-2 text-sm text-gray-700">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-primary font-medium">1.</span>
+                                    <span>Literature review on {ideaTopic}</span>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-primary font-medium">2.</span>
+                                    <span>Define research methodology and data collection approach</span>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-primary font-medium">3.</span>
+                                    <span>Conduct experiments and analysis</span>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-primary font-medium">4.</span>
+                                    <span>Document findings and prepare manuscript</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <h5 className="text-xs font-semibold text-gray-900 mb-2">Key Considerations</h5>
+                                <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                  <li>Feasibility and available resources</li>
+                                  <li>Timeline: 6-12 months estimated</li>
+                                  <li>Required expertise and collaboration needs</li>
+                                  <li>Potential impact and novelty</li>
+                                </ul>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-200">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 text-xs"
+                                  onClick={() => {
+                                    toast({
+                                      title: "Added to Planner",
+                                      description: "Research plan has been added to your planner.",
+                                    })
+                                  }}
+                                >
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  Add to Planner
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 text-xs"
+                                  onClick={() => {
+                                    toast({
+                                      title: "Saved to Workspace",
+                                      description: "Idea has been saved to your workspace.",
+                                    })
+                                  }}
+                                >
+                                  <Save className="h-3 w-3 mr-1" />
+                                  Save to Workspace
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tags */}
+                          {!isExpanded && (
+                            <div className="flex flex-wrap gap-2 pt-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                                {ideaTopic.split(' ')[0] || 'Research'}
+                              </span>
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                                Click <ChevronDown className="inline h-3 w-3" /> for details
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                          aria-label="Bookmark idea"
-                        >
-                          <svg
-                            className="w-4 h-4 text-gray-400 hover:text-gray-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                            />
-                          </svg>
-                        </button>
                       </div>
                     </CardContent>
                   </Card>
