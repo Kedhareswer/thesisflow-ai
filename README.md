@@ -57,7 +57,7 @@
 <td width="25%" align="center">
 
 ### ✍️ Writer
-**LaTeX Editing**
+**Scientific Paper Editor**
 
 </td>
 <td width="25%" align="center">
@@ -86,12 +86,16 @@
 </td>
 <td valign="top">
 
-- Real-time LaTeX preview
-- KaTeX math rendering
-- Multi-format extraction
+- Collaborative editing
+- Real-time presence
+- Hover-activated toolbar
+- Command palette (⌘K)
+- Comments & suggestions
+- Version history timeline
+- Reference management
+- Citation insertion
+- Right-click menus
 - AI writing assistance
-- OCR for scanned docs
-- Template library
 
 </td>
 <td valign="top">
@@ -362,6 +366,22 @@ graph TB
 
 **Collaborative LaTeX Editor with Real-Time Preview**
 
+**NEW: Enhanced Scientific Paper Editor** ⭐
+
+The Writing Assistant has been completely redesigned into a professional scientific paper editor with advanced collaborative features and minimalist UI.
+
+**Key Features:**
+- **Minimalist Interface**: Collapsible reference and activity panels for distraction-free writing
+- **Hover-Activated Toolbar**: Formatting tools appear only when needed
+- **Command Palette (⌘K)**: Keyboard-first workflow for power users
+- **Right-Click Menus**: Context-specific editing options
+- **Collaborative Editing**: Real-time presence, comments, and suggestions
+- **Version History**: Visual timeline of all document changes
+- **Reference Management**: Dedicated sidebar for citations and bibliography
+- **Citation Insertion**: One-click citation insertion from reference library
+
+**Documentation**: See [`docs/pages/writing-assistant.md`](docs/pages/writing-assistant.md) for full details.
+
 ```mermaid
 graph LR
     A[LaTeX Editor] --> B[KaTeX Renderer]
@@ -370,7 +390,7 @@ graph LR
     B --> E[Live Preview]
     C --> E
     D --> A
-    
+
     style A fill:#FF6B2C,color:#fff
     style B fill:#28a745,color:#fff
     style D fill:#17a2b8,color:#fff
