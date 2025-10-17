@@ -338,7 +338,7 @@ All these models are available via Groq API:
 
 ### Power Models (3-10s response)
 - `gpt-oss-120b` - Frontier reasoning, browser search
-- `llama-4-scout-17bx16moe` - 128K context, MoE architecture
+- `llama-3.1-8b-instant` - 128K context, MoE architecture
 - `llama-4-maverick-17bx128moe` - Large-scale MoE for complex analysis
 
 ---

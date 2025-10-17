@@ -438,7 +438,7 @@ export function IdeaGenerator({ className }: IdeaGeneratorProps) {
           {/* Nova AI Status */}
           <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span>Powered by Nova AI (Llama-3.3-70B)</span>
+            <span>Powered by Nova AI</span>
           </div>
         </div>
 

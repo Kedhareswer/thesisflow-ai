@@ -117,7 +117,7 @@ export const MODEL_PRESETS: ModelPreset[] = [
   },
   {
     provider: 'groq',
-    model: 'llama-4-scout-17bx16moe',
+    model: 'llama-3.1-8b-instant',
     defaultTemperature: 0.3,
     systemPromptAddon: 'Use extended 128K context for comprehensive analysis and synthesis. Excellent for long documents.'
   },

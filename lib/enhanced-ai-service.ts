@@ -55,7 +55,7 @@ class EnhancedAIService {
       const result = await this.callGroqAPI(
         apiKey,
         options.prompt,
-        options.model || "llama-4-scout-17bx16moe", // Default: Llama 4 Scout for 128K context + synthesis
+        options.model || "llama-3.1-8b-instant", // Default: Llama 4 Scout for 128K context + synthesis
         options.maxTokens || 1000,
         options.temperature || 0.7
       )

@@ -544,7 +544,7 @@ Thank you!`)
                   <h3 className="text-lg font-semibold text-green-800">Nova AI Usage Overview</h3>
                 </div>
                 <p className="text-sm text-green-700 mb-4">
-                  All AI features powered by <strong>Nova AI (Llama-3.3-70B)</strong> with plan-optimized pricing. 
+                  All AI features powered by <strong>Nova AI</strong> with plan-optimized pricing. 
                   Your costs are included in your subscription - no surprise charges!
                 </p>
                 <div className="flex items-center gap-2 text-xs text-green-600">

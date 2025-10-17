@@ -61,9 +61,9 @@ ThesisFlow AI uses **different Groq models for different tasks** to optimize:
 | Feature | Model | Why This Model | Temperature | Max Tokens |
 |---------|-------|----------------|-------------|------------|
 | **NOVA Chat** | `qwen3-32b` | Thinking mode for reasoning + efficient dialogue | 0.5 | 1000 |
-| **Summarization** | `llama-4-scout-17bx16moe` | 128K context for long documents + MoE efficiency | 0.3-0.5 | 2000 |
+| **Summarization** | `llama-3.1-8b-instant` | 128K context for long documents + MoE efficiency | 0.3-0.5 | 2000 |
 | **Paraphrasing** | `llama-3.1-8b-instant` | Ultra-fast for quick text variations | 0.2-0.8 | Variable |
-| **Research Ideas** | `llama-4-scout-17bx16moe` | Large context + comprehensive analysis | 0.8 | 4000 |
+| **Research Ideas** | `llama-3.1-8b-instant` | Large context + comprehensive analysis | 0.8 | 4000 |
 | **Topic Reports (Curator)** | `llama-3.1-8b-instant` | Fast source ranking | 0.2 | 2000 |
 | **Topic Reports (Analyzer)** | `llama-3.1-8b-instant` | Quick per-source summaries | 0.2 | 2000 |
 | **Topic Reports (Synthesizer)** | `gpt-oss-120b` | Frontier-level reasoning for complex synthesis | 0.3 | 2500-3000 |
@@ -81,7 +81,7 @@ ThesisFlow AI uses **different Groq models for different tasks** to optimize:
 
 **Why**: Adaptive intelligence - can switch between deep thinking and fast responses based on query complexity.
 
-### 2. **Llama 4 Scout** (`llama-4-scout-17bx16moe`)
+### 2. **Llama 4 Scout** (`llama-3.1-8b-instant`)
 **Use Case**: Summarization, Research Ideas
 - **128K Context Window**: Handles very long documents
 - **MoE Architecture**: Mixture of Experts for efficient processing
@@ -171,7 +171,7 @@ handleAIAssistance()    // Direct assistance requests
 - `citation_help` - Citation formatting
 
 #### 2. `lib/enhanced-ai-service.ts`
-**Default Model**: `llama-4-scout-17bx16moe`
+**Default Model**: `llama-3.1-8b-instant`
 **Purpose**: Abstraction layer for AI operations
 
 **Key Methods**:
@@ -230,7 +230,7 @@ All 7 Groq models are pre-configured with optimal settings:
 
 {
   provider: 'groq',
-  model: 'llama-4-scout-17bx16moe',
+  model: 'llama-3.1-8b-instant',
   defaultTemperature: 0.3,
   systemPromptAddon: 'Use extended 128K context for comprehensive analysis and synthesis.'
 }
@@ -305,7 +305,7 @@ Is it a chat/conversation?
   └─▶ NO ↓
 
 Does it need to process long documents (>10K tokens)?
-  └─▶ YES: llama-4-scout-17bx16moe (128K context)
+  └─▶ YES: llama-3.1-8b-instant (128K context)
   └─▶ NO ↓
 
 Is speed the top priority?
@@ -355,7 +355,7 @@ const result = await enhancedAIService.summarizeContent(
 )
 ```
 
-**Model Used**: `llama-4-scout-17bx16moe` (128K context for long papers)
+**Model Used**: `llama-3.1-8b-instant` (128K context for long papers)
 
 ### Paraphrase with Llama 3.1 8B
 

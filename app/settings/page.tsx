@@ -575,7 +575,7 @@ export default function SettingsPage() {
                 <h3 className="font-semibold text-green-800">AI Provider Status</h3>
               </div>
               <p className="text-sm text-green-700 mb-2">
-                ThesisFlow AI uses <strong>Nova AI (Llama-3.3-70B)</strong> exclusively for all AI features.
+                ThesisFlow AI uses <strong>Nova AI</strong> exclusively for all AI features.
               </p>
               <p className="text-xs text-green-600">
                 No configuration needed - Nova AI is optimized for academic and research tasks.
