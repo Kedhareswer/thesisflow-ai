@@ -11,40 +11,27 @@ export class AIConfig {
 
   /**
    * Get available providers (cached for performance)
+   * Simplified for single-provider architecture (Groq/Nova AI only)
    */
   static async getAvailableProviders(): Promise<AIProvider[]> {
     if (this.cachedProviders !== null) {
               return this.cachedProviders
     }
 
-    try {
-      const response = await fetch('/api/ai/providers')
-      if (response.ok) {
-        const data = await response.json()
-        const providers = data.availableProviders || []
-        this.cachedProviders = providers
-        this.cachedBestProvider = data.bestProvider || undefined
-        return providers
-      }
-    } catch (error) {
-      console.error('Error fetching AI providers:', error)
-    }
-
-    // Ensure we return an empty array and cache it to avoid repeated API calls
-    this.cachedProviders = []
-    return []
+    // ThesisFlow-AI uses only Groq (Nova AI) provider
+    // Always return 'groq' as the only provider
+    this.cachedProviders = ['groq']
+    this.cachedBestProvider = 'groq'
+    return ['groq']
   }
 
   /**
    * Get the best available provider
+   * Simplified for single-provider architecture (Groq/Nova AI only)
    */
   static async getBestProvider(): Promise<AIProvider | undefined> {
-    if (this.cachedBestProvider !== undefined) {
-      return this.cachedBestProvider
-    }
-
-    const providers = await this.getAvailableProviders()
-    return providers.length > 0 ? providers[0] : undefined
+    // ThesisFlow-AI uses only Groq (Nova AI) provider
+    return 'groq'
   }
 
   /**
@@ -68,7 +55,7 @@ export class AIConfig {
    */
   static getProviderDisplayName(provider: AIProvider): string {
     const names: Record<AIProvider, string> = {
-      groq: "Groq (Fast)",
+      groq: "Nova AI (Groq)",
       openai: "OpenAI (GPT)",
       gemini: "Google Gemini",
       anthropic: "Anthropic (Claude)",
@@ -80,6 +67,7 @@ export class AIConfig {
 
   /**
    * Get provider status with helpful messages
+   * Simplified for single-provider architecture (Groq/Nova AI only)
    */
   static async getProviderStatus(): Promise<{
     available: AIProvider[]
@@ -87,24 +75,16 @@ export class AIConfig {
     totalConfigured: number
     message: string
   }> {
+    // ThesisFlow-AI uses only Groq (Nova AI) provider
+    const available: AIProvider[] = ['groq']
     const allProviders: AIProvider[] = ["groq", "openai", "gemini", "anthropic", "mistral", "aiml"]
-    const available = await this.getAvailableProviders()
     const unavailable = allProviders.filter(p => !available.includes(p))
-
-    let message = ""
-    if (available.length === 0) {
-      message = "No AI providers configured. Please add API keys to your environment variables."
-    } else if (available.length === 1) {
-      message = `Using ${this.getProviderDisplayName(available[0])} as your AI provider.`
-    } else {
-      message = `${available.length} AI providers available with automatic fallback.`
-    }
 
     return {
       available,
       unavailable,
       totalConfigured: available.length,
-      message
+      message: "Using Nova AI (Groq) as your AI provider."
     }
   }
 }

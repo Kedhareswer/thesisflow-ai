@@ -37,13 +37,21 @@ This document describes all external and internal integrations used by ThesisFlo
 - Planner drafts: `create_planner_drafts`
 
 ## AI Service
-- Service: `lib/enhanced-ai-service.ts` (simplified, server-side only)
-- Direct integration with Llama-3.3-70B via server-configured API
+- Service: `lib/enhanced-ai-service.ts` (multi-model optimization)
+- Multi-model architecture with 7 specialized Groq models:
+  - **Qwen 3 32B**: Chat (thinking mode + dialogue)
+  - **Llama 4 Scout**: Summarization (128K context)
+  - **Llama 3.1 8B Instant**: Paraphrasing (ultra-fast)
+  - **GPT-OSS 120B**: Report synthesis (frontier reasoning)
+  - **Llama 3.3 70B**: General purpose fallback
+  - **GPT-OSS 20B, Llama 4 Maverick**: Additional options
 - Usage:
   - All AI features use server-side API keys exclusively
+  - Model selection based on task requirements (speed, quality, context)
   - No user API key management required
 - Environment: `GROQ_API_KEY` (configured server-side only)
 - Note: Uses internal name "Nova AI" for consistency
+- See: `docs/NOVA_AI.md` for complete architecture details
 
 ## Search providers
 - Aggregated by: `lib/services/literature-search.service.ts`

@@ -1,5 +1,3 @@
-"use client"
-
 import { ProductivityMessage, ProductivityUser } from '@/components/ui/productivity-messaging'
 
 export interface NovaAIContext {
@@ -23,13 +21,19 @@ export interface NovaAIResponse {
 
 export class NovaAIService {
   private static instance: NovaAIService
-  private nebiusApiKey: string
-  
+  private groqApiKey: string
+  private novaChatModel: string
+
   constructor() {
-    // Use server-side env var instead of client-side for security
-    this.nebiusApiKey = process.env.NEBIUS_API_KEY || process.env.NEXT_PUBLIC_NEBIUS_API_KEY || ''
+    // Use ONLY server-side env var for Groq API (security: never expose via NEXT_PUBLIC)
+    this.groqApiKey = process.env.GROQ_API_KEY || ''
+    this.novaChatModel = process.env.NOVA_CHAT_MODEL || 'llama-3.1-8b-instant'
+
+    if (!this.groqApiKey) {
+      console.warn('NovaAIService: GROQ_API_KEY not found in environment variables')
+    }
   }
-  
+
   public static getInstance(): NovaAIService {
     if (!NovaAIService.instance) {
       NovaAIService.instance = new NovaAIService()
@@ -38,15 +42,20 @@ export class NovaAIService {
   }
 
   /**
-   * Process a message with Nova using Nebius API
+   * Process a message with Nova AI using Groq API
    */
   async processMessage(
     message: string,
-    context: NovaAIContext
+    context: NovaAIContext,
+    options?: { temperature?: number; maxTokens?: number }
   ): Promise<NovaAIResponse> {
     try {
+      if (!this.groqApiKey) {
+        throw new Error('GROQ API key is not configured')
+      }
+
       const systemPrompt = this.buildSystemPrompt(context)
-      
+
       // Lightweight debug to help diagnose intermittent behavior without exposing secrets
       try {
         console.debug('[NovaAI] processMessage', {
@@ -56,29 +65,43 @@ export class NovaAIService {
           mentionedUsers: context.mentionedUsers?.length || 0
         })
       } catch {}
-      
-      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+
+      // Build request body with optional web search tools for compound-mini model
+      const requestBody: any = {
+        model: this.novaChatModel, // Configurable via NOVA_CHAT_MODEL env variable
+        max_tokens: options?.maxTokens || 1000,
+        temperature: options?.temperature ?? 0.5,
+        top_p: 0.9,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ]
+      }
+
+      // Enable web search tools if using Research Assistant model (compound-mini)
+      const researchAssistantModel = process.env.RESEARCH_ASSISTANT_MODEL || 'groq/compound-mini'
+      if (this.novaChatModel.includes('compound') || this.novaChatModel === researchAssistantModel) {
+        console.log('[NovaAI] Enabling web_search tool for compound model:', this.novaChatModel)
+        requestBody.compound_custom = {
+          tools: {
+            enabled_tools: ['web_search']
+          }
+        }
+      }
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.nebiusApiKey}`
+          'Authorization': `Bearer ${this.groqApiKey}`
         },
-        body: JSON.stringify({
-          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
-          max_tokens: 1000,
-          temperature: 0.6,
-          top_p: 0.9,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: message }
-          ]
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Nebius API error:', response.status, errorData)
-        throw new Error(`Nebius API error: ${errorData.error?.message || response.statusText}`)
+        console.error('Nova AI (Groq) API error:', response.status, errorData)
+        throw new Error(`Nova AI API error: ${errorData.error?.message || response.statusText}`)
       }
 
       const data = await response.json()
@@ -87,7 +110,7 @@ export class NovaAIService {
     } catch (error) {
       console.error('Nova error:', error)
       return {
-        content: "I'm having trouble connecting right now. Please check your Nebius API configuration and try again!",
+        content: "I'm having trouble connecting right now. Please check your Nova AI configuration and try again!",
         confidence: 0,
         type: 'response'
       }
@@ -95,7 +118,7 @@ export class NovaAIService {
   }
 
   /**
-   * Process a message with Nova using streaming
+   * Process a message with Nova AI using streaming
    */
   async processMessageStream(
     message: string,
@@ -105,8 +128,13 @@ export class NovaAIService {
     onError: (error: Error) => void
   ): Promise<void> {
     try {
+      if (!this.groqApiKey) {
+        onError(new Error('GROQ API key is not configured'))
+        return
+      }
+
       const systemPrompt = this.buildSystemPrompt(context)
-      
+
       // Lightweight debug to help diagnose intermittent behavior without exposing secrets
       try {
         console.debug('[NovaAI] processMessageStream', {
@@ -116,30 +144,44 @@ export class NovaAIService {
           mentionedUsers: context.mentionedUsers?.length || 0
         })
       } catch {}
-      
-      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+
+      // Build request body with optional web search tools for compound-mini model
+      const requestBody: any = {
+        model: this.novaChatModel, // Configurable via NOVA_CHAT_MODEL env variable
+        max_tokens: 1000,
+        temperature: 0.5,
+        top_p: 0.9,
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ]
+      }
+
+      // Enable web search tools if using Research Assistant model (compound-mini)
+      const researchAssistantModel = process.env.RESEARCH_ASSISTANT_MODEL || 'groq/compound-mini'
+      if (this.novaChatModel.includes('compound') || this.novaChatModel === researchAssistantModel) {
+        console.log('[NovaAI] Enabling web_search tool for compound model:', this.novaChatModel)
+        requestBody.compound_custom = {
+          tools: {
+            enabled_tools: ['web_search']
+          }
+        }
+      }
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.nebiusApiKey}`
+          'Authorization': `Bearer ${this.groqApiKey}`
         },
-        body: JSON.stringify({
-          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
-          max_tokens: 1000,
-          temperature: 0.6,
-          top_p: 0.9,
-          stream: true,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: message }
-          ]
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Nebius API error:', response.status, errorData)
-        throw new Error(`Nebius API error: ${errorData.error?.message || response.statusText}`)
+        console.error('Nova AI (Groq) API error:', response.status, errorData)
+        throw new Error(`Nova AI API error: ${errorData.error?.message || response.statusText}`)
       }
 
       if (!response.body) {
@@ -259,32 +301,32 @@ Focus on:
       .join('\n')
 
     try {
-      const response = await fetch('https://api.studio.nebius.com/v1/chat/completions', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.nebiusApiKey}`
+          'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "meta-llama/Llama-3.3-70B-Instruct-fast",
+          model: this.novaChatModel, // Configurable via NOVA_CHAT_MODEL env variable
           max_tokens: 200,
-          temperature: 0.8,
+          temperature: 0.7,
           top_p: 0.9,
           messages: [
-            { 
-              role: "system", 
-              content: 'You are a productivity assistant. Provide concise, actionable suggestions.' 
+            {
+              role: "system",
+              content: 'You are a productivity assistant. Provide concise, actionable suggestions.'
             },
-            { 
-              role: "user", 
-              content: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}` 
+            {
+              role: "user",
+              content: `Based on this conversation, suggest 3 helpful follow-up questions or actions:\n\n${conversationContext}`
             }
           ]
         })
       })
 
       if (!response.ok) {
-        throw new Error(`Nebius API error: ${response.statusText}`)
+        throw new Error(`Nova AI API error: ${response.statusText}`)
       }
 
       const data = await response.json()
@@ -368,6 +410,9 @@ Please provide a helpful, contextual response as Nova, a productivity-focused as
       fileContents: context.fileContents?.map(f => ({ name: f.name, contentLength: f.content.length }))
     })
     
+    // Check if web search is available (compound models)
+    const hasWebSearch = this.novaChatModel.includes('compound')
+
     const basePrompt = `You are Nova, a specialized research collaboration assistant for academic teams and research hubs.
 
 Your role is to:
@@ -376,7 +421,7 @@ Your role is to:
 - Provide guidance on academic citations, formatting, and best practices
 - Support collaborative research workflows and knowledge sharing
 - Maintain a professional, scholarly tone appropriate for academic discourse
-- Suggest relevant research tools, databases, and methodologies when appropriate
+- Suggest relevant research tools, databases, and methodologies when appropriate${hasWebSearch ? '\n- Use web search to find current information, research papers, and validate facts' : ''}
 
 RESEARCH CAPABILITIES:
 - Literature review assistance and paper analysis
@@ -384,7 +429,7 @@ RESEARCH CAPABILITIES:
 - Research methodology guidance and experimental design
 - Data analysis interpretation and statistical insights
 - Grant writing and research proposal assistance
-- Conference presentation and publication support
+- Conference presentation and publication support${hasWebSearch ? '\n- Real-time web search for current research, papers, and information' : ''}
 
 FORMATTING REQUIREMENTS:
 - Use proper GitHub-Flavored Markdown (GFM) for all content

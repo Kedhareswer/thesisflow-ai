@@ -302,7 +302,7 @@ export default function ResearchAssistant() {
           <section className="mb-6">
             <div className="flex items-center justify-center gap-2 text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-200">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Powered by Nova AI (Llama-3.3-70B) - Optimized for research</span>
+              <span>Powered by Nova AI - Optimized for research</span>
             </div>
           </section>
 

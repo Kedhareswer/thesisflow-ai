@@ -182,7 +182,8 @@ export class DataExtractionService {
 
   private async generateSummaryWithNovaAI(text: string): Promise<{ summary: string; keyPoints: string[] }> {
     const groqApiKey = process.env.GROQ_API_KEY
-    
+    const dataExtractionModel = process.env.DATA_EXTRACTION_MODEL || 'groq/compound-mini'
+
     if (!groqApiKey) {
       console.warn('Groq API key not configured, falling back to basic summary')
       const fallbackSummary = this.fallbackSummary(text)
@@ -212,15 +213,15 @@ export class DataExtractionService {
     ].join('\n')
 
     try {
-      console.log('[Data Extraction] Making request to Groq API for summary...')
+      console.log('[Data Extraction] Making request to Groq API for summary using model:', dataExtractionModel)
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${groqApiKey}`
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: dataExtractionModel,
           max_tokens: 2000,
           temperature: 0.7,
           top_p: 0.9,

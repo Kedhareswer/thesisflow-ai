@@ -20,6 +20,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if GROQ API key is available (Nova AI only, no fallback)
+    const groqApiKey = process.env.GROQ_API_KEY
+    if (!groqApiKey) {
+      console.error('Nova AI: GROQ_API_KEY not configured')
+      return NextResponse.json(
+        { error: 'Nova AI service is not configured. Please set GROQ_API_KEY environment variable.' },
+        { status: 503 }
+      )
+    }
+
     const novaService = NovaAIService.getInstance()
 
     if (stream) {

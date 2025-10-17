@@ -173,9 +173,9 @@ export async function GET(request: NextRequest) {
               maxTokens,
               temperature,
               userId: user.id,
-              onToken: (token) => send({ type: "token", token }),
-              onProgress: (p) => send({ type: "progress", ...p }),
-              onError: (err) => {
+              onToken: (token: string) => send({ type: "token", token }),
+              onProgress: (p: { message?: string; percentage?: number }) => send({ type: "progress", ...p }),
+              onError: (err: string) => {
                 // Sanitize error payload to prevent leaking internal details
                 const errorPayload = err && typeof err === 'object'
                   ? {

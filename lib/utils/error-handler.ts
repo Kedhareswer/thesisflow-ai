@@ -39,6 +39,59 @@ export interface ErrorContext {
 
 export class ErrorHandler {
   /**
+   * Check if error is from Chrome extension and should be suppressed
+   */
+  static isChromeExtensionError(error: unknown): boolean {
+    const errorMessage = this.extractErrorMessage(error)
+    const errorLower = errorMessage.toLowerCase()
+    
+    // Common Chrome extension error patterns
+    return (
+      errorLower.includes('chrome-extension://') ||
+      errorLower.includes('contentscript.bundle.js') ||
+      errorLower.includes('web_accessible_resources') ||
+      errorLower.includes('extension context invalidated') ||
+      errorLower.includes('could not establish connection') ||
+      (errorLower.includes('net::err_failed') && errorLower.includes('chrome-extension'))
+    )
+  }
+
+  /**
+   * Initialize global error suppression for Chrome extensions
+   */
+  static initializeChromeExtensionErrorSuppression() {
+    if (typeof window === 'undefined') return
+
+    // Suppress Chrome extension console errors
+    const originalConsoleError = console.error
+    console.error = (...args: any[]) => {
+      const errorString = args.join(' ')
+      if (this.isChromeExtensionError(errorString)) {
+        // Silently ignore Chrome extension errors
+        return
+      }
+      originalConsoleError.apply(console, args)
+    }
+
+    // Suppress Chrome extension window errors
+    window.addEventListener('error', (event) => {
+      if (this.isChromeExtensionError(event.error || event.message)) {
+        event.preventDefault()
+        event.stopPropagation()
+        return false
+      }
+    })
+
+    // Suppress Chrome extension unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      if (this.isChromeExtensionError(event.reason)) {
+        event.preventDefault()
+        return false
+      }
+    })
+  }
+
+  /**
    * Process any error and return user-friendly error information
    */
   static processError(error: unknown, context: ErrorContext): UserFriendlyError {

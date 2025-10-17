@@ -119,8 +119,6 @@ export const GET = withTokenValidation(
             try {
               await aiService.generateTextStream({
                 prompt: fullPrompt,
-                provider: provider,
-                model: model,
                 temperature: temperature,
                 maxTokens: maxTokens,
                 userId: userId,

@@ -5,12 +5,9 @@ import { ArrowRight, Bot, ChevronDown, ChevronUp, Send, Copy, Trash2, Check, Bra
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { motion, AnimatePresence } from "framer-motion"
-import { NovaAIService, type NovaAIContext } from "@/lib/services/nova-ai.service"
+import type { NovaAIContext } from "@/lib/services/nova-ai.service"
 import { useToast } from "@/hooks/use-toast"
 import { useResearchSession } from "@/components/research-session-provider"
 import { Response } from "@/src/components/ai-elements/response"
@@ -22,11 +19,11 @@ import { Source, Sources, SourcesContent, SourcesTrigger } from "@/src/component
 import { Branch, BranchMessages, BranchSelector, BranchPrevious, BranchNext, BranchPage } from "@/src/components/ai-elements/branch"
 import { Task, TaskTrigger, TaskContent, TaskItem, TaskItemFile } from "@/src/components/ai-elements/task"
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from "@/src/components/ai-elements/tool"
-import { 
-  InlineCitation, 
-  InlineCitationText, 
-  InlineCitationCard, 
-  InlineCitationCardTrigger, 
+import {
+  InlineCitation,
+  InlineCitationText,
+  InlineCitationCard,
+  InlineCitationCardTrigger,
   InlineCitationCardBody,
   InlineCitationCarousel,
   InlineCitationCarouselContent,
@@ -203,6 +200,13 @@ export function ResearchAssistant({
     hasContext, 
     contextSummary 
   } = useResearchSession()
+
+  // Create a deferred version of addChatMessage to avoid setState during render
+  const deferredAddChatMessage = useCallback((role: 'user' | 'assistant', content: string, contextUsed?: string[]) => {
+    setTimeout(() => {
+      addChatMessage(role, content, contextUsed)
+    }, 0)
+  }, [addChatMessage])
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
@@ -333,65 +337,97 @@ export function ResearchAssistant({
       const abortController = new AbortController()
       setStreamingAbortController(abortController)
 
-      // Use Nova AI streaming
-      const novaService = NovaAIService.getInstance()
-      await novaService.processMessageStream(
-        contextualMessage,
-        novaContext,
-        // onChunk
-        (chunk: string) => {
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, content: msg.content + chunk }
-              : msg
-          ))
+      // Use Nova AI via API route with streaming
+      const response = await fetch('/api/nova/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        // onComplete
-        (response) => {
-          console.log('Nova AI streaming complete:', response)
-          setIsTyping(false)
-          setIsSending(false)
-          setStreamingAbortController(null)
-          
-          // Mark reasoning as complete and clear shortly after
-          setReasoningLines(['Response complete'])
-          setReasoningProgress(100)
-          setTimeout(() => {
-            setReasoningLines([])
-            setReasoningProgress(undefined)
-          }, 600)
-          
-          // Save messages to session
-          addChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
-          
-          // Save the assistant message
-          setTimeout(() => {
-            setMessages(currentMessages => {
-              const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
-              if (finalMessage?.content) {
-                addChatMessage('assistant', finalMessage.content, researchContext ? ['research_context'] : undefined)
+        body: JSON.stringify({
+          message: contextualMessage,
+          context: novaContext,
+          stream: true
+        }),
+        signal: abortController.signal
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to get response' }))
+        throw new Error(errorData.error || 'Failed to get response from Nova AI')
+      }
+
+      if (!response.body) {
+        throw new Error('No response body received')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim()
+              if (data === '[DONE]') {
+                // Stream complete
+                setIsTyping(false)
+                setIsSending(false)
+                setStreamingAbortController(null)
+
+                // Mark reasoning as complete and clear shortly after
+                setReasoningLines(['Response complete'])
+                setReasoningProgress(100)
+                setTimeout(() => {
+                  setReasoningLines([])
+                  setReasoningProgress(undefined)
+                }, 600)
+
+                // Save messages to session (deferred to avoid setState during render)
+                deferredAddChatMessage('user', userMessageContent, researchContext ? ['research_context'] : undefined)
+
+                // Save the assistant message
+                setTimeout(() => {
+                  setMessages(currentMessages => {
+                    const finalMessage = currentMessages.find(msg => msg.id === assistantMessageId)
+                    if (finalMessage?.content) {
+                      deferredAddChatMessage('assistant', finalMessage.content, researchContext ? ['research_context'] : undefined)
+                    }
+                    return currentMessages
+                  })
+                }, 100)
+                return
               }
-              return currentMessages
-            })
-          }, 100)
-        },
-        // onError
-        (error: Error) => {
-          console.error('Nova AI streaming error:', error)
-          if (error.message !== 'Stream aborted by user') {
-            toast({
-              title: "Error",
-              description: error.message || 'Failed to get response from Nova AI',
-              variant: "destructive"
-            })
+
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed.chunk) {
+                  // Handle streaming chunk
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: msg.content + parsed.chunk }
+                      : msg
+                  ))
+                } else if (parsed.error) {
+                  throw new Error(parsed.error)
+                }
+              } catch (e) {
+                // Skip invalid JSON lines
+                if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+                  console.error('Error parsing stream data:', e)
+                }
+              }
+            }
           }
-          setIsTyping(false)
-          setIsSending(false)
-          setStreamingAbortController(null)
-          setReasoningLines([])
-          setReasoningProgress(undefined)
         }
-      )
+      } finally {
+        reader.releaseLock()
+      }
 
     } catch (error) {
       console.error("Error sending message:", error)
@@ -455,10 +491,11 @@ export function ResearchAssistant({
       {/* Header */}
       <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold">Research Assistant</h3>
-          {selectedPersonality && (
-            <span className="text-sm text-muted-foreground">
-              ({selectedPersonality.name} mode)
+          <h3 className="font-semibold text-lg">Research Assistant</h3>
+          {selectedPersonality && SelectedPersonalityIcon && (
+            <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
+              <SelectedPersonalityIcon className="w-4 h-4" />
+              {selectedPersonality.name}
             </span>
           )}
         </div>
@@ -603,54 +640,51 @@ export function ResearchAssistant({
           )
         )}
         
-        {/* Nova AI Status Indicator */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-200">
+        {/* Nova AI Status and Personality Selector */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span>Powered by Nova AI (Llama-3.3-70B) - Research Optimized</span>
+            <span>Powered by Nova AI</span>
           </div>
 
           {/* Personality Selector */}
-          {personalities.length > 0 && (
-            <DropdownMenu
-              trigger={
-                <Button variant="outline" size="sm" className="h-8">
-                  {selectedPersonality ? (
-                    <>
-                      {SelectedPersonalityIcon && (
-                         <SelectedPersonalityIcon className="w-4 h-4" />
-                       )}
-                      <span className="ml-2">{selectedPersonality.name}</span>
-                    </>
-                  ) : (
-                    <span>Select Personality</span>
-                  )}
-                  <ChevronDown className="w-3 h-3 ml-2" />
-                </Button>
-              }
+          {personalities.length > 0 && onPersonalityChange && (
+            <Select
+              value={selectedPersonality?.key}
+              onValueChange={(value) => {
+                const personality = personalities.find((p) => p.key === value)
+                if (personality) {
+                  onPersonalityChange(personality)
+                }
+              }}
             >
-              {personalities.map((personality) => (
-                <DropdownMenuItem
-                  key={personality.key}
-                  onClick={() => onPersonalityChange?.(personality)}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      {(() => { const Icon = personality.icon; return <Icon className="w-4 h-4" /> })()}
-                      <div>
-                        <div className="font-medium">{personality.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {personality.description}
+              <SelectTrigger className="w-[200px] h-9">
+                {selectedPersonality && SelectedPersonalityIcon && (
+                  <div className="flex items-center gap-2">
+                    <SelectedPersonalityIcon className="w-4 h-4" />
+                    <SelectValue>{selectedPersonality.name}</SelectValue>
+                  </div>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                {personalities.map((personality) => {
+                  const Icon = personality.icon
+                  return (
+                    <SelectItem key={personality.key} value={personality.key}>
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-4 h-4" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{personality.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {personality.description}
+                          </span>
                         </div>
                       </div>
-                    </div>
-                    {selectedPersonality?.key === personality.key && (
-                      <Check className="w-4 h-4 text-primary" />
-                    )}
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenu>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
           )}
         </div>
 

@@ -24,9 +24,18 @@
 
 ## AI Service
 - Server-side AI integration via:
-  - `lib/enhanced-ai-service.ts` (simplified, single provider)
-  - Direct Llama-3.3-70B integration
-  - Research-optimized for academic tasks
+  - `lib/enhanced-ai-service.ts` (multi-model optimization)
+  - `lib/services/nova-ai.service.ts` (NOVA Chat)
+  - `lib/services/paraphrase.service.ts` (Paraphrasing)
+  - `lib/services/topic-report-agents.ts` (Multi-agent reports)
+  - `lib/config/model-presets.ts` (7 Groq models)
+- Multi-model architecture:
+  - Qwen 3 32B (Chat - thinking mode + dialogue)
+  - Llama 4 Scout (Summarization - 128K context)
+  - Llama 3.1 8B Instant (Paraphrasing - ultra-fast)
+  - GPT-OSS 120B (Report synthesis - frontier reasoning)
+  - Llama 3.3 70B (General purpose fallback)
+  - GPT-OSS 20B, Llama 4 Maverick (Additional options)
 - No user API key management - all configuration server-side
 - Environment variable: `GROQ_API_KEY`
 

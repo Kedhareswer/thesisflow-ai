@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 import { useSupabaseAuth } from '@/components/supabase-auth-provider'
 import { useToast } from '@/hooks/use-toast'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/integrations/supabase/client'
 import { planCache } from '@/lib/services/cache.service'
 
 interface UserPlan {
@@ -30,7 +30,7 @@ export function useUserPlan() {
   const [planData, setPlanData] = useState<PlanData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const supabaseRef = useRef<typeof supabase | null>(null)
   const subscriptionRef = useRef<any>(null)
   const subscriptionTokensRef = useRef<any>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -141,42 +141,9 @@ export function useUserPlan() {
   // Move fetchTokenStatus above incrementUsage to avoid 'used before declaration' lint
   const fetchTokenStatus = useCallback(async () => {
     if (!user || !session) return
-    try {
-      const supa = ensureSupabase()
-      const { data, error } = await supa
-        .from('user_tokens')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-      if (error) throw error
-      if (data) {
-        const monthlyLimit = Number((data as any).monthly_limit ?? 0)
-        const monthlyUsed = Number((data as any).monthly_tokens_used ?? 0)
-        const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed)
-        const rawReset = (data as any).last_monthly_reset
-        let isoReset: string | undefined = undefined
-        if (rawReset != null) {
-          try {
-            const d = new Date(rawReset)
-            if (!isNaN(d.getTime())) isoReset = d.toISOString()
-          } catch {}
-        }
-        setTokenStatus({
-          monthlyUsed,
-          monthlyLimit,
-          monthlyRemaining,
-          lastMonthlyReset: isoReset,
-        })
-        return
-      }
-      // Fall through to HTTP fallback when no row
-    } catch (err) {
-      // Try HTTP fallback if direct query failed
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Direct Supabase token fetch failed; trying /api/user/tokens fallback', err)
-      }
-    }
-    // Fallback to API route which also upserts default row when missing
+    
+    // Use API endpoint directly to avoid direct Supabase query issues
+    // This also handles creating default rows when missing
     try {
       const resp = await fetch('/api/user/tokens', {
         headers: {
@@ -199,10 +166,14 @@ export function useUserPlan() {
           monthlyRemaining: Number(data.monthlyRemaining ?? data?.data?.monthlyRemaining ?? 0),
           lastMonthlyReset: isoReset,
         })
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Token status fetch failed:', resp.status, resp.statusText)
+        }
       }
-    } catch (fallbackErr) {
+    } catch (err) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('Fallback /api/user/tokens also failed', fallbackErr)
+        console.warn('/api/user/tokens failed', err)
       }
     }
   }, [user?.id, session?.access_token])
@@ -388,10 +359,7 @@ export function useUserPlan() {
 
   const ensureSupabase = () => {
     if (!supabaseRef.current) {
-      supabaseRef.current = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+      supabaseRef.current = supabase
     }
     return supabaseRef.current
   }
@@ -433,7 +401,7 @@ export function useUserPlan() {
           table: 'user_usage',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
+        (payload: any) => {
           if (process.env.NODE_ENV === 'development') {
             console.log('Usage updated:', payload)
           }

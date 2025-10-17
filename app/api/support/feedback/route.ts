@@ -17,8 +17,17 @@ const feedbackSchema = z.object({
   metadata: z.record(z.any()).optional(),
 })
 
-// Local JSON fallback store - ephemeral temp location to prevent PII persistence
-const storeDir = path.join(os.tmpdir(), 'thesisflow-ai', 'support', '_store')
+// Local JSON fallback store - use runtime data directory or system temp to avoid committing PII
+const getRuntimeDataDir = () => {
+  // Prefer environment-defined runtime data directory
+  if (process.env.RUNTIME_DATA_DIR) {
+    return process.env.RUNTIME_DATA_DIR
+  }
+  // Fallback to system temp directory
+  return process.platform === 'win32' ? process.env.TEMP || os.tmpdir() : '/tmp'
+}
+
+const storeDir = path.join(getRuntimeDataDir(), 'thesisflow-support')
 const feedbackFile = path.join(storeDir, 'feedback.json')
 
 async function ensureStore() {

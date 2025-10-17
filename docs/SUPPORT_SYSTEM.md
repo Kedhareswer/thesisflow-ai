@@ -122,25 +122,55 @@ User can send or modify
 ## Configuration
 
 ### Environment Variables
-None required - fully client-side system
+- **RUNTIME_DATA_DIR** (optional): Custom directory for local fallback storage
+  - Windows default: `%TEMP%`
+  - Unix default: `/tmp`
+- **NEXT_PUBLIC_SUPABASE_URL**: Supabase project URL (for ticket/feedback persistence)
+- **SUPABASE_SERVICE_ROLE_KEY**: Admin key for server-side operations
 
 ### Customization Points
 1. **Intent Keywords**: Modify `data/support/intents.json`
 2. **Response Templates**: Update files in `data/support/responses/`
-3. **Broadcast Messages**: Hardcoded in SupportPanel component
+3. **Broadcast Messages**: Automatically loaded from `data/changelog.json` (latest release)
 4. **Styling**: ThesisFlow-AI orange (#FF6B2C) theme
+5. **Storage Path**: Set `RUNTIME_DATA_DIR` environment variable for custom ticket/feedback storage location
+
+## API Endpoints
+
+### Support Tickets (`/api/support/tickets`)
+- **Purpose**: Create and retrieve support tickets
+- **Methods**: GET (retrieve), POST (create)
+- **Storage**: Supabase (primary) with local file fallback
+- **Fallback Location**: `{RUNTIME_DATA_DIR}/thesisflow-support/tickets.json`
+- **Schema**: email (optional), subject, category, severity, description, pageUrl, browser, sessionId
+
+### Support Feedback (`/api/support/feedback`)
+- **Purpose**: Collect user feedback and suggestions
+- **Methods**: GET (retrieve), POST (submit)
+- **Storage**: Supabase (primary) with local file fallback
+- **Fallback Location**: `{RUNTIME_DATA_DIR}/thesisflow-support/feedback.json`
+- **Schema**: email (optional), subject, category, rating, description, pageUrl, sessionId
+
+### Environment Variables
+- **RUNTIME_DATA_DIR** (optional): Custom directory for local fallback storage
+  - Windows default: `%TEMP%`
+  - Unix default: `/tmp`
+- **NEXT_PUBLIC_SUPABASE_URL**: Supabase project URL (for ticket/feedback persistence)
+- **SUPABASE_SERVICE_ROLE_KEY**: Admin key for server-side operations
 
 ## Security Considerations
 
 ### Data Privacy
-- **Local Storage**: All data stored client-side
-- **No Server Persistence**: No conversation data sent to servers
-- **User Control**: Clear, export, delete options available
+- **Conversation Storage**: Chat history stored in browser localStorage only
+- **Ticket/Feedback Persistence**: Stored in Supabase with RLS policies or local filesystem as fallback
+- **User Control**: Clear, export, delete options available for chat history
+- **PII Protection**: Local fallback files stored in system temp directory (not committed to repo)
 
 ### Content Security
-- **No External Calls**: No AI/LLM API dependencies
-- **Deterministic**: All responses from local templates
+- **No AI/LLM Dependencies**: Support responses use deterministic rule-based system (no external AI calls)
+- **Deterministic**: All chat responses from local JSON templates
 - **Input Sanitization**: Basic text processing only
+- **API Authentication**: Supabase JWT for ticket/feedback endpoints
 
 ## Performance
 
@@ -174,13 +204,24 @@ None required - fully client-side system
 - Optimize intent classification
 - Expand knowledge base as needed
 
-## Future Enhancements
+## Current Implementation Status
+
+### Completed Features ✅
+- **Ticket System**: Full ticket creation and retrieval via API
+- **Feedback System**: User feedback collection with rating support
+- **Dynamic Broadcasts**: Automatic loading from changelog data
+- **Dual Storage**: Supabase primary with local file fallback
+- **User Forms**: In-chat ticket and feedback form interfaces
+- **Privacy Controls**: Export and delete conversation data
+
+### Future Enhancements
 
 ### Phase 2 Possibilities
 - **RAG Integration**: Add embeddings for doc search
-- **Form Support**: Contact forms and bug reports
+- **Email Notifications**: Send confirmation emails for tickets/feedback
+- **Admin Dashboard**: View and manage tickets/feedback
 - **Multi-language**: i18n support
-- **Advanced Analytics**: Conversation analysis
+- **Advanced Analytics**: Conversation analysis and intent tracking
 - **Human Handoff**: Escalation to support team
 
 ### Scalability

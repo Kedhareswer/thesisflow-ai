@@ -388,7 +388,7 @@ export async function GET(request: NextRequest) {
 
       send({ type: 'progress', message: 'Search complete, preparing summary', total: scored.length })
 
-      // Summarization via user's selected provider/model (no env fallback)
+      // Summarization via user's selected provider/model with browser search for deep research
       let summarySent = false
       if (provider) {
         try {
@@ -398,19 +398,91 @@ export async function GET(request: NextRequest) {
           } else {
             const top = scored.slice(0, Math.min(12, Math.max(5, Math.floor(limit / 2))))
             const prompt = buildSummaryPrompt(q, top)
-            const result = await enhancedAIService.generateText({
-              prompt,
-              provider,
-              model,
-              maxTokens: 900,
-              temperature: 0.3,
-              userId: user.id,
-            })
-            if (result.success && result.content) {
-              send({ type: 'summary', provider, model, content: result.content })
-              summarySent = true
+
+            // Use DEEP_RESEARCH_MODEL (gpt-oss-120b) with browser search enabled
+            const deepResearchModel = process.env.DEEP_RESEARCH_MODEL || 'gpt-oss-120b'
+
+            // For Groq API with browser search
+            if (provider === 'groq' && deepResearchModel.includes('gpt-oss')) {
+              try {
+                const groqApiKey = process.env.GROQ_API_KEY
+                if (!groqApiKey) {
+                  send({ type: 'notice', message: 'Groq API key not configured for deep research.' })
+                } else {
+                  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${groqApiKey}`
+                    },
+                    body: JSON.stringify({
+                      model: deepResearchModel,
+                      messages: [
+                        {
+                          role: 'system',
+                          content: 'You are ThesisFlow-AI\'s Deep Research assistant. Provide comprehensive, well-researched summaries with citations.'
+                        },
+                        { role: 'user', content: prompt }
+                      ],
+                      max_tokens: 1500,
+                      temperature: 0.3,
+                      reasoning_effort: 'low', // Cost control for deep research
+                      tools: [
+                        {
+                          type: 'browser_search',
+                          browser_search: {
+                            enabled: true
+                          }
+                        }
+                      ]
+                    })
+                  })
+
+                  if (response.ok) {
+                    const data = await response.json()
+                    const content = data.choices?.[0]?.message?.content
+                    if (content) {
+                      send({ type: 'summary', provider, model: deepResearchModel, content })
+                      summarySent = true
+                    } else {
+                      throw new Error('No content in Groq response')
+                    }
+                  } else {
+                    const errorData = await response.json().catch(() => ({}))
+                    console.error('Groq deep research error:', response.status, errorData)
+                    throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`)
+                  }
+                }
+              } catch (e) {
+                console.error('Browser search deep research failed, falling back to standard:', e)
+                // Fallback to standard enhancedAIService
+                const result = await enhancedAIService.generateText({
+                  prompt,
+                  maxTokens: 900,
+                  temperature: 0.3,
+                  userId: user.id,
+                })
+                if (result.success && result.content) {
+                  send({ type: 'summary', provider, model, content: result.content })
+                  summarySent = true
+                } else {
+                  send({ type: 'notice', message: result.error || 'Summarization failed. Configure API keys in Settings.' })
+                }
+              }
             } else {
-              send({ type: 'notice', message: result.error || 'Summarization failed. Configure API keys in Settings.' })
+              // Use standard enhancedAIService for non-Groq providers
+              const result = await enhancedAIService.generateText({
+                prompt,
+                maxTokens: 900,
+                temperature: 0.3,
+                userId: user.id,
+              })
+              if (result.success && result.content) {
+                send({ type: 'summary', provider, model, content: result.content })
+                summarySent = true
+              } else {
+                send({ type: 'notice', message: result.error || 'Summarization failed. Configure API keys in Settings.' })
+              }
             }
           }
         } catch (e) {

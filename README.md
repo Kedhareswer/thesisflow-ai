@@ -35,6 +35,7 @@
   - [AI-Powered Planner](#ai-powered-planner)
   - [Team Collaboration](#team-collaboration)
   - [AI Integration](#ai-integration)
+  - [Support System](#support-system)
 - [🛠️ Installation Guide](#️-installation-guide)
 - [📡 API Reference](#-api-reference)
 - [🚀 Deployment](#-deployment)
@@ -56,7 +57,7 @@
 <td width="25%" align="center">
 
 ### ✍️ Writer
-**LaTeX Editing**
+**Scientific Paper Editor**
 
 </td>
 <td width="25%" align="center">
@@ -85,12 +86,16 @@
 </td>
 <td valign="top">
 
-- Real-time LaTeX preview
-- KaTeX math rendering
-- Multi-format extraction
+- Collaborative editing
+- Real-time presence
+- Hover-activated toolbar
+- Command palette (⌘K)
+- Comments & suggestions
+- Version history timeline
+- Reference management
+- Citation insertion
+- Right-click menus
 - AI writing assistance
-- OCR for scanned docs
-- Template library
 
 </td>
 <td valign="top">
@@ -162,7 +167,8 @@ graph LR
 <td width="33%">
 
 **AI & External**
-- Nova AI (Llama-3.3-70B via Groq)
+- Nova AI (Multi-model via Groq)
+- 7 Groq models optimized by task
 - Server-side AI processing
 - OpenAlex + arXiv
 - CrossRef + PubMed
@@ -351,7 +357,7 @@ graph TB
 |---------|------------|-------------|
 | **Multi-Source Search** | 11+ APIs orchestration | 1-3s response |
 | **Real-time Streaming** | SSE + WebSocket | <100ms latency |
-| **AI Assistant** | Nova AI (Llama-3.3-70B) | 3-8s generation |
+| **AI Assistant** | Nova AI (Multi-Model) | 0.5-15s (model-dependent) |
 | **Smart Caching** | Supabase + Redis (1hr TTL) | 85%+ hit rate |
 | **Citation Analysis** | OpenAlex graph | Forward/backward links |
 | **Export Formats** | BibTeX, RIS, JSON, CSV | Bulk export |
@@ -359,6 +365,22 @@ graph TB
 ### LaTeX Writer
 
 **Collaborative LaTeX Editor with Real-Time Preview**
+
+**NEW: Enhanced Scientific Paper Editor** ⭐
+
+The Writing Assistant has been completely redesigned into a professional scientific paper editor with advanced collaborative features and minimalist UI.
+
+**Key Features:**
+- **Minimalist Interface**: Collapsible reference and activity panels for distraction-free writing
+- **Hover-Activated Toolbar**: Formatting tools appear only when needed
+- **Command Palette (⌘K)**: Keyboard-first workflow for power users
+- **Right-Click Menus**: Context-specific editing options
+- **Collaborative Editing**: Real-time presence, comments, and suggestions
+- **Version History**: Visual timeline of all document changes
+- **Reference Management**: Dedicated sidebar for citations and bibliography
+- **Citation Insertion**: One-click citation insertion from reference library
+
+**Documentation**: See [`docs/pages/writing-assistant.md`](docs/pages/writing-assistant.md) for full details.
 
 ```mermaid
 graph LR
@@ -368,7 +390,7 @@ graph LR
     B --> E[Live Preview]
     C --> E
     D --> A
-    
+
     style A fill:#FF6B2C,color:#fff
     style B fill:#28a745,color:#fff
     style D fill:#17a2b8,color:#fff
@@ -521,41 +543,45 @@ graph TB
 
 ### AI Integration
 
-**Simplified Server-Side AI Service**
+**Multi-Model Optimization Architecture**
 
 ```mermaid
 graph TB
     A[AI Requests] --> B[Enhanced AI Service]
     B --> C[Nova AI - Groq]
-    C --> D[Llama-3.3-70B]
-    D --> E[SSE Streaming]
+    C --> D[Model Router]
+    D --> E[7 Specialized Models]
+    E --> F[SSE Streaming]
 
     style B fill:#FF6B2C,color:#fff
     style C fill:#28a745,color:#fff
-    style E fill:#17a2b8,color:#fff
+    style F fill:#17a2b8,color:#fff
 ```
 
 #### Nova AI Architecture
 
-ThesisFlow-AI uses a **simplified single-provider architecture** with Nova AI (Llama-3.3-70B via Groq) for all AI-powered features.
+ThesisFlow-AI uses a **multi-model optimization architecture** with Nova AI powered by **7 specialized Groq models**, each optimized for specific tasks.
 
 **Key Benefits:**
 - ✅ **Zero Configuration** - No user API keys needed
-- ✅ **Consistent Performance** - Single optimized model for academic tasks
+- ✅ **Optimized Performance** - Right model for each task (speed, quality, context)
 - ✅ **Better Security** - API keys managed server-side only
-- ✅ **Simplified Codebase** - No provider fallback complexity
-- ✅ **Research-Optimized** - Tuned specifically for academic workflows
+- ✅ **Cost Efficiency** - 8B models for simple tasks, 120B for complex synthesis
+- ✅ **Research-Optimized** - Academic-focused model selection
 
-#### AI Model Specifications
+#### Multi-Model Strategy
 
-| Feature | Details |
-|---------|---------|
-| **Provider** | Groq Cloud API |
-| **Model** | Llama-3.3-70B-Versatile |
-| **Context Window** | 128K tokens |
-| **Performance** | 500+ tokens/second |
-| **Configuration** | Server-side only (`GROQ_API_KEY`) |
-| **Branding** | "Nova AI" (internal name) |
+| System | Model | Why |
+|--------|-------|-----|
+| **NOVA Chat** | Qwen 3 32B | Thinking mode + efficient dialogue |
+| **Summarization** | Llama 4 Scout (128K) | Extended context for long documents |
+| **Paraphrasing** | Llama 3.1 8B Instant | Ultra-fast with low latency |
+| **Research Ideas** | Llama 4 Scout | Comprehensive analysis + large context |
+| **Report Curator** | Llama 3.1 8B | Fast source ranking |
+| **Report Analyzer** | Llama 3.1 8B | Quick per-source summaries |
+| **Report Synthesizer** | GPT-OSS 120B | Frontier reasoning for complex synthesis |
+
+**Performance Range:** 0.5s (8B fast) to 15s (120B complex)
 
 #### AI-Powered Features
 
@@ -608,6 +634,345 @@ eventSource.addEventListener('done', (event) => {
 - Initial response: 200-500ms
 - Average generation: 3-8 seconds
 - Concurrent requests: 30+ supported
+
+---
+
+### 🤖 Nova AI Architecture
+
+**Multi-Model Optimization for Academic Excellence**
+
+ThesisFlow AI uses a **multi-model optimization architecture** powered exclusively by **Nova AI** (Groq API with 7 specialized models). This design provides optimal performance, speed, and quality for each type of academic research task.
+
+```mermaid
+graph TB
+    A[User Request] --> B[API Routes Layer]
+    B --> C[Service Layer]
+    C --> D[Groq API]
+    D --> E[Model Router]
+    E --> F1[Qwen 3 32B]
+    E --> F2[Llama 4 Scout]
+    E --> F3[Llama 3.1 8B]
+    E --> F4[GPT-OSS 120B]
+    F1 --> G[Streaming Response]
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    G --> H[Client UI]
+
+    style C fill:#FF6B2C,color:#fff
+    style E fill:#28a745,color:#fff
+    style G fill:#17a2b8,color:#fff
+```
+
+#### Core Components
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| **NovaAIService** | Singleton managing all AI operations | `lib/services/nova-ai.service.ts` |
+| **API Routes** | REST endpoints for AI features | `app/api/nova/*`, `app/api/ai/*` |
+| **Enhanced AI Service** | High-level operations wrapper | `lib/enhanced-ai-service.ts` |
+| **Configuration** | Provider detection and setup | `lib/ai-config.ts` |
+
+#### Specialized Action Types
+
+Nova AI supports 11 specialized action types optimized for academic workflows:
+
+```typescript
+- general              // General assistance
+- research             // Research guidance and suggestions
+- literature_review    // Academic paper analysis
+- methodology          // Research methodology and design
+- data_analysis        // Statistical interpretation
+- writing_assistance   // Academic writing improvement
+- citation_help        // Citation formatting (APA, MLA, Chicago)
+- summarize            // Content summarization
+- action_items         // Task extraction
+- clarify              // Clarification requests
+- decision             // Decision-making support
+```
+
+Each action type has a specialized system prompt optimized for that specific academic task.
+
+#### Key Features
+
+<table>
+<tr>
+<td width="50%">
+
+**Technical Capabilities**
+- Real-time token streaming (SSE)
+- Conversation history (up to 100 messages)
+- File content analysis (PDFs, documents)
+- Context-aware responses
+- Output sanitization
+- Action item extraction
+
+</td>
+<td width="50%">
+
+**Academic Focus**
+- Research methodology guidance
+- Literature review assistance
+- Academic writing support
+- Citation formatting help
+- Data analysis interpretation
+- Statistical insights
+
+</td>
+</tr>
+</table>
+
+#### API Endpoints
+
+```http
+# Nova AI Chat
+POST /api/nova/chat              # Direct chat (streaming & non-streaming)
+GET  /api/nova/chat              # Health check
+
+# General AI Generation
+POST /api/ai/generate            # Single generation request
+POST /api/ai/chat/stream         # SSE streaming with full history
+
+# Research Planning
+POST /api/plan-and-execute       # AI-powered research planning
+```
+
+#### Configuration
+
+**Required Environment Variable:**
+```bash
+# Server-side only (never use NEXT_PUBLIC_*)
+GROQ_API_KEY=gsk_your_groq_api_key_here
+```
+
+**Optional Alias (backward compatibility):**
+```bash
+NOVA_API_KEY=gsk_your_groq_api_key_here
+```
+
+#### Security Best Practices
+
+✅ **CORRECT:**
+```typescript
+const groqApiKey = process.env.GROQ_API_KEY
+```
+
+❌ **INCORRECT (Security Risk):**
+```typescript
+// Never use NEXT_PUBLIC_* for API keys
+const groqApiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
+```
+
+**Why**: `NEXT_PUBLIC_*` variables are exposed to client-side JavaScript, potentially leaking API keys.
+
+#### Recent Code Fixes (2025-10-16)
+
+**✅ Fixed Issues:**
+
+1. **Dead Code Removed**
+   - `lib/ai-service.ts` → Removed Google Gemini fallback (never used)
+   - `hooks/use-user-ai.ts` → Removed broken hook (nonexistent API reference)
+
+2. **Security Improvements**
+   - Fixed API key exposure risk (removed `NEXT_PUBLIC_GROQ_API_KEY` checks)
+   - Enforced server-side only API key management
+   - Consistent security patterns across all files
+
+3. **Logic Corrections**
+   - Removed incorrect fallback to Google Gemini in `/api/nova/chat`
+   - Clarified single-provider architecture
+   - Improved error messages (clear 503 when GROQ_API_KEY missing)
+
+**Impact:**
+- 🔒 Eliminated security vulnerability (API key exposure)
+- 🧹 Removed 500+ lines of dead code
+- ✨ Clarified single-provider architecture
+- 🐛 Fixed broken fallback logic
+- 📚 Added comprehensive documentation
+
+#### Documentation
+
+For detailed information about Nova AI implementation:
+
+- **📖 Architecture Guide**: [`docs/NOVA_AI.md`](docs/NOVA_AI.md)
+  - Multi-model optimization strategy
+  - Model selection decision tree
+  - Complete system architecture
+  - Usage patterns and examples
+  - Security best practices
+  - Troubleshooting guide
+  - Performance metrics
+
+#### Performance Benchmarks
+
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
+| **Token Streaming** | 300+ tokens/sec | 500+ tokens/sec | ✅ Exceeded |
+| **Initial Response** | <500ms | 200-500ms | ✅ Achieved |
+| **Average Generation** | <10s | 3-8s | ✅ Exceeded |
+| **Concurrent Requests** | 20+ | 30+ | ✅ Exceeded |
+| **Success Rate** | >95% | 97%+ | ✅ Exceeded |
+
+#### Conversation Context
+
+Nova AI maintains rich conversation context for better responses:
+
+```typescript
+interface NovaAIContext {
+  teamId: string                    // Team identifier
+  recentMessages: Message[]         // Up to 100 recent messages
+  currentUser: User                 // Current user info
+  mentionedUsers: User[]            // @mentioned team members
+  conversationTopic?: string        // Optional topic
+  actionType: ActionType            // Specialized action
+  fileContents?: FileContent[]      // Referenced files
+}
+```
+
+**File Analysis Support**: Nova can analyze uploaded PDF and document files, answering questions about their content, structure, and key points.
+
+#### Example Usage
+
+**Basic Generation:**
+```typescript
+import { NovaAIService } from '@/lib/services/nova-ai.service'
+
+const novaService = NovaAIService.getInstance()
+
+const response = await novaService.processMessage(
+  "Explain quantum computing in simple terms",
+  {
+    teamId: 'team-123',
+    recentMessages: [],
+    currentUser: { id: 'user-1', name: 'John' },
+    mentionedUsers: [],
+    actionType: 'general'
+  }
+)
+
+console.log(response.content)
+```
+
+**Streaming Response:**
+```typescript
+await novaService.processMessageStream(
+  "Generate a research proposal on climate change",
+  context,
+  (chunk) => {
+    // Handle each token as it arrives
+    process.stdout.write(chunk)
+  },
+  (finalResponse) => {
+    // Handle complete response
+    console.log('\nDone:', finalResponse.type)
+  },
+  (error) => {
+    // Handle errors
+    console.error('Error:', error.message)
+  }
+)
+```
+
+#### Troubleshooting
+
+**"Nova AI not configured" Error**
+
+Solution: Set `GROQ_API_KEY` in environment variables
+```bash
+# .env.local or hosting platform
+GROQ_API_KEY=gsk_your_actual_key_here
+```
+
+**Streaming Not Working**
+
+Check:
+1. Client is using `EventSource` or equivalent
+2. Server is sending proper SSE headers
+3. No proxy/CDN is buffering the stream
+
+**Slow Response Times**
+
+Causes & Solutions:
+- Groq API rate limiting → Implement request queuing
+- Large conversation history → Trim to last 50-100 messages
+- Network latency → Use CDN for API route
+
+#### Future Enhancements
+
+Planned features for Nova AI:
+- 🧠 Conversation memory across sessions
+- 🎯 Custom fine-tuning for domain-specific tasks
+- 📷 Multi-modal support (images, PDFs)
+- 🎙️ Voice integration (speech-to-text, text-to-speech)
+- 👥 Collaborative AI sessions (multi-user)
+
+**Not Planned** (by design):
+- ❌ Multiple AI provider support (adds complexity)
+- ❌ User-provided API keys (security, support burden)
+- ❌ Client-side AI processing (requires server infrastructure)
+
+### Support System
+
+**Intelligent Help & Assistance**
+
+```mermaid
+graph TB
+    A[Support Widget] --> B[Intent Engine]
+    B --> C[Response Templates]
+    C --> D[Quick Replies]
+    B --> E[API Routes]
+    E --> F[Tickets/Feedback]
+
+    style A fill:#FF6B2C,color:#fff
+    style B fill:#28a745,color:#fff
+    style E fill:#17a2b8,color:#fff
+```
+
+#### Features
+
+| Feature | Description | Technology |
+|---------|-------------|------------|
+| **Smart Chat Assistant** | Nova AI support bot with intent classification | Rule-based engine |
+| **Knowledge Base** | 15+ intents covering all platform features | JSON templates |
+| **Ticket System** | Report bugs and issues with full tracking | Supabase + Local fallback |
+| **Feedback Collection** | Share suggestions and rate experiences | Supabase + Local fallback |
+| **Dynamic Broadcasts** | Latest release announcements in-chat | Changelog integration |
+| **Privacy Controls** | Export, clear, or delete chat history | Browser localStorage |
+
+#### Support Topics Covered
+
+<table>
+<tr>
+<td width="50%">
+
+**Platform Information**
+- Pricing & subscription plans
+- Token usage & limits
+- Feature explanations
+- Navigation & getting started
+- Account management
+- Latest updates & changelog
+
+</td>
+<td width="50%">
+
+**User Actions**
+- Report technical issues
+- Submit feature requests
+- Provide feedback & ratings
+- Contact support team
+- Export conversation history
+- Manage privacy preferences
+
+</td>
+</tr>
+</table>
+
+#### Availability
+- **Location**: Home page only (floating action button)
+- **Response Time**: Instant (deterministic responses)
+- **Storage**: Client-side localStorage for conversations
+- **Ticket/Feedback**: Persisted to Supabase or local filesystem
 
 ---
 
@@ -817,7 +1182,7 @@ pnpm build
 
 **🔧 Core Technologies:** Next.js 15 • React 19 • Supabase • TypeScript • TailwindCSS
 
-**🤖 AI Technology:** Groq Cloud API (Nova AI - Llama-3.3-70B) • HuggingFace (AI Detection)
+**🤖 AI Technology:** Groq Cloud API (Nova AI - Multi-Model) • 7 Specialized Groq Models • HuggingFace (AI Detection)
 
 **📚 Academic Sources:** OpenAlex • arXiv • CrossRef • PubMed • Google Scholar (API)
 

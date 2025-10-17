@@ -135,7 +135,7 @@ export default function ResearchExplorer() {
                     <EnhancedLiteratureSearch initialQuery={initialQuery} />
                   </TabsContent>
                   <TabsContent value="explore">
-                    <TopicExplorer selectedProvider={selectedProvider} selectedModel={selectedModel} />
+                    <TopicExplorer />
                   </TabsContent>
                   <TabsContent value="ideas">
                     <IdeaGenerator />

@@ -115,6 +115,36 @@ export const MODEL_PRESETS: ModelPreset[] = [
     defaultTemperature: 0.4,
     systemPromptAddon: 'Provide thorough, well-reasoned responses with citations when relevant.'
   },
+  {
+    provider: 'groq',
+    model: 'llama-3.1-8b-instant',
+    defaultTemperature: 0.3,
+    systemPromptAddon: 'Use extended 128K context for comprehensive analysis and synthesis. Excellent for long documents.'
+  },
+  {
+    provider: 'groq',
+    model: 'llama-4-maverick-17bx128moe',
+    defaultTemperature: 0.3,
+    systemPromptAddon: 'Apply large-scale MoE architecture for complex multi-source analysis with 128K context.'
+  },
+  {
+    provider: 'groq',
+    model: 'qwen3-32b',
+    defaultTemperature: 0.4,
+    systemPromptAddon: 'Use thinking mode for complex reasoning and non-thinking mode for efficient dialogue. Excellent agent capabilities.'
+  },
+  {
+    provider: 'groq',
+    model: 'gpt-oss-20b',
+    defaultTemperature: 0.3,
+    systemPromptAddon: 'Apply reasoning capabilities with built-in browser search and code execution support.'
+  },
+  {
+    provider: 'groq',
+    model: 'gpt-oss-120b',
+    defaultTemperature: 0.3,
+    systemPromptAddon: 'Use frontier-level reasoning comparable to o3-mini. Ideal for complex synthesis and report generation.'
+  },
 
   // Mistral
   {
