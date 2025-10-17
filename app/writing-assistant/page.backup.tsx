@@ -318,7 +318,10 @@ Provide your response in the following JSON format:
 
   // --- Real-time Collaboration Setup ---
   const ydoc = React.useMemo(() => new Y.Doc(), []);
-  const provider = React.useMemo(() => new WebsocketProvider("wss://demos.yjs.dev", "writing-assistant", ydoc), [ydoc]);
+  const provider = React.useMemo(() => {
+    const wsUrl = process.env.NEXT_PUBLIC_YJS_WEBSOCKET_URL || "ws://localhost:1234";
+    return new WebsocketProvider(wsUrl, "writing-assistant", ydoc);
+  }, [ydoc]);
   const [awareness] = React.useState(() => provider.awareness);
 
   // Dummy: Replace with real user info from auth/session

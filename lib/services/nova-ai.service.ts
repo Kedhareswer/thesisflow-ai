@@ -44,7 +44,8 @@ export class NovaAIService {
    */
   async processMessage(
     message: string,
-    context: NovaAIContext
+    context: NovaAIContext,
+    options?: { temperature?: number; maxTokens?: number }
   ): Promise<NovaAIResponse> {
     try {
       if (!this.groqApiKey) {
@@ -71,8 +72,8 @@ export class NovaAIService {
         },
         body: JSON.stringify({
           model: "qwen3-32b", // Updated: Qwen 3 32B for thinking mode + efficient dialogue
-          max_tokens: 1000,
-          temperature: 0.5, // Adjusted: Slightly lower for balanced reasoning
+          max_tokens: options?.maxTokens || 1000,
+          temperature: options?.temperature ?? 0.5, // Adjusted: Slightly lower for balanced reasoning
           top_p: 0.9,
           messages: [
             { role: "system", content: systemPrompt },

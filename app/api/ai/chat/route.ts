@@ -37,7 +37,10 @@ export async function POST(request: NextRequest) {
       : message
 
     // Generate AI response using Nova AI
-    const response = await novaService.processMessage(fullMessage, context)
+    const response = await novaService.processMessage(fullMessage, context, {
+      temperature,
+      maxTokens
+    })
 
     return NextResponse.json({
       success: true,

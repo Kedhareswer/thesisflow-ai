@@ -219,7 +219,11 @@ export default function EnhancedScientificEditor() {
   // Collaboration setup
   const ydoc = React.useMemo(() => new Y.Doc(), []);
   const provider = React.useMemo(
-    () => new WebsocketProvider("wss://demos.yjs.dev", "scientific-editor", ydoc),
+    () => {
+      const wsUrl = process.env.NEXT_PUBLIC_YJS_WEBSOCKET_URL || "ws://localhost:1234";
+      const roomId = "scientific-editor";
+      return new WebsocketProvider(wsUrl, roomId, ydoc);
+    },
     [ydoc]
   );
   const [awareness] = React.useState(() => provider.awareness);
@@ -233,6 +237,14 @@ export default function EnhancedScientificEditor() {
   React.useEffect(() => {
     awareness.setLocalStateField("user", user);
   }, [awareness, user]);
+
+  // Cleanup Yjs resources on unmount
+  React.useEffect(() => {
+    return () => {
+      provider.destroy();
+      ydoc.destroy();
+    };
+  }, [provider, ydoc]);
 
   // Tiptap editor
   const editor = useEditor({
@@ -267,8 +279,9 @@ export default function EnhancedScientificEditor() {
   const handleShareInvite = (email: string, permission: "viewer" | "editor") => {
     if (!socket) {
       toast({
-        title: "Invitation Sent",
-        description: `An invitation has been sent to ${email} as ${permission}.`,
+        title: "Unable to Send Invitation",
+        description: "You are currently offline or the collaboration service is unavailable. Please check your connection and try again.",
+        variant: "destructive",
       });
       return;
     }
@@ -577,7 +590,7 @@ export default function EnhancedScientificEditor() {
 
           <DropdownMenu
             trigger={
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" aria-label="More options" aria-haspopup="true">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             }

@@ -1,5 +1,14 @@
 # Enhanced Scientific Paper Editor - Implementation Summary
 
+> ⚠️ **IMPORTANT**: This document describes the **Writing Assistant** page at `/writing-assistant`
+> 
+> This is **NOT** the same as the **AI Writer** page at `/writer`!
+> 
+> - **Writing Assistant** (`/writing-assistant`): Collaborative scientific editor with Y.js, TipTap, real-time presence
+> - **AI Writer** (`/writer`): Document editor with LaTeX, FloatingToolbar, AI context menu
+> 
+> For AI Writer documentation, see: `docs/pages/writer/README.md`
+
 ## ✅ Completed Tasks
 
 ### 1. **Backup & Migration** ✓

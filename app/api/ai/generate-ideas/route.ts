@@ -16,7 +16,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('Idea generation request received:', { topic, context, count, researchLevel })
+    // Only log detailed metadata in non-production environments
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Idea generation request received:', {
+        topicLength: topic?.length || 0,
+        contextLength: context?.length || 0,
+        count: count || 5,
+        researchLevel: researchLevel || 'masters',
+        timestamp: new Date().toISOString()
+      })
+    }
 
     const result = await enhancedAIService.generateResearchIdeas(
       topic,

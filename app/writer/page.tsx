@@ -946,28 +946,161 @@ export default function WriterPage() {
     }
   }
 
-  const handleContextMenuAiAssist = (action: string) => {
-    toast({
-      title: "AI Assistant",
-      description: `${action} action triggered`,
+  const handleContextMenuAiAssist = async (action: string) => {
+    const selection = window.getSelection()
+    const selectedText = selection?.toString() || ""
+
+    if (!selectedText) {
+      toast({
+        title: "No text selected",
+        description: "Please select some text to use AI assistance",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const loadingToast = toast({
+      title: "AI Processing",
+      description: `${action} in progress...`,
     })
-    // In production, integrate with AI writing assistant
+
+    try {
+      const promptMap: Record<string, string> = {
+        improve: `Improve this text for academic writing:\n\n${selectedText}`,
+        summarize: `Summarize this text concisely:\n\n${selectedText}`,
+        expand: `Expand on this text with more detail and examples:\n\n${selectedText}`,
+        simplify: `Simplify this text to make it easier to understand:\n\n${selectedText}`,
+        formal: `Rewrite this text in a more formal, academic tone:\n\n${selectedText}`,
+        casual: `Rewrite this text in a more casual, conversational tone:\n\n${selectedText}`,
+      }
+
+      const prompt = promptMap[action] || `Process this text: ${selectedText}`
+
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: prompt,
+          context: {
+            actionType: "writing_assistance",
+            documentContent: documentContent,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("AI request failed")
+      }
+
+      const data = await response.json()
+      const aiResult = data.response || data.content || ""
+
+      // Replace selected text with AI result
+      const startIndex = documentContent.indexOf(selectedText)
+      if (startIndex !== -1) {
+        const newContent =
+          documentContent.substring(0, startIndex) +
+          aiResult +
+          documentContent.substring(startIndex + selectedText.length)
+        setDocumentContent(newContent)
+      }
+
+      toast({
+        title: "AI Assistance Complete",
+        description: `Text has been ${action}d successfully`,
+      })
+    } catch (error) {
+      console.error("AI assistance error:", error)
+      toast({
+        title: "AI Assistance Failed",
+        description: "Failed to process text. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleContextMenuTranslate = (language: string) => {
-    toast({
-      title: "Translate",
-      description: `Translating to ${language}`,
+  const handleContextMenuTranslate = async (language: string) => {
+    const selection = window.getSelection()
+    const selectedText = selection?.toString() || ""
+
+    if (!selectedText) {
+      toast({
+        title: "No text selected",
+        description: "Please select some text to translate",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const languageNames: Record<string, string> = {
+      es: "Spanish",
+      fr: "French",
+      de: "German",
+      zh: "Chinese",
+      ja: "Japanese",
+      ar: "Arabic",
+    }
+
+    const loadingToast = toast({
+      title: "Translating",
+      description: `Translating to ${languageNames[language]}...`,
     })
-    // In production, integrate with translation service
+
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `Translate this text to ${languageNames[language]}:\n\n${selectedText}`,
+          context: {
+            actionType: "general",
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Translation failed")
+      }
+
+      const data = await response.json()
+      const translation = data.response || data.content || ""
+
+      // Replace selected text with translation
+      const startIndex = documentContent.indexOf(selectedText)
+      if (startIndex !== -1) {
+        const newContent =
+          documentContent.substring(0, startIndex) +
+          translation +
+          documentContent.substring(startIndex + selectedText.length)
+        setDocumentContent(newContent)
+      }
+
+      toast({
+        title: "Translation Complete",
+        description: `Translated to ${languageNames[language]}`,
+      })
+    } catch (error) {
+      console.error("Translation error:", error)
+      toast({
+        title: "Translation Failed",
+        description: "Failed to translate text. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleContextMenuSearch = (text: string) => {
+    if (!text) return
+
+    // Open Google Scholar search in a new tab
+    const searchQuery = encodeURIComponent(text)
+    const url = `https://scholar.google.com/scholar?q=${searchQuery}`
+    window.open(url, "_blank")
+
     toast({
-      title: "Search",
-      description: `Searching for "${text}"`,
+      title: "Search Opened",
+      description: `Searching for "${text.substring(0, 30)}..." on Google Scholar`,
     })
-    // In production, open search dialog
   }
 
   if (loading) {
@@ -1159,9 +1292,6 @@ export default function WriterPage() {
                           onTemplateChange={setSelectedTemplate}
                         />
                       </EditorContextMenu>
-
-                      {/* Floating Toolbar */}
-                      <FloatingToolbar onFormat={handleFloatingToolbarFormat} />
 
                       <Separator className="my-8" />
 
@@ -1428,6 +1558,9 @@ export default function WriterPage() {
         documentId={document?.id}
         documentTitle={documentTitle}
       />
+
+    {/* Floating Toolbar - Outside scroll container for proper visibility */}
+    <FloatingToolbar onFormat={handleFloatingToolbarFormat} />
     </TooltipProvider>
   )
 }
