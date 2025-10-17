@@ -1,8 +1,12 @@
-# Writer (AI Writer)
+# Writer (AI Writer) - Unified Document Editor
 
 - Source: `app/writer/page.tsx`
 - Route: `/writer`
-- Status: ✅ **FULLY FUNCTIONAL** (Verified October 2025)
+- Status: ✅ **FULLY FUNCTIONAL & OPTIMIZED** (Cleaned & Merged October 2025)
+
+> **Note**: This is the unified document editor that combines all writing and collaboration features.
+> The previous separate "Writing Assistant" page has been merged into this single, optimized page.
+> **Code cleanup**: Removed ~270 lines of dead placeholder code for better maintainability.
 
 ## What is here
 - Full document editor with LaTeX export, citation manager, AI writing assistant, AI detection, and sharing.
