@@ -25,6 +25,22 @@ export function IdeasWorkspace({ className }: IdeasWorkspaceProps) {
     idea.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Sort ideas based on sortBy value
+  const sortedIdeas = [...filteredIdeas].sort((a, b) => {
+    switch (sortBy) {
+      case "Title":
+        return a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+      case "Date Created":
+        // Sort by savedAt (newest first)
+        return new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime()
+      case "Last Modified":
+        // Sort by updatedAt (newest first)
+        return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+      default:
+        return 0
+    }
+  })
+
   return (
     <div className={className}>
       {/* Header */}
@@ -77,7 +93,7 @@ export function IdeasWorkspace({ className }: IdeasWorkspaceProps) {
           </div>
         )}
 
-        {filteredIdeas.map((idea) => (
+        {sortedIdeas.map((idea) => (
           <Card
             key={idea.id}
             className="hover:shadow-lg transition-shadow cursor-pointer group"

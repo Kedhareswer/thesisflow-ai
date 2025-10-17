@@ -1,5 +1,3 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
@@ -7,8 +5,9 @@ import { Shield, Lock, Eye, Database, UserCheck, Globe, FileText, Mail } from "l
 import Link from "next/link"
 
 export default function PrivacyPage() {
-  const lastUpdated = "October 16, 2025"
-  const effectiveDate = "October 16, 2025"
+  // Use environment variables with fallback values
+  const lastUpdated = process.env.NEXT_PUBLIC_PRIVACY_LAST_UPDATED || "October 16, 2025"
+  const effectiveDate = process.env.NEXT_PUBLIC_PRIVACY_EFFECTIVE_DATE || "October 16, 2025"
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-12 px-4">

@@ -803,10 +803,21 @@ export default function WriterPage() {
   const handleFloatingToolbarFormat = (format: string) => {
     // Handle text formatting from floating toolbar
     const selection = window.getSelection()
-    if (!selection || selection.isCollapsed) return
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return
 
     const selectedText = selection.toString()
     if (!selectedText) return
+
+    // Get the range to find exact position
+    const range = selection.getRangeAt(0)
+
+    // Find the selected text position in documentContent
+    // We need to map DOM selection to the text content string
+    const beforeSelection = documentContent.substring(0, documentContent.indexOf(selectedText))
+    const afterSelection = documentContent.substring(documentContent.indexOf(selectedText) + selectedText.length)
+
+    // Only proceed if we found an exact match
+    if (!documentContent.includes(selectedText)) return
 
     let formattedText = selectedText
     switch (format) {
@@ -850,8 +861,9 @@ export default function WriterPage() {
         return
     }
 
-    // Find and replace the selected text in the document content
-    const newContent = documentContent.replace(selectedText, formattedText)
+    // Build new content with exact replacement
+    const startIndex = documentContent.indexOf(selectedText)
+    const newContent = documentContent.substring(0, startIndex) + formattedText + documentContent.substring(startIndex + selectedText.length)
     setDocumentContent(newContent)
 
     toast({
@@ -872,13 +884,32 @@ export default function WriterPage() {
 
   const handleContextMenuCut = () => {
     try {
-      const selectedText = window.getSelection()?.toString() || ""
-      navigator.clipboard.writeText(selectedText)
-      if (selectedText) {
-        const newContent = documentContent.replace(selectedText, "")
-        setDocumentContent(newContent)
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) {
+        toast({ title: "No selection", description: "Please select text to cut", variant: "destructive" })
+        return
       }
-      toast({ title: "Cut", description: "Text cut to clipboard" })
+
+      const selectedText = selection.toString()
+      if (!selectedText) return
+
+      // Copy to clipboard first
+      navigator.clipboard.writeText(selectedText)
+        .then(() => {
+          // Find exact position and remove the selected text
+          const startIndex = documentContent.indexOf(selectedText)
+          if (startIndex !== -1) {
+            const newContent = documentContent.substring(0, startIndex) + documentContent.substring(startIndex + selectedText.length)
+            setDocumentContent(newContent)
+            toast({ title: "Cut", description: "Text cut to clipboard" })
+          } else {
+            toast({ title: "Cut failed", description: "Could not locate selected text", variant: "destructive" })
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to cut:', err)
+          toast({ title: "Cut failed", description: "Failed to cut text", variant: "destructive" })
+        })
     } catch (err) {
       toast({ title: "Cut failed", description: "Failed to cut text", variant: "destructive" })
     }
@@ -887,15 +918,29 @@ export default function WriterPage() {
   const handleContextMenuPaste = async () => {
     try {
       const text = await navigator.clipboard.readText()
+      if (!text) return
+
       const selection = window.getSelection()
+
       if (selection && !selection.isCollapsed) {
+        // Replace the selected text with pasted content
         const selectedText = selection.toString()
-        const newContent = documentContent.replace(selectedText, text)
-        setDocumentContent(newContent)
+        const startIndex = documentContent.indexOf(selectedText)
+
+        if (startIndex !== -1) {
+          const newContent = documentContent.substring(0, startIndex) + text + documentContent.substring(startIndex + selectedText.length)
+          setDocumentContent(newContent)
+          toast({ title: "Pasted", description: "Text pasted from clipboard" })
+        } else {
+          // Fallback to append if we can't find the selection
+          setDocumentContent(documentContent + text)
+          toast({ title: "Pasted", description: "Text pasted at end" })
+        }
       } else {
+        // No selection - append at the end
         setDocumentContent(documentContent + text)
+        toast({ title: "Pasted", description: "Text pasted from clipboard" })
       }
-      toast({ title: "Pasted", description: "Text pasted from clipboard" })
     } catch (err) {
       toast({ title: "Paste failed", description: "Failed to paste text", variant: "destructive" })
     }

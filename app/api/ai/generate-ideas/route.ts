@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-utils'
 import { enhancedAIService } from '@/lib/enhanced-ai-service'
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication before processing
+    await requireAuth(request, "generate-ideas")
+
     const { topic, context, count, researchLevel } = await request.json()
 
     if (!topic) {

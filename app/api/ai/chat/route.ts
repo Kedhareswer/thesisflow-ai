@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       success: true,
       content: response.content,
       provider: 'nova',
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen3-32b', // Match NovaAIService.processMessage() actual model
       suggestions: response.suggestions,
       actionItems: response.actionItems,
       type: response.type

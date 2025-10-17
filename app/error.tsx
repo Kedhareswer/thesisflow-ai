@@ -37,16 +37,46 @@ URL: ${typeof window !== 'undefined' ? window.location.href : 'Unknown'}
 User Agent: ${typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'}
     `.trim()
 
-    navigator.clipboard.writeText(errorDetails)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    // Check if clipboard API is available
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(errorDetails)
+        .then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        })
+        .catch((err) => {
+          console.error('Failed to copy to clipboard:', err)
+          // Don't set copied state on error
+        })
+    } else {
+      // Fallback: create a temporary textarea
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = errorDetails
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        const success = document.execCommand('copy')
+        document.body.removeChild(textarea)
+
+        if (success) {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err)
+        // Silently fail, don't throw in error boundary
+      }
+    }
   }
 
   const getErrorType = (error: Error) => {
-    if (error.message.includes('fetch')) return 'Network Error'
-    if (error.message.includes('timeout')) return 'Timeout Error'
-    if (error.message.includes('auth')) return 'Authentication Error'
-    if (error.message.includes('permission')) return 'Permission Error'
+    const msg = error.message.toLowerCase()
+    if (msg.includes('fetch')) return 'Network Error'
+    if (msg.includes('timeout')) return 'Timeout Error'
+    if (msg.includes('auth')) return 'Authentication Error'
+    if (msg.includes('permission')) return 'Permission Error'
     return 'Application Error'
   }
 
