@@ -97,8 +97,8 @@ export async function paraphrase(options: ParaphraseOptions): Promise<{ output: 
     throw new Error("Text is required")
   }
 
-  // Default to Llama 3.1 8B for fast, cost-effective paraphrasing
-  const defaultModel = options.model || "llama-3.1-8b-instant"
+  // Use PARAPHRASING_MODEL from env or default to Llama 3.1 8B for fast, cost-effective paraphrasing
+  const defaultModel = options.model || process.env.PARAPHRASING_MODEL || "llama-3.1-8b-instant"
 
   // For very long texts, paraphrase per paragraph to keep structure
   const normalized = options.text.replace(/\r\n/g, "\n")

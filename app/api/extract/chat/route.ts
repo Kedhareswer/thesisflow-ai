@@ -4,21 +4,22 @@ import { requireAuth } from '@/lib/auth-utils'
 // Server-side Nova AI functionality using hardcoded Groq API (same as topics report)
 async function callNovaAI(systemPrompt: string, userPrompt: string): Promise<string> {
   const groqApiKey = process.env.GROQ_API_KEY
-  
+  const dataExtractionModel = process.env.DATA_EXTRACTION_MODEL || 'groq/compound-mini'
+
   if (!groqApiKey) {
     throw new Error('Groq API key not configured. Please set GROQ_API_KEY environment variable.')
   }
-  
+
   try {
-    console.log('[Extract Chat] Making request to Groq API...')
+    console.log('[Extract Chat] Making request to Groq API with model:', dataExtractionModel)
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${groqApiKey}`
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile", // Groq's Llama 3.3 70B model
+        model: dataExtractionModel,
         max_tokens: 2000,
         temperature: 0.7,
         top_p: 0.9,
@@ -47,10 +48,16 @@ async function callNovaAI(systemPrompt: string, userPrompt: string): Promise<str
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const auth = await requireAuth(request)
-    if (!auth.success) {
-      return NextResponse.json({ success: false, error: auth.error }, { status: 401 })
+    // Authenticate user (optional - extract chat works for all users)
+    let userId = 'anonymous'
+    try {
+      const auth = await requireAuth(request)
+      if (auth.success) {
+        userId = auth.userId || 'authenticated'
+      }
+    } catch (e) {
+      // If auth fails, continue as anonymous user
+      console.log('[Extract Chat] Proceeding without authentication')
     }
 
     const { message, context } = await request.json()
@@ -69,11 +76,28 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = [
       'You are Nova, a specialized research collaboration assistant for academic teams and research hubs.',
-      'You are helping with document extraction and Q&A tasks.',
-      'Answer strictly using the provided document context. If the answer is not in the context, say you do not know.',
-      'Be concise, factual, and avoid speculation. Use markdown lists or tables when helpful.',
-      'Preserve equations, units, and citations as-is if present. Do not fabricate references.',
-      'Maintain a professional, scholarly tone appropriate for academic discourse.',
+      'You are helping with document extraction, data analysis, and Q&A tasks.',
+      '',
+      '**Your Capabilities:**',
+      '- Answer questions strictly using the provided document context',
+      '- Extract and analyze data from tables, equations, and structured content',
+      '- Provide summaries, key findings, and insights from research papers',
+      '- Explain complex mathematical concepts and statistical results',
+      '- Identify methodologies, limitations, and contributions',
+      '',
+      '**Rules:**',
+      '- If the answer is not in the context, clearly state you do not know',
+      '- Be concise, factual, and avoid speculation',
+      '- Use markdown formatting: lists, tables, bold, code blocks when helpful',
+      '- Preserve equations, units, and citations exactly as written',
+      '- Do not fabricate references, data, or findings',
+      '- Maintain a professional, scholarly tone appropriate for academic discourse',
+      '',
+      '**Response Format:**',
+      '- For summaries: Provide structured overview with key points',
+      '- For data questions: Present findings clearly with supporting context',
+      '- For methodologies: Explain approaches and techniques used',
+      '- For math/tables: Break down complex information step-by-step',
     ].join('\n')
 
     const safeContext = (context || '').slice(0, 8000)

@@ -33,16 +33,18 @@ function enumerateSources(papers: Paper[]): { lines: string, count: number } {
 }
 
 async function tryNova(prompt: string, userId?: string, signal?: AbortSignal): Promise<string> {
+  const model = process.env.TOPIC_REPORT_CURATOR_MODEL || "llama-3.1-8b-instant"
+
   try {
     const result = await enhancedAIService.generateText({
       prompt,
       provider: "groq",
-      model: "llama-3.1-8b-instant",
+      model,
       maxTokens: 2000,
       temperature: 0.2,
       userId
     })
-    
+
     if (result.success && result.content) {
       return result.content
     }
@@ -85,6 +87,8 @@ ${sourcesText}`
 // Agent 3: Synthesizer - produce beautiful structured review with tables & ASCII charts
 async function synthesizerAgent(query: string, sourcesText: string, quality: 'Standard'|'Enhanced', userId?: string, signal?: AbortSignal): Promise<string> {
   const words = quality === 'Enhanced' ? '1500-2200' : '1000-1500'
+  const synthesizerModel = process.env.TOPIC_REPORT_SYNTHESIZER_MODEL || 'gpt-oss-120b'
+
   const prompt = `You are a senior research writer. Produce structured, citation‑grounded reviews.
 
 Write a scholarly review on: "${query}". Use ONLY the numbered sources below. Cite inline with [n]. Length ${words} words.
@@ -102,12 +106,12 @@ After body, include a "References" section listing the same numbered items.
 Sources:
 ${sourcesText}`
 
-  // Use GPT-OSS 120B for advanced synthesis with reasoning capabilities
+  // Use configurable synthesizer model (gpt-oss-120b by default) for advanced synthesis with reasoning capabilities
   try {
     const result = await enhancedAIService.generateText({
       prompt,
       provider: "groq",
-      model: "gpt-oss-120b", // Updated: GPT-OSS 120B for frontier-level reasoning and comprehensive report generation
+      model: synthesizerModel,
       maxTokens: quality === 'Enhanced' ? 3000 : 2500,
       temperature: 0.3,
       userId

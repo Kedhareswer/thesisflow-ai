@@ -22,10 +22,12 @@ export interface NovaAIResponse {
 export class NovaAIService {
   private static instance: NovaAIService
   private groqApiKey: string
+  private novaChatModel: string
 
   constructor() {
     // Use ONLY server-side env var for Groq API (security: never expose via NEXT_PUBLIC)
     this.groqApiKey = process.env.GROQ_API_KEY || ''
+    this.novaChatModel = process.env.NOVA_CHAT_MODEL || 'llama-3.1-8b-instant'
 
     if (!this.groqApiKey) {
       console.warn('NovaAIService: GROQ_API_KEY not found in environment variables')
@@ -64,22 +66,36 @@ export class NovaAIService {
         })
       } catch {}
 
+      // Build request body with optional web search tools for compound-mini model
+      const requestBody: any = {
+        model: this.novaChatModel, // Configurable via NOVA_CHAT_MODEL env variable
+        max_tokens: options?.maxTokens || 1000,
+        temperature: options?.temperature ?? 0.5,
+        top_p: 0.9,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ]
+      }
+
+      // Enable web search tools if using Research Assistant model (compound-mini)
+      const researchAssistantModel = process.env.RESEARCH_ASSISTANT_MODEL || 'groq/compound-mini'
+      if (this.novaChatModel.includes('compound') || this.novaChatModel === researchAssistantModel) {
+        console.log('[NovaAI] Enabling web_search tool for compound model:', this.novaChatModel)
+        requestBody.compound_custom = {
+          tools: {
+            enabled_tools: ['web_search']
+          }
+        }
+      }
+
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.groqApiKey}`
         },
-        body: JSON.stringify({
-          model: "qwen3-32b", // Updated: Qwen 3 32B for thinking mode + efficient dialogue
-          max_tokens: options?.maxTokens || 1000,
-          temperature: options?.temperature ?? 0.5, // Adjusted: Slightly lower for balanced reasoning
-          top_p: 0.9,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: message }
-          ]
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -129,23 +145,37 @@ export class NovaAIService {
         })
       } catch {}
 
+      // Build request body with optional web search tools for compound-mini model
+      const requestBody: any = {
+        model: this.novaChatModel, // Configurable via NOVA_CHAT_MODEL env variable
+        max_tokens: 1000,
+        temperature: 0.5,
+        top_p: 0.9,
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ]
+      }
+
+      // Enable web search tools if using Research Assistant model (compound-mini)
+      const researchAssistantModel = process.env.RESEARCH_ASSISTANT_MODEL || 'groq/compound-mini'
+      if (this.novaChatModel.includes('compound') || this.novaChatModel === researchAssistantModel) {
+        console.log('[NovaAI] Enabling web_search tool for compound model:', this.novaChatModel)
+        requestBody.compound_custom = {
+          tools: {
+            enabled_tools: ['web_search']
+          }
+        }
+      }
+
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.groqApiKey}`
         },
-        body: JSON.stringify({
-          model: "qwen3-32b", // Updated: Qwen 3 32B for thinking mode + efficient dialogue
-          max_tokens: 1000,
-          temperature: 0.5, // Adjusted: Slightly lower for balanced reasoning
-          top_p: 0.9,
-          stream: true,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: message }
-          ]
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -278,9 +308,9 @@ Focus on:
           'Authorization': `Bearer ${this.groqApiKey}`
         },
         body: JSON.stringify({
-          model: "qwen3-32b", // Updated: Qwen 3 32B for better suggestion generation
+          model: this.novaChatModel, // Configurable via NOVA_CHAT_MODEL env variable
           max_tokens: 200,
-          temperature: 0.7, // Adjusted: Slightly lower for more focused suggestions
+          temperature: 0.7,
           top_p: 0.9,
           messages: [
             {
@@ -380,6 +410,9 @@ Please provide a helpful, contextual response as Nova, a productivity-focused as
       fileContents: context.fileContents?.map(f => ({ name: f.name, contentLength: f.content.length }))
     })
     
+    // Check if web search is available (compound models)
+    const hasWebSearch = this.novaChatModel.includes('compound')
+
     const basePrompt = `You are Nova, a specialized research collaboration assistant for academic teams and research hubs.
 
 Your role is to:
@@ -388,7 +421,7 @@ Your role is to:
 - Provide guidance on academic citations, formatting, and best practices
 - Support collaborative research workflows and knowledge sharing
 - Maintain a professional, scholarly tone appropriate for academic discourse
-- Suggest relevant research tools, databases, and methodologies when appropriate
+- Suggest relevant research tools, databases, and methodologies when appropriate${hasWebSearch ? '\n- Use web search to find current information, research papers, and validate facts' : ''}
 
 RESEARCH CAPABILITIES:
 - Literature review assistance and paper analysis
@@ -396,7 +429,7 @@ RESEARCH CAPABILITIES:
 - Research methodology guidance and experimental design
 - Data analysis interpretation and statistical insights
 - Grant writing and research proposal assistance
-- Conference presentation and publication support
+- Conference presentation and publication support${hasWebSearch ? '\n- Real-time web search for current research, papers, and information' : ''}
 
 FORMATTING REQUIREMENTS:
 - Use proper GitHub-Flavored Markdown (GFM) for all content
