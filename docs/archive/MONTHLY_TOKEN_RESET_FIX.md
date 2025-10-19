@@ -1,11 +1,12 @@
-# Monthly Token Reset Fix
+# Monthly Token Reset Fix - IMPLEMENTATION COMPLETE ✅
 
-## Problem (FIXED)
-The monthly token rollover system was previously only triggered when users actively used token-consuming features. This meant that inactive users would retain their token usage from previous months, causing confusion and preventing proper token refreshes.
+**Status:** FULLY OPERATIONAL
+**Last Verified:** October 19, 2025
+**Current System:** Auto-reset via triggers + view + scheduled backup
 
-**Example Issue**: User had 77/500 tokens used from September 28th, but on October 2nd still showed the same usage instead of resetting to 0/500.
+> **Note:** This document describes the historical implementation. For current system status, see [`docs/TOKEN_SYSTEM_STATUS_2025.md`](../TOKEN_SYSTEM_STATUS_2025.md)
 
-## Root Cause (RESOLVED)
+## Original Problem (RESOLVED ✅)
 The old system had `reset_user_tokens_if_needed()` function only called through user activity:
 1. `check_user_tokens()` - called during token deduction
 2. `check_token_rate_limit()` - called during rate limit checks

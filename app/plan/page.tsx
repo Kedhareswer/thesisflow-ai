@@ -18,6 +18,7 @@ import { BackBreadcrumb } from "@/components/ui/back-breadcrumb"
 import { TokenOverviewCards } from "@/components/analytics/token-overview-cards"
 import { UsageAnalyticsV2 } from "@/components/analytics/usage-analytics-v2"
 import { TopEntitiesTable } from "@/components/analytics/top-entities-table"
+import { UsageTrendsChart } from "@/components/analytics/usage-trends-chart"
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
@@ -314,24 +315,42 @@ Thank you!`)
 
                 {tokenStatus && (
                   <div className="space-y-3">
-                    <h3 className="font-semibold">Tokens</h3>
+                    <h3 className="font-semibold">Monthly Tokens</h3>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Monthly</span>
+                        <span className="text-muted-foreground">Usage</span>
                         <span className="font-medium">
-                          {tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit} used • {tokenStatus.monthlyRemaining} left
+                          {tokenStatus.monthlyUsed} / {tokenStatus.monthlyLimit}
                         </span>
                       </div>
                       <Progress value={tokenStatus.monthlyLimit ? (tokenStatus.monthlyUsed / tokenStatus.monthlyLimit) * 100 : 0} className="h-2" />
+                      <div className="flex items-center justify-between text-sm pt-1">
+                        <span className="text-green-600 font-medium">{tokenStatus.monthlyRemaining} remaining</span>
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round((tokenStatus.monthlyRemaining / tokenStatus.monthlyLimit) * 100)}% left
+                        </span>
+                      </div>
                     </div>
                     {(() => {
-                      if (!tokenStatus.lastMonthlyReset) return null
-                      const d = new Date(tokenStatus.lastMonthlyReset)
-                      if (isNaN(d.getTime())) return null
+                      // Calculate next reset date (first day of next month)
+                      const now = new Date()
+                      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                      const lastReset = tokenStatus.lastMonthlyReset ? new Date(tokenStatus.lastMonthlyReset) : new Date(now.getFullYear(), now.getMonth(), 1)
+                      const daysUntilReset = Math.ceil((nextMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
                       return (
-                        <p className="text-xs text-muted-foreground">
-                          Resets — Monthly: {d.toLocaleDateString()}
-                        </p>
+                        <div className="text-xs space-y-1 pt-2 border-t">
+                          <p className="text-muted-foreground flex items-center justify-between">
+                            <span>Last reset:</span>
+                            <span className="font-medium">{!isNaN(lastReset.getTime()) ? lastReset.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</span>
+                          </p>
+                          <p className="text-muted-foreground flex items-center justify-between">
+                            <span>Next reset:</span>
+                            <span className="font-medium text-green-600">
+                              {nextMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ({daysUntilReset} days)
+                            </span>
+                          </p>
+                        </div>
                       )
                     })()}
                   </div>
@@ -544,7 +563,7 @@ Thank you!`)
                   <h3 className="text-lg font-semibold text-green-800">Nova AI Usage Overview</h3>
                 </div>
                 <p className="text-sm text-green-700 mb-4">
-                  All AI features powered by <strong>Nova AI</strong> with plan-optimized pricing. 
+                  All AI features powered by <strong>Nova AI</strong> with plan-optimized pricing.
                   Your costs are included in your subscription - no surprise charges!
                 </p>
                 <div className="flex items-center gap-2 text-xs text-green-600">
@@ -563,13 +582,16 @@ Thank you!`)
               />
             )}
 
+            {/* NEW: Usage Trends & Predictions */}
+            <UsageTrendsChart />
+
             {/* Enhanced Analytics Chart */}
             <UsageAnalyticsV2 />
 
             {/* Top Entities Table */}
             <TopEntitiesTable />
 
-            
+
           </TabsContent>
         </Tabs>
       </div>
