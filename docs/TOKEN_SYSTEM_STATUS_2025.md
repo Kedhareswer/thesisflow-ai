@@ -2,7 +2,7 @@
 
 **Last Updated:** October 19, 2025
 **Project:** AI Project Planner (BOLT ReSEARCH HUB)
-**Supabase Project ID:** wvlxgbqjwgleizbpdulo
+**Supabase Project ID:** wvlxxxx
 
 ## ✅ Executive Summary
 
