@@ -84,3 +84,4 @@ env/
 data/support/_store/
 NUL
 .claude/settings.local.json
+.claude/.claude.json

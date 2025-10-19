@@ -13,6 +13,7 @@ import { Analytics } from "@vercel/analytics/react"
 import { AuthDebug } from "@/components/auth-debug"
 import CookieConsent from "@/components/ui/cookies"
 import { ClientErrorSuppression } from "@/components/common/ClientErrorSuppression"
+import { MobileWarning } from "@/components/mobile-warning"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -41,6 +42,8 @@ export default function RootLayout({
                 <CookieConsent />
                 {/* Chrome Extension Error Suppression */}
                 <ClientErrorSuppression />
+                {/* Mobile Device Warning */}
+                <MobileWarning />
               </ResearchSessionProvider>
             </SupabaseAuthProvider>
           </AuthErrorBoundary>
